@@ -1,0 +1,9 @@
+title: editable
+author: Emil Hvitfeldt
+version: 1.0.0
+quarto-required: ">=1.6.0"
+contributes:
+  revealjs-plugins:
+    - name: Revealeditable
+      script:
+        - editable.js
