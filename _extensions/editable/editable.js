@@ -280,7 +280,8 @@ async function saveMovedImages() {
 // Function to read index.qmd file
 async function readIndexQmd() {
   try {
-    const response = await fetch(geteditableFilename());
+    const filename = geteditableFilename();
+    const response = await fetch(filename);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -294,8 +295,7 @@ async function readIndexQmd() {
 
 // Function to get data-filename attribute from editable div
 function geteditableFilename() {
-  const editableDiv = document.getElementById('filename');
-  return editableDiv ? editableDiv.getAttribute('data-filename') : null;
+  return window._input_filename.split(/[/\\]/).pop();
 }
 
 // Function to extract width and height of images with editable id

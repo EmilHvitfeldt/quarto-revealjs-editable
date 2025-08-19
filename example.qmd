@@ -4,11 +4,10 @@ format:
   revealjs: default
 revealjs-plugins:
   - editable
+filters:
+  - editable
 ---
 
 # In the morning
 
-::: {#filename filename=example.qmd}
-:::
-
-![](image.png){.editable width=482px height=432px left=544.137px top=334.899px}
+![](image.png){.absolute}
