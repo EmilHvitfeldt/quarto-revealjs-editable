@@ -3,9 +3,9 @@ window.Revealeditable = function () {
     id: "Revealeditable",
     init: function (deck) {
       document.addEventListener('DOMContentLoaded', function () {
-        const editableImages = document.querySelectorAll('img.editable');
+        const editableElements = getEditableElements();
 
-        editableImages.forEach(setupDraggableImage);
+        editableElements.forEach(setupDraggableElt);
 
         // Find the slide-menu-items ul inside menu-custom-panel div
         const slideMenuItems = document.querySelector('div.slide-menu-custom-panel ul.slide-menu-items');
@@ -25,7 +25,7 @@ window.Revealeditable = function () {
           const newLi = document.createElement('li');
           newLi.className = 'slide-tool-item';
           newLi.setAttribute('data-item', (maxDataItem + 1).toString());
-          newLi.innerHTML = '<a href="#" onclick="saveMovedImages()"><kbd>?</kbd> Save Moved Images</a>';
+          newLi.innerHTML = '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
 
           // Append to the ul
           slideMenuItems.appendChild(newLi);
@@ -35,34 +35,38 @@ window.Revealeditable = function () {
   };
 };
 
-function setupDraggableImage(img) {
+function getEditableElements() {
+  return document.querySelectorAll('img.editable, div.editable');
+}
+
+function setupDraggableElt(elt) {
   let isDragging = false;
   let isResizing = false;
   let startX, startY, initialX, initialY, initialWidth, initialHeight;
   let resizeHandle = null;
 
-  const container = createImageContainer(img);
-  setupImageStyles(img);
+  const container = createEltContainer(elt);
+  setupEltStyles(elt);
   createResizeHandles(container);
   setupHoverEffects(container, () => isDragging, () => isResizing);
   attachEventListeners();
 
-  function createImageContainer(img) {
+  function createEltContainer(elt) {
     const container = document.createElement('div');
     container.style.position = 'absolute';
     container.style.display = 'inline-block';
     container.style.border = '2px solid transparent';
-    img.parentNode.insertBefore(container, img);
-    container.appendChild(img);
+    elt.parentNode.insertBefore(container, elt);
+    container.appendChild(elt);
     return container;
   }
 
-  function setupImageStyles(img) {
-    img.style.cursor = 'move';
-    img.style.position = 'relative';
-    img.style.width = (img.naturalWidth || img.offsetWidth) / 2 + 'px';
-    img.style.height = (img.naturalHeight || img.offsetHeight) / 2 + 'px';
-    img.style.display = 'block';
+  function setupEltStyles(elt) {
+    elt.style.cursor = 'move';
+    elt.style.position = 'relative';
+    elt.style.width = (elt.naturalWidth || elt.offsetWidth) / 2 + 'px';
+    elt.style.height = (elt.naturalHeight || elt.offsetHeight) / 2 + 'px';
+    elt.style.display = 'block';
   }
 
   function createResizeHandles(container) {
@@ -104,8 +108,8 @@ function setupDraggableImage(img) {
   }
 
   function attachEventListeners() {
-    img.addEventListener('mousedown', startDrag);
-    img.addEventListener('touchstart', startDrag);
+    elt.addEventListener('mousedown', startDrag);
+    elt.addEventListener('touchstart', startDrag);
 
     container.querySelectorAll('.resize-handle').forEach(handle => {
       handle.addEventListener('mousedown', startResize);
@@ -155,8 +159,8 @@ function setupDraggableImage(img) {
 
     startX = clientX;
     startY = clientY;
-    initialWidth = img.offsetWidth;
-    initialHeight = img.offsetHeight;
+    initialWidth = elt.offsetWidth;
+    initialHeight = elt.offsetHeight;
     initialX = container.offsetLeft;
     initialY = container.offsetTop;
 
@@ -246,8 +250,8 @@ function setupDraggableImage(img) {
       }
     }
 
-    img.style.width = newWidth + 'px';
-    img.style.height = newHeight + 'px';
+    elt.style.width = newWidth + 'px';
+    elt.style.height = newHeight + 'px';
     container.style.left = newX + 'px';
     container.style.top = newY + 'px';
 
@@ -270,11 +274,11 @@ function setupDraggableImage(img) {
   }
 }
 
-async function saveMovedImages() {
+async function saveMovedElts() {
   index = await readIndexQmd()
-  image_dim = extracteditableImageDimensions()
-  image_attr = formateditableImageStrings(image_dim)
-  index = replaceeditableOccurrences(index, image_attr)
+  Elt_dim = extracteditableEltDimensions()
+  Elt_attr = formateditableEltStrings(Elt_dim)
+  index = replaceeditableOccurrences(index, Elt_attr)
   downloadString(index)
 }
 // Function to read index.qmd file
@@ -298,17 +302,17 @@ function geteditableFilename() {
   return window._input_filename.split(/[/\\]/).pop();
 }
 
-// Function to extract width and height of images with editable id
-function extracteditableImageDimensions() {
-  const editableImages = document.querySelectorAll('img.editable');
+// Function to extract width and height of Elts with editable id
+function extracteditableEltDimensions() {
+  const editableElements = getEditableElements();
   const dimensions = [];
 
-  editableImages.forEach((img, index) => {
-    const width = img.style.width ? parseFloat(img.style.width) : img.offsetWidth;
-    const height = img.style.height ? parseFloat(img.style.height) : img.offsetHeight;
+  editableElements.forEach((elt, index) => {
+    const width = elt.style.width ? parseFloat(elt.style.width) : elt.offsetWidth;
+    const height = elt.style.height ? parseFloat(elt.style.height) : elt.offsetHeight;
 
     // Get parent container (div) position
-    const parentContainer = img.parentNode;
+    const parentContainer = elt.parentNode;
     const left = parentContainer.style.left ? parseFloat(parentContainer.style.left) : parentContainer.offsetLeft;
     const top = parentContainer.style.top ? parseFloat(parentContainer.style.top) : parentContainer.offsetTop;
 
@@ -332,8 +336,8 @@ function replaceeditableOccurrences(text, replacements) {
   });
 }
 
-// Function to format editable image dimensions as strings
-function formateditableImageStrings(dimensions) {
+// Function to format editable dimensions as strings
+function formateditableEltStrings(dimensions) {
   return dimensions.map(dim => {
     return `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px}`;
   });
