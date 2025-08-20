@@ -47,7 +47,7 @@ Note that this extension adds the file name of the slides qmd file to the docume
 
 ## Demo Video
 
-![](demo.gif)
+![](demo-text.gif)
 
 ## Example
 
