@@ -123,9 +123,47 @@ function setupDraggableElt(elt) {
       increaseBtn.style.border = 'none';
       increaseBtn.style.cursor = 'pointer';
       increaseBtn.style.borderRadius = '3px';
+      increaseBtn.style.marginRight = '10px';
+
+      // Create text alignment controls
+      const alignLeftBtn = document.createElement('button');
+      alignLeftBtn.textContent = '⇤';
+      alignLeftBtn.style.fontSize = '20px';
+      alignLeftBtn.style.padding = '4px 12px';
+      alignLeftBtn.style.backgroundColor = '#007cba';
+      alignLeftBtn.style.color = 'white';
+      alignLeftBtn.style.border = 'none';
+      alignLeftBtn.style.cursor = 'pointer';
+      alignLeftBtn.style.borderRadius = '3px';
+      alignLeftBtn.title = 'Align Left';
+
+      const alignCenterBtn = document.createElement('button');
+      alignCenterBtn.textContent = '⇔';
+      alignCenterBtn.style.fontSize = '20px';
+      alignCenterBtn.style.padding = '4px 12px';
+      alignCenterBtn.style.backgroundColor = '#007cba';
+      alignCenterBtn.style.color = 'white';
+      alignCenterBtn.style.border = 'none';
+      alignCenterBtn.style.cursor = 'pointer';
+      alignCenterBtn.style.borderRadius = '3px';
+      alignCenterBtn.title = 'Align Center';
+
+      const alignRightBtn = document.createElement('button');
+      alignRightBtn.textContent = '⇥';
+      alignRightBtn.style.fontSize = '20px';
+      alignRightBtn.style.padding = '4px 12px';
+      alignRightBtn.style.backgroundColor = '#007cba';
+      alignRightBtn.style.color = 'white';
+      alignRightBtn.style.border = 'none';
+      alignRightBtn.style.cursor = 'pointer';
+      alignRightBtn.style.borderRadius = '3px';
+      alignRightBtn.title = 'Align Right';
 
       fontControls.appendChild(decreaseBtn);
       fontControls.appendChild(increaseBtn);
+      fontControls.appendChild(alignLeftBtn);
+      fontControls.appendChild(alignCenterBtn);
+      fontControls.appendChild(alignRightBtn);
       container.appendChild(fontControls);
 
       // Add event listeners for font size controls
@@ -137,6 +175,22 @@ function setupDraggableElt(elt) {
       increaseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         changeFontSize(elt, 2);
+      });
+
+      // Add event listeners for text alignment controls
+      alignLeftBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elt.style.textAlign = 'left';
+      });
+
+      alignCenterBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elt.style.textAlign = 'center';
+      });
+
+      alignRightBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elt.style.textAlign = 'right';
       });
     }
   }
@@ -387,6 +441,10 @@ function extracteditableEltDimensions() {
     if (elt.tagName.toLowerCase() === 'div' && elt.style.fontSize) {
       dimensionData.fontSize = parseFloat(elt.style.fontSize);
     }
+    // Add text-align for div elements if it's set
+    if (elt.tagName.toLowerCase() === 'div' && elt.style.textAlign) {
+      dimensionData.textAlign = elt.style.textAlign;
+    }
 
     dimensions.push(dimensionData);
   });
@@ -407,8 +465,19 @@ function replaceeditableOccurrences(text, replacements) {
 function formateditableEltStrings(dimensions) {
   return dimensions.map(dim => {
     let str = `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px`;
-    if (dim.fontSize) {
-      str += ` style="font-size=${dim.fontSize}px"`;
+    if (dim.fontSize || dim.textAlign) {
+      str += ` style="`
+      if (dim.fontSize) {
+        str += `font-size: ${dim.fontSize}px;`
+      }
+      if (dim.fontSize && dim.textAlign) {
+        str += ` `
+      }
+
+      if (dim.textAlign) {
+        str += `text-align: ${dim.textAlign};`
+      }
+      str += `"`;
     }
     str += '}';
     return str;
