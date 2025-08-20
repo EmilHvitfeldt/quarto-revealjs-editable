@@ -159,11 +159,24 @@ function setupDraggableElt(elt) {
       alignRightBtn.style.borderRadius = '3px';
       alignRightBtn.title = 'Align Right';
 
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '✎';
+      editBtn.style.fontSize = '20px';
+      editBtn.style.padding = '4px 12px';
+      editBtn.style.backgroundColor = '#007cba';
+      editBtn.style.color = 'white';
+      editBtn.style.border = 'none';
+      editBtn.style.cursor = 'pointer';
+      editBtn.style.borderRadius = '3px';
+      editBtn.style.marginLeft = '10px';
+      editBtn.title = 'Toggle Edit Mode';
+
       fontControls.appendChild(decreaseBtn);
       fontControls.appendChild(increaseBtn);
       fontControls.appendChild(alignLeftBtn);
       fontControls.appendChild(alignCenterBtn);
       fontControls.appendChild(alignRightBtn);
+      fontControls.appendChild(editBtn);
       container.appendChild(fontControls);
 
       // Add event listeners for font size controls
@@ -191,6 +204,18 @@ function setupDraggableElt(elt) {
       alignRightBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         elt.style.textAlign = 'right';
+      });
+
+      // Add event listener for edit button
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isEditable = elt.contentEditable === 'true';
+        elt.contentEditable = !isEditable;
+        editBtn.style.backgroundColor = !isEditable ? '#28a745' : '#007cba';
+        editBtn.title = !isEditable ? 'Exit Edit Mode' : 'Toggle Edit Mode';
+        if (!isEditable) {
+          elt.focus();
+        }
       });
     }
   }
@@ -244,6 +269,7 @@ function setupDraggableElt(elt) {
   }
 
   function startDrag(e) {
+    if (e.target.parentElement.contentEditable == "true") return;
     if (e.target.classList.contains('resize-handle')) return;
 
     isDragging = true;
