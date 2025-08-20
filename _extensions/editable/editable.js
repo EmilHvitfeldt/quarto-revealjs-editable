@@ -92,7 +92,7 @@ function setupDraggableElt(elt) {
       container.appendChild(handle);
     });
 
-        // Create font size controls for div elements
+    // Create font size controls for div elements
     if (elt.tagName.toLowerCase() === 'div') {
       const fontControls = document.createElement('div');
       fontControls.className = 'font-controls';
@@ -181,11 +181,11 @@ function setupDraggableElt(elt) {
     // the slide fits completely in the viewport. We have to
     // adjust the mouse/touch positions by this scaling.
     const slidesContainerEl = document.querySelector('.slides')
-    const scale =  window.getComputedStyle(slidesContainerEl).getPropertyValue('--slide-scale')
+    const scale = window.getComputedStyle(slidesContainerEl).getPropertyValue('--slide-scale')
 
     return {
-      clientX: (isTouch ? e.touches[0].clientX : e.clientX)/scale,
-      clientY: (isTouch ? e.touches[0].clientY : e.clientY)/scale
+      clientX: (isTouch ? e.touches[0].clientX : e.clientX) / scale,
+      clientY: (isTouch ? e.touches[0].clientY : e.clientY) / scale
     };
   }
 
