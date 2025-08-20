@@ -39,6 +39,10 @@ function getEditableElements() {
   return document.querySelectorAll('img.editable, div.editable');
 }
 
+function getEditableDivs() {
+  return document.querySelectorAll('div.editable');
+}
+
 function setupDraggableElt(elt) {
   let isDragging = false;
   let isResizing = false;
@@ -417,6 +421,9 @@ function setupDraggableElt(elt) {
 async function saveMovedElts() {
   index = await readIndexQmd()
   Elt_dim = extracteditableEltDimensions()
+
+  index = udpdateTextDivs(index)  
+
   Elt_attr = formateditableEltStrings(Elt_dim)
   index = replaceeditableOccurrences(index, Elt_attr)
   downloadString(index)
@@ -476,6 +483,40 @@ function extracteditableEltDimensions() {
   });
 
   return dimensions;
+}
+
+// Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
+function udpdateTextDivs(text) {
+  divs = getEditableDivs();
+  replacements = Array.from(divs).map(htmlToQuarto);
+  
+  const regex = /::: ?\{\.editable[^}]*\}[^:::]*\:::/g;
+  
+  let index = 0;
+  return text.replace(regex, () => {
+    return replacements[index++] || '';
+  });
+}
+
+function htmlToQuarto (div) {
+  text = div.innerHTML;
+
+  text = text.trim()
+  text = text.replaceAll("<p>", "")
+  text = text.replaceAll("</p>", "")
+  text = text.replaceAll("<code>", "`")
+  text = text.replaceAll("</code>", "`")
+  text = text.replaceAll("<strong>", "**")
+  text = text.replaceAll("</strong>", "**")
+  text = text.replaceAll("<em>", "*")
+  text = text.replaceAll("</em>", "*")
+  text = text.replaceAll("<del>", "~~")
+  text = text.replaceAll("</del>", "~~")
+  text = text.replaceAll("\n", "\n\n")
+
+  text = "::: {.editable}\n" + text +"\n:::"
+
+  return text
 }
 
 // Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
