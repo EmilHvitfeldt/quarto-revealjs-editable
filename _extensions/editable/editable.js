@@ -108,70 +108,23 @@ function setupDraggableElt(elt) {
       fontControls.style.display = 'flex';
       fontControls.style.gap = '5px';
 
-      const decreaseBtn = document.createElement('button');
-      decreaseBtn.textContent = 'A-';
-      decreaseBtn.style.fontSize = '24px';
-      decreaseBtn.style.padding = '4px 12px';
-      decreaseBtn.style.backgroundColor = '#007cba';
-      decreaseBtn.style.color = 'white';
-      decreaseBtn.style.border = 'none';
-      decreaseBtn.style.cursor = 'pointer';
-      decreaseBtn.style.borderRadius = '3px';
+      const decreaseBtn = createButton('A-', '24px', '4px 12px');
+      decreaseBtn.style.marginRight = '0';
 
-      const increaseBtn = document.createElement('button');
-      increaseBtn.textContent = 'A+';
-      increaseBtn.style.fontSize = '24px';
-      increaseBtn.style.padding = '4px 12px';
-      increaseBtn.style.backgroundColor = '#007cba';
-      increaseBtn.style.color = 'white';
-      increaseBtn.style.border = 'none';
-      increaseBtn.style.cursor = 'pointer';
-      increaseBtn.style.borderRadius = '3px';
+      const increaseBtn = createButton('A+', '24px', '4px 12px');
       increaseBtn.style.marginRight = '10px';
 
       // Create text alignment controls
-      const alignLeftBtn = document.createElement('button');
-      alignLeftBtn.textContent = '⇤';
-      alignLeftBtn.style.fontSize = '20px';
-      alignLeftBtn.style.padding = '4px 12px';
-      alignLeftBtn.style.backgroundColor = '#007cba';
-      alignLeftBtn.style.color = 'white';
-      alignLeftBtn.style.border = 'none';
-      alignLeftBtn.style.cursor = 'pointer';
-      alignLeftBtn.style.borderRadius = '3px';
+      const alignLeftBtn = createButton('⇤', '20px', '4px 12px');
       alignLeftBtn.title = 'Align Left';
 
-      const alignCenterBtn = document.createElement('button');
-      alignCenterBtn.textContent = '⇔';
-      alignCenterBtn.style.fontSize = '20px';
-      alignCenterBtn.style.padding = '4px 12px';
-      alignCenterBtn.style.backgroundColor = '#007cba';
-      alignCenterBtn.style.color = 'white';
-      alignCenterBtn.style.border = 'none';
-      alignCenterBtn.style.cursor = 'pointer';
-      alignCenterBtn.style.borderRadius = '3px';
+      const alignCenterBtn = createButton('⇔', '20px', '4px 12px');
       alignCenterBtn.title = 'Align Center';
 
-      const alignRightBtn = document.createElement('button');
-      alignRightBtn.textContent = '⇥';
-      alignRightBtn.style.fontSize = '20px';
-      alignRightBtn.style.padding = '4px 12px';
-      alignRightBtn.style.backgroundColor = '#007cba';
-      alignRightBtn.style.color = 'white';
-      alignRightBtn.style.border = 'none';
-      alignRightBtn.style.cursor = 'pointer';
-      alignRightBtn.style.borderRadius = '3px';
+      const alignRightBtn = createButton('⇥', '20px', '4px 12px');
       alignRightBtn.title = 'Align Right';
 
-      const editBtn = document.createElement('button');
-      editBtn.textContent = '✎';
-      editBtn.style.fontSize = '20px';
-      editBtn.style.padding = '4px 12px';
-      editBtn.style.backgroundColor = '#007cba';
-      editBtn.style.color = 'white';
-      editBtn.style.border = 'none';
-      editBtn.style.cursor = 'pointer';
-      editBtn.style.borderRadius = '3px';
+      const editBtn = createButton('✎', '20px', '4px 12px');
       editBtn.style.marginLeft = '10px';
       editBtn.title = 'Toggle Edit Mode';
 
@@ -415,6 +368,19 @@ function setupDraggableElt(elt) {
     const currentFontSize = parseFloat(window.getComputedStyle(element).fontSize) || 16;
     const newFontSize = Math.max(8, currentFontSize + delta); // Minimum font size of 8px
     element.style.fontSize = newFontSize + 'px';
+  }
+
+  function createButton(text, fontSize, padding) {
+    const button = document.createElement('button');
+    button.textContent = text;
+    button.style.fontSize = fontSize;
+    button.style.padding = padding;
+    button.style.backgroundColor = '#007cba';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.cursor = 'pointer';
+    button.style.borderRadius = '3px';
+    return button;
   }
 }
 
