@@ -91,18 +91,70 @@ function setupDraggableElt(elt) {
       handle.dataset.position = position;
       container.appendChild(handle);
     });
+
+        // Create font size controls for div elements
+    if (elt.tagName.toLowerCase() === 'div') {
+      const fontControls = document.createElement('div');
+      fontControls.className = 'font-controls';
+      fontControls.style.position = 'absolute';
+      fontControls.style.top = '-30px';
+      fontControls.style.left = '0';
+      fontControls.style.opacity = '0';
+      fontControls.style.transition = 'opacity 0.2s';
+      fontControls.style.display = 'flex';
+      fontControls.style.gap = '5px';
+
+      const decreaseBtn = document.createElement('button');
+      decreaseBtn.textContent = 'A-';
+      decreaseBtn.style.fontSize = '24px';
+      decreaseBtn.style.padding = '4px 12px';
+      decreaseBtn.style.backgroundColor = '#007cba';
+      decreaseBtn.style.color = 'white';
+      decreaseBtn.style.border = 'none';
+      decreaseBtn.style.cursor = 'pointer';
+      decreaseBtn.style.borderRadius = '3px';
+
+      const increaseBtn = document.createElement('button');
+      increaseBtn.textContent = 'A+';
+      increaseBtn.style.fontSize = '24px';
+      increaseBtn.style.padding = '4px 12px';
+      increaseBtn.style.backgroundColor = '#007cba';
+      increaseBtn.style.color = 'white';
+      increaseBtn.style.border = 'none';
+      increaseBtn.style.cursor = 'pointer';
+      increaseBtn.style.borderRadius = '3px';
+
+      fontControls.appendChild(decreaseBtn);
+      fontControls.appendChild(increaseBtn);
+      container.appendChild(fontControls);
+
+      // Add event listeners for font size controls
+      decreaseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        changeFontSize(elt, -2);
+      });
+
+      increaseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        changeFontSize(elt, 2);
+      });
+    }
   }
 
   function setupHoverEffects(container, isDraggingFn, isResizingFn) {
     container.addEventListener('mouseenter', () => {
       container.style.border = '2px solid #007cba';
       container.querySelectorAll('.resize-handle').forEach(h => h.style.opacity = '1');
+      const fontControls = container.querySelector('.font-controls');
+      if (fontControls) fontControls.style.opacity = '1';
     });
 
     container.addEventListener('mouseleave', () => {
       if (!isDraggingFn() && !isResizingFn()) {
         container.style.border = '2px solid transparent';
         container.querySelectorAll('.resize-handle').forEach(h => h.style.opacity = '0');
+        const fontControls = container.querySelector('.font-controls');
+        if (fontControls) fontControls.style.opacity = '0';
       }
     });
   }
@@ -264,6 +316,8 @@ function setupDraggableElt(elt) {
         if (!container.matches(':hover')) {
           container.style.border = '2px solid transparent';
           container.querySelectorAll('.resize-handle').forEach(h => h.style.opacity = '0');
+          const fontControls = container.querySelector('.font-controls');
+          if (fontControls) fontControls.style.opacity = '0';
         }
       }, 500);
     }
@@ -271,6 +325,12 @@ function setupDraggableElt(elt) {
     isDragging = false;
     isResizing = false;
     resizeHandle = null;
+  }
+
+  function changeFontSize(element, delta) {
+    const currentFontSize = parseFloat(window.getComputedStyle(element).fontSize) || 16;
+    const newFontSize = Math.max(8, currentFontSize + delta); // Minimum font size of 8px
+    element.style.fontSize = newFontSize + 'px';
   }
 }
 
@@ -316,12 +376,19 @@ function extracteditableEltDimensions() {
     const left = parentContainer.style.left ? parseFloat(parentContainer.style.left) : parentContainer.offsetLeft;
     const top = parentContainer.style.top ? parseFloat(parentContainer.style.top) : parentContainer.offsetTop;
 
-    dimensions.push({
+    const dimensionData = {
       width: width,
       height: height,
       left: left,
       top: top
-    });
+    };
+
+    // Add font-size for div elements if it's set
+    if (elt.tagName.toLowerCase() === 'div' && elt.style.fontSize) {
+      dimensionData.fontSize = parseFloat(elt.style.fontSize);
+    }
+
+    dimensions.push(dimensionData);
   });
 
   return dimensions;
@@ -339,7 +406,12 @@ function replaceeditableOccurrences(text, replacements) {
 // Function to format editable dimensions as strings
 function formateditableEltStrings(dimensions) {
   return dimensions.map(dim => {
-    return `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px}`;
+    let str = `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px`;
+    if (dim.fontSize) {
+      str += ` style="font-size=${dim.fontSize}px"`;
+    }
+    str += '}';
+    return str;
   });
 }
 
