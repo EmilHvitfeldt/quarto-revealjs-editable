@@ -25,7 +25,7 @@ filters:
 To designate that you want to move and resize an image or a div, add the `editable` id to the image like so.
 
 ```markdown
-![](image.png){#editable}
+![](image.png){.editable}
 ```
 
 or like so for text.
