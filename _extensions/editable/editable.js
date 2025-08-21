@@ -401,8 +401,8 @@ function setupDraggableElt(elt) {
   }
 }
 
-async function saveMovedElts() {
-  index = await readIndexQmd();
+function saveMovedElts() {
+  index = readIndexQmd();
   Elt_dim = extracteditableEltDimensions();
 
   index = udpdateTextDivs(index);
@@ -412,19 +412,8 @@ async function saveMovedElts() {
   downloadString(index);
 }
 // Function to read index.qmd file
-async function readIndexQmd() {
-  try {
-    const filename = geteditableFilename();
-    const response = await fetch(filename);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const content = await response.text();
-    return content;
-  } catch (error) {
-    console.error("Error reading index.qmd:", error);
-    return null;
-  }
+function readIndexQmd() {
+  return window._input_file;
 }
 
 // Function to get data-filename attribute from editable div
