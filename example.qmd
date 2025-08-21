@@ -12,8 +12,10 @@ filters:
 
 ![](image.png){.editable}
 
-# Text
+## Text
 
 ::: {.editable}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sed diam rutrum, porta nulla vitae, elementum lacus. Donec et congue sapien. Praesent quis dui nulla. Donec convallis, risus a sodales luctus, diam eros dapibus ante, ac pharetra nulla odio at lorem.
+Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit. Praesent sed diam rutrum, porta nulla vitae, elementum lacus.
+
+**Donec** et congue sapien. *Praesent* quis dui nulla. ***Donec*** convallis, risus a sodales ~~luctus~~, diam eros dapibus ante, ac pharetra nulla odio at lorem.
 :::
