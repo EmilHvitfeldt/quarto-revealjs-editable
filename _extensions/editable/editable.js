@@ -588,6 +588,7 @@ function saveMovedElts() {
   index = readIndexQmd();
   Elt_dim = extracteditableEltDimensions();
 
+  index = addNewSlides(index);
   index = udpdateTextDivs(index);
 
   Elt_attr = formateditableEltStrings(Elt_dim);
@@ -646,6 +647,70 @@ function extracteditableEltDimensions() {
   });
 
   return dimensions;
+}
+
+function getNewSlideDivIndices(nodeList) {
+  const indices = [];
+  for (let i = 0; i < nodeList.length; i++) {
+    if (nodeList[i].classList.contains("new-slide")) {
+      indices.push(i);
+    }
+  }
+
+  return indices;
+}
+
+function countNormalSlidesBefore(divs, index) {
+  if (index == 0) {
+    return 0;
+  }
+
+  const previous = Array.from(divs).slice(0, index);
+  const n_new_slides = getNewSlideDivIndices(previous).length;
+
+  return previous.length - n_new_slides;
+}
+
+function addNewSlides(text) {
+  all_html_slides = document.querySelectorAll("section:not(#title-slide)");
+
+  new_slide_inds = getNewSlideDivIndices(all_html_slides);
+
+  if (new_slide_inds.length < 1) {
+    return text;
+  }
+
+  const lines = text.split("\n");
+
+  // Find all elements in lines that start with "## " preceded by an empty line
+  const headingsAfterEmptyLines = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const currentLine = lines[i].trim();
+    const previousLine = lines[i - 1].trim();
+
+    // Check if current line starts with "## " and previous line is empty
+    if (currentLine.startsWith("## ") && previousLine === "") {
+      headingsAfterEmptyLines.push(i);
+    }
+  }
+
+  for (let i = new_slide_inds.length - 1; i >= 0; i--) {
+    nSlidesBefore = countNormalSlidesBefore(all_html_slides, new_slide_inds[i]);
+
+    // fix bug when you add multiple slides at the end
+    if (nSlidesBefore == headingsAfterEmptyLines.length) {
+      lines.push("");
+      lines.push("## ");
+      lines.push("");
+    } else {
+      lines.splice(headingsAfterEmptyLines[nSlidesBefore], 0, "## ", "");
+    }
+  }
+
+  text = lines.join("\n");
+
+  return text;
 }
 
 // Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
