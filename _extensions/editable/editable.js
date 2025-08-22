@@ -76,8 +76,42 @@ function createHorizontalMenuBar() {
     saveButton.textContent = "💾";
   });
 
+  // Create and add the Add Text Element button
+  const addTextButton = document.createElement("button");
+  addTextButton.textContent = "📝";
+  addTextButton.style.backgroundColor = "#28a745";
+  addTextButton.style.color = "white";
+  addTextButton.style.border = "none";
+  addTextButton.style.padding = "8px 12px";
+  addTextButton.style.borderRadius = "4px";
+  addTextButton.style.cursor = "pointer";
+  addTextButton.style.fontSize = "14px";
+  addTextButton.style.fontWeight = "500";
+  addTextButton.title = "Add text";
+
+  addTextButton.addEventListener("click", () => {
+    const parentDiv = document.querySelector("section.slide.present");
+    const newDiv = document.createElement("div");
+    newDiv.textContent = "Text";
+    newDiv.classList.add("editable");
+    newDiv.classList.add("editable-new-div");
+    parentDiv.appendChild(newDiv);
+    setupDraggableElt(newDiv);
+  });
+
+  // Hover effects for the add text button
+  addTextButton.addEventListener("mouseenter", () => {
+    addTextButton.style.backgroundColor = "#218838";
+    addTextButton.textContent = "📝 Add Text";
+  });
+  addTextButton.addEventListener("mouseleave", () => {
+    addTextButton.style.backgroundColor = "#28a745";
+    addTextButton.textContent = "📝";
+  });
+
   menuBar.appendChild(dragHandle);
   menuBar.appendChild(saveButton);
+  menuBar.appendChild(addTextButton);
   document.body.appendChild(menuBar);
 
   return menuBar;
