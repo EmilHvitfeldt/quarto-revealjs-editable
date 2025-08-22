@@ -109,9 +109,42 @@ function createHorizontalMenuBar() {
     addTextButton.textContent = "📝";
   });
 
+  // Create and add the Add Slide button
+  const addSlideButton = document.createElement("button");
+  addSlideButton.textContent = "📄";
+  addSlideButton.style.backgroundColor = "#17a2b8";
+  addSlideButton.style.color = "white";
+  addSlideButton.style.border = "none";
+  addSlideButton.style.padding = "8px 12px";
+  addSlideButton.style.borderRadius = "4px";
+  addSlideButton.style.cursor = "pointer";
+  addSlideButton.style.fontSize = "14px";
+  addSlideButton.style.fontWeight = "500";
+  addSlideButton.title = "Add new slide";
+
+  addSlideButton.addEventListener("click", () => {
+    const originalDiv = document.querySelector("section.slide.present");
+    const newSlide = document.createElement("section");
+    newSlide.className = "slide level2 new-slide";
+    newSlide.style.display = "block";
+    originalDiv.insertAdjacentElement("afterend", newSlide);
+    Reveal.next();
+  });
+
+  // Hover effects for the add slide button
+  addSlideButton.addEventListener("mouseenter", () => {
+    addSlideButton.style.backgroundColor = "#138496";
+    addSlideButton.textContent = "📄 Add Slide";
+  });
+  addSlideButton.addEventListener("mouseleave", () => {
+    addSlideButton.style.backgroundColor = "#17a2b8";
+    addSlideButton.textContent = "📄";
+  });
+
   menuBar.appendChild(dragHandle);
   menuBar.appendChild(saveButton);
   menuBar.appendChild(addTextButton);
+  menuBar.appendChild(addSlideButton);
   document.body.appendChild(menuBar);
 
   return menuBar;
