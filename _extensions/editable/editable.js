@@ -7,37 +7,40 @@ window.Revealeditable = function () {
 
         editableElements.forEach(setupDraggableElt);
 
-        // Find the slide-menu-items ul inside menu-custom-panel div
-        const slideMenuItems = document.querySelector(
-          "div.slide-menu-custom-panel ul.slide-menu-items"
-        );
-
-        if (slideMenuItems) {
-          // Find the highest data-item value
-          const existingItems =
-            slideMenuItems.querySelectorAll("li[data-item]");
-          let maxDataItem = 0;
-          existingItems.forEach((item) => {
-            const dataValue = parseInt(item.getAttribute("data-item")) || 0;
-            if (dataValue > maxDataItem) {
-              maxDataItem = dataValue;
-            }
-          });
-
-          // Create the new li element
-          const newLi = document.createElement("li");
-          newLi.className = "slide-tool-item";
-          newLi.setAttribute("data-item", (maxDataItem + 1).toString());
-          newLi.innerHTML =
-            '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
-
-          // Append to the ul
-          slideMenuItems.appendChild(newLi);
-        }
+        addSaveMenuButton();
       });
     },
   };
 };
+
+function addSaveMenuButton() {
+  // Find the slide-menu-items ul inside menu-custom-panel div
+  const slideMenuItems = document.querySelector(
+    "div.slide-menu-custom-panel ul.slide-menu-items"
+  );
+
+  if (slideMenuItems) {
+    // Find the highest data-item value
+    const existingItems = slideMenuItems.querySelectorAll("li[data-item]");
+    let maxDataItem = 0;
+    existingItems.forEach((item) => {
+      const dataValue = parseInt(item.getAttribute("data-item")) || 0;
+      if (dataValue > maxDataItem) {
+        maxDataItem = dataValue;
+      }
+    });
+
+    // Create the new li element
+    const newLi = document.createElement("li");
+    newLi.className = "slide-tool-item";
+    newLi.setAttribute("data-item", (maxDataItem + 1).toString());
+    newLi.innerHTML =
+      '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
+
+    // Append to the ul
+    slideMenuItems.appendChild(newLi);
+  }
+}
 
 function getEditableElements() {
   return document.querySelectorAll("img.editable, div.editable");
