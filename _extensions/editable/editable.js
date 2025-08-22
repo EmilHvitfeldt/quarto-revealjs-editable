@@ -7,39 +7,152 @@ window.Revealeditable = function () {
 
         editableElements.forEach(setupDraggableElt);
 
-        addSaveMenuButton();
+        createHorizontalMenuBar();
       });
     },
   };
 };
 
-function addSaveMenuButton() {
-  // Find the slide-menu-items ul inside menu-custom-panel div
-  const slideMenuItems = document.querySelector(
-    "div.slide-menu-custom-panel ul.slide-menu-items"
-  );
+function createHorizontalMenuBar() {
+  // Create the menu bar container
+  const menuBar = document.createElement("div");
+  menuBar.id = "horizontal-menu-bar";
+  menuBar.style.position = "fixed";
+  menuBar.style.top = "50%";
+  menuBar.style.right = "20px";
+  menuBar.style.transform = "translateY(-50%)";
+  menuBar.style.display = "flex";
+  menuBar.style.flexDirection = "column";
+  menuBar.style.gap = "10px";
+  menuBar.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+  menuBar.style.padding = "10px";
+  menuBar.style.borderRadius = "8px";
+  menuBar.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.1)";
+  menuBar.style.zIndex = "1000";
+  menuBar.style.backdropFilter = "blur(5px)";
+  menuBar.style.cursor = "move";
 
-  if (slideMenuItems) {
-    // Find the highest data-item value
-    const existingItems = slideMenuItems.querySelectorAll("li[data-item]");
-    let maxDataItem = 0;
-    existingItems.forEach((item) => {
-      const dataValue = parseInt(item.getAttribute("data-item")) || 0;
-      if (dataValue > maxDataItem) {
-        maxDataItem = dataValue;
-      }
-    });
+  // Make the menu bar draggable
+  makeDraggable(menuBar);
 
-    // Create the new li element
-    const newLi = document.createElement("li");
-    newLi.className = "slide-tool-item";
-    newLi.setAttribute("data-item", (maxDataItem + 1).toString());
-    newLi.innerHTML =
-      '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
+  // Create drag handle (three dots)
+  const dragHandle = document.createElement("div");
+  dragHandle.innerHTML = "...";
+  dragHandle.style.fontSize = "18px";
+  dragHandle.style.color = "#666";
+  dragHandle.style.cursor = "grab";
+  dragHandle.style.padding = "4px 8px";
+  dragHandle.style.userSelect = "none";
+  dragHandle.title = "Drag to move menu";
 
-    // Append to the ul
-    slideMenuItems.appendChild(newLi);
+  dragHandle.addEventListener("mousedown", () => {
+    dragHandle.style.cursor = "grabbing";
+  });
+
+  document.addEventListener("mouseup", () => {
+    dragHandle.style.cursor = "grab";
+  });
+
+  // Create and add the Save button
+  const saveButton = document.createElement("button");
+  saveButton.textContent = "💾";
+  saveButton.style.backgroundColor = "#007cba";
+  saveButton.style.color = "white";
+  saveButton.style.border = "none";
+  saveButton.style.padding = "8px 12px";
+  saveButton.style.borderRadius = "4px";
+  saveButton.style.cursor = "pointer";
+  saveButton.style.fontSize = "14px";
+  saveButton.style.fontWeight = "500";
+  saveButton.addEventListener("click", saveMovedElts);
+
+  // Hover effects for the save button
+  saveButton.addEventListener("mouseenter", () => {
+    saveButton.style.backgroundColor = "#005a8b";
+    saveButton.textContent = "💾 Save Edits";
+  });
+  saveButton.addEventListener("mouseleave", () => {
+    saveButton.style.backgroundColor = "#007cba";
+    saveButton.textContent = "💾";
+  });
+
+  menuBar.appendChild(dragHandle);
+  menuBar.appendChild(saveButton);
+  document.body.appendChild(menuBar);
+
+  return menuBar;
+}
+
+function makeDraggable(element) {
+  let isDragging = false;
+  let startX, startY, initialX, initialY;
+
+  element.addEventListener("mousedown", startDrag);
+  document.addEventListener("mousemove", drag);
+  document.addEventListener("mouseup", stopDrag);
+
+  function startDrag(e) {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    const rect = element.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+
+    element.style.position = "fixed";
+    element.style.transform = "none";
+    // Don't set a fixed width, let the menu maintain its natural width
+    element.style.left = initialX + "px";
+    element.style.top = initialY + "px";
+    element.style.right = "auto"; // Remove right positioning
+
+    e.preventDefault();
   }
+
+  function drag(e) {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    element.style.left = initialX + deltaX + "px";
+    element.style.top = initialY + deltaY + "px";
+  }
+
+  function stopDrag() {
+    isDragging = false;
+  }
+}
+
+function addButtonToMenuBar(text, onClick, options = {}) {
+  const menuBar = document.getElementById("horizontal-menu-bar");
+  if (!menuBar) return null;
+
+  const button = document.createElement("button");
+  button.textContent = text;
+  button.style.backgroundColor = options.backgroundColor || "#6c757d";
+  button.style.color = options.color || "white";
+  button.style.border = "none";
+  button.style.padding = options.padding || "8px 12px";
+  button.style.borderRadius = "4px";
+  button.style.cursor = "pointer";
+  button.style.fontSize = "14px";
+  button.style.fontWeight = "500";
+  button.addEventListener("click", onClick);
+
+  // Hover effects
+  const originalBg = options.backgroundColor || "#6c757d";
+  const hoverBg = options.hoverBackgroundColor || "#5a6268";
+  button.addEventListener("mouseenter", () => {
+    button.style.backgroundColor = hoverBg;
+  });
+  button.addEventListener("mouseleave", () => {
+    button.style.backgroundColor = originalBg;
+  });
+
+  menuBar.appendChild(button);
+  return button;
 }
 
 function getEditableElements() {
