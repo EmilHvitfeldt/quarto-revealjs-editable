@@ -473,7 +473,7 @@ function udpdateTextDivs(text) {
   divs = getEditableDivs();
   replacements = Array.from(divs).map(htmlToQuarto);
 
-  const regex = /::: ?\{\.editable[^}]*\}[^:::]*\:::/g;
+  const regex = /::: ?(?:\{\.editable[^}]*\}|editable)[^:::]*\:::/g;
 
   let index = 0;
   return text.replace(regex, () => {
@@ -504,7 +504,8 @@ function htmlToQuarto(div) {
 
 // Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
 function replaceeditableOccurrences(text, replacements) {
-  const regex = /\{\.editable[^}]*\}/g;
+  const regex = /\{\.editable[^}]*\}|::: ?editable/g;
+
   let index = 0;
   return text.replace(regex, () => {
     return replacements[index++] || "";
