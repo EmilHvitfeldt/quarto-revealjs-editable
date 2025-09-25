@@ -10,11 +10,11 @@ filters:
 
 ## In the morning
 
-![](image.png){.absolute width=482px height=432px left=0px top=89px}
+![](image.png){.editable}
 
 ## Text
 
-::: {.absolute width=523.5px height=319px left=367.78px top=89px}
+::: {.editable}
 Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit. Praesent sed diam rutrum, porta nulla vitae, elementum lacus.
 
 **Donec** et congue sapien. *Praesent* quis dui nulla. ***Donec*** convallis, risus a sodales ~~luctus~~, diam eros dapibus ante, ac pharetra nulla odio at lorem.
@@ -22,7 +22,7 @@ Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit
 
 ## More text
 
-::: {.absolute width=523.5px height=319px left=165.724px top=551.542px}
+::: editable
 Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit. Praesent sed diam rutrum, porta nulla vitae, elementum lacus.
 
 **Donec** et congue sapien. *Praesent* quis dui nulla. ***Donec*** convallis, risus a sodales ~~luctus~~, diam eros dapibus ante, ac pharetra nulla odio at lorem.
