@@ -53,16 +53,20 @@ function getEditableDivs() {
 function setupDraggableElt(elt) {
   let isDragging = false;
   let isResizing = false;
+  let isRotating = false;
   let startX, startY, initialX, initialY, initialWidth, initialHeight;
+  let initialRotation = 0;
   let resizeHandle = null;
 
   const container = createEltContainer(elt);
   setupEltStyles(elt);
   createResizeHandles(container);
+  createRotationHandle(container);
   setupHoverEffects(
     container,
     () => isDragging,
-    () => isResizing
+    () => isResizing,
+    () => isRotating
   );
   attachEventListeners();
 
@@ -106,6 +110,78 @@ function setupDraggableElt(elt) {
       handle.dataset.position = position;
       container.appendChild(handle);
     });
+  }
+
+  function createRotationHandle(container) {
+    const rotateHandle = document.createElement("div");
+    rotateHandle.className = "rotate-handle";
+    rotateHandle.style.position = "absolute";
+    rotateHandle.style.width = "12px";
+    rotateHandle.style.height = "12px";
+    rotateHandle.style.backgroundColor = "#28a745";
+    rotateHandle.style.border = "1px solid #fff";
+    rotateHandle.style.borderRadius = "50%";
+    rotateHandle.style.cursor = "grab";
+    rotateHandle.style.opacity = "0";
+    rotateHandle.style.transition = "opacity 0.2s";
+    rotateHandle.style.top = "-20px";
+    rotateHandle.style.left = "50%";
+    rotateHandle.style.transform = "translateX(-50%)";
+    rotateHandle.title = "Rotate element";
+
+    container.appendChild(rotateHandle);
+
+    function setupHoverEffects(container, isDraggingFn, isResizingFn) {
+      container.addEventListener("mouseenter", () => {
+        container.style.border = "2px solid #007cba";
+        container
+          .querySelectorAll(".resize-handle, .rotate-handle")
+          .forEach((h) => (h.style.opacity = "1"));
+        const fontControls = container.querySelector(".font-controls");
+        if (fontControls) fontControls.style.opacity = "1";
+      });
+
+      container.addEventListener("mouseleave", () => {
+        if (!isDraggingFn() && !isResizingFn()) {
+          container.style.border = "2px solid transparent";
+          container
+            .querySelectorAll(".resize-handle, .rotate-handle")
+            .forEach((h) => (h.style.opacity = "0"));
+          const fontControls = container.querySelector(".font-controls");
+          if (fontControls) fontControls.style.opacity = "0";
+        }
+      });
+    }
+    function setupHoverEffects(
+      container,
+      isDraggingFn,
+      isResizingFn,
+      isRotatingFn
+    ) {
+      container.addEventListener("mouseenter", () => {
+        container.style.border = "2px solid #007cba";
+        container
+          .querySelectorAll(".resize-handle, .rotate-handle")
+          .forEach((h) => (h.style.opacity = "1"));
+        const rotateHandle = container.querySelector(".rotate-handle");
+        if (rotateHandle) rotateHandle.style.opacity = "1";
+        const fontControls = container.querySelector(".font-controls");
+        if (fontControls) fontControls.style.opacity = "1";
+      });
+
+      container.addEventListener("mouseleave", () => {
+        if (!isDraggingFn() && !isResizingFn() && !isRotatingFn()) {
+          container.style.border = "2px solid transparent";
+          container
+            .querySelectorAll(".resize-handle, .rotate-handle")
+            .forEach((h) => (h.style.opacity = "0"));
+          const rotateHandle = container.querySelector(".rotate-handle");
+          if (rotateHandle) rotateHandle.style.opacity = "0";
+          const fontControls = container.querySelector(".font-controls");
+          if (fontControls) fontControls.style.opacity = "0";
+        }
+      });
+    }
 
     // Create font size controls for div elements
     if (elt.tagName.toLowerCase() === "div") {
@@ -192,7 +268,7 @@ function setupDraggableElt(elt) {
     container.addEventListener("mouseenter", () => {
       container.style.border = "2px solid #007cba";
       container
-        .querySelectorAll(".resize-handle")
+        .querySelectorAll(".resize-handle, .rotate-handle")
         .forEach((h) => (h.style.opacity = "1"));
       const fontControls = container.querySelector(".font-controls");
       if (fontControls) fontControls.style.opacity = "1";
@@ -202,7 +278,7 @@ function setupDraggableElt(elt) {
       if (!isDraggingFn() && !isResizingFn()) {
         container.style.border = "2px solid transparent";
         container
-          .querySelectorAll(".resize-handle")
+          .querySelectorAll(".resize-handle, .rotate-handle")
           .forEach((h) => (h.style.opacity = "0"));
         const fontControls = container.querySelector(".font-controls");
         if (fontControls) fontControls.style.opacity = "0";
@@ -218,6 +294,12 @@ function setupDraggableElt(elt) {
       handle.addEventListener("mousedown", startResize);
       handle.addEventListener("touchstart", startResize);
     });
+
+    const rotateHandle = container.querySelector(".rotate-handle");
+    if (rotateHandle) {
+      rotateHandle.addEventListener("mousedown", startRotate);
+      rotateHandle.addEventListener("touchstart", startRotate);
+    }
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", stopAction);
@@ -274,11 +356,33 @@ function setupDraggableElt(elt) {
     e.stopPropagation();
   }
 
+  function startRotate(e) {
+    isRotating = true;
+
+    const { clientX, clientY } = getClientCoordinates(e);
+
+    startX = clientX;
+    startY = clientY;
+
+    // Get current rotation from transform style
+    const currentTransform = elt.style.transform || "";
+    const rotateMatch = currentTransform.match(/rotate\(([^)]+)deg\)/);
+    initialRotation = rotateMatch ? parseFloat(rotateMatch[1]) : 0;
+
+    const rotateHandle = container.querySelector(".rotate-handle");
+    rotateHandle.style.cursor = "grabbing";
+
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   function handleMouseMove(e) {
     if (isDragging) {
       drag(e);
     } else if (isResizing) {
       resize(e);
+    } else if (isRotating) {
+      rotate(e);
     }
   }
 
@@ -287,6 +391,8 @@ function setupDraggableElt(elt) {
       drag(e);
     } else if (isResizing) {
       resize(e);
+    } else if (isRotating) {
+      rotate(e);
     }
   }
 
@@ -364,14 +470,50 @@ function setupDraggableElt(elt) {
     e.preventDefault();
   }
 
+  function rotate(e) {
+    if (!isRotating) return;
+
+    const { clientX, clientY } = getClientCoordinates(e);
+
+    // Get the center of the element
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    // Calculate the angle from center to current mouse position
+    const angle = Math.atan2(clientY - centerY, clientX - centerX);
+    const startAngle = Math.atan2(startY - centerY, startX - centerX);
+
+    // Convert to degrees and calculate the rotation difference
+    const angleDiff = (angle - startAngle) * (180 / Math.PI);
+    let newRotation = initialRotation + angleDiff;
+
+    // Snap to 15-degree increments if Shift key is pressed
+    if (e.shiftKey) {
+      newRotation = Math.round(newRotation / 15) * 15;
+    }
+
+    // Normalize angle to 0-360 range
+    newRotation = ((newRotation % 360) + 360) % 360;
+
+    elt.style.transform = `rotate(${newRotation}deg)`;
+
+    e.preventDefault();
+  }
+
   function stopAction() {
-    if (isDragging || isResizing) {
+    if (isDragging || isResizing || isRotating) {
       setTimeout(() => {
         if (!container.matches(":hover")) {
           container.style.border = "2px solid transparent";
           container
             .querySelectorAll(".resize-handle")
             .forEach((h) => (h.style.opacity = "0"));
+          const rotateHandle = container.querySelector(".rotate-handle");
+          if (rotateHandle) {
+            rotateHandle.style.opacity = "0";
+            rotateHandle.style.cursor = "grab";
+          }
           const fontControls = container.querySelector(".font-controls");
           if (fontControls) fontControls.style.opacity = "0";
         }
@@ -380,6 +522,7 @@ function setupDraggableElt(elt) {
 
     isDragging = false;
     isResizing = false;
+    isRotating = false;
     resizeHandle = null;
   }
 
@@ -452,6 +595,13 @@ function extracteditableEltDimensions() {
       left: left,
       top: top,
     };
+
+    // Add rotation if it's set
+    const currentTransform = elt.style.transform || "";
+    const rotateMatch = currentTransform.match(/rotate\(([^)]+)deg\)/);
+    if (rotateMatch) {
+      dimensionData.rotation = parseFloat(rotateMatch[1]);
+    }
 
     // Add font-size for div elements if it's set
     if (elt.tagName.toLowerCase() === "div" && elt.style.fontSize) {
