@@ -34,6 +34,12 @@ or like so for text.
 ::: {.editable}
 some text here
 :::
+
+or
+
+::: editable
+some text here
+:::
 ```
 
 Note that this extension will completely rewrite the `{}`.
