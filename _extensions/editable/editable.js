@@ -7,39 +7,219 @@ window.Revealeditable = function () {
 
         editableElements.forEach(setupDraggableElt);
 
-        addSaveMenuButton();
+        createHorizontalMenuBar();
       });
     },
   };
 };
 
-function addSaveMenuButton() {
-  // Find the slide-menu-items ul inside menu-custom-panel div
-  const slideMenuItems = document.querySelector(
-    "div.slide-menu-custom-panel ul.slide-menu-items"
-  );
+function createHorizontalMenuBar() {
+  // Create the menu bar container
+  const menuBar = document.createElement("div");
+  menuBar.id = "horizontal-menu-bar";
+  menuBar.style.position = "fixed";
+  menuBar.style.top = "50%";
+  menuBar.style.right = "20px";
+  menuBar.style.transform = "translateY(-50%)";
+  menuBar.style.display = "flex";
+  menuBar.style.flexDirection = "column";
+  menuBar.style.gap = "10px";
+  menuBar.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+  menuBar.style.padding = "10px";
+  menuBar.style.borderRadius = "8px";
+  menuBar.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.1)";
+  menuBar.style.zIndex = "1000";
+  menuBar.style.backdropFilter = "blur(5px)";
+  menuBar.style.cursor = "move";
 
-  if (slideMenuItems) {
-    // Find the highest data-item value
-    const existingItems = slideMenuItems.querySelectorAll("li[data-item]");
-    let maxDataItem = 0;
-    existingItems.forEach((item) => {
-      const dataValue = parseInt(item.getAttribute("data-item")) || 0;
-      if (dataValue > maxDataItem) {
-        maxDataItem = dataValue;
-      }
-    });
+  // Make the menu bar draggable
+  makeDraggable(menuBar);
 
-    // Create the new li element
-    const newLi = document.createElement("li");
-    newLi.className = "slide-tool-item";
-    newLi.setAttribute("data-item", (maxDataItem + 1).toString());
-    newLi.innerHTML =
-      '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
+  // Create drag handle (three dots)
+  const dragHandle = document.createElement("div");
+  dragHandle.innerHTML = "...";
+  dragHandle.style.fontSize = "18px";
+  dragHandle.style.color = "#666";
+  dragHandle.style.cursor = "grab";
+  dragHandle.style.padding = "4px 8px";
+  dragHandle.style.userSelect = "none";
+  dragHandle.title = "Drag to move menu";
 
-    // Append to the ul
-    slideMenuItems.appendChild(newLi);
+  dragHandle.addEventListener("mousedown", () => {
+    dragHandle.style.cursor = "grabbing";
+  });
+
+  document.addEventListener("mouseup", () => {
+    dragHandle.style.cursor = "grab";
+  });
+
+  // Create and add the Save button
+  const saveButton = document.createElement("button");
+  saveButton.textContent = "💾";
+  saveButton.style.backgroundColor = "#007cba";
+  saveButton.style.color = "white";
+  saveButton.style.border = "none";
+  saveButton.style.padding = "8px 12px";
+  saveButton.style.borderRadius = "4px";
+  saveButton.style.cursor = "pointer";
+  saveButton.style.fontSize = "14px";
+  saveButton.style.fontWeight = "500";
+  saveButton.addEventListener("click", saveMovedElts);
+
+  // Hover effects for the save button
+  saveButton.addEventListener("mouseenter", () => {
+    saveButton.style.backgroundColor = "#005a8b";
+    saveButton.textContent = "💾 Save Edits";
+  });
+  saveButton.addEventListener("mouseleave", () => {
+    saveButton.style.backgroundColor = "#007cba";
+    saveButton.textContent = "💾";
+  });
+
+  // Create and add the Add Text Element button
+  const addTextButton = document.createElement("button");
+  addTextButton.textContent = "📝";
+  addTextButton.style.backgroundColor = "#28a745";
+  addTextButton.style.color = "white";
+  addTextButton.style.border = "none";
+  addTextButton.style.padding = "8px 12px";
+  addTextButton.style.borderRadius = "4px";
+  addTextButton.style.cursor = "pointer";
+  addTextButton.style.fontSize = "14px";
+  addTextButton.style.fontWeight = "500";
+  addTextButton.title = "Add text";
+
+  addTextButton.addEventListener("click", () => {
+    const parentDiv = document.querySelector("section.slide.present");
+    const newDiv = document.createElement("div");
+    newDiv.textContent = "Text";
+    newDiv.classList.add("editable");
+    newDiv.classList.add("editable-new-div");
+    parentDiv.appendChild(newDiv);
+    setupDraggableElt(newDiv);
+  });
+
+  // Hover effects for the add text button
+  addTextButton.addEventListener("mouseenter", () => {
+    addTextButton.style.backgroundColor = "#218838";
+    addTextButton.textContent = "📝 Add Text";
+  });
+  addTextButton.addEventListener("mouseleave", () => {
+    addTextButton.style.backgroundColor = "#28a745";
+    addTextButton.textContent = "📝";
+  });
+
+  // Create and add the Add Slide button
+  const addSlideButton = document.createElement("button");
+  addSlideButton.textContent = "📄";
+  addSlideButton.style.backgroundColor = "#17a2b8";
+  addSlideButton.style.color = "white";
+  addSlideButton.style.border = "none";
+  addSlideButton.style.padding = "8px 12px";
+  addSlideButton.style.borderRadius = "4px";
+  addSlideButton.style.cursor = "pointer";
+  addSlideButton.style.fontSize = "14px";
+  addSlideButton.style.fontWeight = "500";
+  addSlideButton.title = "Add new slide";
+
+  addSlideButton.addEventListener("click", () => {
+    const originalDiv = document.querySelector("section.slide.present");
+    const newSlide = document.createElement("section");
+    newSlide.className = "slide level2 new-slide";
+    newSlide.style.display = "block";
+    originalDiv.insertAdjacentElement("afterend", newSlide);
+    Reveal.next();
+  });
+
+  // Hover effects for the add slide button
+  addSlideButton.addEventListener("mouseenter", () => {
+    addSlideButton.style.backgroundColor = "#138496";
+    addSlideButton.textContent = "📄 Add Slide";
+  });
+  addSlideButton.addEventListener("mouseleave", () => {
+    addSlideButton.style.backgroundColor = "#17a2b8";
+    addSlideButton.textContent = "📄";
+  });
+
+  menuBar.appendChild(dragHandle);
+  menuBar.appendChild(saveButton);
+  menuBar.appendChild(addTextButton);
+  menuBar.appendChild(addSlideButton);
+  document.body.appendChild(menuBar);
+
+  return menuBar;
+}
+
+function makeDraggable(element) {
+  let isDragging = false;
+  let startX, startY, initialX, initialY;
+
+  element.addEventListener("mousedown", startDrag);
+  document.addEventListener("mousemove", drag);
+  document.addEventListener("mouseup", stopDrag);
+
+  function startDrag(e) {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    const rect = element.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+
+    element.style.position = "fixed";
+    element.style.transform = "none";
+    // Don't set a fixed width, let the menu maintain its natural width
+    element.style.left = initialX + "px";
+    element.style.top = initialY + "px";
+    element.style.right = "auto"; // Remove right positioning
+
+    e.preventDefault();
   }
+
+  function drag(e) {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    element.style.left = initialX + deltaX + "px";
+    element.style.top = initialY + deltaY + "px";
+  }
+
+  function stopDrag() {
+    isDragging = false;
+  }
+}
+
+function addButtonToMenuBar(text, onClick, options = {}) {
+  const menuBar = document.getElementById("horizontal-menu-bar");
+  if (!menuBar) return null;
+
+  const button = document.createElement("button");
+  button.textContent = text;
+  button.style.backgroundColor = options.backgroundColor || "#6c757d";
+  button.style.color = options.color || "white";
+  button.style.border = "none";
+  button.style.padding = options.padding || "8px 12px";
+  button.style.borderRadius = "4px";
+  button.style.cursor = "pointer";
+  button.style.fontSize = "14px";
+  button.style.fontWeight = "500";
+  button.addEventListener("click", onClick);
+
+  // Hover effects
+  const originalBg = options.backgroundColor || "#6c757d";
+  const hoverBg = options.hoverBackgroundColor || "#5a6268";
+  button.addEventListener("mouseenter", () => {
+    button.style.backgroundColor = hoverBg;
+  });
+  button.addEventListener("mouseleave", () => {
+    button.style.backgroundColor = originalBg;
+  });
+
+  menuBar.appendChild(button);
+  return button;
 }
 
 function getEditableElements() {
@@ -408,6 +588,7 @@ function saveMovedElts() {
   index = readIndexQmd();
   Elt_dim = extracteditableEltDimensions();
 
+  index = addNewSlides(index);
   index = udpdateTextDivs(index);
 
   Elt_attr = formateditableEltStrings(Elt_dim);
@@ -478,6 +659,70 @@ function extracteditableEltDimensions() {
   });
 
   return dimensions;
+}
+
+function getNewSlideDivIndices(nodeList) {
+  const indices = [];
+  for (let i = 0; i < nodeList.length; i++) {
+    if (nodeList[i].classList.contains("new-slide")) {
+      indices.push(i);
+    }
+  }
+
+  return indices;
+}
+
+function countNormalSlidesBefore(divs, index) {
+  if (index == 0) {
+    return 0;
+  }
+
+  const previous = Array.from(divs).slice(0, index);
+  const n_new_slides = getNewSlideDivIndices(previous).length;
+
+  return previous.length - n_new_slides;
+}
+
+function addNewSlides(text) {
+  all_html_slides = document.querySelectorAll("section:not(#title-slide)");
+
+  new_slide_inds = getNewSlideDivIndices(all_html_slides);
+
+  if (new_slide_inds.length < 1) {
+    return text;
+  }
+
+  const lines = text.split("\n");
+
+  // Find all elements in lines that start with "## " preceded by an empty line
+  const headingsAfterEmptyLines = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const currentLine = lines[i].trim();
+    const previousLine = lines[i - 1].trim();
+
+    // Check if current line starts with "## " and previous line is empty
+    if (currentLine.startsWith("## ") && previousLine === "") {
+      headingsAfterEmptyLines.push(i);
+    }
+  }
+
+  for (let i = new_slide_inds.length - 1; i >= 0; i--) {
+    nSlidesBefore = countNormalSlidesBefore(all_html_slides, new_slide_inds[i]);
+
+    // fix bug when you add multiple slides at the end
+    if (nSlidesBefore == headingsAfterEmptyLines.length) {
+      lines.push("");
+      lines.push("## ");
+      lines.push("");
+    } else {
+      lines.splice(headingsAfterEmptyLines[nSlidesBefore], 0, "## ", "");
+    }
+  }
+
+  text = lines.join("\n");
+
+  return text;
 }
 
 // Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
