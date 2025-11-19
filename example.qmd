@@ -27,3 +27,15 @@ Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit
 
 **Donec** et congue sapien. *Praesent* quis dui nulla. ***Donec*** convallis, risus a sodales ~~luctus~~, diam eros dapibus ante, ac pharetra nulla odio at lorem.
 :::
+
+## Tests - backslashes are preserved
+
+Explicit spaces\ \ 
+
+```r
+"\\d"
+```
+
+```r
+rename_all(\(x))
+```
