@@ -47,7 +47,7 @@ Note that this extension will completely rewrite the `{}`.
 Once you have rerendered the slides, each image with the id should be movable and resizable using the corners.
 Holding shift while pulling the corners respects aspect ratios.
 
-Once you are happy with the sizes, open the menu (M), go to tools, and click "Save Moved Elements". This will prompt you to save a file. Choose the same folder you are working in to overwrite the document you are in. Rerender, and the elements should be locked in place.
+Once you are happy with the sizes, open the menu (M), go to tools, and click "Save Edits". This will prompt you to save a file. Choose the same folder you are working in to overwrite the document you are in. Rerender, and the elements should be locked in place.
 
 Note that this extension adds the file name of the slides qmd file to the document itself, if you don't want that you happen, remove `editable` from `filters` before making the document public. And rerender the document.
 
