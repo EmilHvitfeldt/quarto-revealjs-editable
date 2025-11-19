@@ -413,14 +413,19 @@ function saveMovedElts() {
   Elt_attr = formateditableEltStrings(Elt_dim);
   index = replaceeditableOccurrences(index, Elt_attr);
 
+  index = preserveBackSlashes(index);
+  downloadString(index);
+}
+
+function preserveBackSlashes(index) {
   // avoid removing some backslashes
   index = index.replaceAll("\\", "\\\\");
   index = index.replaceAll("\\\\(", "\\(");
   index = index.replaceAll("\\\\)", "\\)");
   index = index.replace(/ +(?=\n)/g, (match) => "\\ ".repeat(match.length));
-
-  downloadString(index);
+  return index;
 }
+
 // Function to read index.qmd file
 function readIndexQmd() {
   return window._input_file;
