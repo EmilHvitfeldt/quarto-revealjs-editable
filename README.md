@@ -51,6 +51,9 @@ Once you are happy with the sizes, open the menu (M), go to tools, and click "Sa
 
 Note that this extension adds the file name of the slides qmd file to the document itself, if you don't want that you happen, remove `editable` from `filters` before making the document public. And rerender the document.
 
+> [!WARNING]  
+> This extension does NOT work with [shortcodes](https://quarto.org/docs/authoring/shortcodes.html). See [issue #15](https://github.com/EmilHvitfeldt/quarto-revealjs-editable/issues/15) for progress.
+
 ## Demo Video
 
 ![](demo-text.gif)
