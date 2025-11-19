@@ -54,6 +54,15 @@ Note that this extension adds the file name of the slides qmd file to the docume
 > [!WARNING]  
 > This extension does NOT work with [shortcodes](https://quarto.org/docs/authoring/shortcodes.html). See [issue #15](https://github.com/EmilHvitfeldt/quarto-revealjs-editable/issues/15) for progress.
 
+> [!TIP]
+> sometimes you might find that images don't stay the size that you dragged them to be. this is because the default is to set `max-width` and `max-height` to `95%`. We can undo that by adding the following to out scss file.
+> ```scss
+> .reveal img {
+>   max-width: unset;
+>   max-height: unset;
+> }
+> ```
+
 ## Demo Video
 
 ![](demo-text.gif)
