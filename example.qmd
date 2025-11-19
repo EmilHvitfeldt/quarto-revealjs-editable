@@ -39,12 +39,3 @@ Explicit spaces\ \
 ```r
 rename_all(\(x))
 ```
-
-$$
-x^* = \left\{
-    \begin{array}{ll}
-      \dfrac{x^\lambda - 1}{\lambda \tilde{x}^{\lambda - 1}}, & \lambda \neq 0 \\
-      \tilde{x} \log x & \lambda = 0
-    \end{array}
-  \right.
-$$
