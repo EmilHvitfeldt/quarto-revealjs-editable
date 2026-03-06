@@ -45,6 +45,25 @@ function addSaveMenuButton() {
     newLi.appendChild(newA);
 
     slideMenuItems.appendChild(newLi);
+
+    // Add "Copy qmd to clipboard" button
+    const copyLi = document.createElement("li");
+    copyLi.className = "slide-tool-item";
+    copyLi.setAttribute("data-item", (maxDataItem + 2).toString());
+
+    const copyA = document.createElement("a");
+    copyA.href = "#";
+    const copyKbd = document.createElement("kbd");
+    copyKbd.textContent = "c";
+    copyA.appendChild(copyKbd);
+    copyA.appendChild(document.createTextNode(" Copy qmd to Clipboard"));
+    copyA.addEventListener("click", function (e) {
+      e.preventDefault();
+      copyQmdToClipboard();
+    });
+    copyLi.appendChild(copyA);
+
+    slideMenuItems.appendChild(copyLi);
   }
 }
 
@@ -412,6 +431,23 @@ function saveMovedElts() {
 // Function to read index.qmd file (decoded from base64 by atob() at load time)
 function readIndexQmd() {
   return window._input_file;
+}
+
+// Function to copy the modified qmd content to clipboard (closes #8)
+function copyQmdToClipboard() {
+  let index = readIndexQmd();
+  Elt_dim = extracteditableEltDimensions();
+
+  index = udpdateTextDivs(index);
+
+  Elt_attr = formateditableEltStrings(Elt_dim);
+  index = replaceeditableOccurrences(index, Elt_attr);
+
+  navigator.clipboard.writeText(index).then(function () {
+    console.log("qmd content copied to clipboard");
+  }).catch(function (err) {
+    console.error("Failed to copy to clipboard:", err);
+  });
 }
 
 // Function to get data-filename attribute from editable div
