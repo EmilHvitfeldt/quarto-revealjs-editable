@@ -1,3 +1,124 @@
+// ─── Floating dirty-state toolbar ────────────────────────────────────────────
+
+(function () {
+  var toolbar = null;
+  var hideTimer = null;
+
+  function createToolbar() {
+    if (document.getElementById('editable-toolbar')) return;
+
+    var t = document.createElement('div');
+    t.id = 'editable-toolbar';
+    t.style.cssText = [
+      'position: fixed',
+      'bottom: 0',
+      'left: 0',
+      'right: 0',
+      'height: 48px',
+      'background: rgba(10, 10, 20, 0.78)',
+      'backdrop-filter: blur(12px)',
+      '-webkit-backdrop-filter: blur(12px)',
+      'border-top: 1px solid rgba(255,255,255,0.07)',
+      'display: flex',
+      'align-items: center',
+      'padding: 0 20px',
+      'gap: 10px',
+      'z-index: 9999',
+      'transform: translateY(100%)',
+      'transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+      'font-family: ui-monospace, "SF Mono", monospace',
+      'font-size: 12px',
+    ].join(';');
+
+    // dot
+    var dot = document.createElement('span');
+    dot.id = 'editable-toolbar-dot';
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#e0c36a;display:inline-block;flex-shrink:0;transition:background 0.4s ease';
+
+    // label
+    var label = document.createElement('span');
+    label.id = 'editable-toolbar-label';
+    label.style.cssText = 'color:#bdbdbd;letter-spacing:0.06em;flex:1;';
+    label.textContent = 'unsaved changes';
+
+    // dismiss button
+    var dismiss = document.createElement('button');
+    dismiss.textContent = '×';
+    dismiss.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 6px;line-height:1;';
+    dismiss.title = 'Dismiss';
+    dismiss.addEventListener('click', function () { hideToolbar(); });
+
+    // copy button
+    var btnCopy = document.createElement('button');
+    btnCopy.id = 'editable-toolbar-copy';
+    btnCopy.textContent = '📋 Copy to clipboard';
+    btnCopy.style.cssText = 'background:#007cba;border:none;color:white;font-size:12px;font-family:inherit;padding:0 14px;height:30px;border-radius:3px;cursor:pointer;letter-spacing:0.04em;';
+    btnCopy.addEventListener('mouseenter', function() { this.style.background='#0090d4'; });
+    btnCopy.addEventListener('mouseleave', function() { this.style.background='#007cba'; });
+    btnCopy.addEventListener('click', function (e) { e.preventDefault(); copyQmdToClipboard(); });
+
+    // save button
+    var btnSave = document.createElement('button');
+    btnSave.id = 'editable-toolbar-save';
+    btnSave.textContent = '💾 Save edits';
+    btnSave.style.cssText = 'background:#da7756;border:none;color:white;font-size:12px;font-family:inherit;padding:0 16px;height:30px;border-radius:3px;cursor:pointer;letter-spacing:0.04em;';
+    btnSave.addEventListener('mouseenter', function() { this.style.background='#e08868'; });
+    btnSave.addEventListener('mouseleave', function() { this.style.background='#da7756'; });
+    btnSave.addEventListener('click', function (e) { e.preventDefault(); saveMovedElts(); });
+
+    t.appendChild(dot);
+    t.appendChild(label);
+    t.appendChild(dismiss);
+    t.appendChild(btnCopy);
+    t.appendChild(btnSave);
+    document.body.appendChild(t);
+    toolbar = t;
+  }
+
+  function showToolbar() {
+    createToolbar();
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    // reset to dirty state
+    var dot = document.getElementById('editable-toolbar-dot');
+    var label = document.getElementById('editable-toolbar-label');
+    if (dot) dot.style.background = '#e0c36a';
+    if (label) label.textContent = 'unsaved changes';
+    // slide in
+    setTimeout(function () {
+      toolbar.style.transform = 'translateY(0)';
+    }, 10);
+  }
+
+  function hideToolbar() {
+    if (!toolbar) return;
+    toolbar.style.transform = 'translateY(100%)';
+  }
+
+  function showSavedFeedback(type) {
+    if (!toolbar) return;
+    var dot = document.getElementById('editable-toolbar-dot');
+    var label = document.getElementById('editable-toolbar-label');
+    if (dot) dot.style.background = '#4caf82';
+    if (label) {
+      if (type === 'copy') {
+        label.textContent = 'copied! → paste into your .qmd to apply changes';
+      } else {
+        label.textContent = 'downloaded! → replace your original .qmd if satisfied';
+      }
+    }
+    hideTimer = setTimeout(function () { hideToolbar(); }, 3500);
+  }
+
+  // Expose globally
+  window._editableToolbar = {
+    show: showToolbar,
+    showSaved: showSavedFeedback,
+    hide: hideToolbar,
+  };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 window.Revealeditable = function () {
   return {
     id: "Revealeditable",
@@ -45,6 +166,25 @@ function addSaveMenuButton() {
     newLi.appendChild(newA);
 
     slideMenuItems.appendChild(newLi);
+
+    // Add "Copy qmd to clipboard" button
+    const copyLi = document.createElement("li");
+    copyLi.className = "slide-tool-item";
+    copyLi.setAttribute("data-item", (maxDataItem + 2).toString());
+
+    const copyA = document.createElement("a");
+    copyA.href = "#";
+    const copyKbd = document.createElement("kbd");
+    copyKbd.textContent = "c";
+    copyA.appendChild(copyKbd);
+    copyA.appendChild(document.createTextNode(" Copy qmd to Clipboard"));
+    copyA.addEventListener("click", function (e) {
+      e.preventDefault();
+      copyQmdToClipboard();
+    });
+    copyLi.appendChild(copyA);
+
+    slideMenuItems.appendChild(copyLi);
   }
 }
 
@@ -184,6 +324,10 @@ function setupDraggableElt(elt) {
         editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
         if (!isEditable) {
           elt.focus();
+          // Show dirty toolbar on any text input while in edit mode
+          elt.addEventListener("input", function () {
+            window._editableToolbar.show();
+          }, { once: false });
         }
       });
     }
@@ -359,6 +503,8 @@ function setupDraggableElt(elt) {
 
   function stopAction() {
     if (isDragging || isResizing) {
+      // Show dirty toolbar when a drag or resize ends
+      window._editableToolbar.show();
       setTimeout(() => {
         if (!container.matches(":hover")) {
           container.style.border = "2px solid transparent";
@@ -398,7 +544,6 @@ function setupDraggableElt(elt) {
 }
 
 function saveMovedElts() {
-  // Decode the base64-encoded source file
   let index = readIndexQmd();
   Elt_dim = extracteditableEltDimensions();
 
@@ -407,14 +552,31 @@ function saveMovedElts() {
   Elt_attr = formateditableEltStrings(Elt_dim);
   index = replaceeditableOccurrences(index, Elt_attr);
 
-
-
   downloadString(index);
+  window._editableToolbar.showSaved('save');
 }
 
 // Function to read index.qmd file (decoded from base64 by atob() at load time)
 function readIndexQmd() {
   return window._input_file;
+}
+
+// Function to copy the modified qmd content to clipboard (closes #8)
+function copyQmdToClipboard() {
+  let index = readIndexQmd();
+  Elt_dim = extracteditableEltDimensions();
+
+  index = udpdateTextDivs(index);
+
+  Elt_attr = formateditableEltStrings(Elt_dim);
+  index = replaceeditableOccurrences(index, Elt_attr);
+
+  navigator.clipboard.writeText(index).then(function () {
+    console.log("qmd content copied to clipboard");
+    window._editableToolbar.showSaved('copy');
+  }).catch(function (err) {
+    console.error("Failed to copy to clipboard:", err);
+  });
 }
 
 // Function to get data-filename attribute from editable div
