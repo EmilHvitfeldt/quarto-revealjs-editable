@@ -29,10 +29,20 @@ function addSaveMenuButton() {
     });
 
     const newLi = document.createElement("li");
-    newLi.className = "slide-tool-item";
+    newLi.className = "slide-menu-item";
     newLi.setAttribute("data-item", (maxDataItem + 1).toString());
-    newLi.innerHTML =
-      '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
+
+    const newA = document.createElement("a");
+    newA.href = "#";
+    const kbd = document.createElement("kbd");
+    kbd.textContent = "?";
+    newA.appendChild(kbd);
+    newA.appendChild(document.createTextNode(" Save Edits"));
+    newA.addEventListener("click", function (e) {
+      e.preventDefault();
+      saveMovedElts();
+    });
+    newLi.appendChild(newA);
 
     slideMenuItems.appendChild(newLi);
   }
@@ -388,7 +398,6 @@ function setupDraggableElt(elt) {
 }
 
 function saveMovedElts() {
-  // Decode the base64-encoded source file
   let index = readIndexQmd();
   Elt_dim = extracteditableEltDimensions();
 
@@ -396,8 +405,6 @@ function saveMovedElts() {
 
   Elt_attr = formateditableEltStrings(Elt_dim);
   index = replaceeditableOccurrences(index, Elt_attr);
-
-
 
   downloadString(index);
 }
