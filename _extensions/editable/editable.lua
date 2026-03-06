@@ -23,7 +23,44 @@ local function b64encode(data)
   return table.concat(result)
 end
 
+-- Check if a Pandoc element has the class "editable"
+local function has_editable_class(el)
+  if el.attr and el.attr.classes then
+    for _, cls in ipairs(el.attr.classes) do
+      if cls == 'editable' then return true end
+    end
+  end
+  return false
+end
+
+-- Walk the AST looking for Div or Image elements with class "editable".
+-- These are the only elements the JS targets: div.editable and img.editable.
+-- Using the AST avoids any risk of false positives on the word "editable"
+-- appearing in plain text or code blocks.
+local found_editable = false
+
+function Div(el)
+  if has_editable_class(el) then
+    found_editable = true
+  end
+  return el
+end
+
+function Image(el)
+  if has_editable_class(el) then
+    found_editable = true
+  end
+  return el
+end
+
 function Pandoc(doc)
+  -- No editable elements found: skip injection entirely.
+  -- This keeps the generated HTML clean after a save (when all {.editable}
+  -- have been replaced by {.absolute ...}) and avoids unnecessary base64
+  -- encoding when the filter is active but unused.
+  if not found_editable then return doc end
+
+  -- Encode qmd source as base64 and inject into <head>
   local filename = quarto.doc.input_file
   local text = assert(io.open(filename, "r")):read("a")
   local encoded = b64encode(text)
