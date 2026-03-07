@@ -66,7 +66,11 @@ function Pandoc(doc)
   local encoded = b64encode(text)
 
   local script = "<script>\n"
-  script = script .. "window._input_file = atob('" .. encoded .. "');\n"
+  -- Use TextDecoder to properly handle UTF-8 encoded characters (accents, etc.)
+  -- atob() alone returns a binary Latin-1 string and corrupts non-ASCII chars.
+  script = script .. "window._input_file = new TextDecoder('utf-8').decode(\n"
+  script = script .. "  Uint8Array.from(atob('" .. encoded .. "'), function(c) { return c.charCodeAt(0); })\n"
+  script = script .. ");\n"
   script = script .. "window._input_filename = '" .. filename .. "';\n"
   script = script .. "</script>"
 
