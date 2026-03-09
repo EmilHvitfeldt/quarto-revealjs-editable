@@ -1,0 +1,26 @@
+---
+title: "Special Characters Test"
+---
+
+## Slide with backslashes
+
+::: {.editable}
+Backslash in code: `"\\d"` and `rename_all(\(x))`
+
+Explicit trailing spaces:\ \
+
+LaTeX inline: $x = \frac{a}{b}$
+:::
+
+## Slide with equation
+
+::: {.editable}
+$$
+x^* = \left\{
+    \begin{array}{ll}
+      \dfrac{x^\lambda - 1}{\lambda {x}^{\lambda - 1}}, & \lambda \neq 0 \\
+      {x} \log x & \lambda = 0
+    \end{array}
+  \right.
+$$
+:::

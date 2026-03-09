@@ -1,0 +1,13 @@
+---
+title: "Basic Test"
+---
+
+## Slide 1
+
+![](../image.png){.editable}
+
+## Slide 2
+
+::: {.editable}
+Some editable text here.
+:::

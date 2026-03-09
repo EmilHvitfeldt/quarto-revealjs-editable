@@ -1,0 +1,12 @@
+project:
+  type: default
+
+format:
+  revealjs:
+    theme: default
+
+filters:
+  - editable
+
+revealjs-plugins:
+  - editable

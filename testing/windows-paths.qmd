@@ -1,0 +1,13 @@
+---
+title: "Windows Paths Test"
+---
+
+## Windows-style paths
+
+::: {.editable}
+Path test: C:\Users\bob\Documents\file.txt
+
+Another: D:\Projects\my-project\data.csv
+
+Backslash-b: \b should not become backspace
+:::
