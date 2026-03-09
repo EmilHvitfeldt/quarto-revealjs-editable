@@ -1,0 +1,19 @@
+---
+title: "Multiple Elements"
+---
+
+## Slide 1
+
+![](../image.png){.editable}
+
+::: {.editable}
+First text block
+:::
+
+## Slide 2
+
+![](../image.png){.editable}
+
+::: {.editable}
+Second text block with **bold** and *italic*
+:::
