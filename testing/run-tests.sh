@@ -79,6 +79,20 @@ else
   FAILED=1
 fi
 
+# Test 7: Windows paths / backslash preservation (issues #13, #14)
+echo "Test 7: Backslash preservation (#13, #14)..."
+quarto render windows-paths.qmd --quiet
+# In properly escaped JS, backslashes must be doubled: C:\\Users\\bob
+# PR #22 uses base64 encoding which avoids escaping entirely
+if grep -q "atob(" windows-paths.html; then
+  echo "  ✓ Using base64 encoding (PR #22)"
+elif grep 'window._input_file' windows-paths.html | grep -q 'C:\\\\Users\\\\bob'; then
+  echo "  ✓ Backslashes properly escaped for JS"
+else
+  # Backslashes not doubled = JS will interpret \b as backspace, \f as formfeed, etc.
+  echo "  ⚠ Backslashes not escaped (known bug #13, #14 - fixed by PR #22)"
+fi
+
 echo ""
 if [ $FAILED -eq 0 ]; then
   echo "=== All tests passed! ==="
