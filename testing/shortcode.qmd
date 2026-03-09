@@ -1,0 +1,9 @@
+---
+title: "Shortcode Test"
+---
+
+## Slide with shortcode
+
+::: {.editable}
+The title is: {{< meta title >}}
+:::

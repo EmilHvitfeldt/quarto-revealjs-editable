@@ -1,0 +1,15 @@
+---
+title: "UTF-8 Test"
+---
+
+## Accented characters
+
+::: {.editable}
+French: éàùçê
+
+German: äöüß
+
+Spanish: ñ¿¡
+
+Emoji:
+:::
