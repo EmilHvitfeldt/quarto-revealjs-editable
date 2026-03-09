@@ -12,91 +12,61 @@ echo ""
 
 FAILED=0
 
-# Test 1: Basic rendering with editable elements
-echo "Test 1: Basic rendering..."
-if ! quarto render basic.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "window._input_file" basic.html 2>/dev/null; then
-  echo "  ✓ _input_file injected"
-else
-  echo "  ✗ _input_file missing"
-  FAILED=1
-fi
+# Helper function to run a test
+run_render_test() {
+  local test_name="$1"
+  local qmd_file="$2"
+  local check_type="$3"  # "inject", "no-inject", or "base64"
 
-# Test 2: No editable elements should skip injection
-echo "Test 2: No editable elements..."
-if ! quarto render no-editable.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "window._input_file" no-editable.html 2>/dev/null; then
-  echo "  ✗ _input_file should NOT be injected when no .editable elements"
-  FAILED=1
-else
-  echo "  ✓ No injection (correct)"
-fi
+  echo "$test_name..."
 
-# Test 3: Special characters (backslashes, LaTeX)
-echo "Test 3: Special characters..."
-if ! quarto render special-chars.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "window._input_file" special-chars.html 2>/dev/null; then
-  echo "  ✓ Rendered successfully"
-else
-  echo "  ✗ Injection failed"
-  FAILED=1
-fi
+  local html_file="${qmd_file%.qmd}.html"
+  local output
+  output=$(quarto render "$qmd_file" 2>&1)
+  local exit_code=$?
 
-# Test 4: Shortcodes
-echo "Test 4: Shortcodes..."
-if ! quarto render shortcode.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "window._input_file" shortcode.html 2>/dev/null; then
-  echo "  ✓ Rendered successfully"
-else
-  echo "  ✗ Injection failed"
-  FAILED=1
-fi
+  if [ $exit_code -ne 0 ]; then
+    echo "  ✗ Render failed"
+    echo "    Error: $output"
+    FAILED=1
+    return
+  fi
 
-# Test 5: UTF-8 content
-echo "Test 5: UTF-8 content..."
-if ! quarto render utf8.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "window._input_file" utf8.html 2>/dev/null; then
-  echo "  ✓ Rendered successfully"
-else
-  echo "  ✗ Injection failed"
-  FAILED=1
-fi
+  case "$check_type" in
+    inject)
+      if grep -q "window._input_file" "$html_file" 2>/dev/null; then
+        echo "  ✓ Pass"
+      else
+        echo "  ✗ _input_file missing"
+        FAILED=1
+      fi
+      ;;
+    no-inject)
+      if grep -q "window._input_file" "$html_file" 2>/dev/null; then
+        echo "  ✗ _input_file should NOT be injected"
+        FAILED=1
+      else
+        echo "  ✓ Pass (no injection)"
+      fi
+      ;;
+    base64)
+      if grep -q "atob(" "$html_file" 2>/dev/null; then
+        echo "  ✓ Pass (base64 encoding)"
+      else
+        echo "  ✗ base64 encoding not found"
+        FAILED=1
+      fi
+      ;;
+  esac
+}
 
-# Test 6: Include-in-header (issue #21)
-echo "Test 6: Include-in-header..."
-if ! quarto render include-header.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "window._input_file" include-header.html 2>/dev/null; then
-  echo "  ✓ Rendered successfully"
-else
-  echo "  ✗ Injection failed"
-  FAILED=1
-fi
-
-# Test 7: Windows paths / backslash preservation (issues #13, #14)
-echo "Test 7: Backslash preservation (#13, #14)..."
-if ! quarto render windows-paths.qmd --quiet 2>&1; then
-  echo "  ✗ Render failed"
-  FAILED=1
-elif grep -q "atob(" windows-paths.html 2>/dev/null; then
-  echo "  ✓ Using base64 encoding"
-elif grep "window._input_file" windows-paths.html 2>/dev/null | grep -q 'C:\\\\Users\\\\bob'; then
-  echo "  ✓ Backslashes properly escaped"
-else
-  echo "  ✗ Backslashes not properly escaped"
-  FAILED=1
-fi
+run_render_test "Test 1: Basic rendering" "basic.qmd" "inject"
+run_render_test "Test 2: No editable elements" "no-editable.qmd" "no-inject"
+run_render_test "Test 3: Special characters" "special-chars.qmd" "inject"
+run_render_test "Test 4: Shortcodes" "shortcode.qmd" "inject"
+run_render_test "Test 5: UTF-8 content" "utf8.qmd" "inject"
+run_render_test "Test 6: Include-in-header (#21)" "include-header.qmd" "inject"
+run_render_test "Test 7: Backslash preservation (#13, #14)" "windows-paths.qmd" "base64"
 
 echo ""
 if [ $FAILED -eq 0 ]; then
