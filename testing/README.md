@@ -81,18 +81,30 @@ npm run test:e2e
 | Shortcodes preserved          | `{{< meta title >}}` survives save                 |
 | LaTeX preserved               | `\dfrac`, `\lambda` survive save                   |
 
-**`e2e/ui-controls.spec.js`** - UI elements (8 tests):
+**`e2e/ui-controls.spec.js`** - UI elements (20 tests):
 
-| Test                     | What it verifies                                  |
-|--------------------------|---------------------------------------------------|
-| Font controls exist      | 6 buttons (A-, A+, align×3, edit)                 |
-| Font size changes        | Style updates correctly                           |
-| Text alignment works     | `textAlign` style can be set                      |
-| Edit mode works          | `contentEditable` toggles                         |
-| Resize handles created   | 4 handles (nw, ne, sw, se)                        |
-| Menu buttons added       | Save & Copy buttons in menu                       |
-| htmlToQuarto conversion  | `<strong>`→`**`, `<em>`→`*`, `<code>`→backticks   |
-| Strikethrough conversion | `<del>`→`~~`                                      |
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Font controls exist              | 6 buttons (A-, A+, align×3, edit)                 |
+| Font size changes                | Style updates correctly                           |
+| Text alignment works             | `textAlign` style can be set                      |
+| Edit mode works                  | `contentEditable` toggles                         |
+| Resize handles created           | 4 handles (nw, ne, sw, se)                        |
+| Menu buttons added               | Save & Copy buttons in menu                       |
+| Dragging image                   | Container position changes after drag             |
+| Resizing image                   | Element dimensions change after resize            |
+| Dragging div                     | Div container position changes after drag         |
+| Resize with shift key            | Aspect ratio preserved during resize              |
+| Resize from NW corner            | Position adjusts when resizing from top-left      |
+| Resize minimum size              | Cannot resize below 50px                          |
+| Font size decrease minimum       | Cannot decrease font below 8px                    |
+| Font size increase button        | A+ button increases font size                     |
+| Alignment buttons                | Left/center/right buttons set `textAlign`         |
+| Edit mode button                 | Edit button toggles `contentEditable`             |
+| Multiple elements independent    | Each element has its own container and handlers   |
+| Multiple elements dimensions     | `extracteditableEltDimensions()` returns all      |
+| htmlToQuarto conversion          | `<strong>`→`**`, `<em>`→`*`, `<code>`→backticks   |
+| Strikethrough conversion         | `<del>`→`~~`                                      |
 
 ---
 
