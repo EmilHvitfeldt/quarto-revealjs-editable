@@ -4,3 +4,9 @@ _extensions
 
 /.quarto/
 **/*.quarto_ipynb
+
+# Node/Playwright
+node_modules/
+package-lock.json
+test-results/
+playwright-report/

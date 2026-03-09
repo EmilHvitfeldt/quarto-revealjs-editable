@@ -1,9 +1,23 @@
 # Test Fixtures
 
-Test files for the editable extension. Run locally with:
+Test files for the editable extension.
 
+## Running Tests
+
+### Shell tests (rendering & content verification)
 ```bash
 ./run-tests.sh
+```
+
+### E2E tests (browser-based, requires Node.js)
+```bash
+npm install
+npm run test:e2e
+```
+
+### All tests
+```bash
+npm run test:all
 ```
 
 ## Test Cases
@@ -50,9 +64,22 @@ Test files for the editable extension. Run locally with:
 
 | Issue | Description                              | Test Coverage |
 |-------|------------------------------------------|---------------|
-| #8    | Clipboard feature                        | ✓ Feature test |
+| #8    | Clipboard feature                        | ✓ Feature test + E2E |
 | #13   | Windows path separator in save dialog    | ✓ windows-paths.qmd |
 | #14   | Backslash corruption when saving         | ✓ windows-paths.qmd, round-trip.qmd |
-| #15   | Shortcodes resolved when saving          | ✓ shortcode.qmd, round-trip.qmd |
-| #16   | Backslashes removed (LaTeX, spaces)      | ✓ special-chars.qmd, latex.qmd, round-trip.qmd |
+| #15   | Shortcodes resolved when saving          | ✓ shortcode.qmd, round-trip.qmd + E2E |
+| #16   | Backslashes removed (LaTeX, spaces)      | ✓ special-chars.qmd, latex.qmd, round-trip.qmd + E2E |
 | #21   | Content leaks with include-in-header     | ✓ include-header.qmd |
+
+## E2E Tests (Playwright)
+
+Located in `e2e/save-edits.spec.js`:
+
+| Test | What it verifies |
+|------|------------------|
+| Save Edits transforms editable to absolute | `{.editable}` → `{.absolute width=... height=...}` |
+| Editable elements wrapped in containers | Containers have `position: absolute` and resize handles |
+| Dimensions extracted correctly | `extracteditableEltDimensions()` returns valid data |
+| Copy to clipboard works | `copyQmdToClipboard()` writes transformed content |
+| Shortcodes preserved | `{{< meta title >}}` survives save |
+| LaTeX preserved | `\dfrac`, `\lambda`, etc. survive save |
