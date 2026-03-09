@@ -74,20 +74,6 @@ function Pandoc(doc)
   script = script .. "window._input_filename = '" .. filename .. "';\n"
   script = script .. "</script>"
 
-  -- os.tmpname() returns a relative path on Windows (e.g., \s1a4.)
-  -- We need to prepend the temp directory for it to work
-  local tmpfile = os.tmpname()
-  if package.config:sub(1,1) == '\\' then  -- Windows
-    local temp_dir = os.getenv("TEMP") or os.getenv("TMP") or "."
-    if tmpfile:sub(1,1) == '\\' then
-      tmpfile = temp_dir .. tmpfile
-    end
-  end
-  tmpfile = tmpfile .. ".html"
-  local f = assert(io.open(tmpfile, "w"))
-  f:write(script)
-  f:close()
-
-  quarto.doc.include_file("in-header", tmpfile)
+  quarto.doc.include_text("in-header", script)
   return doc
 end
