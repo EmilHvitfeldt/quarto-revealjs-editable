@@ -14,13 +14,11 @@ window.Revealeditable = function () {
 };
 
 function addSaveMenuButton() {
-  // Find the slide-menu-items ul inside menu-custom-panel div
   const slideMenuItems = document.querySelector(
     "div.slide-menu-custom-panel ul.slide-menu-items"
   );
 
   if (slideMenuItems) {
-    // Find the highest data-item value
     const existingItems = slideMenuItems.querySelectorAll("li[data-item]");
     let maxDataItem = 0;
     existingItems.forEach((item) => {
@@ -30,15 +28,42 @@ function addSaveMenuButton() {
       }
     });
 
-    // Create the new li element
     const newLi = document.createElement("li");
-    newLi.className = "slide-tool-item";
+    newLi.className = "slide-menu-item";
     newLi.setAttribute("data-item", (maxDataItem + 1).toString());
-    newLi.innerHTML =
-      '<a href="#" onclick="saveMovedElts()"><kbd>?</kbd> Save Edits</a>';
 
-    // Append to the ul
+    const newA = document.createElement("a");
+    newA.href = "#";
+    const kbd = document.createElement("kbd");
+    kbd.textContent = "?";
+    newA.appendChild(kbd);
+    newA.appendChild(document.createTextNode(" Save Edits"));
+    newA.addEventListener("click", function (e) {
+      e.preventDefault();
+      saveMovedElts();
+    });
+    newLi.appendChild(newA);
+
     slideMenuItems.appendChild(newLi);
+
+    // Add "Copy qmd to clipboard" button
+    const copyLi = document.createElement("li");
+    copyLi.className = "slide-tool-item";
+    copyLi.setAttribute("data-item", (maxDataItem + 2).toString());
+
+    const copyA = document.createElement("a");
+    copyA.href = "#";
+    const copyKbd = document.createElement("kbd");
+    copyKbd.textContent = "c";
+    copyA.appendChild(copyKbd);
+    copyA.appendChild(document.createTextNode(" Copy qmd to Clipboard"));
+    copyA.addEventListener("click", function (e) {
+      e.preventDefault();
+      copyQmdToClipboard();
+    });
+    copyLi.appendChild(copyA);
+
+    slideMenuItems.appendChild(copyLi);
   }
 }
 
@@ -107,7 +132,6 @@ function setupDraggableElt(elt) {
       container.appendChild(handle);
     });
 
-    // Create font size controls for div elements
     if (elt.tagName.toLowerCase() === "div") {
       const fontControls = document.createElement("div");
       fontControls.className = "font-controls";
@@ -125,7 +149,6 @@ function setupDraggableElt(elt) {
       const increaseBtn = createButton("A+", "24px", "4px 12px");
       increaseBtn.style.marginRight = "10px";
 
-      // Create text alignment controls
       const alignLeftBtn = createButton("⇤", "20px", "4px 12px");
       alignLeftBtn.title = "Align Left";
 
@@ -147,7 +170,6 @@ function setupDraggableElt(elt) {
       fontControls.appendChild(editBtn);
       container.appendChild(fontControls);
 
-      // Add event listeners for font size controls
       decreaseBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         changeFontSize(elt, -2);
@@ -158,7 +180,6 @@ function setupDraggableElt(elt) {
         changeFontSize(elt, 2);
       });
 
-      // Add event listeners for text alignment controls
       alignLeftBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         elt.style.textAlign = "left";
@@ -174,7 +195,6 @@ function setupDraggableElt(elt) {
         elt.style.textAlign = "right";
       });
 
-      // Add event listener for edit button
       editBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         const isEditable = elt.contentEditable === "true";
@@ -227,10 +247,6 @@ function setupDraggableElt(elt) {
 
   function getClientCoordinates(e) {
     const isTouch = e.type.startsWith("touch");
-
-    // revealjs scales this .slides container element so that
-    // the slide fits completely in the viewport. We have to
-    // adjust the mouse/touch positions by this scaling.
     const slidesContainerEl = document.querySelector(".slides");
     const scale = window
       .getComputedStyle(slidesContainerEl)
@@ -315,12 +331,10 @@ function setupDraggableElt(elt) {
     let newX = initialX;
     let newY = initialY;
 
-    // Check if Shift key is pressed for aspect ratio preservation
     const preserveAspectRatio = e.shiftKey;
     const aspectRatio = initialWidth / initialHeight;
 
     if (preserveAspectRatio) {
-      // For corner handles, use the larger delta to maintain aspect ratio
       if (resizeHandle.includes("e") || resizeHandle.includes("w")) {
         const widthChange = resizeHandle.includes("e") ? deltaX : -deltaX;
         newWidth = Math.max(50, initialWidth + widthChange);
@@ -331,7 +345,6 @@ function setupDraggableElt(elt) {
         newWidth = newHeight * aspectRatio;
       }
 
-      // Adjust position for west/north handles when preserving aspect ratio
       if (resizeHandle.includes("w")) {
         newX = initialX + (initialWidth - newWidth);
       }
@@ -339,7 +352,6 @@ function setupDraggableElt(elt) {
         newY = initialY + (initialHeight - newHeight);
       }
     } else {
-      // Original free resize behavior
       if (resizeHandle.includes("e")) {
         newWidth = Math.max(50, initialWidth + deltaX);
       }
@@ -386,7 +398,7 @@ function setupDraggableElt(elt) {
   function changeFontSize(element, delta) {
     const currentFontSize =
       parseFloat(window.getComputedStyle(element).fontSize) || 16;
-    const newFontSize = Math.max(8, currentFontSize + delta); // Minimum font size of 8px
+    const newFontSize = Math.max(8, currentFontSize + delta);
     element.style.fontSize = newFontSize + "px";
   }
 
@@ -405,7 +417,7 @@ function setupDraggableElt(elt) {
 }
 
 function saveMovedElts() {
-  index = readIndexQmd();
+  let index = readIndexQmd();
   Elt_dim = extracteditableEltDimensions();
 
   index = udpdateTextDivs(index);
@@ -413,22 +425,29 @@ function saveMovedElts() {
   Elt_attr = formateditableEltStrings(Elt_dim);
   index = replaceeditableOccurrences(index, Elt_attr);
 
-  index = preserveBackSlashes(index);
   downloadString(index);
 }
 
-function preserveBackSlashes(index) {
-  // avoid removing some backslashes
-  index = index.replaceAll("\\", "\\\\");
-  index = index.replaceAll("\\\\(", "\\(");
-  index = index.replaceAll("\\\\)", "\\)");
-  index = index.replace(/ +(?=\n)/g, (match) => "\\ ".repeat(match.length));
-  return index;
-}
-
-// Function to read index.qmd file
+// Function to read index.qmd file (decoded from base64 by atob() at load time)
 function readIndexQmd() {
   return window._input_file;
+}
+
+// Function to copy the modified qmd content to clipboard (closes #8)
+function copyQmdToClipboard() {
+  let index = readIndexQmd();
+  Elt_dim = extracteditableEltDimensions();
+
+  index = udpdateTextDivs(index);
+
+  Elt_attr = formateditableEltStrings(Elt_dim);
+  index = replaceeditableOccurrences(index, Elt_attr);
+
+  navigator.clipboard.writeText(index).then(function () {
+    console.log("qmd content copied to clipboard");
+  }).catch(function (err) {
+    console.error("Failed to copy to clipboard:", err);
+  });
 }
 
 // Function to get data-filename attribute from editable div
@@ -449,7 +468,6 @@ function extracteditableEltDimensions() {
       ? parseFloat(elt.style.height)
       : elt.offsetHeight;
 
-    // Get parent container (div) position
     const parentContainer = elt.parentNode;
     const left = parentContainer.style.left
       ? parseFloat(parentContainer.style.left)
@@ -465,11 +483,9 @@ function extracteditableEltDimensions() {
       top: top,
     };
 
-    // Add font-size for div elements if it's set
     if (elt.tagName.toLowerCase() === "div" && elt.style.fontSize) {
       dimensionData.fontSize = parseFloat(elt.style.fontSize);
     }
-    // Add text-align for div elements if it's set
     if (elt.tagName.toLowerCase() === "div" && elt.style.textAlign) {
       dimensionData.textAlign = elt.style.textAlign;
     }
@@ -480,7 +496,6 @@ function extracteditableEltDimensions() {
   return dimensions;
 }
 
-// Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
 function udpdateTextDivs(text) {
   divs = getEditableDivs();
   replacements = Array.from(divs).map(htmlToQuarto);
@@ -514,7 +529,6 @@ function htmlToQuarto(div) {
   return text;
 }
 
-// Function to replace all occurrences that start with "{.editable" and go until the first "}" with replacements from array
 function replaceeditableOccurrences(text, replacements) {
   const regex = /\{\.editable[^}]*\}|::: ?editable/g;
 
@@ -524,7 +538,6 @@ function replaceeditableOccurrences(text, replacements) {
   });
 }
 
-// Function to format editable dimensions as strings
 function formateditableEltStrings(dimensions) {
   return dimensions.map((dim) => {
     let str = `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px`;
@@ -536,7 +549,6 @@ function formateditableEltStrings(dimensions) {
       if (dim.fontSize && dim.textAlign) {
         str += ` `;
       }
-
       if (dim.textAlign) {
         str += `text-align: ${dim.textAlign};`;
       }
@@ -547,13 +559,10 @@ function formateditableEltStrings(dimensions) {
   });
 }
 
-// Function to make a string available as a downloadable file
 async function downloadString(content, mimeType = "text/plain") {
   filename = geteditableFilename();
-  // Check if the File System Access API is supported
   if ("showSaveFilePicker" in window) {
     try {
-      // Show file picker dialog
       const fileHandle = await window.showSaveFilePicker({
         suggestedName: filename,
         types: [
@@ -564,7 +573,6 @@ async function downloadString(content, mimeType = "text/plain") {
         ],
       });
 
-      // Create a writable stream and write the content
       const writable = await fileHandle.createWritable();
       await writable.write(content);
       await writable.close();
@@ -572,12 +580,10 @@ async function downloadString(content, mimeType = "text/plain") {
       console.log("File saved successfully");
       return;
     } catch (error) {
-      // User cancelled or error occurred, fall back to traditional method
       console.log("File picker cancelled or failed, using fallback method");
     }
   }
 
-  // Fallback to traditional download method
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
 
