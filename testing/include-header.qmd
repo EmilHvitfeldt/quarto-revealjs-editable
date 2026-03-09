@@ -1,0 +1,18 @@
+---
+title: "Include Header Test"
+include-in-header:
+  text: |
+    <script>
+      window.myVar = 42;
+    </script>
+---
+
+## Slide 1
+
+This tests that include-in-header doesn't break injection.
+
+## Slide 2
+
+::: {.editable}
+Editable content with custom header script.
+:::

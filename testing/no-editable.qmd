@@ -1,0 +1,11 @@
+---
+title: "No Editable Elements"
+---
+
+## Slide 1
+
+This slide has no editable elements.
+
+## Slide 2
+
+Just regular content here.
