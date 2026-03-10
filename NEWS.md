@@ -28,6 +28,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Fixed
 
+- Menu buttons now have proper hover effect matching other tools (#7)
 - Raw qmd content no longer leaks into slides when `include-in-header` contains a `<script>` (#21)
 - Shortcodes are now preserved when saving, instead of being resolved (#15)
 - Backslashes no longer removed from content (LaTeX, regex, paths) (#16)

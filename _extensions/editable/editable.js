@@ -1015,9 +1015,23 @@ function addSaveMenuButton() {
       }
     });
 
+    // Helper to add menu hover behavior (matches reveal-menu plugin)
+    function addMenuHoverBehavior(li) {
+      li.addEventListener("mouseenter", function () {
+        // Remove selected from siblings
+        slideMenuItems.querySelectorAll(".slide-tool-item.selected").forEach((item) => {
+          item.classList.remove("selected");
+        });
+        li.classList.add("selected");
+      });
+      li.addEventListener("mouseleave", function () {
+        li.classList.remove("selected");
+      });
+    }
+
     // Add "Save Edits" button
     const newLi = document.createElement("li");
-    newLi.className = "slide-menu-item";
+    newLi.className = "slide-tool-item";
     newLi.setAttribute("data-item", (maxDataItem + 1).toString());
 
     const newA = document.createElement("a");
@@ -1031,6 +1045,7 @@ function addSaveMenuButton() {
       saveMovedElts();
     });
     newLi.appendChild(newA);
+    addMenuHoverBehavior(newLi);
     slideMenuItems.appendChild(newLi);
 
     // Add "Copy qmd to clipboard" button
@@ -1049,6 +1064,7 @@ function addSaveMenuButton() {
       copyQmdToClipboard();
     });
     copyLi.appendChild(copyA);
+    addMenuHoverBehavior(copyLi);
     slideMenuItems.appendChild(copyLi);
   }
 }
