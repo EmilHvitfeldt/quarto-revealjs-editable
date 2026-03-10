@@ -14,6 +14,116 @@ const CONFIG = {
 };
 
 // =============================================================================
+// Element State Management
+// =============================================================================
+
+// Registry to track all editable elements
+const editableRegistry = new Map();
+
+// EditableElement class - centralized state for each editable element
+class EditableElement {
+  constructor(element) {
+    this.element = element;
+    this.container = null;
+    this.type = element.tagName.toLowerCase();
+
+    // Initialize state from current element
+    this.state = {
+      x: 0,
+      y: 0,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+      // Div-specific properties
+      fontSize: null,
+      textAlign: null,
+    };
+  }
+
+  // Get a copy of current state
+  getState() {
+    return { ...this.state };
+  }
+
+  // Update state and optionally sync to DOM
+  setState(updates, syncToDOM = true) {
+    Object.assign(this.state, updates);
+
+    if (syncToDOM) {
+      this.syncToDOM();
+    }
+  }
+
+  // Sync state to DOM elements
+  syncToDOM() {
+    if (this.container) {
+      this.container.style.left = this.state.x + "px";
+      this.container.style.top = this.state.y + "px";
+    }
+
+    this.element.style.width = this.state.width + "px";
+    this.element.style.height = this.state.height + "px";
+
+    if (this.state.fontSize !== null) {
+      this.element.style.fontSize = this.state.fontSize + "px";
+    }
+    if (this.state.textAlign !== null) {
+      this.element.style.textAlign = this.state.textAlign;
+    }
+  }
+
+  // Read current values from DOM into state
+  syncFromDOM() {
+    if (this.container) {
+      this.state.x = this.container.style.left
+        ? parseFloat(this.container.style.left)
+        : this.container.offsetLeft;
+      this.state.y = this.container.style.top
+        ? parseFloat(this.container.style.top)
+        : this.container.offsetTop;
+    }
+
+    this.state.width = this.element.style.width
+      ? parseFloat(this.element.style.width)
+      : this.element.offsetWidth;
+    this.state.height = this.element.style.height
+      ? parseFloat(this.element.style.height)
+      : this.element.offsetHeight;
+
+    if (this.type === "div") {
+      if (this.element.style.fontSize) {
+        this.state.fontSize = parseFloat(this.element.style.fontSize);
+      }
+      if (this.element.style.textAlign) {
+        this.state.textAlign = this.element.style.textAlign;
+      }
+    }
+  }
+
+  // Generate dimension object for serialization
+  toDimensions() {
+    this.syncFromDOM();
+
+    const dims = {
+      width: this.state.width,
+      height: this.state.height,
+      left: this.state.x,
+      top: this.state.y,
+    };
+
+    if (this.type === "div") {
+      if (this.state.fontSize !== null) {
+        dims.fontSize = this.state.fontSize;
+      }
+      if (this.state.textAlign !== null) {
+        dims.textAlign = this.state.textAlign;
+      }
+    }
+
+    return dims;
+  }
+}
+
+// =============================================================================
 // Utility Functions
 // =============================================================================
 
@@ -55,6 +165,12 @@ function changeFontSize(element, delta) {
     parseFloat(window.getComputedStyle(element).fontSize) || CONFIG.DEFAULT_FONT_SIZE;
   const newFontSize = Math.max(CONFIG.MIN_FONT_SIZE, currentFontSize + delta);
   element.style.fontSize = newFontSize + "px";
+
+  // Update state if element is in registry
+  const editableElt = editableRegistry.get(element);
+  if (editableElt) {
+    editableElt.state.fontSize = newFontSize;
+  }
 }
 
 // =============================================================================
@@ -148,6 +264,10 @@ function addSaveMenuButton() {
 // =============================================================================
 
 function setupDraggableElt(elt) {
+  // Create state manager for this element
+  const editableElt = new EditableElement(elt);
+  editableRegistry.set(elt, editableElt);
+
   // Interaction state
   let isDragging = false;
   let isResizing = false;
@@ -158,10 +278,11 @@ function setupDraggableElt(elt) {
 
   // Setup
   const container = createEltContainer(elt);
+  editableElt.container = container;
   setupEltStyles(elt);
   createResizeHandles(container, elt);
   setupHoverEffects(container);
-  setupKeyboardNavigation(container, elt);
+  setupKeyboardNavigation(container, elt, editableElt);
   attachEventListeners();
 
   // -------------------------------------------------------------------------
@@ -240,13 +361,21 @@ function setupDraggableElt(elt) {
       changeFontSize(elt, CONFIG.FONT_SIZE_STEP);
     });
 
-    // Alignment buttons
+    // Alignment buttons with state update
+    function setAlignment(alignment) {
+      elt.style.textAlign = alignment;
+      const editableElt = editableRegistry.get(elt);
+      if (editableElt) {
+        editableElt.state.textAlign = alignment;
+      }
+    }
+
     const alignLeftBtn = createButton("⇤", "editable-button-align");
     alignLeftBtn.setAttribute("aria-label", "Align text left");
     alignLeftBtn.title = "Align Left";
     alignLeftBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      elt.style.textAlign = "left";
+      setAlignment("left");
     });
 
     const alignCenterBtn = createButton("⇔", "editable-button-align");
@@ -254,7 +383,7 @@ function setupDraggableElt(elt) {
     alignCenterBtn.title = "Align Center";
     alignCenterBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      elt.style.textAlign = "center";
+      setAlignment("center");
     });
 
     const alignRightBtn = createButton("⇥", "editable-button-align");
@@ -262,7 +391,7 @@ function setupDraggableElt(elt) {
     alignRightBtn.title = "Align Right";
     alignRightBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      elt.style.textAlign = "right";
+      setAlignment("right");
     });
 
     // Edit mode button
@@ -322,7 +451,7 @@ function setupDraggableElt(elt) {
   // Keyboard Navigation
   // -------------------------------------------------------------------------
 
-  function setupKeyboardNavigation(container, elt) {
+  function setupKeyboardNavigation(container, elt, editableElt) {
     container.addEventListener("keydown", (e) => {
       // Shift+Tab exits to normal slide navigation
       if (e.key === "Tab" && e.shiftKey) {
@@ -340,42 +469,39 @@ function setupDraggableElt(elt) {
       e.stopPropagation();
 
       const step = CONFIG.KEYBOARD_MOVE_STEP;
-      const currentLeft = parseFloat(container.style.left) || container.offsetLeft;
-      const currentTop = parseFloat(container.style.top) || container.offsetTop;
+      editableElt.syncFromDOM();
+      const state = editableElt.getState();
 
       if (e.shiftKey) {
         // Shift + arrows = resize
-        const currentWidth = parseFloat(elt.style.width) || elt.offsetWidth;
-        const currentHeight = parseFloat(elt.style.height) || elt.offsetHeight;
-
         switch (e.key) {
           case "ArrowRight":
-            elt.style.width = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentWidth + step) + "px";
+            editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width + step) });
             break;
           case "ArrowLeft":
-            elt.style.width = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentWidth - step) + "px";
+            editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width - step) });
             break;
           case "ArrowDown":
-            elt.style.height = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentHeight + step) + "px";
+            editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height + step) });
             break;
           case "ArrowUp":
-            elt.style.height = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentHeight - step) + "px";
+            editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height - step) });
             break;
         }
       } else {
         // Arrows = move
         switch (e.key) {
           case "ArrowRight":
-            container.style.left = (currentLeft + step) + "px";
+            editableElt.setState({ x: state.x + step });
             break;
           case "ArrowLeft":
-            container.style.left = (currentLeft - step) + "px";
+            editableElt.setState({ x: state.x - step });
             break;
           case "ArrowDown":
-            container.style.top = (currentTop + step) + "px";
+            editableElt.setState({ y: state.y + step });
             break;
           case "ArrowUp":
-            container.style.top = (currentTop - step) + "px";
+            editableElt.setState({ y: state.y - step });
             break;
         }
       }
@@ -619,30 +745,25 @@ function extractEditableEltDimensions() {
   const dimensions = [];
 
   editableElements.forEach((elt) => {
-    const width = elt.style.width ? parseFloat(elt.style.width) : elt.offsetWidth;
-    const height = elt.style.height ? parseFloat(elt.style.height) : elt.offsetHeight;
+    const editableElt = editableRegistry.get(elt);
+    if (editableElt) {
+      // Use centralized state
+      dimensions.push(editableElt.toDimensions());
+    } else {
+      // Fallback for elements not in registry (shouldn't happen)
+      const width = elt.style.width ? parseFloat(elt.style.width) : elt.offsetWidth;
+      const height = elt.style.height ? parseFloat(elt.style.height) : elt.offsetHeight;
 
-    const parentContainer = elt.parentNode;
-    const left = parentContainer.style.left
-      ? parseFloat(parentContainer.style.left)
-      : parentContainer.offsetLeft;
-    const top = parentContainer.style.top
-      ? parseFloat(parentContainer.style.top)
-      : parentContainer.offsetTop;
+      const parentContainer = elt.parentNode;
+      const left = parentContainer.style.left
+        ? parseFloat(parentContainer.style.left)
+        : parentContainer.offsetLeft;
+      const top = parentContainer.style.top
+        ? parseFloat(parentContainer.style.top)
+        : parentContainer.offsetTop;
 
-    const dimensionData = { width, height, left, top };
-
-    // Add div-specific properties
-    if (elt.tagName.toLowerCase() === "div") {
-      if (elt.style.fontSize) {
-        dimensionData.fontSize = parseFloat(elt.style.fontSize);
-      }
-      if (elt.style.textAlign) {
-        dimensionData.textAlign = elt.style.textAlign;
-      }
+      dimensions.push({ width, height, left, top });
     }
-
-    dimensions.push(dimensionData);
   });
 
   return dimensions;

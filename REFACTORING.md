@@ -46,18 +46,20 @@ const dimensionData = {
 - UI controls
 - Keyboard handlers
 
-### 4. Duplicate Code
+### 4. Duplicate Code ✅ RESOLVED (Phase 1)
 
-- `handleMouseMove` and `handleTouchMove` are identical
-- `saveMovedElts` and `copyQmdToClipboard` share transformation logic
+- ~~`handleMouseMove` and `handleTouchMove` are identical~~ → Combined into `handlePointerMove`
+- ~~`saveMovedElts` and `copyQmdToClipboard` share transformation logic~~ → Extracted to `getTransformedQmd()`
 
-### 5. Mixed Concerns in `createResizeHandles`
+### 5. Mixed Concerns in `createResizeHandles` ✅ RESOLVED (Phase 1)
 
-This function creates:
-- Resize handles
-- ARIA attributes
-- Font controls (for divs)
-- Button event handlers
+~~This function creates:~~
+- ~~Resize handles~~
+- ~~ARIA attributes~~
+- ~~Font controls (for divs)~~
+- ~~Button event handlers~~
+
+Now split into separate `createResizeHandles()` and `createFontControls()` functions.
 
 ---
 
@@ -238,15 +240,17 @@ _extensions/editable/
 
 ## Migration Path
 
-### Phase 1: Extract Utilities (Low risk)
+### Phase 1: Extract Utilities (Low risk) ✅ COMPLETE
 - Extract `getSlideScale`, `getClientCoordinates` to utils
 - Combine `handleMouseMove`/`handleTouchMove`
 - Extract shared logic from `saveMovedElts`/`copyQmdToClipboard`
 
-### Phase 2: State Management (Medium risk)
-- Create state object per element
-- Refactor dimension extraction to use state
-- Refactor serialization to use state
+### Phase 2: State Management (Medium risk) ✅ COMPLETE
+- Create `EditableElement` class with centralized state
+- Create `editableRegistry` Map to track all elements
+- Refactor dimension extraction to use `toDimensions()` method
+- State updates for font size and alignment changes
+- Keyboard navigation uses state via `setState()`/`getState()`
 
 ### Phase 3: Capability System (Medium risk)
 - Define capability interface
