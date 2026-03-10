@@ -32,10 +32,10 @@ test.describe('Save Edits Feature', () => {
     const savedContent = await page.evaluate(() => {
       // Call the internal functions to get what would be saved
       const index = window._input_file;
-      const Elt_dim = extracteditableEltDimensions();
+      const Elt_dim = extractEditableEltDimensions();
       let result = updateTextDivs(index);
-      const Elt_attr = formateditableEltStrings(Elt_dim);
-      result = replaceeditableOccurrences(result, Elt_attr);
+      const Elt_attr = formatEditableEltStrings(Elt_dim);
+      result = replaceEditableOccurrences(result, Elt_attr);
       return result;
     });
 
@@ -82,7 +82,7 @@ test.describe('Save Edits Feature', () => {
 
     // Get dimensions using the extension's function
     const dimensions = await page.evaluate(() => {
-      return extracteditableEltDimensions();
+      return extractEditableEltDimensions();
     });
 
     // Should have dimensions for each editable element
@@ -157,10 +157,10 @@ test.describe('Save Edits Feature', () => {
     // Get saved content - this tests that the regex correctly matches div content with colons
     const savedContent = await page.evaluate(() => {
       const index = window._input_file;
-      const Elt_dim = extracteditableEltDimensions();
+      const Elt_dim = extractEditableEltDimensions();
       let result = updateTextDivs(index);
-      const Elt_attr = formateditableEltStrings(Elt_dim);
-      result = replaceeditableOccurrences(result, Elt_attr);
+      const Elt_attr = formatEditableEltStrings(Elt_dim);
+      result = replaceEditableOccurrences(result, Elt_attr);
       return result;
     });
 
@@ -201,10 +201,10 @@ test.describe('Save Edits Feature', () => {
     // Both should be transformable
     const savedContent = await page.evaluate(() => {
       const index = window._input_file;
-      const Elt_dim = extracteditableEltDimensions();
+      const Elt_dim = extractEditableEltDimensions();
       let result = updateTextDivs(index);
-      const Elt_attr = formateditableEltStrings(Elt_dim);
-      result = replaceeditableOccurrences(result, Elt_attr);
+      const Elt_attr = formatEditableEltStrings(Elt_dim);
+      result = replaceEditableOccurrences(result, Elt_attr);
       return result;
     });
 
@@ -228,10 +228,10 @@ test.describe('Save Edits Feature', () => {
     // Get saved content
     const savedContent = await page.evaluate(() => {
       const index = window._input_file;
-      const Elt_dim = extracteditableEltDimensions();
+      const Elt_dim = extractEditableEltDimensions();
       let result = updateTextDivs(index);
-      const Elt_attr = formateditableEltStrings(Elt_dim);
-      result = replaceeditableOccurrences(result, Elt_attr);
+      const Elt_attr = formatEditableEltStrings(Elt_dim);
+      result = replaceEditableOccurrences(result, Elt_attr);
       return result;
     });
 

@@ -648,7 +648,7 @@ test.describe('Multiple Elements', () => {
     expect(result.firstMoved).toBe(true);
   });
 
-  test('extracteditableEltDimensions returns all elements', async ({ page }) => {
+  test('extractEditableEltDimensions returns all elements', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'multiple-elements.html');
 
     if (!fs.existsSync(htmlPath)) {
@@ -662,7 +662,7 @@ test.describe('Multiple Elements', () => {
 
     const result = await page.evaluate(() => {
       const editables = document.querySelectorAll('.editable');
-      const dimensions = extracteditableEltDimensions();
+      const dimensions = extractEditableEltDimensions();
       return {
         elementCount: editables.length,
         dimensionCount: dimensions.length,
@@ -732,7 +732,7 @@ test.describe('Code Quality', () => {
         top: 25.111111
       }];
 
-      const formatted = formateditableEltStrings(testDimensions);
+      const formatted = formatEditableEltStrings(testDimensions);
       return formatted[0];
     });
 
@@ -759,10 +759,10 @@ test.describe('Code Quality', () => {
 
       // Trigger save logic
       const index = window._input_file;
-      const Elt_dim = extracteditableEltDimensions();
+      const Elt_dim = extractEditableEltDimensions();
       const result = updateTextDivs(index);
-      const Elt_attr = formateditableEltStrings(Elt_dim);
-      replaceeditableOccurrences(result, Elt_attr);
+      const Elt_attr = formatEditableEltStrings(Elt_dim);
+      replaceEditableOccurrences(result, Elt_attr);
 
       // Check for new global variables (excluding expected ones)
       const afterProps = Object.keys(window);

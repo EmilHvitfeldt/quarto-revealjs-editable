@@ -33,24 +33,20 @@ local function has_editable_class(el)
   return false
 end
 
--- Walk the AST looking for Div or Image elements with class "editable".
--- These are the only elements the JS targets: div.editable and img.editable.
--- Using the AST avoids any risk of false positives on the word "editable"
--- appearing in plain text or code blocks.
-local found_editable = false
-
-function Div(el)
-  if has_editable_class(el) then
-    found_editable = true
-  end
-  return el
-end
-
-function Image(el)
-  if has_editable_class(el) then
-    found_editable = true
-  end
-  return el
+-- Check if document has any editable elements (Div or Image with class "editable")
+-- Walk AST inside Pandoc to avoid module-level state that persists across files
+local function has_editable_elements(doc)
+  local found = false
+  local filter = {
+    Div = function(el)
+      if has_editable_class(el) then found = true end
+    end,
+    Image = function(el)
+      if has_editable_class(el) then found = true end
+    end
+  }
+  pandoc.walk_block(pandoc.Div(doc.blocks), filter)
+  return found
 end
 
 function Pandoc(doc)
@@ -58,7 +54,7 @@ function Pandoc(doc)
   -- This keeps the generated HTML clean after a save (when all {.editable}
   -- have been replaced by {.absolute ...}) and avoids unnecessary base64
   -- encoding when the filter is active but unused.
-  if not found_editable then return doc end
+  if not has_editable_elements(doc) then return doc end
 
   -- Encode qmd source as base64 and inject into <head>
   local filename = quarto.doc.input_file

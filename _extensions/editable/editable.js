@@ -418,12 +418,12 @@ function setupDraggableElt(elt) {
 
 function saveMovedElts() {
   let index = readIndexQmd();
-  const Elt_dim = extracteditableEltDimensions();
+  const Elt_dim = extractEditableEltDimensions();
 
   index = updateTextDivs(index);
 
-  const Elt_attr = formateditableEltStrings(Elt_dim);
-  index = replaceeditableOccurrences(index, Elt_attr);
+  const Elt_attr = formatEditableEltStrings(Elt_dim);
+  index = replaceEditableOccurrences(index, Elt_attr);
 
   downloadString(index);
 }
@@ -440,12 +440,12 @@ function readIndexQmd() {
 // Function to copy the modified qmd content to clipboard (closes #8)
 function copyQmdToClipboard() {
   let index = readIndexQmd();
-  const Elt_dim = extracteditableEltDimensions();
+  const Elt_dim = extractEditableEltDimensions();
 
   index = updateTextDivs(index);
 
-  const Elt_attr = formateditableEltStrings(Elt_dim);
-  index = replaceeditableOccurrences(index, Elt_attr);
+  const Elt_attr = formatEditableEltStrings(Elt_dim);
+  index = replaceEditableOccurrences(index, Elt_attr);
 
   navigator.clipboard.writeText(index).then(function () {
     console.log("qmd content copied to clipboard");
@@ -455,12 +455,12 @@ function copyQmdToClipboard() {
 }
 
 // Function to get data-filename attribute from editable div
-function geteditableFilename() {
+function getEditableFilename() {
   return window._input_filename.split(/[/\\]/).pop();
 }
 
 // Function to extract width and height of Elts with editable id
-function extracteditableEltDimensions() {
+function extractEditableEltDimensions() {
   const editableElements = getEditableElements();
   const dimensions = [];
 
@@ -516,26 +516,32 @@ function updateTextDivs(text) {
 
 function htmlToQuarto(div) {
   let text = div.innerHTML;
-
   text = text.trim();
-  text = text.replaceAll("<p>", "");
-  text = text.replaceAll("</p>", "");
-  text = text.replaceAll("<code>", "`");
-  text = text.replaceAll("</code>", "`");
-  text = text.replaceAll("<strong>", "**");
-  text = text.replaceAll("</strong>", "**");
-  text = text.replaceAll("<em>", "*");
-  text = text.replaceAll("</em>", "*");
-  text = text.replaceAll("<del>", "~~");
-  text = text.replaceAll("</del>", "~~");
-  text = text.replaceAll("\n", "\n\n");
 
-  text = "::: {.editable}\n" + text + "\n:::";
+  // Handle br tags first (self-closing or not)
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+
+  // Handle tags with potential attributes using regex
+  text = text.replace(/<p[^>]*>/gi, "");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<code[^>]*>/gi, "`");
+  text = text.replace(/<\/code>/gi, "`");
+  text = text.replace(/<strong[^>]*>/gi, "**");
+  text = text.replace(/<\/strong>/gi, "**");
+  text = text.replace(/<em[^>]*>/gi, "*");
+  text = text.replace(/<\/em>/gi, "*");
+  text = text.replace(/<del[^>]*>/gi, "~~");
+  text = text.replace(/<\/del>/gi, "~~");
+
+  // Clean up excessive newlines (3+ -> 2)
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  text = "::: {.editable}\n" + text.trim() + "\n:::";
 
   return text;
 }
 
-function replaceeditableOccurrences(text, replacements) {
+function replaceEditableOccurrences(text, replacements) {
   // Match {.editable} or {.editable ...} patterns
   // Note: ::: editable divs are normalized to {.editable} by updateTextDivs first
   const regex = /\{\.editable[^}]*\}/g;
@@ -546,7 +552,7 @@ function replaceeditableOccurrences(text, replacements) {
   });
 }
 
-function formateditableEltStrings(dimensions) {
+function formatEditableEltStrings(dimensions) {
   // Round to 1 decimal place for cleaner output
   const round = (n) => Math.round(n * 10) / 10;
 
@@ -571,7 +577,7 @@ function formateditableEltStrings(dimensions) {
 }
 
 async function downloadString(content, mimeType = "text/plain") {
-  const filename = geteditableFilename();
+  const filename = getEditableFilename();
   if ("showSaveFilePicker" in window) {
     try {
       const fileHandle = await window.showSaveFilePicker({

@@ -78,7 +78,7 @@ npm run test:e2e
 |-------------------------------|---------------------------------------------------|
 | Save Edits transforms content | `{.editable}` → `{.absolute width=... height=...}` |
 | Containers wrapped correctly  | `position: absolute` and resize handles            |
-| Dimensions extracted          | `extracteditableEltDimensions()` returns valid data |
+| Dimensions extracted          | `extractEditableEltDimensions()` returns valid data |
 | Clipboard works               | `copyQmdToClipboard()` writes to clipboard         |
 | Shortcodes in base64          | `{{< meta title >}}` preserved in source           |
 | Content with colons           | Div content with `:` handled correctly (regex fix) |
@@ -106,7 +106,7 @@ npm run test:e2e
 | Alignment buttons                | Left/center/right buttons set `textAlign`         |
 | Edit mode button                 | Edit button toggles `contentEditable`             |
 | Multiple elements independent    | Each element has its own container and handlers   |
-| Multiple elements dimensions     | `extracteditableEltDimensions()` returns all      |
+| Multiple elements dimensions     | `extractEditableEltDimensions()` returns all      |
 | No global variable pollution     | Save functions don't leak globals                 |
 | Missing _input_file handled      | Graceful error when filter not applied            |
 | Dimension rounding               | Output values rounded to 1 decimal place          |
