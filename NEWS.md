@@ -6,9 +6,14 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Added
 
+- **Rotation support** for images and text divs
+  - Orange circular handle at top center of elements
+  - Hold Shift while rotating to snap to 15° increments
+  - Keyboard shortcuts: Ctrl+Left/Right to rotate, Ctrl+Shift for 15° steps
+  - Rotation saved to QMD as `transform: rotate(Xdeg)` in style attribute
 - **Undo/redo support** for element positioning and styling (#26)
   - Ctrl+Z (Cmd+Z on Mac) to undo, Ctrl+Y or Ctrl+Shift+Z to redo
-  - Tracks position, size, font size, and text alignment changes
+  - Tracks position, size, rotation, font size, and text alignment changes
   - Separate from browser's native undo in text edit mode
 - **"Copy qmd to Clipboard" button** in Tools menu for easier workflow (#8)
 - **Accessibility support**: Editable elements are now fully keyboard accessible

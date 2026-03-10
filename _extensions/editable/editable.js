@@ -36,6 +36,7 @@ class EditableElement {
       y: 0,
       width: element.offsetWidth,
       height: element.offsetHeight,
+      rotation: 0,
       // Div-specific properties
       fontSize: null,
       textAlign: null,
@@ -61,6 +62,12 @@ class EditableElement {
     if (this.container) {
       this.container.style.left = this.state.x + "px";
       this.container.style.top = this.state.y + "px";
+      // Apply rotation to container
+      if (this.state.rotation !== 0) {
+        this.container.style.transform = `rotate(${this.state.rotation}deg)`;
+      } else {
+        this.container.style.transform = "";
+      }
     }
 
     this.element.style.width = this.state.width + "px";
@@ -83,6 +90,11 @@ class EditableElement {
       this.state.y = this.container.style.top
         ? parseFloat(this.container.style.top)
         : this.container.offsetTop;
+
+      // Parse rotation from transform
+      const transform = this.container.style.transform || "";
+      const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
+      this.state.rotation = rotateMatch ? parseFloat(rotateMatch[1]) : 0;
     }
 
     this.state.width = this.element.style.width
@@ -112,6 +124,11 @@ class EditableElement {
       left: this.state.x,
       top: this.state.y,
     };
+
+    // Include rotation if set
+    if (this.state.rotation !== 0) {
+      dims.rotation = this.state.rotation;
+    }
 
     if (this.type === "div") {
       if (this.state.fontSize !== null) {
@@ -320,6 +337,7 @@ const Capabilities = {
 
     handleKeyboard(context, e, editableElt) {
       if (e.shiftKey) return false; // Let resize handle shift+arrows
+      if (e.ctrlKey || e.metaKey) return false; // Let rotate handle ctrl/cmd+arrows
 
       const step = CONFIG.KEYBOARD_MOVE_STEP;
       const state = editableElt.getState();
@@ -484,6 +502,7 @@ const Capabilities = {
 
     handleKeyboard(context, e, editableElt) {
       if (!e.shiftKey) return false; // Only handle shift+arrows
+      if (e.ctrlKey || e.metaKey) return false; // Let rotate handle ctrl/cmd+shift+arrows
 
       const step = CONFIG.KEYBOARD_MOVE_STEP;
       const state = editableElt.getState();
@@ -578,12 +597,133 @@ const Capabilities = {
       // Events are attached via ControlRegistry.createButton
     },
   },
+
+  // Rotate capability - handles rotating elements
+  rotate: {
+    name: "rotate",
+
+    init(context) {
+      context.isRotating = false;
+      context.rotateStartAngle = 0;
+      context.rotateInitialRotation = 0;
+    },
+
+    createHandles(context) {
+      const { container } = context;
+
+      const handle = document.createElement("div");
+      handle.className = "rotate-handle";
+      handle.setAttribute("role", "slider");
+      handle.setAttribute("aria-label", "Rotate element");
+      handle.setAttribute("tabindex", "-1");
+      handle.title = "Rotate (Shift to snap to 15°)";
+      container.appendChild(handle);
+    },
+
+    attachEvents(context) {
+      const { container } = context;
+
+      const startRotate = (e) => {
+        // Capture state for undo before starting rotate
+        pushUndoState();
+
+        context.cachedScale = getSlideScale();
+        context.isRotating = true;
+
+        // Get center of container
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        context.rotateCenterX = centerX;
+        context.rotateCenterY = centerY;
+
+        // Calculate starting angle from center to mouse
+        const coords = getClientCoordinates(e, 1); // Don't scale for angle calculation
+        context.rotateStartAngle = Math.atan2(
+          coords.clientY * context.cachedScale - centerY,
+          coords.clientX * context.cachedScale - centerX
+        );
+
+        // Get current rotation from state
+        const editableElt = context.editableElt;
+        context.rotateInitialRotation = editableElt.state.rotation || 0;
+
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      const rotateHandle = container.querySelector(".rotate-handle");
+      rotateHandle.addEventListener("mousedown", startRotate);
+      rotateHandle.addEventListener("touchstart", startRotate);
+
+      context.handlers.rotate = startRotate;
+    },
+
+    onMove(context, e) {
+      if (!context.isRotating) return;
+
+      const coords = getClientCoordinates(e, 1); // Don't scale for angle calculation
+
+      // Calculate current angle from center to mouse
+      const currentAngle = Math.atan2(
+        coords.clientY * context.cachedScale - context.rotateCenterY,
+        coords.clientX * context.cachedScale - context.rotateCenterX
+      );
+
+      // Calculate rotation difference in degrees
+      const angleDiff = (currentAngle - context.rotateStartAngle) * (180 / Math.PI);
+      let newRotation = context.rotateInitialRotation + angleDiff;
+
+      // Snap to 15-degree increments if Shift key is pressed
+      if (e.shiftKey) {
+        newRotation = Math.round(newRotation / 15) * 15;
+      }
+
+      // Normalize angle to -180 to 180 range
+      while (newRotation > 180) newRotation -= 360;
+      while (newRotation < -180) newRotation += 360;
+
+      // Update state and DOM
+      context.editableElt.setState({ rotation: newRotation });
+
+      e.preventDefault();
+    },
+
+    onStop(context) {
+      context.isRotating = false;
+    },
+
+    isActive(context) {
+      return context.isRotating;
+    },
+
+    handleKeyboard(context, e, editableElt) {
+      // Ctrl/Cmd + arrow keys for rotation
+      if (!e.ctrlKey && !e.metaKey) return false;
+
+      const step = e.shiftKey ? 15 : 5; // Shift for larger steps
+      const state = editableElt.getState();
+
+      // Capture state for undo before keyboard rotate
+      pushUndoState();
+
+      switch (e.key) {
+        case "ArrowRight":
+          editableElt.setState({ rotation: state.rotation + step });
+          return true;
+        case "ArrowLeft":
+          editableElt.setState({ rotation: state.rotation - step });
+          return true;
+      }
+      return false;
+    },
+  },
 };
 
 // Map element types to their capabilities
 const ELEMENT_CAPABILITIES = {
-  img: ["move", "resize"],
-  div: ["move", "resize", "fontControls", "editText"],
+  img: ["move", "resize", "rotate"],
+  div: ["move", "resize", "rotate", "fontControls", "editText"],
 };
 
 // Get capabilities for an element type
@@ -743,12 +883,10 @@ const PropertySerializers = {
     type: "style",
     serialize: (v) => (v ? `text-align: ${v};` : null),
   },
-
-  // Future properties can be added here:
-  // rotation: {
-  //   type: "attr",
-  //   serialize: (v) => v !== 0 ? `data-rotation="${v}"` : null,
-  // },
+  rotation: {
+    type: "style",
+    serialize: (v) => (v ? `transform: rotate(${round(v)}deg);` : null),
+  },
 };
 
 // Serialize dimensions to QMD attribute string

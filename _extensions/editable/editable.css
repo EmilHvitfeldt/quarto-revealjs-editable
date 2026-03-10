@@ -2,6 +2,7 @@
 :root {
   --editable-accent-color: #007cba;
   --editable-accent-active: #28a745;
+  --editable-rotate-color: #ff6600;
   --editable-handle-size: 10px;
   --editable-handle-offset: -6px;
   --editable-handle-border-color: #fff;
@@ -11,6 +12,8 @@
   --editable-font-controls-gap: 5px;
   --editable-button-border-radius: 3px;
   --editable-button-margin: 10px;
+  --editable-rotate-handle-size: 12px;
+  --editable-rotate-handle-offset: -20px;
 }
 
 /* Container for editable elements */
@@ -64,6 +67,32 @@
   bottom: var(--editable-handle-offset);
   right: var(--editable-handle-offset);
   cursor: se-resize;
+}
+
+/* Rotation handle */
+.rotate-handle {
+  position: absolute;
+  width: var(--editable-rotate-handle-size);
+  height: var(--editable-rotate-handle-size);
+  background-color: var(--editable-rotate-color);
+  border: 1px solid var(--editable-handle-border-color);
+  border-radius: 50%;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--editable-transition);
+  top: var(--editable-rotate-handle-offset);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.rotate-handle:active {
+  cursor: grabbing;
+}
+
+.editable-container:hover .rotate-handle,
+.editable-container:focus .rotate-handle,
+.editable-container.active .rotate-handle {
+  opacity: 1;
 }
 
 /* Font controls for text divs */
