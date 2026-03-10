@@ -78,7 +78,11 @@ test.describe('Save Edits Feature', () => {
     await page.goto(`file://${htmlPath}`);
 
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    // Wait for editable elements to be set up with dimensions
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.editable');
+      return el && el.style.width && parseFloat(el.style.width) > 0;
+    });
 
     // Get dimensions using the extension's function
     const dimensions = await page.evaluate(() => {

@@ -32,7 +32,7 @@ window.Revealeditable = function () {
   return {
     id: "Revealeditable",
     init: function (deck) {
-      document.addEventListener("DOMContentLoaded", function () {
+      deck.on("ready", function () {
         const editableElements = getEditableElements();
 
         editableElements.forEach(setupDraggableElt);
