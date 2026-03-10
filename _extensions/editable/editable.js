@@ -124,6 +124,386 @@ class EditableElement {
 }
 
 // =============================================================================
+// Capability System
+// =============================================================================
+
+// Capability definitions - each capability handles a specific interaction type
+const Capabilities = {
+  // Move capability - handles dragging elements
+  move: {
+    name: "move",
+
+    init(context) {
+      context.isDragging = false;
+      context.dragStartX = 0;
+      context.dragStartY = 0;
+      context.dragInitialX = 0;
+      context.dragInitialY = 0;
+    },
+
+    attachEvents(context) {
+      const { element, container } = context;
+
+      const startDrag = (e) => {
+        if (e.target.parentElement.contentEditable === "true") return;
+        if (e.target.classList.contains("resize-handle")) return;
+
+        context.cachedScale = getSlideScale();
+        context.isDragging = true;
+        const coords = getClientCoordinates(e, context.cachedScale);
+
+        context.dragStartX = coords.clientX;
+        context.dragStartY = coords.clientY;
+        context.dragInitialX = container.offsetLeft;
+        context.dragInitialY = container.offsetTop;
+
+        e.preventDefault();
+      };
+
+      element.addEventListener("mousedown", startDrag);
+      element.addEventListener("touchstart", startDrag);
+
+      context.handlers.drag = startDrag;
+    },
+
+    onMove(context, e) {
+      if (!context.isDragging) return;
+
+      const coords = getClientCoordinates(e, context.cachedScale);
+      const deltaX = coords.clientX - context.dragStartX;
+      const deltaY = coords.clientY - context.dragStartY;
+
+      context.container.style.left = context.dragInitialX + deltaX + "px";
+      context.container.style.top = context.dragInitialY + deltaY + "px";
+
+      e.preventDefault();
+    },
+
+    onStop(context) {
+      context.isDragging = false;
+    },
+
+    isActive(context) {
+      return context.isDragging;
+    },
+
+    handleKeyboard(context, e, editableElt) {
+      if (e.shiftKey) return false; // Let resize handle shift+arrows
+
+      const step = CONFIG.KEYBOARD_MOVE_STEP;
+      const state = editableElt.getState();
+
+      switch (e.key) {
+        case "ArrowRight":
+          editableElt.setState({ x: state.x + step });
+          return true;
+        case "ArrowLeft":
+          editableElt.setState({ x: state.x - step });
+          return true;
+        case "ArrowDown":
+          editableElt.setState({ y: state.y + step });
+          return true;
+        case "ArrowUp":
+          editableElt.setState({ y: state.y - step });
+          return true;
+      }
+      return false;
+    },
+  },
+
+  // Resize capability - handles resizing elements
+  resize: {
+    name: "resize",
+
+    init(context) {
+      context.isResizing = false;
+      context.resizeHandle = null;
+      context.resizeStartX = 0;
+      context.resizeStartY = 0;
+      context.resizeInitialWidth = 0;
+      context.resizeInitialHeight = 0;
+      context.resizeInitialX = 0;
+      context.resizeInitialY = 0;
+    },
+
+    createHandles(context) {
+      const { container } = context;
+
+      const handles = ["nw", "ne", "sw", "se"];
+      const handleLabels = {
+        nw: "Resize from top-left corner",
+        ne: "Resize from top-right corner",
+        sw: "Resize from bottom-left corner",
+        se: "Resize from bottom-right corner",
+      };
+
+      handles.forEach((position) => {
+        const handle = document.createElement("div");
+        handle.className = "resize-handle handle-" + position;
+        handle.setAttribute("role", "slider");
+        handle.setAttribute("aria-label", handleLabels[position]);
+        handle.setAttribute("tabindex", "-1");
+        handle.dataset.position = position;
+        container.appendChild(handle);
+      });
+    },
+
+    attachEvents(context) {
+      const { container, element } = context;
+
+      const startResize = (e) => {
+        context.cachedScale = getSlideScale();
+        context.isResizing = true;
+        context.resizeHandle = e.target.dataset.position;
+
+        const coords = getClientCoordinates(e, context.cachedScale);
+
+        context.resizeStartX = coords.clientX;
+        context.resizeStartY = coords.clientY;
+        context.resizeInitialWidth = element.offsetWidth;
+        context.resizeInitialHeight = element.offsetHeight;
+        context.resizeInitialX = container.offsetLeft;
+        context.resizeInitialY = container.offsetTop;
+
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      container.querySelectorAll(".resize-handle").forEach((handle) => {
+        handle.addEventListener("mousedown", startResize);
+        handle.addEventListener("touchstart", startResize);
+      });
+
+      context.handlers.resize = startResize;
+    },
+
+    onMove(context, e) {
+      if (!context.isResizing) return;
+
+      const { element, container } = context;
+      const coords = getClientCoordinates(e, context.cachedScale);
+      const deltaX = coords.clientX - context.resizeStartX;
+      const deltaY = coords.clientY - context.resizeStartY;
+
+      let newWidth = context.resizeInitialWidth;
+      let newHeight = context.resizeInitialHeight;
+      let newX = context.resizeInitialX;
+      let newY = context.resizeInitialY;
+
+      const preserveAspectRatio = e.shiftKey;
+      const aspectRatio = context.resizeInitialWidth / context.resizeInitialHeight;
+      const handle = context.resizeHandle;
+
+      if (preserveAspectRatio) {
+        if (handle.includes("e") || handle.includes("w")) {
+          const widthChange = handle.includes("e") ? deltaX : -deltaX;
+          newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialWidth + widthChange);
+          newHeight = newWidth / aspectRatio;
+        } else if (handle.includes("s") || handle.includes("n")) {
+          const heightChange = handle.includes("s") ? deltaY : -deltaY;
+          newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialHeight + heightChange);
+          newWidth = newHeight * aspectRatio;
+        }
+
+        if (handle.includes("w")) {
+          newX = context.resizeInitialX + (context.resizeInitialWidth - newWidth);
+        }
+        if (handle.includes("n")) {
+          newY = context.resizeInitialY + (context.resizeInitialHeight - newHeight);
+        }
+      } else {
+        if (handle.includes("e")) {
+          newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialWidth + deltaX);
+        }
+        if (handle.includes("w")) {
+          newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialWidth - deltaX);
+          newX = context.resizeInitialX + (context.resizeInitialWidth - newWidth);
+        }
+        if (handle.includes("s")) {
+          newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialHeight + deltaY);
+        }
+        if (handle.includes("n")) {
+          newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialHeight - deltaY);
+          newY = context.resizeInitialY + (context.resizeInitialHeight - newHeight);
+        }
+      }
+
+      element.style.width = newWidth + "px";
+      element.style.height = newHeight + "px";
+      container.style.left = newX + "px";
+      container.style.top = newY + "px";
+
+      e.preventDefault();
+    },
+
+    onStop(context) {
+      context.isResizing = false;
+      context.resizeHandle = null;
+    },
+
+    isActive(context) {
+      return context.isResizing;
+    },
+
+    handleKeyboard(context, e, editableElt) {
+      if (!e.shiftKey) return false; // Only handle shift+arrows
+
+      const step = CONFIG.KEYBOARD_MOVE_STEP;
+      const state = editableElt.getState();
+
+      switch (e.key) {
+        case "ArrowRight":
+          editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width + step) });
+          return true;
+        case "ArrowLeft":
+          editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width - step) });
+          return true;
+        case "ArrowDown":
+          editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height + step) });
+          return true;
+        case "ArrowUp":
+          editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height - step) });
+          return true;
+      }
+      return false;
+    },
+  },
+
+  // Font controls capability - font size and alignment (div only)
+  fontControls: {
+    name: "fontControls",
+
+    init(context) {
+      // No special state needed
+    },
+
+    createControls(context) {
+      const { container, element } = context;
+
+      const fontControls = document.createElement("div");
+      fontControls.className = "editable-font-controls";
+
+      // Font size buttons
+      const decreaseBtn = createButton("A-", "editable-button-font editable-button-decrease");
+      decreaseBtn.setAttribute("aria-label", "Decrease font size");
+      decreaseBtn.title = "Decrease font size";
+      decreaseBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        changeFontSize(element, -CONFIG.FONT_SIZE_STEP);
+      });
+
+      const increaseBtn = createButton("A+", "editable-button-font editable-button-increase");
+      increaseBtn.setAttribute("aria-label", "Increase font size");
+      increaseBtn.title = "Increase font size";
+      increaseBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        changeFontSize(element, CONFIG.FONT_SIZE_STEP);
+      });
+
+      // Alignment buttons
+      function setAlignment(alignment) {
+        element.style.textAlign = alignment;
+        const editableElt = editableRegistry.get(element);
+        if (editableElt) {
+          editableElt.state.textAlign = alignment;
+        }
+      }
+
+      const alignLeftBtn = createButton("⇤", "editable-button-align");
+      alignLeftBtn.setAttribute("aria-label", "Align text left");
+      alignLeftBtn.title = "Align Left";
+      alignLeftBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setAlignment("left");
+      });
+
+      const alignCenterBtn = createButton("⇔", "editable-button-align");
+      alignCenterBtn.setAttribute("aria-label", "Align text center");
+      alignCenterBtn.title = "Align Center";
+      alignCenterBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setAlignment("center");
+      });
+
+      const alignRightBtn = createButton("⇥", "editable-button-align");
+      alignRightBtn.setAttribute("aria-label", "Align text right");
+      alignRightBtn.title = "Align Right";
+      alignRightBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setAlignment("right");
+      });
+
+      fontControls.appendChild(decreaseBtn);
+      fontControls.appendChild(increaseBtn);
+      fontControls.appendChild(alignLeftBtn);
+      fontControls.appendChild(alignCenterBtn);
+      fontControls.appendChild(alignRightBtn);
+      container.appendChild(fontControls);
+
+      return fontControls;
+    },
+
+    attachEvents(context) {
+      // Events are attached in createControls
+    },
+  },
+
+  // Edit text capability - contentEditable toggle (div only)
+  editText: {
+    name: "editText",
+
+    init(context) {
+      // No special state needed
+    },
+
+    createControls(context) {
+      const { container, element } = context;
+
+      // Find font controls container to append to
+      let fontControls = container.querySelector(".editable-font-controls");
+      if (!fontControls) {
+        fontControls = document.createElement("div");
+        fontControls.className = "editable-font-controls";
+        container.appendChild(fontControls);
+      }
+
+      const editBtn = createButton("✎", "editable-button-edit");
+      editBtn.setAttribute("aria-label", "Toggle edit mode");
+      editBtn.title = "Toggle Edit Mode";
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isEditable = element.contentEditable === "true";
+        element.contentEditable = !isEditable;
+        editBtn.classList.toggle("active", !isEditable);
+        editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
+        if (!isEditable) {
+          element.focus();
+        }
+      });
+
+      fontControls.appendChild(editBtn);
+      return editBtn;
+    },
+
+    attachEvents(context) {
+      // Events are attached in createControls
+    },
+  },
+};
+
+// Map element types to their capabilities
+const ELEMENT_CAPABILITIES = {
+  img: ["move", "resize"],
+  div: ["move", "resize", "fontControls", "editText"],
+};
+
+// Get capabilities for an element type
+function getCapabilitiesFor(elementType) {
+  const capabilityNames = ELEMENT_CAPABILITIES[elementType] || ["move", "resize"];
+  return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);
+}
+
+// =============================================================================
 // Utility Functions
 // =============================================================================
 
@@ -268,22 +648,50 @@ function setupDraggableElt(elt) {
   const editableElt = new EditableElement(elt);
   editableRegistry.set(elt, editableElt);
 
-  // Interaction state
-  let isDragging = false;
-  let isResizing = false;
-  let startX, startY, initialX, initialY, initialWidth, initialHeight;
-  let resizeHandle = null;
-  let rafId = null;
-  let cachedScale = 1;
-
-  // Setup
+  // Create container
   const container = createEltContainer(elt);
   editableElt.container = container;
   setupEltStyles(elt);
-  createResizeHandles(container, elt);
-  setupHoverEffects(container);
-  setupKeyboardNavigation(container, elt, editableElt);
-  attachEventListeners();
+
+  // Create shared context for capabilities
+  const context = {
+    element: elt,
+    container: container,
+    editableElt: editableElt,
+    handlers: {},
+    rafId: null,
+    cachedScale: 1,
+  };
+
+  // Get capabilities for this element type
+  const elementType = elt.tagName.toLowerCase();
+  const capabilities = getCapabilitiesFor(elementType);
+
+  // Initialize capabilities
+  capabilities.forEach((cap) => {
+    if (cap.init) cap.init(context);
+  });
+
+  // Setup container accessibility
+  setupContainerAccessibility(container);
+
+  // Let capabilities create their UI elements
+  capabilities.forEach((cap) => {
+    if (cap.createHandles) cap.createHandles(context);
+    if (cap.createControls) cap.createControls(context);
+  });
+
+  // Let capabilities attach their events
+  capabilities.forEach((cap) => {
+    if (cap.attachEvents) cap.attachEvents(context);
+  });
+
+  // Setup hover/focus effects and keyboard navigation
+  setupHoverEffects(context, capabilities);
+  setupKeyboardNavigation(context, capabilities, editableElt);
+
+  // Attach global pointer events
+  attachGlobalEvents(context, capabilities);
 
   // -------------------------------------------------------------------------
   // Container and Style Setup
@@ -305,125 +713,19 @@ function setupDraggableElt(elt) {
     elt.style.display = "block";
   }
 
-  // -------------------------------------------------------------------------
-  // Resize Handles and Controls
-  // -------------------------------------------------------------------------
-
-  function createResizeHandles(container, elt) {
-    // Make container focusable for keyboard navigation
+  function setupContainerAccessibility(container) {
     container.setAttribute("tabindex", "0");
     container.setAttribute("role", "application");
     container.setAttribute("aria-label", "Editable element. Use arrow keys to move, Shift+arrows to resize.");
-
-    // Create corner resize handles
-    const handles = ["nw", "ne", "sw", "se"];
-    const handleLabels = {
-      nw: "Resize from top-left corner",
-      ne: "Resize from top-right corner",
-      sw: "Resize from bottom-left corner",
-      se: "Resize from bottom-right corner"
-    };
-
-    handles.forEach((position) => {
-      const handle = document.createElement("div");
-      handle.className = "resize-handle handle-" + position;
-      handle.setAttribute("role", "slider");
-      handle.setAttribute("aria-label", handleLabels[position]);
-      handle.setAttribute("tabindex", "-1");
-      handle.dataset.position = position;
-      container.appendChild(handle);
-    });
-
-    // Create font controls for div elements
-    if (elt.tagName.toLowerCase() === "div") {
-      createFontControls(container, elt);
-    }
-  }
-
-  function createFontControls(container, elt) {
-    const fontControls = document.createElement("div");
-    fontControls.className = "editable-font-controls";
-
-    // Font size buttons
-    const decreaseBtn = createButton("A-", "editable-button-font editable-button-decrease");
-    decreaseBtn.setAttribute("aria-label", "Decrease font size");
-    decreaseBtn.title = "Decrease font size";
-    decreaseBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      changeFontSize(elt, -CONFIG.FONT_SIZE_STEP);
-    });
-
-    const increaseBtn = createButton("A+", "editable-button-font editable-button-increase");
-    increaseBtn.setAttribute("aria-label", "Increase font size");
-    increaseBtn.title = "Increase font size";
-    increaseBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      changeFontSize(elt, CONFIG.FONT_SIZE_STEP);
-    });
-
-    // Alignment buttons with state update
-    function setAlignment(alignment) {
-      elt.style.textAlign = alignment;
-      const editableElt = editableRegistry.get(elt);
-      if (editableElt) {
-        editableElt.state.textAlign = alignment;
-      }
-    }
-
-    const alignLeftBtn = createButton("⇤", "editable-button-align");
-    alignLeftBtn.setAttribute("aria-label", "Align text left");
-    alignLeftBtn.title = "Align Left";
-    alignLeftBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setAlignment("left");
-    });
-
-    const alignCenterBtn = createButton("⇔", "editable-button-align");
-    alignCenterBtn.setAttribute("aria-label", "Align text center");
-    alignCenterBtn.title = "Align Center";
-    alignCenterBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setAlignment("center");
-    });
-
-    const alignRightBtn = createButton("⇥", "editable-button-align");
-    alignRightBtn.setAttribute("aria-label", "Align text right");
-    alignRightBtn.title = "Align Right";
-    alignRightBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setAlignment("right");
-    });
-
-    // Edit mode button
-    const editBtn = createButton("✎", "editable-button-edit");
-    editBtn.setAttribute("aria-label", "Toggle edit mode");
-    editBtn.title = "Toggle Edit Mode";
-    editBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const isEditable = elt.contentEditable === "true";
-      elt.contentEditable = !isEditable;
-      editBtn.classList.toggle("active", !isEditable);
-      editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
-      if (!isEditable) {
-        elt.focus();
-      }
-    });
-
-    // Append all buttons
-    fontControls.appendChild(decreaseBtn);
-    fontControls.appendChild(increaseBtn);
-    fontControls.appendChild(alignLeftBtn);
-    fontControls.appendChild(alignCenterBtn);
-    fontControls.appendChild(alignRightBtn);
-    fontControls.appendChild(editBtn);
-    container.appendChild(fontControls);
   }
 
   // -------------------------------------------------------------------------
   // Hover and Focus Effects
   // -------------------------------------------------------------------------
 
-  function setupHoverEffects(container) {
+  function setupHoverEffects(context, capabilities) {
+    const { container } = context;
+
     function showControls() {
       container.classList.add("active");
     }
@@ -432,9 +734,13 @@ function setupDraggableElt(elt) {
       container.classList.remove("active");
     }
 
+    function isAnyCapabilityActive() {
+      return capabilities.some((cap) => cap.isActive && cap.isActive(context));
+    }
+
     container.addEventListener("mouseenter", showControls);
     container.addEventListener("mouseleave", () => {
-      if (!isDragging && !isResizing) {
+      if (!isAnyCapabilityActive()) {
         hideControls();
       }
     });
@@ -451,7 +757,9 @@ function setupDraggableElt(elt) {
   // Keyboard Navigation
   // -------------------------------------------------------------------------
 
-  function setupKeyboardNavigation(container, elt, editableElt) {
+  function setupKeyboardNavigation(context, capabilities, editableElt) {
+    const { container } = context;
+
     container.addEventListener("keydown", (e) => {
       // Shift+Tab exits to normal slide navigation
       if (e.key === "Tab" && e.shiftKey) {
@@ -468,224 +776,65 @@ function setupDraggableElt(elt) {
       e.preventDefault();
       e.stopPropagation();
 
-      const step = CONFIG.KEYBOARD_MOVE_STEP;
       editableElt.syncFromDOM();
-      const state = editableElt.getState();
 
-      if (e.shiftKey) {
-        // Shift + arrows = resize
-        switch (e.key) {
-          case "ArrowRight":
-            editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width + step) });
-            break;
-          case "ArrowLeft":
-            editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width - step) });
-            break;
-          case "ArrowDown":
-            editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height + step) });
-            break;
-          case "ArrowUp":
-            editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height - step) });
-            break;
-        }
-      } else {
-        // Arrows = move
-        switch (e.key) {
-          case "ArrowRight":
-            editableElt.setState({ x: state.x + step });
-            break;
-          case "ArrowLeft":
-            editableElt.setState({ x: state.x - step });
-            break;
-          case "ArrowDown":
-            editableElt.setState({ y: state.y + step });
-            break;
-          case "ArrowUp":
-            editableElt.setState({ y: state.y - step });
-            break;
+      // Let capabilities handle keyboard input
+      for (const cap of capabilities) {
+        if (cap.handleKeyboard && cap.handleKeyboard(context, e, editableElt)) {
+          break;
         }
       }
     });
   }
 
   // -------------------------------------------------------------------------
-  // Event Listeners
+  // Global Event Handlers
   // -------------------------------------------------------------------------
 
-  function attachEventListeners() {
-    // Drag events on element
-    elt.addEventListener("mousedown", startDrag);
-    elt.addEventListener("touchstart", startDrag);
+  function attachGlobalEvents(context, capabilities) {
+    function handlePointerMove(e) {
+      const isActive = capabilities.some((cap) => cap.isActive && cap.isActive(context));
+      if (!isActive) return;
 
-    // Resize events on handles
-    container.querySelectorAll(".resize-handle").forEach((handle) => {
-      handle.addEventListener("mousedown", startResize);
-      handle.addEventListener("touchstart", startResize);
-    });
+      // Cancel any pending frame
+      if (context.rafId) {
+        cancelAnimationFrame(context.rafId);
+      }
 
-    // Global move/end events (unified handler for mouse and touch)
+      // Schedule update on next animation frame
+      context.rafId = requestAnimationFrame(() => {
+        capabilities.forEach((cap) => {
+          if (cap.onMove) cap.onMove(context, e);
+        });
+        context.rafId = null;
+      });
+    }
+
+    function stopAction() {
+      const wasActive = capabilities.some((cap) => cap.isActive && cap.isActive(context));
+
+      if (wasActive) {
+        setTimeout(() => {
+          if (!context.container.matches(":hover")) {
+            context.container.classList.remove("active");
+          }
+        }, CONFIG.HOVER_TIMEOUT);
+      }
+
+      if (context.rafId) {
+        cancelAnimationFrame(context.rafId);
+        context.rafId = null;
+      }
+
+      capabilities.forEach((cap) => {
+        if (cap.onStop) cap.onStop(context);
+      });
+    }
+
     document.addEventListener("mousemove", handlePointerMove);
     document.addEventListener("touchmove", handlePointerMove);
     document.addEventListener("mouseup", stopAction);
     document.addEventListener("touchend", stopAction);
-  }
-
-  // -------------------------------------------------------------------------
-  // Drag Logic
-  // -------------------------------------------------------------------------
-
-  function startDrag(e) {
-    if (e.target.parentElement.contentEditable === "true") return;
-    if (e.target.classList.contains("resize-handle")) return;
-
-    cachedScale = getSlideScale();
-    isDragging = true;
-    const coords = getClientCoordinates(e, cachedScale);
-
-    startX = coords.clientX;
-    startY = coords.clientY;
-    initialX = container.offsetLeft;
-    initialY = container.offsetTop;
-
-    e.preventDefault();
-  }
-
-  function drag(e) {
-    if (!isDragging) return;
-
-    const coords = getClientCoordinates(e, cachedScale);
-    const deltaX = coords.clientX - startX;
-    const deltaY = coords.clientY - startY;
-
-    container.style.left = initialX + deltaX + "px";
-    container.style.top = initialY + deltaY + "px";
-
-    e.preventDefault();
-  }
-
-  // -------------------------------------------------------------------------
-  // Resize Logic
-  // -------------------------------------------------------------------------
-
-  function startResize(e) {
-    cachedScale = getSlideScale();
-    isResizing = true;
-    resizeHandle = e.target.dataset.position;
-
-    const coords = getClientCoordinates(e, cachedScale);
-
-    startX = coords.clientX;
-    startY = coords.clientY;
-    initialWidth = elt.offsetWidth;
-    initialHeight = elt.offsetHeight;
-    initialX = container.offsetLeft;
-    initialY = container.offsetTop;
-
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  function resize(e) {
-    if (!isResizing) return;
-
-    const coords = getClientCoordinates(e, cachedScale);
-    const deltaX = coords.clientX - startX;
-    const deltaY = coords.clientY - startY;
-
-    let newWidth = initialWidth;
-    let newHeight = initialHeight;
-    let newX = initialX;
-    let newY = initialY;
-
-    const preserveAspectRatio = e.shiftKey;
-    const aspectRatio = initialWidth / initialHeight;
-
-    if (preserveAspectRatio) {
-      if (resizeHandle.includes("e") || resizeHandle.includes("w")) {
-        const widthChange = resizeHandle.includes("e") ? deltaX : -deltaX;
-        newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialWidth + widthChange);
-        newHeight = newWidth / aspectRatio;
-      } else if (resizeHandle.includes("s") || resizeHandle.includes("n")) {
-        const heightChange = resizeHandle.includes("s") ? deltaY : -deltaY;
-        newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialHeight + heightChange);
-        newWidth = newHeight * aspectRatio;
-      }
-
-      if (resizeHandle.includes("w")) {
-        newX = initialX + (initialWidth - newWidth);
-      }
-      if (resizeHandle.includes("n")) {
-        newY = initialY + (initialHeight - newHeight);
-      }
-    } else {
-      if (resizeHandle.includes("e")) {
-        newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialWidth + deltaX);
-      }
-      if (resizeHandle.includes("w")) {
-        newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialWidth - deltaX);
-        newX = initialX + (initialWidth - newWidth);
-      }
-      if (resizeHandle.includes("s")) {
-        newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialHeight + deltaY);
-      }
-      if (resizeHandle.includes("n")) {
-        newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialHeight - deltaY);
-        newY = initialY + (initialHeight - newHeight);
-      }
-    }
-
-    elt.style.width = newWidth + "px";
-    elt.style.height = newHeight + "px";
-    container.style.left = newX + "px";
-    container.style.top = newY + "px";
-
-    e.preventDefault();
-  }
-
-  // -------------------------------------------------------------------------
-  // Unified Pointer Move Handler (mouse + touch)
-  // -------------------------------------------------------------------------
-
-  function handlePointerMove(e) {
-    if (!isDragging && !isResizing) return;
-
-    // Cancel any pending frame to avoid queuing multiple updates
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-    }
-
-    // Schedule update on next animation frame for smooth performance
-    rafId = requestAnimationFrame(() => {
-      if (isDragging) {
-        drag(e);
-      } else if (isResizing) {
-        resize(e);
-      }
-      rafId = null;
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // Stop Action
-  // -------------------------------------------------------------------------
-
-  function stopAction() {
-    if (isDragging || isResizing) {
-      setTimeout(() => {
-        if (!container.matches(":hover")) {
-          container.classList.remove("active");
-        }
-      }, CONFIG.HOVER_TIMEOUT);
-    }
-
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-
-    isDragging = false;
-    isResizing = false;
-    resizeHandle = null;
   }
 }
 

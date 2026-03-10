@@ -4,31 +4,37 @@ This document outlines refactoring opportunities to support future features like
 
 ## Current Architecture Issues
 
-### 1. Monolithic `setupDraggableElt` Function (~430 lines)
+### 1. Monolithic `setupDraggableElt` Function (~430 lines) ✅ RESOLVED (Phase 3)
 
-**Problem:** This single function handles:
-- Container creation
-- Style setup
-- Resize handle creation
-- Font controls (for divs only)
-- Hover effects
-- Keyboard navigation
-- Mouse/touch event handling
-- Drag logic
-- Resize logic
+~~**Problem:** This single function handles:~~
+~~- Container creation~~
+~~- Style setup~~
+~~- Resize handle creation~~
+~~- Font controls (for divs only)~~
+~~- Hover effects~~
+~~- Keyboard navigation~~
+~~- Mouse/touch event handling~~
+~~- Drag logic~~
+~~- Resize logic~~
 
-**Impact:** Adding rotation would require modifying this massive function in multiple places.
+Now refactored into capability-based architecture. Each capability (`move`, `resize`, `fontControls`, `editText`) handles its own logic.
 
-### 2. No Element Type Abstraction
+### 2. No Element Type Abstraction ✅ RESOLVED (Phase 3)
 
-**Current approach:**
+~~**Current approach:**~~
+~~```javascript~~
+~~if (elt.tagName.toLowerCase() === "div") {~~
+~~  // div-specific controls~~
+~~}~~
+~~```~~
+
+Now uses `ELEMENT_CAPABILITIES` map to register capabilities per element type:
 ```javascript
-if (elt.tagName.toLowerCase() === "div") {
-  // div-specific controls
-}
+const ELEMENT_CAPABILITIES = {
+  img: ["move", "resize"],
+  div: ["move", "resize", "fontControls", "editText"],
+};
 ```
-
-**Problem:** Adding support for videos, tables, or custom elements requires adding more conditionals everywhere.
 
 ### 3. Hardcoded Properties in Dimension Extraction
 
@@ -252,10 +258,14 @@ _extensions/editable/
 - State updates for font size and alignment changes
 - Keyboard navigation uses state via `setState()`/`getState()`
 
-### Phase 3: Capability System (Medium risk)
-- Define capability interface
-- Extract move/resize logic into capabilities
-- Register capabilities per element type
+### Phase 3: Capability System (Medium risk) ✅ COMPLETE
+- Define capability interface with `init`, `attachEvents`, `onMove`, `onStop`, `isActive`, `handleKeyboard` methods
+- Extract move logic into `Capabilities.move`
+- Extract resize logic into `Capabilities.resize`
+- Extract font controls into `Capabilities.fontControls`
+- Extract edit text into `Capabilities.editText`
+- Register capabilities per element type via `ELEMENT_CAPABILITIES` map
+- Refactor `setupDraggableElt` to use capability-based architecture
 
 ### Phase 4: Control Registry (Low risk)
 - Create control registry
