@@ -1277,3 +1277,220 @@ test.describe('CSS Customization', () => {
     expect(result.removedHasActive).toBe(false);
   });
 });
+
+// Undo/Redo Tests
+test.describe('Undo/Redo', () => {
+  test('Undo stack functions exist', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    const result = await page.evaluate(() => {
+      return {
+        hasUndo: typeof undo === 'function',
+        hasRedo: typeof redo === 'function',
+        hasCanUndo: typeof canUndo === 'function',
+        hasCanRedo: typeof canRedo === 'function',
+        hasPushUndoState: typeof pushUndoState === 'function',
+      };
+    });
+
+    expect(result.hasUndo).toBe(true);
+    expect(result.hasRedo).toBe(true);
+    expect(result.hasCanUndo).toBe(true);
+    expect(result.hasCanRedo).toBe(true);
+    expect(result.hasPushUndoState).toBe(true);
+  });
+
+  test('Undo reverts drag position', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    const result = await page.evaluate(async () => {
+      const container = document.querySelector('.editable-container');
+      const img = container.querySelector('img.editable');
+
+      // Get initial position
+      const initialLeft = container.offsetLeft;
+      const initialTop = container.offsetTop;
+
+      // Simulate drag by pushing undo state and changing position
+      pushUndoState();
+      container.style.left = (initialLeft + 100) + 'px';
+      container.style.top = (initialTop + 50) + 'px';
+
+      // Verify position changed
+      const movedLeft = parseFloat(container.style.left);
+      const movedTop = parseFloat(container.style.top);
+
+      // Undo
+      const undoResult = undo();
+
+      // Wait for state to be applied
+      await new Promise(r => requestAnimationFrame(r));
+
+      // Get position after undo
+      const afterUndoLeft = container.style.left ? parseFloat(container.style.left) : container.offsetLeft;
+      const afterUndoTop = container.style.top ? parseFloat(container.style.top) : container.offsetTop;
+
+      return {
+        initialLeft,
+        initialTop,
+        movedLeft,
+        movedTop,
+        undoResult,
+        afterUndoLeft,
+        afterUndoTop,
+      };
+    });
+
+    expect(result.movedLeft).toBe(result.initialLeft + 100);
+    expect(result.movedTop).toBe(result.initialTop + 50);
+    expect(result.undoResult).toBe(true);
+    expect(result.afterUndoLeft).toBe(result.initialLeft);
+    expect(result.afterUndoTop).toBe(result.initialTop);
+  });
+
+  test('Redo restores undone action', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    const result = await page.evaluate(async () => {
+      const container = document.querySelector('.editable-container');
+
+      // Get initial position
+      const initialLeft = container.offsetLeft;
+
+      // Make a change
+      pushUndoState();
+      container.style.left = (initialLeft + 100) + 'px';
+
+      // Sync to editableRegistry
+      const img = container.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+      if (editableElt) {
+        editableElt.syncFromDOM();
+      }
+
+      const afterMoveLeft = parseFloat(container.style.left);
+
+      // Undo
+      undo();
+      await new Promise(r => requestAnimationFrame(r));
+      const afterUndoLeft = container.style.left ? parseFloat(container.style.left) : container.offsetLeft;
+
+      // Redo
+      redo();
+      await new Promise(r => requestAnimationFrame(r));
+      const afterRedoLeft = container.style.left ? parseFloat(container.style.left) : container.offsetLeft;
+
+      return {
+        initialLeft,
+        afterMoveLeft,
+        afterUndoLeft,
+        afterRedoLeft,
+      };
+    });
+
+    expect(result.afterMoveLeft).toBe(result.initialLeft + 100);
+    expect(result.afterUndoLeft).toBe(result.initialLeft);
+    expect(result.afterRedoLeft).toBe(result.initialLeft + 100);
+  });
+
+  test('canUndo returns false when stack is empty', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    const result = await page.evaluate(() => {
+      // Clear stacks by reloading page, so they should be empty
+      // Since we just loaded, stacks are empty
+      return {
+        canUndoInitial: canUndo(),
+        canRedoInitial: canRedo(),
+      };
+    });
+
+    expect(result.canUndoInitial).toBe(false);
+    expect(result.canRedoInitial).toBe(false);
+  });
+
+  test('canUndo returns true after action', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    const result = await page.evaluate(() => {
+      const canUndoBefore = canUndo();
+
+      // Push a state
+      pushUndoState();
+
+      const canUndoAfter = canUndo();
+
+      return {
+        canUndoBefore,
+        canUndoAfter,
+      };
+    });
+
+    expect(result.canUndoBefore).toBe(false);
+    expect(result.canUndoAfter).toBe(true);
+  });
+
+  test('Undo clears redo stack on new action', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    const result = await page.evaluate(() => {
+      // Make a change
+      pushUndoState();
+
+      // Undo it
+      undo();
+      const canRedoAfterUndo = canRedo();
+
+      // Make a new change (should clear redo stack)
+      pushUndoState();
+      const canRedoAfterNewAction = canRedo();
+
+      return {
+        canRedoAfterUndo,
+        canRedoAfterNewAction,
+      };
+    });
+
+    expect(result.canRedoAfterUndo).toBe(true);
+    expect(result.canRedoAfterNewAction).toBe(false);
+  });
+
+  test('Ctrl+Z triggers undo', async ({ page }) => {
+    await page.goto(`file://${process.cwd()}/basic.html`);
+    await page.waitForSelector('.editable-container');
+
+    // Setup: make a change
+    await page.evaluate(() => {
+      const container = document.querySelector('.editable-container');
+      pushUndoState();
+      container.style.left = '200px';
+      const img = container.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+      if (editableElt) {
+        editableElt.state.x = 200;
+      }
+    });
+
+    // Press Ctrl+Z
+    await page.keyboard.press('Control+z');
+
+    // Wait for undo to apply
+    await page.waitForTimeout(100);
+
+    const result = await page.evaluate(() => {
+      const container = document.querySelector('.editable-container');
+      return {
+        left: container.style.left ? parseFloat(container.style.left) : container.offsetLeft,
+      };
+    });
+
+    // Position should be reverted (not 200)
+    expect(result.left).not.toBe(200);
+  });
+});

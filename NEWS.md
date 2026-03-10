@@ -6,6 +6,10 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Added
 
+- **Undo/redo support** for element positioning and styling (#26)
+  - Ctrl+Z (Cmd+Z on Mac) to undo, Ctrl+Y or Ctrl+Shift+Z to redo
+  - Tracks position, size, font size, and text alignment changes
+  - Separate from browser's native undo in text edit mode
 - **"Copy qmd to Clipboard" button** in Tools menu for easier workflow (#8)
 - **Accessibility support**: Editable elements are now fully keyboard accessible
   - Arrow keys move elements, Shift+Arrow keys resize

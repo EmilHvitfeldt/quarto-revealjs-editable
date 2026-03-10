@@ -11,6 +11,9 @@ const CONFIG = {
 
   // Timing
   HOVER_TIMEOUT: 500,
+
+  // Undo/Redo
+  MAX_UNDO_STACK_SIZE: 50,
 };
 
 // =============================================================================
@@ -124,6 +127,131 @@ class EditableElement {
 }
 
 // =============================================================================
+// Undo/Redo System
+// =============================================================================
+
+const undoStack = [];
+const redoStack = [];
+
+// Capture a snapshot of an element's state
+function captureElementState(element) {
+  const editableElt = editableRegistry.get(element);
+  if (!editableElt) return null;
+
+  editableElt.syncFromDOM();
+  return {
+    element: element,
+    state: { ...editableElt.state },
+  };
+}
+
+// Capture state of all elements
+function captureAllState() {
+  const snapshots = [];
+  for (const [element, editableElt] of editableRegistry) {
+    editableElt.syncFromDOM();
+    snapshots.push({
+      element: element,
+      state: { ...editableElt.state },
+    });
+  }
+  return snapshots;
+}
+
+// Restore state from a snapshot
+function restoreState(snapshots) {
+  for (const snapshot of snapshots) {
+    const editableElt = editableRegistry.get(snapshot.element);
+    if (editableElt) {
+      editableElt.setState(snapshot.state);
+    }
+  }
+}
+
+// Push current state to undo stack (call before making changes)
+function pushUndoState() {
+  const state = captureAllState();
+  undoStack.push(state);
+
+  // Limit stack size
+  if (undoStack.length > CONFIG.MAX_UNDO_STACK_SIZE) {
+    undoStack.shift();
+  }
+
+  // Clear redo stack on new action
+  redoStack.length = 0;
+}
+
+// Undo last action
+function undo() {
+  if (undoStack.length === 0) return false;
+
+  // Save current state to redo stack
+  const currentState = captureAllState();
+  redoStack.push(currentState);
+
+  // Restore previous state
+  const previousState = undoStack.pop();
+  restoreState(previousState);
+
+  return true;
+}
+
+// Redo last undone action
+function redo() {
+  if (redoStack.length === 0) return false;
+
+  // Save current state to undo stack
+  const currentState = captureAllState();
+  undoStack.push(currentState);
+
+  // Restore redo state
+  const redoState = redoStack.pop();
+  restoreState(redoState);
+
+  return true;
+}
+
+// Check if undo is available
+function canUndo() {
+  return undoStack.length > 0;
+}
+
+// Check if redo is available
+function canRedo() {
+  return redoStack.length > 0;
+}
+
+// Setup global keyboard shortcuts for undo/redo
+function setupUndoRedoKeyboard() {
+  document.addEventListener("keydown", (e) => {
+    // Check for Ctrl+Z (undo) or Cmd+Z on Mac
+    if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+      // Don't intercept if user is editing text content
+      if (document.activeElement.contentEditable === "true") return;
+
+      e.preventDefault();
+      if (undo()) {
+        console.log("Undo performed");
+      }
+      return;
+    }
+
+    // Check for Ctrl+Y or Ctrl+Shift+Z (redo)
+    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+      // Don't intercept if user is editing text content
+      if (document.activeElement.contentEditable === "true") return;
+
+      e.preventDefault();
+      if (redo()) {
+        console.log("Redo performed");
+      }
+      return;
+    }
+  });
+}
+
+// =============================================================================
 // Capability System
 // =============================================================================
 
@@ -147,6 +275,9 @@ const Capabilities = {
       const startDrag = (e) => {
         if (e.target.parentElement.contentEditable === "true") return;
         if (e.target.classList.contains("resize-handle")) return;
+
+        // Capture state for undo before starting drag
+        pushUndoState();
 
         context.cachedScale = getSlideScale();
         context.isDragging = true;
@@ -192,6 +323,9 @@ const Capabilities = {
 
       const step = CONFIG.KEYBOARD_MOVE_STEP;
       const state = editableElt.getState();
+
+      // Capture state for undo before keyboard move
+      pushUndoState();
 
       switch (e.key) {
         case "ArrowRight":
@@ -252,6 +386,9 @@ const Capabilities = {
       const { container, element } = context;
 
       const startResize = (e) => {
+        // Capture state for undo before starting resize
+        pushUndoState();
+
         context.cachedScale = getSlideScale();
         context.isResizing = true;
         context.resizeHandle = e.target.dataset.position;
@@ -350,6 +487,9 @@ const Capabilities = {
 
       const step = CONFIG.KEYBOARD_MOVE_STEP;
       const state = editableElt.getState();
+
+      // Capture state for undo before keyboard resize
+      pushUndoState();
 
       switch (e.key) {
         case "ArrowRight":
@@ -493,7 +633,10 @@ ControlRegistry.register("decreaseFont", {
   title: "Decrease font size",
   className: "editable-button-font editable-button-decrease",
   appliesTo: ["div"],
-  onClick: (element) => changeFontSize(element, -CONFIG.FONT_SIZE_STEP),
+  onClick: (element) => {
+    pushUndoState();
+    changeFontSize(element, -CONFIG.FONT_SIZE_STEP);
+  },
 });
 
 ControlRegistry.register("increaseFont", {
@@ -502,7 +645,10 @@ ControlRegistry.register("increaseFont", {
   title: "Increase font size",
   className: "editable-button-font editable-button-increase",
   appliesTo: ["div"],
-  onClick: (element) => changeFontSize(element, CONFIG.FONT_SIZE_STEP),
+  onClick: (element) => {
+    pushUndoState();
+    changeFontSize(element, CONFIG.FONT_SIZE_STEP);
+  },
 });
 
 ControlRegistry.register("alignLeft", {
@@ -512,6 +658,7 @@ ControlRegistry.register("alignLeft", {
   className: "editable-button-align",
   appliesTo: ["div"],
   onClick: (element) => {
+    pushUndoState();
     element.style.textAlign = "left";
     const editableElt = editableRegistry.get(element);
     if (editableElt) editableElt.state.textAlign = "left";
@@ -525,6 +672,7 @@ ControlRegistry.register("alignCenter", {
   className: "editable-button-align",
   appliesTo: ["div"],
   onClick: (element) => {
+    pushUndoState();
     element.style.textAlign = "center";
     const editableElt = editableRegistry.get(element);
     if (editableElt) editableElt.state.textAlign = "center";
@@ -538,6 +686,7 @@ ControlRegistry.register("alignRight", {
   className: "editable-button-align",
   appliesTo: ["div"],
   onClick: (element) => {
+    pushUndoState();
     element.style.textAlign = "right";
     const editableElt = editableRegistry.get(element);
     if (editableElt) editableElt.state.textAlign = "right";
@@ -703,6 +852,7 @@ window.Revealeditable = function () {
         const editableElements = getEditableElements();
         editableElements.forEach(setupDraggableElt);
         addSaveMenuButton();
+        setupUndoRedoKeyboard();
       });
     },
   };
