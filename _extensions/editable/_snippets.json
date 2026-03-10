@@ -1,0 +1,30 @@
+{
+  "Editable setup": {
+    "prefix": "setup",
+    "body": [
+      "format:",
+      "  revealjs: default",
+      "revealjs-plugins:",
+      "  - editable",
+      "filters:",
+      "  - editable"
+    ],
+    "description": "Insert minimal revealjs metadata to enable editable plugin and filter."
+  },
+  "Editable image": {
+    "prefix": "image",
+    "body": [
+      "![](${1:image.png}){.editable}"
+    ],
+    "description": "Insert an editable image that can be moved and resized in revealjs preview."
+  },
+  "Editable text block": {
+    "prefix": "block",
+    "body": [
+      "::: {.editable}",
+      "${1:Text to edit in slides.}",
+      ":::"
+    ],
+    "description": "Insert an editable Div block for draggable and resizable text content."
+  }
+}
