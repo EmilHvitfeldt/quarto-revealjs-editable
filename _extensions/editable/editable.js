@@ -248,9 +248,9 @@ function setupDraggableElt(elt) {
   function getClientCoordinates(e) {
     const isTouch = e.type.startsWith("touch");
     const slidesContainerEl = document.querySelector(".slides");
-    const scale = window
-      .getComputedStyle(slidesContainerEl)
-      .getPropertyValue("--slide-scale");
+    const scale = slidesContainerEl
+      ? parseFloat(window.getComputedStyle(slidesContainerEl).getPropertyValue("--slide-scale")) || 1
+      : 1;
 
     return {
       clientX: (isTouch ? e.touches[0].clientX : e.clientX) / scale,
@@ -259,7 +259,7 @@ function setupDraggableElt(elt) {
   }
 
   function startDrag(e) {
-    if (e.target.parentElement.contentEditable == "true") return;
+    if (e.target.parentElement.contentEditable === "true") return;
     if (e.target.classList.contains("resize-handle")) return;
 
     isDragging = true;
@@ -430,6 +430,10 @@ function saveMovedElts() {
 
 // Function to read index.qmd file (decoded from base64 by atob() at load time)
 function readIndexQmd() {
+  if (!window._input_file) {
+    console.error("_input_file not found. Was the editable filter applied?");
+    return "";
+  }
   return window._input_file;
 }
 
@@ -541,8 +545,11 @@ function replaceeditableOccurrences(text, replacements) {
 }
 
 function formateditableEltStrings(dimensions) {
+  // Round to 1 decimal place for cleaner output
+  const round = (n) => Math.round(n * 10) / 10;
+
   return dimensions.map((dim) => {
-    let str = `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px`;
+    let str = `{.absolute width=${round(dim.width)}px height=${round(dim.height)}px left=${round(dim.left)}px top=${round(dim.top)}px`;
     if (dim.fontSize || dim.textAlign) {
       str += ` style="`;
       if (dim.fontSize) {

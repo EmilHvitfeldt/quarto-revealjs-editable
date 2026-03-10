@@ -680,6 +680,72 @@ test.describe('Multiple Elements', () => {
 
 test.describe('Code Quality', () => {
 
+  test('Graceful handling when _input_file is missing', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+
+    // Capture console errors
+    const consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
+    // Test behavior when _input_file is missing
+    const result = await page.evaluate(() => {
+      // Save original value
+      const original = window._input_file;
+
+      // Remove _input_file to simulate missing filter
+      delete window._input_file;
+
+      // Call readIndexQmd
+      const content = readIndexQmd();
+
+      // Restore original
+      window._input_file = original;
+
+      return {
+        returnedEmpty: content === "",
+        didNotCrash: true
+      };
+    });
+
+    expect(result.returnedEmpty).toBe(true);
+    expect(result.didNotCrash).toBe(true);
+  });
+
+  test('Dimension values are rounded to 1 decimal place', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      // Create dimensions with many decimal places
+      const testDimensions = [{
+        width: 123.456789,
+        height: 78.123456,
+        left: 50.999999,
+        top: 25.111111
+      }];
+
+      const formatted = formateditableEltStrings(testDimensions);
+      return formatted[0];
+    });
+
+    // Should have at most 1 decimal place
+    expect(result).toContain('width=123.5px');
+    expect(result).toContain('height=78.1px');
+    expect(result).toContain('left=51px');
+    expect(result).toContain('top=25.1px');
+    // Should not have many decimal places
+    expect(result).not.toContain('123.456789');
+    expect(result).not.toContain('78.123456');
+  });
+
   test('No global variable pollution', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'basic.html');
     await page.goto(`file://${htmlPath}`);

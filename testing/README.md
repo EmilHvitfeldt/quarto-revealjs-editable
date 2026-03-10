@@ -85,7 +85,7 @@ npm run test:e2e
 | Both div syntaxes work        | `::: editable` and `::: {.editable}` both work     |
 | LaTeX preserved               | `\dfrac`, `\lambda` survive save                   |
 
-**`e2e/ui-controls.spec.js`** - UI elements (21 tests):
+**`e2e/ui-controls.spec.js`** - UI elements (23 tests):
 
 | Test                             | What it verifies                                  |
 |----------------------------------|---------------------------------------------------|
@@ -108,6 +108,8 @@ npm run test:e2e
 | Multiple elements independent    | Each element has its own container and handlers   |
 | Multiple elements dimensions     | `extracteditableEltDimensions()` returns all      |
 | No global variable pollution     | Save functions don't leak globals                 |
+| Missing _input_file handled      | Graceful error when filter not applied            |
+| Dimension rounding               | Output values rounded to 1 decimal place          |
 | htmlToQuarto conversion          | `<strong>`→`**`, `<em>`→`*`, `<code>`→backticks   |
 | Strikethrough conversion         | `<del>`→`~~`                                      |
 
