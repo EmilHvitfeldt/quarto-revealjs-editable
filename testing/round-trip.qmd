@@ -1,0 +1,19 @@
+---
+title: "Round-trip Test"
+---
+
+## Content that must survive round-trip
+
+::: {.editable}
+LaTeX inline: $\frac{a}{b}$ and $\alpha + \beta$
+
+Shortcode: {{< meta title >}}
+
+Windows path: C:\Users\bob\file.txt
+
+Explicit spaces:\ \ \
+
+Code: `"\\d+"` and `\n`
+
+Backslash-b: \b should not be backspace
+:::

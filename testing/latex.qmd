@@ -1,0 +1,21 @@
+---
+title: "LaTeX Test"
+---
+
+## Complex equations
+
+::: {.editable}
+Inline math: $\alpha$, $\beta$, $\gamma$
+
+Display math:
+$$
+x^* = \left\{
+    \begin{array}{ll}
+      \dfrac{x^\lambda - 1}{\lambda {x}^{\lambda - 1}}, & \lambda \neq 0 \\
+      {x} \log x & \lambda = 0
+    \end{array}
+  \right.
+$$
+
+More LaTeX: $\sum_{i=1}^{n} x_i$ and $\int_0^\infty e^{-x} dx$
+:::

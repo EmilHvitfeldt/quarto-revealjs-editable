@@ -6,6 +6,7 @@ on:
   pull_request:
 
 jobs:
+  # Shell tests run on all platforms
   test:
     strategy:
       fail-fast: false
@@ -45,3 +46,49 @@ jobs:
           cd testing
           chmod +x run-tests.sh
           ./run-tests.sh
+
+  # Playwright E2E tests run only on Ubuntu (JS behavior is cross-platform)
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test  # Run after shell tests pass
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup symlink
+        run: |
+          cd testing
+          ln -sf ../_extensions _extensions
+
+      - name: Render test files
+        run: |
+          cd testing
+          chmod +x run-tests.sh
+          ./run-tests.sh
+
+      - name: Install Playwright
+        run: |
+          cd testing
+          npm install
+          npx playwright install chromium
+
+      - name: Run Playwright tests
+        run: |
+          cd testing
+          npx playwright test
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: testing/test-results/
+          retention-days: 7

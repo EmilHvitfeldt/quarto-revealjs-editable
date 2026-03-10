@@ -33,24 +33,20 @@ local function has_editable_class(el)
   return false
 end
 
--- Walk the AST looking for Div or Image elements with class "editable".
--- These are the only elements the JS targets: div.editable and img.editable.
--- Using the AST avoids any risk of false positives on the word "editable"
--- appearing in plain text or code blocks.
-local found_editable = false
-
-function Div(el)
-  if has_editable_class(el) then
-    found_editable = true
-  end
-  return el
-end
-
-function Image(el)
-  if has_editable_class(el) then
-    found_editable = true
-  end
-  return el
+-- Check if document has any editable elements (Div or Image with class "editable")
+-- Walk AST inside Pandoc to avoid module-level state that persists across files
+local function has_editable_elements(doc)
+  local found = false
+  local filter = {
+    Div = function(el)
+      if has_editable_class(el) then found = true end
+    end,
+    Image = function(el)
+      if has_editable_class(el) then found = true end
+    end
+  }
+  pandoc.walk_block(pandoc.Div(doc.blocks), filter)
+  return found
 end
 
 function Pandoc(doc)
@@ -58,12 +54,17 @@ function Pandoc(doc)
   -- This keeps the generated HTML clean after a save (when all {.editable}
   -- have been replaced by {.absolute ...}) and avoids unnecessary base64
   -- encoding when the filter is active but unused.
-  if not found_editable then return doc end
+  if not has_editable_elements(doc) then return doc end
 
   -- Encode qmd source as base64 and inject into <head>
   local filename = quarto.doc.input_file
-  local text = assert(io.open(filename, "r")):read("a")
+  local f = assert(io.open(filename, "r"))
+  local text = f:read("a")
+  f:close()
   local encoded = b64encode(text)
+
+  -- Escape backslashes and single quotes in filename for safe JS string
+  local escaped_filename = filename:gsub("\\", "\\\\"):gsub("'", "\\'")
 
   local script = "<script>\n"
   -- Use TextDecoder to properly handle UTF-8 encoded characters (accents, etc.)
@@ -71,14 +72,9 @@ function Pandoc(doc)
   script = script .. "window._input_file = new TextDecoder('utf-8').decode(\n"
   script = script .. "  Uint8Array.from(atob('" .. encoded .. "'), function(c) { return c.charCodeAt(0); })\n"
   script = script .. ");\n"
-  script = script .. "window._input_filename = '" .. filename .. "';\n"
+  script = script .. "window._input_filename = '" .. escaped_filename .. "';\n"
   script = script .. "</script>"
 
-  local tmpfile = os.tmpname() .. ".html"
-  local f = assert(io.open(tmpfile, "w"))
-  f:write(script)
-  f:close()
-
-  quarto.doc.include_file("in-header", tmpfile)
+  quarto.doc.include_text("in-header", script)
   return doc
 end

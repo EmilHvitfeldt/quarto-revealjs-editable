@@ -1,17 +1,716 @@
+// Configuration constants (only runtime values - visual styling is in editable.css)
+const CONFIG = {
+  // Sizing constraints
+  MIN_ELEMENT_SIZE: 50,
+  KEYBOARD_MOVE_STEP: 10,
+
+  // Font constraints
+  MIN_FONT_SIZE: 8,
+  DEFAULT_FONT_SIZE: 16,
+  FONT_SIZE_STEP: 2,
+
+  // Timing
+  HOVER_TIMEOUT: 500,
+};
+
+// =============================================================================
+// Element State Management
+// =============================================================================
+
+// Registry to track all editable elements
+const editableRegistry = new Map();
+
+// EditableElement class - centralized state for each editable element
+class EditableElement {
+  constructor(element) {
+    this.element = element;
+    this.container = null;
+    this.type = element.tagName.toLowerCase();
+
+    // Initialize state from current element
+    this.state = {
+      x: 0,
+      y: 0,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+      // Div-specific properties
+      fontSize: null,
+      textAlign: null,
+    };
+  }
+
+  // Get a copy of current state
+  getState() {
+    return { ...this.state };
+  }
+
+  // Update state and optionally sync to DOM
+  setState(updates, syncToDOM = true) {
+    Object.assign(this.state, updates);
+
+    if (syncToDOM) {
+      this.syncToDOM();
+    }
+  }
+
+  // Sync state to DOM elements
+  syncToDOM() {
+    if (this.container) {
+      this.container.style.left = this.state.x + "px";
+      this.container.style.top = this.state.y + "px";
+    }
+
+    this.element.style.width = this.state.width + "px";
+    this.element.style.height = this.state.height + "px";
+
+    if (this.state.fontSize !== null) {
+      this.element.style.fontSize = this.state.fontSize + "px";
+    }
+    if (this.state.textAlign !== null) {
+      this.element.style.textAlign = this.state.textAlign;
+    }
+  }
+
+  // Read current values from DOM into state
+  syncFromDOM() {
+    if (this.container) {
+      this.state.x = this.container.style.left
+        ? parseFloat(this.container.style.left)
+        : this.container.offsetLeft;
+      this.state.y = this.container.style.top
+        ? parseFloat(this.container.style.top)
+        : this.container.offsetTop;
+    }
+
+    this.state.width = this.element.style.width
+      ? parseFloat(this.element.style.width)
+      : this.element.offsetWidth;
+    this.state.height = this.element.style.height
+      ? parseFloat(this.element.style.height)
+      : this.element.offsetHeight;
+
+    if (this.type === "div") {
+      if (this.element.style.fontSize) {
+        this.state.fontSize = parseFloat(this.element.style.fontSize);
+      }
+      if (this.element.style.textAlign) {
+        this.state.textAlign = this.element.style.textAlign;
+      }
+    }
+  }
+
+  // Generate dimension object for serialization
+  toDimensions() {
+    this.syncFromDOM();
+
+    const dims = {
+      width: this.state.width,
+      height: this.state.height,
+      left: this.state.x,
+      top: this.state.y,
+    };
+
+    if (this.type === "div") {
+      if (this.state.fontSize !== null) {
+        dims.fontSize = this.state.fontSize;
+      }
+      if (this.state.textAlign !== null) {
+        dims.textAlign = this.state.textAlign;
+      }
+    }
+
+    return dims;
+  }
+}
+
+// =============================================================================
+// Capability System
+// =============================================================================
+
+// Capability definitions - each capability handles a specific interaction type
+const Capabilities = {
+  // Move capability - handles dragging elements
+  move: {
+    name: "move",
+
+    init(context) {
+      context.isDragging = false;
+      context.dragStartX = 0;
+      context.dragStartY = 0;
+      context.dragInitialX = 0;
+      context.dragInitialY = 0;
+    },
+
+    attachEvents(context) {
+      const { element, container } = context;
+
+      const startDrag = (e) => {
+        if (e.target.parentElement.contentEditable === "true") return;
+        if (e.target.classList.contains("resize-handle")) return;
+
+        context.cachedScale = getSlideScale();
+        context.isDragging = true;
+        const coords = getClientCoordinates(e, context.cachedScale);
+
+        context.dragStartX = coords.clientX;
+        context.dragStartY = coords.clientY;
+        context.dragInitialX = container.offsetLeft;
+        context.dragInitialY = container.offsetTop;
+
+        e.preventDefault();
+      };
+
+      element.addEventListener("mousedown", startDrag);
+      element.addEventListener("touchstart", startDrag);
+
+      context.handlers.drag = startDrag;
+    },
+
+    onMove(context, e) {
+      if (!context.isDragging) return;
+
+      const coords = getClientCoordinates(e, context.cachedScale);
+      const deltaX = coords.clientX - context.dragStartX;
+      const deltaY = coords.clientY - context.dragStartY;
+
+      context.container.style.left = context.dragInitialX + deltaX + "px";
+      context.container.style.top = context.dragInitialY + deltaY + "px";
+
+      e.preventDefault();
+    },
+
+    onStop(context) {
+      context.isDragging = false;
+    },
+
+    isActive(context) {
+      return context.isDragging;
+    },
+
+    handleKeyboard(context, e, editableElt) {
+      if (e.shiftKey) return false; // Let resize handle shift+arrows
+
+      const step = CONFIG.KEYBOARD_MOVE_STEP;
+      const state = editableElt.getState();
+
+      switch (e.key) {
+        case "ArrowRight":
+          editableElt.setState({ x: state.x + step });
+          return true;
+        case "ArrowLeft":
+          editableElt.setState({ x: state.x - step });
+          return true;
+        case "ArrowDown":
+          editableElt.setState({ y: state.y + step });
+          return true;
+        case "ArrowUp":
+          editableElt.setState({ y: state.y - step });
+          return true;
+      }
+      return false;
+    },
+  },
+
+  // Resize capability - handles resizing elements
+  resize: {
+    name: "resize",
+
+    init(context) {
+      context.isResizing = false;
+      context.resizeHandle = null;
+      context.resizeStartX = 0;
+      context.resizeStartY = 0;
+      context.resizeInitialWidth = 0;
+      context.resizeInitialHeight = 0;
+      context.resizeInitialX = 0;
+      context.resizeInitialY = 0;
+    },
+
+    createHandles(context) {
+      const { container } = context;
+
+      const handles = ["nw", "ne", "sw", "se"];
+      const handleLabels = {
+        nw: "Resize from top-left corner",
+        ne: "Resize from top-right corner",
+        sw: "Resize from bottom-left corner",
+        se: "Resize from bottom-right corner",
+      };
+
+      handles.forEach((position) => {
+        const handle = document.createElement("div");
+        handle.className = "resize-handle handle-" + position;
+        handle.setAttribute("role", "slider");
+        handle.setAttribute("aria-label", handleLabels[position]);
+        handle.setAttribute("tabindex", "-1");
+        handle.dataset.position = position;
+        container.appendChild(handle);
+      });
+    },
+
+    attachEvents(context) {
+      const { container, element } = context;
+
+      const startResize = (e) => {
+        context.cachedScale = getSlideScale();
+        context.isResizing = true;
+        context.resizeHandle = e.target.dataset.position;
+
+        const coords = getClientCoordinates(e, context.cachedScale);
+
+        context.resizeStartX = coords.clientX;
+        context.resizeStartY = coords.clientY;
+        context.resizeInitialWidth = element.offsetWidth;
+        context.resizeInitialHeight = element.offsetHeight;
+        context.resizeInitialX = container.offsetLeft;
+        context.resizeInitialY = container.offsetTop;
+
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      container.querySelectorAll(".resize-handle").forEach((handle) => {
+        handle.addEventListener("mousedown", startResize);
+        handle.addEventListener("touchstart", startResize);
+      });
+
+      context.handlers.resize = startResize;
+    },
+
+    onMove(context, e) {
+      if (!context.isResizing) return;
+
+      const { element, container } = context;
+      const coords = getClientCoordinates(e, context.cachedScale);
+      const deltaX = coords.clientX - context.resizeStartX;
+      const deltaY = coords.clientY - context.resizeStartY;
+
+      let newWidth = context.resizeInitialWidth;
+      let newHeight = context.resizeInitialHeight;
+      let newX = context.resizeInitialX;
+      let newY = context.resizeInitialY;
+
+      const preserveAspectRatio = e.shiftKey;
+      const aspectRatio = context.resizeInitialWidth / context.resizeInitialHeight;
+      const handle = context.resizeHandle;
+
+      if (preserveAspectRatio) {
+        if (handle.includes("e") || handle.includes("w")) {
+          const widthChange = handle.includes("e") ? deltaX : -deltaX;
+          newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialWidth + widthChange);
+          newHeight = newWidth / aspectRatio;
+        } else if (handle.includes("s") || handle.includes("n")) {
+          const heightChange = handle.includes("s") ? deltaY : -deltaY;
+          newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialHeight + heightChange);
+          newWidth = newHeight * aspectRatio;
+        }
+
+        if (handle.includes("w")) {
+          newX = context.resizeInitialX + (context.resizeInitialWidth - newWidth);
+        }
+        if (handle.includes("n")) {
+          newY = context.resizeInitialY + (context.resizeInitialHeight - newHeight);
+        }
+      } else {
+        if (handle.includes("e")) {
+          newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialWidth + deltaX);
+        }
+        if (handle.includes("w")) {
+          newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialWidth - deltaX);
+          newX = context.resizeInitialX + (context.resizeInitialWidth - newWidth);
+        }
+        if (handle.includes("s")) {
+          newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialHeight + deltaY);
+        }
+        if (handle.includes("n")) {
+          newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, context.resizeInitialHeight - deltaY);
+          newY = context.resizeInitialY + (context.resizeInitialHeight - newHeight);
+        }
+      }
+
+      element.style.width = newWidth + "px";
+      element.style.height = newHeight + "px";
+      container.style.left = newX + "px";
+      container.style.top = newY + "px";
+
+      e.preventDefault();
+    },
+
+    onStop(context) {
+      context.isResizing = false;
+      context.resizeHandle = null;
+    },
+
+    isActive(context) {
+      return context.isResizing;
+    },
+
+    handleKeyboard(context, e, editableElt) {
+      if (!e.shiftKey) return false; // Only handle shift+arrows
+
+      const step = CONFIG.KEYBOARD_MOVE_STEP;
+      const state = editableElt.getState();
+
+      switch (e.key) {
+        case "ArrowRight":
+          editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width + step) });
+          return true;
+        case "ArrowLeft":
+          editableElt.setState({ width: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.width - step) });
+          return true;
+        case "ArrowDown":
+          editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height + step) });
+          return true;
+        case "ArrowUp":
+          editableElt.setState({ height: Math.max(CONFIG.MIN_ELEMENT_SIZE, state.height - step) });
+          return true;
+      }
+      return false;
+    },
+  },
+
+  // Font controls capability - font size and alignment (div only)
+  fontControls: {
+    name: "fontControls",
+
+    init(context) {
+      // No special state needed
+    },
+
+    createControls(context) {
+      const { container, element } = context;
+      const elementType = element.tagName.toLowerCase();
+
+      // Create font controls container
+      const fontControls = document.createElement("div");
+      fontControls.className = "editable-font-controls";
+
+      // Get controls from registry for this element type
+      const controlNames = ["decreaseFont", "increaseFont", "alignLeft", "alignCenter", "alignRight"];
+      controlNames.forEach((name) => {
+        const config = ControlRegistry.controls.get(name);
+        if (config && config.appliesTo.includes(elementType)) {
+          const btn = ControlRegistry.createButton(config, element);
+          fontControls.appendChild(btn);
+        }
+      });
+
+      container.appendChild(fontControls);
+      return fontControls;
+    },
+
+    attachEvents(context) {
+      // Events are attached via ControlRegistry.createButton
+    },
+  },
+
+  // Edit text capability - contentEditable toggle (div only)
+  editText: {
+    name: "editText",
+
+    init(context) {
+      // No special state needed
+    },
+
+    createControls(context) {
+      const { container, element } = context;
+      const elementType = element.tagName.toLowerCase();
+
+      // Find font controls container to append to
+      let fontControls = container.querySelector(".editable-font-controls");
+      if (!fontControls) {
+        fontControls = document.createElement("div");
+        fontControls.className = "editable-font-controls";
+        container.appendChild(fontControls);
+      }
+
+      // Get edit mode control from registry
+      const config = ControlRegistry.controls.get("editMode");
+      if (config && config.appliesTo.includes(elementType)) {
+        const btn = ControlRegistry.createButton(config, element);
+        fontControls.appendChild(btn);
+        return btn;
+      }
+      return null;
+    },
+
+    attachEvents(context) {
+      // Events are attached via ControlRegistry.createButton
+    },
+  },
+};
+
+// Map element types to their capabilities
+const ELEMENT_CAPABILITIES = {
+  img: ["move", "resize"],
+  div: ["move", "resize", "fontControls", "editText"],
+};
+
+// Get capabilities for an element type
+function getCapabilitiesFor(elementType) {
+  const capabilityNames = ELEMENT_CAPABILITIES[elementType] || ["move", "resize"];
+  return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);
+}
+
+// =============================================================================
+// Control Registry
+// =============================================================================
+
+// Registry for UI controls - allows easy addition of new controls
+const ControlRegistry = {
+  controls: new Map(),
+
+  // Register a new control
+  register(name, config) {
+    // config: { icon, ariaLabel, title, onClick, appliesTo, className }
+    this.controls.set(name, { name, ...config });
+  },
+
+  // Get controls for a specific element type
+  getControlsFor(elementType) {
+    return [...this.controls.values()].filter(
+      (c) => c.appliesTo.includes(elementType)
+    );
+  },
+
+  // Create a button from a control config
+  createButton(config, element) {
+    const btn = createButton(config.icon, config.className || "");
+    btn.setAttribute("aria-label", config.ariaLabel);
+    btn.title = config.title;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      config.onClick(element, btn, e);
+    });
+    return btn;
+  },
+};
+
+// Register built-in controls
+ControlRegistry.register("decreaseFont", {
+  icon: "A-",
+  ariaLabel: "Decrease font size",
+  title: "Decrease font size",
+  className: "editable-button-font editable-button-decrease",
+  appliesTo: ["div"],
+  onClick: (element) => changeFontSize(element, -CONFIG.FONT_SIZE_STEP),
+});
+
+ControlRegistry.register("increaseFont", {
+  icon: "A+",
+  ariaLabel: "Increase font size",
+  title: "Increase font size",
+  className: "editable-button-font editable-button-increase",
+  appliesTo: ["div"],
+  onClick: (element) => changeFontSize(element, CONFIG.FONT_SIZE_STEP),
+});
+
+ControlRegistry.register("alignLeft", {
+  icon: "⇤",
+  ariaLabel: "Align text left",
+  title: "Align Left",
+  className: "editable-button-align",
+  appliesTo: ["div"],
+  onClick: (element) => {
+    element.style.textAlign = "left";
+    const editableElt = editableRegistry.get(element);
+    if (editableElt) editableElt.state.textAlign = "left";
+  },
+});
+
+ControlRegistry.register("alignCenter", {
+  icon: "⇔",
+  ariaLabel: "Align text center",
+  title: "Align Center",
+  className: "editable-button-align",
+  appliesTo: ["div"],
+  onClick: (element) => {
+    element.style.textAlign = "center";
+    const editableElt = editableRegistry.get(element);
+    if (editableElt) editableElt.state.textAlign = "center";
+  },
+});
+
+ControlRegistry.register("alignRight", {
+  icon: "⇥",
+  ariaLabel: "Align text right",
+  title: "Align Right",
+  className: "editable-button-align",
+  appliesTo: ["div"],
+  onClick: (element) => {
+    element.style.textAlign = "right";
+    const editableElt = editableRegistry.get(element);
+    if (editableElt) editableElt.state.textAlign = "right";
+  },
+});
+
+ControlRegistry.register("editMode", {
+  icon: "✎",
+  ariaLabel: "Toggle edit mode",
+  title: "Toggle Edit Mode",
+  className: "editable-button-edit",
+  appliesTo: ["div"],
+  onClick: (element, btn) => {
+    const isEditable = element.contentEditable === "true";
+    element.contentEditable = !isEditable;
+    btn.classList.toggle("active", !isEditable);
+    btn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
+    if (!isEditable) {
+      element.focus();
+    }
+  },
+});
+
+// =============================================================================
+// Property Serializers
+// =============================================================================
+
+// Serializers for converting state to QMD attributes
+const PropertySerializers = {
+  // Core position/size properties (go in attribute list)
+  width: {
+    type: "attr",
+    serialize: (v) => `width=${round(v)}px`,
+  },
+  height: {
+    type: "attr",
+    serialize: (v) => `height=${round(v)}px`,
+  },
+  left: {
+    type: "attr",
+    serialize: (v) => `left=${round(v)}px`,
+  },
+  top: {
+    type: "attr",
+    serialize: (v) => `top=${round(v)}px`,
+  },
+
+  // Style properties (go in style attribute)
+  fontSize: {
+    type: "style",
+    serialize: (v) => (v ? `font-size: ${v}px;` : null),
+  },
+  textAlign: {
+    type: "style",
+    serialize: (v) => (v ? `text-align: ${v};` : null),
+  },
+
+  // Future properties can be added here:
+  // rotation: {
+  //   type: "attr",
+  //   serialize: (v) => v !== 0 ? `data-rotation="${v}"` : null,
+  // },
+};
+
+// Serialize dimensions to QMD attribute string
+function serializeToQmd(dimensions) {
+  const attrs = [];
+  const styles = [];
+
+  for (const [key, value] of Object.entries(dimensions)) {
+    const serializer = PropertySerializers[key];
+    if (serializer && value != null) {
+      const result = serializer.serialize(value);
+      if (result) {
+        if (serializer.type === "style") {
+          styles.push(result);
+        } else {
+          attrs.push(result);
+        }
+      }
+    }
+  }
+
+  let str = `{.absolute ${attrs.join(" ")}`;
+  if (styles.length > 0) {
+    str += ` style="${styles.join(" ")}"`;
+  }
+  str += "}";
+  return str;
+}
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
+
+// Round to 1 decimal place for cleaner output
+function round(n) {
+  return Math.round(n * 10) / 10;
+}
+
+// Get the current slide scale from reveal.js
+function getSlideScale() {
+  const slidesContainerEl = document.querySelector(".slides");
+  return slidesContainerEl
+    ? parseFloat(window.getComputedStyle(slidesContainerEl).getPropertyValue("--slide-scale")) || 1
+    : 1;
+}
+
+// Get client coordinates from mouse or touch event, adjusted for slide scale
+function getClientCoordinates(e, cachedScale) {
+  const isTouch = e.type.startsWith("touch");
+  const scale = cachedScale || getSlideScale();
+
+  return {
+    clientX: (isTouch ? e.touches[0].clientX : e.clientX) / scale,
+    clientY: (isTouch ? e.touches[0].clientY : e.clientY) / scale,
+  };
+}
+
+// Create a styled button element
+function createButton(text, additionalClasses) {
+  const button = document.createElement("button");
+  button.textContent = text;
+  button.className = "editable-button " + additionalClasses;
+  return button;
+}
+
+// Change font size of an element with minimum constraint
+function changeFontSize(element, delta) {
+  const currentFontSize =
+    parseFloat(window.getComputedStyle(element).fontSize) || CONFIG.DEFAULT_FONT_SIZE;
+  const newFontSize = Math.max(CONFIG.MIN_FONT_SIZE, currentFontSize + delta);
+  element.style.fontSize = newFontSize + "px";
+
+  // Update state if element is in registry
+  const editableElt = editableRegistry.get(element);
+  if (editableElt) {
+    editableElt.state.fontSize = newFontSize;
+  }
+}
+
+// =============================================================================
+// DOM Query Functions
+// =============================================================================
+
+function getEditableElements() {
+  return document.querySelectorAll("img.editable, div.editable");
+}
+
+function getEditableDivs() {
+  return document.querySelectorAll("div.editable");
+}
+
+// =============================================================================
+// Plugin Initialization
+// =============================================================================
+
 window.Revealeditable = function () {
   return {
     id: "Revealeditable",
     init: function (deck) {
-      document.addEventListener("DOMContentLoaded", function () {
+      deck.on("ready", function () {
         const editableElements = getEditableElements();
-
         editableElements.forEach(setupDraggableElt);
-
         addSaveMenuButton();
       });
     },
   };
 };
+
+// =============================================================================
+// Menu Button Setup
+// =============================================================================
 
 function addSaveMenuButton() {
   const slideMenuItems = document.querySelector(
@@ -28,6 +727,7 @@ function addSaveMenuButton() {
       }
     });
 
+    // Add "Save Edits" button
     const newLi = document.createElement("li");
     newLi.className = "slide-menu-item";
     newLi.setAttribute("data-item", (maxDataItem + 1).toString());
@@ -43,7 +743,6 @@ function addSaveMenuButton() {
       saveMovedElts();
     });
     newLi.appendChild(newA);
-
     slideMenuItems.appendChild(newLi);
 
     // Add "Copy qmd to clipboard" button
@@ -62,40 +761,71 @@ function addSaveMenuButton() {
       copyQmdToClipboard();
     });
     copyLi.appendChild(copyA);
-
     slideMenuItems.appendChild(copyLi);
   }
 }
 
-function getEditableElements() {
-  return document.querySelectorAll("img.editable, div.editable");
-}
-
-function getEditableDivs() {
-  return document.querySelectorAll("div.editable");
-}
+// =============================================================================
+// Editable Element Setup
+// =============================================================================
 
 function setupDraggableElt(elt) {
-  let isDragging = false;
-  let isResizing = false;
-  let startX, startY, initialX, initialY, initialWidth, initialHeight;
-  let resizeHandle = null;
+  // Create state manager for this element
+  const editableElt = new EditableElement(elt);
+  editableRegistry.set(elt, editableElt);
 
+  // Create container
   const container = createEltContainer(elt);
+  editableElt.container = container;
   setupEltStyles(elt);
-  createResizeHandles(container);
-  setupHoverEffects(
-    container,
-    () => isDragging,
-    () => isResizing
-  );
-  attachEventListeners();
+
+  // Create shared context for capabilities
+  const context = {
+    element: elt,
+    container: container,
+    editableElt: editableElt,
+    handlers: {},
+    rafId: null,
+    cachedScale: 1,
+  };
+
+  // Get capabilities for this element type
+  const elementType = elt.tagName.toLowerCase();
+  const capabilities = getCapabilitiesFor(elementType);
+
+  // Initialize capabilities
+  capabilities.forEach((cap) => {
+    if (cap.init) cap.init(context);
+  });
+
+  // Setup container accessibility
+  setupContainerAccessibility(container);
+
+  // Let capabilities create their UI elements
+  capabilities.forEach((cap) => {
+    if (cap.createHandles) cap.createHandles(context);
+    if (cap.createControls) cap.createControls(context);
+  });
+
+  // Let capabilities attach their events
+  capabilities.forEach((cap) => {
+    if (cap.attachEvents) cap.attachEvents(context);
+  });
+
+  // Setup hover/focus effects and keyboard navigation
+  setupHoverEffects(context, capabilities);
+  setupKeyboardNavigation(context, capabilities, editableElt);
+
+  // Attach global pointer events
+  attachGlobalEvents(context, capabilities);
+
+  // -------------------------------------------------------------------------
+  // Container and Style Setup
+  // -------------------------------------------------------------------------
 
   function createEltContainer(elt) {
     const container = document.createElement("div");
-    container.style.position = "absolute";
-    container.style.display = "inline-block";
-    container.style.border = "2px solid transparent";
+    container.className = "editable-container";
     elt.parentNode.insertBefore(container, elt);
     container.appendChild(elt);
     return container;
@@ -104,403 +834,225 @@ function setupDraggableElt(elt) {
   function setupEltStyles(elt) {
     elt.style.cursor = "move";
     elt.style.position = "relative";
-    elt.style.width = (elt.naturalWidth || elt.offsetWidth) / 2 + "px";
-    elt.style.height = (elt.naturalHeight || elt.offsetHeight) / 2 + "px";
+    elt.style.width = elt.offsetWidth + "px";
+    elt.style.height = elt.offsetHeight + "px";
     elt.style.display = "block";
   }
 
-  function createResizeHandles(container) {
-    const handles = ["nw", "ne", "sw", "se"];
-    handles.forEach((position) => {
-      const handle = document.createElement("div");
-      handle.className = "resize-handle";
-      handle.style.position = "absolute";
-      handle.style.width = "10px";
-      handle.style.height = "10px";
-      handle.style.backgroundColor = "#007cba";
-      handle.style.border = "1px solid #fff";
-      handle.style.cursor = position + "-resize";
-      handle.style.opacity = "0";
-      handle.style.transition = "opacity 0.2s";
-
-      if (position.includes("n")) handle.style.top = "-6px";
-      if (position.includes("s")) handle.style.bottom = "-6px";
-      if (position.includes("w")) handle.style.left = "-6px";
-      if (position.includes("e")) handle.style.right = "-6px";
-
-      handle.dataset.position = position;
-      container.appendChild(handle);
-    });
-
-    if (elt.tagName.toLowerCase() === "div") {
-      const fontControls = document.createElement("div");
-      fontControls.className = "font-controls";
-      fontControls.style.position = "absolute";
-      fontControls.style.top = "-30px";
-      fontControls.style.left = "0";
-      fontControls.style.opacity = "0";
-      fontControls.style.transition = "opacity 0.2s";
-      fontControls.style.display = "flex";
-      fontControls.style.gap = "5px";
-
-      const decreaseBtn = createButton("A-", "24px", "4px 12px");
-      decreaseBtn.style.marginRight = "0";
-
-      const increaseBtn = createButton("A+", "24px", "4px 12px");
-      increaseBtn.style.marginRight = "10px";
-
-      const alignLeftBtn = createButton("⇤", "20px", "4px 12px");
-      alignLeftBtn.title = "Align Left";
-
-      const alignCenterBtn = createButton("⇔", "20px", "4px 12px");
-      alignCenterBtn.title = "Align Center";
-
-      const alignRightBtn = createButton("⇥", "20px", "4px 12px");
-      alignRightBtn.title = "Align Right";
-
-      const editBtn = createButton("✎", "20px", "4px 12px");
-      editBtn.style.marginLeft = "10px";
-      editBtn.title = "Toggle Edit Mode";
-
-      fontControls.appendChild(decreaseBtn);
-      fontControls.appendChild(increaseBtn);
-      fontControls.appendChild(alignLeftBtn);
-      fontControls.appendChild(alignCenterBtn);
-      fontControls.appendChild(alignRightBtn);
-      fontControls.appendChild(editBtn);
-      container.appendChild(fontControls);
-
-      decreaseBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        changeFontSize(elt, -2);
-      });
-
-      increaseBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        changeFontSize(elt, 2);
-      });
-
-      alignLeftBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        elt.style.textAlign = "left";
-      });
-
-      alignCenterBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        elt.style.textAlign = "center";
-      });
-
-      alignRightBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        elt.style.textAlign = "right";
-      });
-
-      editBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isEditable = elt.contentEditable === "true";
-        elt.contentEditable = !isEditable;
-        editBtn.style.backgroundColor = !isEditable ? "#28a745" : "#007cba";
-        editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
-        if (!isEditable) {
-          elt.focus();
-        }
-      });
-    }
+  function setupContainerAccessibility(container) {
+    container.setAttribute("tabindex", "0");
+    container.setAttribute("role", "application");
+    container.setAttribute("aria-label", "Editable element. Use arrow keys to move, Shift+arrows to resize.");
   }
 
-  function setupHoverEffects(container, isDraggingFn, isResizingFn) {
-    container.addEventListener("mouseenter", () => {
-      container.style.border = "2px solid #007cba";
-      container
-        .querySelectorAll(".resize-handle")
-        .forEach((h) => (h.style.opacity = "1"));
-      const fontControls = container.querySelector(".font-controls");
-      if (fontControls) fontControls.style.opacity = "1";
+  // -------------------------------------------------------------------------
+  // Hover and Focus Effects
+  // -------------------------------------------------------------------------
+
+  function setupHoverEffects(context, capabilities) {
+    const { container } = context;
+
+    function showControls() {
+      container.classList.add("active");
+    }
+
+    function hideControls() {
+      container.classList.remove("active");
+    }
+
+    function isAnyCapabilityActive() {
+      return capabilities.some((cap) => cap.isActive && cap.isActive(context));
+    }
+
+    container.addEventListener("mouseenter", showControls);
+    container.addEventListener("mouseleave", () => {
+      if (!isAnyCapabilityActive()) {
+        hideControls();
+      }
     });
 
-    container.addEventListener("mouseleave", () => {
-      if (!isDraggingFn() && !isResizingFn()) {
-        container.style.border = "2px solid transparent";
-        container
-          .querySelectorAll(".resize-handle")
-          .forEach((h) => (h.style.opacity = "0"));
-        const fontControls = container.querySelector(".font-controls");
-        if (fontControls) fontControls.style.opacity = "0";
+    container.addEventListener("focus", showControls);
+    container.addEventListener("blur", (e) => {
+      if (!container.contains(e.relatedTarget)) {
+        hideControls();
       }
     });
   }
 
-  function attachEventListeners() {
-    elt.addEventListener("mousedown", startDrag);
-    elt.addEventListener("touchstart", startDrag);
+  // -------------------------------------------------------------------------
+  // Keyboard Navigation
+  // -------------------------------------------------------------------------
 
-    container.querySelectorAll(".resize-handle").forEach((handle) => {
-      handle.addEventListener("mousedown", startResize);
-      handle.addEventListener("touchstart", startResize);
+  function setupKeyboardNavigation(context, capabilities, editableElt) {
+    const { container } = context;
+
+    container.addEventListener("keydown", (e) => {
+      // Shift+Tab exits to normal slide navigation
+      if (e.key === "Tab" && e.shiftKey) {
+        container.blur();
+        e.preventDefault();
+        return;
+      }
+
+      // Only handle arrow keys
+      if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      editableElt.syncFromDOM();
+
+      // Let capabilities handle keyboard input
+      for (const cap of capabilities) {
+        if (cap.handleKeyboard && cap.handleKeyboard(context, e, editableElt)) {
+          break;
+        }
+      }
     });
+  }
 
-    document.addEventListener("mousemove", handleMouseMove);
+  // -------------------------------------------------------------------------
+  // Global Event Handlers
+  // -------------------------------------------------------------------------
+
+  function attachGlobalEvents(context, capabilities) {
+    function handlePointerMove(e) {
+      const isActive = capabilities.some((cap) => cap.isActive && cap.isActive(context));
+      if (!isActive) return;
+
+      // Cancel any pending frame
+      if (context.rafId) {
+        cancelAnimationFrame(context.rafId);
+      }
+
+      // Schedule update on next animation frame
+      context.rafId = requestAnimationFrame(() => {
+        capabilities.forEach((cap) => {
+          if (cap.onMove) cap.onMove(context, e);
+        });
+        context.rafId = null;
+      });
+    }
+
+    function stopAction() {
+      const wasActive = capabilities.some((cap) => cap.isActive && cap.isActive(context));
+
+      if (wasActive) {
+        setTimeout(() => {
+          if (!context.container.matches(":hover")) {
+            context.container.classList.remove("active");
+          }
+        }, CONFIG.HOVER_TIMEOUT);
+      }
+
+      if (context.rafId) {
+        cancelAnimationFrame(context.rafId);
+        context.rafId = null;
+      }
+
+      capabilities.forEach((cap) => {
+        if (cap.onStop) cap.onStop(context);
+      });
+    }
+
+    document.addEventListener("mousemove", handlePointerMove);
+    document.addEventListener("touchmove", handlePointerMove);
     document.addEventListener("mouseup", stopAction);
-    document.addEventListener("touchmove", handleTouchMove);
     document.addEventListener("touchend", stopAction);
   }
+}
 
-  function getClientCoordinates(e) {
-    const isTouch = e.type.startsWith("touch");
-    const slidesContainerEl = document.querySelector(".slides");
-    const scale = window
-      .getComputedStyle(slidesContainerEl)
-      .getPropertyValue("--slide-scale");
+// =============================================================================
+// Save/Export Functions
+// =============================================================================
 
-    return {
-      clientX: (isTouch ? e.touches[0].clientX : e.clientX) / scale,
-      clientY: (isTouch ? e.touches[0].clientY : e.clientY) / scale,
-    };
-  }
+// Get the transformed QMD content (shared logic for save and clipboard)
+function getTransformedQmd() {
+  let content = readIndexQmd();
+  if (!content) return "";
 
-  function startDrag(e) {
-    if (e.target.parentElement.contentEditable == "true") return;
-    if (e.target.classList.contains("resize-handle")) return;
+  const dimensions = extractEditableEltDimensions();
+  content = updateTextDivs(content);
+  const attributes = formatEditableEltStrings(dimensions);
+  content = replaceEditableOccurrences(content, attributes);
 
-    isDragging = true;
-    const { clientX, clientY } = getClientCoordinates(e);
-
-    startX = clientX;
-    startY = clientY;
-    initialX = container.offsetLeft;
-    initialY = container.offsetTop;
-
-    e.preventDefault();
-  }
-
-  function startResize(e) {
-    isResizing = true;
-    resizeHandle = e.target.dataset.position;
-
-    const { clientX, clientY } = getClientCoordinates(e);
-
-    startX = clientX;
-    startY = clientY;
-    initialWidth = elt.offsetWidth;
-    initialHeight = elt.offsetHeight;
-    initialX = container.offsetLeft;
-    initialY = container.offsetTop;
-
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  function handleMouseMove(e) {
-    if (isDragging) {
-      drag(e);
-    } else if (isResizing) {
-      resize(e);
-    }
-  }
-
-  function handleTouchMove(e) {
-    if (isDragging) {
-      drag(e);
-    } else if (isResizing) {
-      resize(e);
-    }
-  }
-
-  function drag(e) {
-    if (!isDragging) return;
-
-    const { clientX, clientY } = getClientCoordinates(e);
-    const deltaX = clientX - startX;
-    const deltaY = clientY - startY;
-
-    container.style.left = initialX + deltaX + "px";
-    container.style.top = initialY + deltaY + "px";
-
-    e.preventDefault();
-  }
-
-  function resize(e) {
-    if (!isResizing) return;
-
-    const { clientX, clientY } = getClientCoordinates(e);
-    const deltaX = clientX - startX;
-    const deltaY = clientY - startY;
-
-    let newWidth = initialWidth;
-    let newHeight = initialHeight;
-    let newX = initialX;
-    let newY = initialY;
-
-    const preserveAspectRatio = e.shiftKey;
-    const aspectRatio = initialWidth / initialHeight;
-
-    if (preserveAspectRatio) {
-      if (resizeHandle.includes("e") || resizeHandle.includes("w")) {
-        const widthChange = resizeHandle.includes("e") ? deltaX : -deltaX;
-        newWidth = Math.max(50, initialWidth + widthChange);
-        newHeight = newWidth / aspectRatio;
-      } else if (resizeHandle.includes("s") || resizeHandle.includes("n")) {
-        const heightChange = resizeHandle.includes("s") ? deltaY : -deltaY;
-        newHeight = Math.max(50, initialHeight + heightChange);
-        newWidth = newHeight * aspectRatio;
-      }
-
-      if (resizeHandle.includes("w")) {
-        newX = initialX + (initialWidth - newWidth);
-      }
-      if (resizeHandle.includes("n")) {
-        newY = initialY + (initialHeight - newHeight);
-      }
-    } else {
-      if (resizeHandle.includes("e")) {
-        newWidth = Math.max(50, initialWidth + deltaX);
-      }
-      if (resizeHandle.includes("w")) {
-        newWidth = Math.max(50, initialWidth - deltaX);
-        newX = initialX + (initialWidth - newWidth);
-      }
-      if (resizeHandle.includes("s")) {
-        newHeight = Math.max(50, initialHeight + deltaY);
-      }
-      if (resizeHandle.includes("n")) {
-        newHeight = Math.max(50, initialHeight - deltaY);
-        newY = initialY + (initialHeight - newHeight);
-      }
-    }
-
-    elt.style.width = newWidth + "px";
-    elt.style.height = newHeight + "px";
-    container.style.left = newX + "px";
-    container.style.top = newY + "px";
-
-    e.preventDefault();
-  }
-
-  function stopAction() {
-    if (isDragging || isResizing) {
-      setTimeout(() => {
-        if (!container.matches(":hover")) {
-          container.style.border = "2px solid transparent";
-          container
-            .querySelectorAll(".resize-handle")
-            .forEach((h) => (h.style.opacity = "0"));
-          const fontControls = container.querySelector(".font-controls");
-          if (fontControls) fontControls.style.opacity = "0";
-        }
-      }, 500);
-    }
-
-    isDragging = false;
-    isResizing = false;
-    resizeHandle = null;
-  }
-
-  function changeFontSize(element, delta) {
-    const currentFontSize =
-      parseFloat(window.getComputedStyle(element).fontSize) || 16;
-    const newFontSize = Math.max(8, currentFontSize + delta);
-    element.style.fontSize = newFontSize + "px";
-  }
-
-  function createButton(text, fontSize, padding) {
-    const button = document.createElement("button");
-    button.textContent = text;
-    button.style.fontSize = fontSize;
-    button.style.padding = padding;
-    button.style.backgroundColor = "#007cba";
-    button.style.color = "white";
-    button.style.border = "none";
-    button.style.cursor = "pointer";
-    button.style.borderRadius = "3px";
-    return button;
-  }
+  return content;
 }
 
 function saveMovedElts() {
-  let index = readIndexQmd();
-  Elt_dim = extracteditableEltDimensions();
-
-  index = udpdateTextDivs(index);
-
-  Elt_attr = formateditableEltStrings(Elt_dim);
-  index = replaceeditableOccurrences(index, Elt_attr);
-
-  downloadString(index);
+  const content = getTransformedQmd();
+  if (content) {
+    downloadString(content);
+  }
 }
 
-// Function to read index.qmd file (decoded from base64 by atob() at load time)
-function readIndexQmd() {
-  return window._input_file;
-}
-
-// Function to copy the modified qmd content to clipboard (closes #8)
 function copyQmdToClipboard() {
-  let index = readIndexQmd();
-  Elt_dim = extracteditableEltDimensions();
+  const content = getTransformedQmd();
+  if (!content) return;
 
-  index = udpdateTextDivs(index);
-
-  Elt_attr = formateditableEltStrings(Elt_dim);
-  index = replaceeditableOccurrences(index, Elt_attr);
-
-  navigator.clipboard.writeText(index).then(function () {
+  navigator.clipboard.writeText(content).then(function () {
     console.log("qmd content copied to clipboard");
   }).catch(function (err) {
     console.error("Failed to copy to clipboard:", err);
   });
 }
 
-// Function to get data-filename attribute from editable div
-function geteditableFilename() {
+function readIndexQmd() {
+  if (!window._input_file) {
+    console.error("_input_file not found. Was the editable filter applied?");
+    return "";
+  }
+  return window._input_file;
+}
+
+function getEditableFilename() {
   return window._input_filename.split(/[/\\]/).pop();
 }
 
-// Function to extract width and height of Elts with editable id
-function extracteditableEltDimensions() {
+// =============================================================================
+// Dimension Extraction
+// =============================================================================
+
+function extractEditableEltDimensions() {
   const editableElements = getEditableElements();
   const dimensions = [];
 
-  editableElements.forEach((elt, index) => {
-    const width = elt.style.width
-      ? parseFloat(elt.style.width)
-      : elt.offsetWidth;
-    const height = elt.style.height
-      ? parseFloat(elt.style.height)
-      : elt.offsetHeight;
+  editableElements.forEach((elt) => {
+    const editableElt = editableRegistry.get(elt);
+    if (editableElt) {
+      // Use centralized state
+      dimensions.push(editableElt.toDimensions());
+    } else {
+      // Fallback for elements not in registry (shouldn't happen)
+      const width = elt.style.width ? parseFloat(elt.style.width) : elt.offsetWidth;
+      const height = elt.style.height ? parseFloat(elt.style.height) : elt.offsetHeight;
 
-    const parentContainer = elt.parentNode;
-    const left = parentContainer.style.left
-      ? parseFloat(parentContainer.style.left)
-      : parentContainer.offsetLeft;
-    const top = parentContainer.style.top
-      ? parseFloat(parentContainer.style.top)
-      : parentContainer.offsetTop;
+      const parentContainer = elt.parentNode;
+      const left = parentContainer.style.left
+        ? parseFloat(parentContainer.style.left)
+        : parentContainer.offsetLeft;
+      const top = parentContainer.style.top
+        ? parseFloat(parentContainer.style.top)
+        : parentContainer.offsetTop;
 
-    const dimensionData = {
-      width: width,
-      height: height,
-      left: left,
-      top: top,
-    };
-
-    if (elt.tagName.toLowerCase() === "div" && elt.style.fontSize) {
-      dimensionData.fontSize = parseFloat(elt.style.fontSize);
+      dimensions.push({ width, height, left, top });
     }
-    if (elt.tagName.toLowerCase() === "div" && elt.style.textAlign) {
-      dimensionData.textAlign = elt.style.textAlign;
-    }
-
-    dimensions.push(dimensionData);
   });
 
   return dimensions;
 }
 
-function udpdateTextDivs(text) {
-  divs = getEditableDivs();
-  replacements = Array.from(divs).map(htmlToQuarto);
+// =============================================================================
+// QMD Transformation
+// =============================================================================
 
-  const regex = /::: ?(?:\{\.editable[^}]*\}|editable)[^:::]*\:::/g;
+function updateTextDivs(text) {
+  const divs = getEditableDivs();
+  const replacements = Array.from(divs).map(htmlToQuarto);
+
+  const regex = /::: ?(?:\{\.editable[^}]*\}|editable)[\s\S]*?\n:::/g;
 
   let index = 0;
   return text.replace(regex, () => {
@@ -509,28 +1061,29 @@ function udpdateTextDivs(text) {
 }
 
 function htmlToQuarto(div) {
-  text = div.innerHTML;
+  let text = div.innerHTML.trim();
 
-  text = text.trim();
-  text = text.replaceAll("<p>", "");
-  text = text.replaceAll("</p>", "");
-  text = text.replaceAll("<code>", "`");
-  text = text.replaceAll("</code>", "`");
-  text = text.replaceAll("<strong>", "**");
-  text = text.replaceAll("</strong>", "**");
-  text = text.replaceAll("<em>", "*");
-  text = text.replaceAll("</em>", "*");
-  text = text.replaceAll("<del>", "~~");
-  text = text.replaceAll("</del>", "~~");
-  text = text.replaceAll("\n", "\n\n");
+  // Convert HTML tags to Quarto/Markdown equivalents
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<p[^>]*>/gi, "");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<code[^>]*>/gi, "`");
+  text = text.replace(/<\/code>/gi, "`");
+  text = text.replace(/<strong[^>]*>/gi, "**");
+  text = text.replace(/<\/strong>/gi, "**");
+  text = text.replace(/<em[^>]*>/gi, "*");
+  text = text.replace(/<\/em>/gi, "*");
+  text = text.replace(/<del[^>]*>/gi, "~~");
+  text = text.replace(/<\/del>/gi, "~~");
 
-  text = "::: {.editable}\n" + text + "\n:::";
+  // Clean up excessive newlines
+  text = text.replace(/\n{3,}/g, "\n\n");
 
-  return text;
+  return "::: {.editable}\n" + text.trim() + "\n:::";
 }
 
-function replaceeditableOccurrences(text, replacements) {
-  const regex = /\{\.editable[^}]*\}|::: ?editable/g;
+function replaceEditableOccurrences(text, replacements) {
+  const regex = /\{\.editable[^}]*\}/g;
 
   let index = 0;
   return text.replace(regex, () => {
@@ -538,29 +1091,18 @@ function replaceeditableOccurrences(text, replacements) {
   });
 }
 
-function formateditableEltStrings(dimensions) {
-  return dimensions.map((dim) => {
-    let str = `{.absolute width=${dim.width}px height=${dim.height}px left=${dim.left}px top=${dim.top}px`;
-    if (dim.fontSize || dim.textAlign) {
-      str += ` style="`;
-      if (dim.fontSize) {
-        str += `font-size: ${dim.fontSize}px;`;
-      }
-      if (dim.fontSize && dim.textAlign) {
-        str += ` `;
-      }
-      if (dim.textAlign) {
-        str += `text-align: ${dim.textAlign};`;
-      }
-      str += `"`;
-    }
-    str += "}";
-    return str;
-  });
+function formatEditableEltStrings(dimensions) {
+  return dimensions.map((dim) => serializeToQmd(dim));
 }
 
+// =============================================================================
+// File Download
+// =============================================================================
+
 async function downloadString(content, mimeType = "text/plain") {
-  filename = geteditableFilename();
+  const filename = getEditableFilename();
+
+  // Try modern File System Access API first
   if ("showSaveFilePicker" in window) {
     try {
       const fileHandle = await window.showSaveFilePicker({
@@ -584,6 +1126,7 @@ async function downloadString(content, mimeType = "text/plain") {
     }
   }
 
+  // Fallback to download link
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
 

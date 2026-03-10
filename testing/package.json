@@ -1,0 +1,12 @@
+{
+  "name": "quarto-editable-tests",
+  "private": true,
+  "scripts": {
+    "test": "./run-tests.sh",
+    "test:e2e": "npx playwright test",
+    "test:all": "./run-tests.sh && npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

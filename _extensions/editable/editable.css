@@ -1,0 +1,125 @@
+/* CSS Custom Properties for theming */
+:root {
+  --editable-accent-color: #007cba;
+  --editable-accent-active: #28a745;
+  --editable-handle-size: 10px;
+  --editable-handle-offset: -6px;
+  --editable-handle-border-color: #fff;
+  --editable-border-width: 2px;
+  --editable-transition: 0.2s;
+  --editable-font-controls-offset: -30px;
+  --editable-font-controls-gap: 5px;
+  --editable-button-border-radius: 3px;
+  --editable-button-margin: 10px;
+}
+
+/* Container for editable elements */
+.editable-container {
+  position: absolute;
+  display: inline-block;
+  border: var(--editable-border-width) solid transparent;
+}
+
+.editable-container:hover,
+.editable-container.active {
+  border-color: var(--editable-accent-color);
+}
+
+/* Resize handles */
+.resize-handle {
+  position: absolute;
+  width: var(--editable-handle-size);
+  height: var(--editable-handle-size);
+  background-color: var(--editable-accent-color);
+  border: 1px solid var(--editable-handle-border-color);
+  opacity: 0;
+  transition: opacity var(--editable-transition);
+}
+
+.editable-container:hover .resize-handle,
+.editable-container:focus .resize-handle,
+.editable-container.active .resize-handle {
+  opacity: 1;
+}
+
+.resize-handle.handle-nw {
+  top: var(--editable-handle-offset);
+  left: var(--editable-handle-offset);
+  cursor: nw-resize;
+}
+
+.resize-handle.handle-ne {
+  top: var(--editable-handle-offset);
+  right: var(--editable-handle-offset);
+  cursor: ne-resize;
+}
+
+.resize-handle.handle-sw {
+  bottom: var(--editable-handle-offset);
+  left: var(--editable-handle-offset);
+  cursor: sw-resize;
+}
+
+.resize-handle.handle-se {
+  bottom: var(--editable-handle-offset);
+  right: var(--editable-handle-offset);
+  cursor: se-resize;
+}
+
+/* Font controls for text divs */
+.editable-font-controls {
+  position: absolute;
+  top: var(--editable-font-controls-offset);
+  left: 0;
+  opacity: 0;
+  transition: opacity var(--editable-transition);
+  display: flex;
+  gap: var(--editable-font-controls-gap);
+}
+
+.editable-container:hover .editable-font-controls,
+.editable-container:focus .editable-font-controls,
+.editable-container.active .editable-font-controls {
+  opacity: 1;
+}
+
+/* Buttons */
+.editable-button {
+  background-color: var(--editable-accent-color);
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--editable-button-border-radius);
+}
+
+.editable-button:hover {
+  filter: brightness(1.1);
+}
+
+.editable-button.active {
+  background-color: var(--editable-accent-active);
+}
+
+.editable-button-font {
+  font-size: 24px;
+  padding: 4px 12px;
+}
+
+.editable-button-align {
+  font-size: 20px;
+  padding: 4px 12px;
+}
+
+.editable-button-edit {
+  font-size: 20px;
+  padding: 4px 12px;
+  margin-left: var(--editable-button-margin);
+}
+
+.editable-button-decrease {
+  margin-right: 0;
+}
+
+.editable-button-increase {
+  margin-right: var(--editable-button-margin);
+}

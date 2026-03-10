@@ -1,0 +1,15 @@
+---
+title: "Bare Syntax Test"
+---
+
+## Slide with bare editable syntax
+
+::: editable
+This uses the bare word syntax without curly braces.
+:::
+
+## Slide with curly brace syntax
+
+::: {.editable}
+This uses the curly brace syntax.
+:::
