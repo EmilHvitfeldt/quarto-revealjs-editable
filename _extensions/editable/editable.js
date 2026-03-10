@@ -1,3 +1,33 @@
+// Configuration constants
+const CONFIG = {
+  // Sizing
+  MIN_ELEMENT_SIZE: 50,
+  INITIAL_SIZE_SCALE: 0.5,
+  HANDLE_SIZE: 10,
+  HANDLE_OFFSET: -6,
+  BORDER_WIDTH: 2,
+
+  // Font
+  MIN_FONT_SIZE: 8,
+  DEFAULT_FONT_SIZE: 16,
+  FONT_SIZE_STEP: 2,
+
+  // Colors
+  ACCENT_COLOR: "#007cba",
+  ACCENT_COLOR_ACTIVE: "#28a745",
+  HANDLE_BORDER_COLOR: "#fff",
+
+  // Timing
+  TRANSITION_DURATION: "0.2s",
+  HOVER_TIMEOUT: 500,
+
+  // UI
+  FONT_CONTROLS_OFFSET: -30,
+  FONT_CONTROLS_GAP: 5,
+  BUTTON_BORDER_RADIUS: 3,
+  BUTTON_MARGIN: 10,
+};
+
 window.Revealeditable = function () {
   return {
     id: "Revealeditable",
@@ -95,7 +125,7 @@ function setupDraggableElt(elt) {
     const container = document.createElement("div");
     container.style.position = "absolute";
     container.style.display = "inline-block";
-    container.style.border = "2px solid transparent";
+    container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
     elt.parentNode.insertBefore(container, elt);
     container.appendChild(elt);
     return container;
@@ -104,8 +134,8 @@ function setupDraggableElt(elt) {
   function setupEltStyles(elt) {
     elt.style.cursor = "move";
     elt.style.position = "relative";
-    elt.style.width = (elt.naturalWidth || elt.offsetWidth) / 2 + "px";
-    elt.style.height = (elt.naturalHeight || elt.offsetHeight) / 2 + "px";
+    elt.style.width = (elt.naturalWidth || elt.offsetWidth) * CONFIG.INITIAL_SIZE_SCALE + "px";
+    elt.style.height = (elt.naturalHeight || elt.offsetHeight) * CONFIG.INITIAL_SIZE_SCALE + "px";
     elt.style.display = "block";
   }
 
@@ -115,18 +145,18 @@ function setupDraggableElt(elt) {
       const handle = document.createElement("div");
       handle.className = "resize-handle";
       handle.style.position = "absolute";
-      handle.style.width = "10px";
-      handle.style.height = "10px";
-      handle.style.backgroundColor = "#007cba";
-      handle.style.border = "1px solid #fff";
+      handle.style.width = CONFIG.HANDLE_SIZE + "px";
+      handle.style.height = CONFIG.HANDLE_SIZE + "px";
+      handle.style.backgroundColor = CONFIG.ACCENT_COLOR;
+      handle.style.border = "1px solid " + CONFIG.HANDLE_BORDER_COLOR;
       handle.style.cursor = position + "-resize";
       handle.style.opacity = "0";
-      handle.style.transition = "opacity 0.2s";
+      handle.style.transition = "opacity " + CONFIG.TRANSITION_DURATION;
 
-      if (position.includes("n")) handle.style.top = "-6px";
-      if (position.includes("s")) handle.style.bottom = "-6px";
-      if (position.includes("w")) handle.style.left = "-6px";
-      if (position.includes("e")) handle.style.right = "-6px";
+      if (position.includes("n")) handle.style.top = CONFIG.HANDLE_OFFSET + "px";
+      if (position.includes("s")) handle.style.bottom = CONFIG.HANDLE_OFFSET + "px";
+      if (position.includes("w")) handle.style.left = CONFIG.HANDLE_OFFSET + "px";
+      if (position.includes("e")) handle.style.right = CONFIG.HANDLE_OFFSET + "px";
 
       handle.dataset.position = position;
       container.appendChild(handle);
@@ -136,18 +166,18 @@ function setupDraggableElt(elt) {
       const fontControls = document.createElement("div");
       fontControls.className = "font-controls";
       fontControls.style.position = "absolute";
-      fontControls.style.top = "-30px";
+      fontControls.style.top = CONFIG.FONT_CONTROLS_OFFSET + "px";
       fontControls.style.left = "0";
       fontControls.style.opacity = "0";
-      fontControls.style.transition = "opacity 0.2s";
+      fontControls.style.transition = "opacity " + CONFIG.TRANSITION_DURATION;
       fontControls.style.display = "flex";
-      fontControls.style.gap = "5px";
+      fontControls.style.gap = CONFIG.FONT_CONTROLS_GAP + "px";
 
       const decreaseBtn = createButton("A-", "24px", "4px 12px");
       decreaseBtn.style.marginRight = "0";
 
       const increaseBtn = createButton("A+", "24px", "4px 12px");
-      increaseBtn.style.marginRight = "10px";
+      increaseBtn.style.marginRight = CONFIG.BUTTON_MARGIN + "px";
 
       const alignLeftBtn = createButton("⇤", "20px", "4px 12px");
       alignLeftBtn.title = "Align Left";
@@ -159,7 +189,7 @@ function setupDraggableElt(elt) {
       alignRightBtn.title = "Align Right";
 
       const editBtn = createButton("✎", "20px", "4px 12px");
-      editBtn.style.marginLeft = "10px";
+      editBtn.style.marginLeft = CONFIG.BUTTON_MARGIN + "px";
       editBtn.title = "Toggle Edit Mode";
 
       fontControls.appendChild(decreaseBtn);
@@ -172,12 +202,12 @@ function setupDraggableElt(elt) {
 
       decreaseBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        changeFontSize(elt, -2);
+        changeFontSize(elt, -CONFIG.FONT_SIZE_STEP);
       });
 
       increaseBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        changeFontSize(elt, 2);
+        changeFontSize(elt, CONFIG.FONT_SIZE_STEP);
       });
 
       alignLeftBtn.addEventListener("click", (e) => {
@@ -199,7 +229,7 @@ function setupDraggableElt(elt) {
         e.stopPropagation();
         const isEditable = elt.contentEditable === "true";
         elt.contentEditable = !isEditable;
-        editBtn.style.backgroundColor = !isEditable ? "#28a745" : "#007cba";
+        editBtn.style.backgroundColor = !isEditable ? CONFIG.ACCENT_COLOR_ACTIVE : CONFIG.ACCENT_COLOR;
         editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
         if (!isEditable) {
           elt.focus();
@@ -210,7 +240,7 @@ function setupDraggableElt(elt) {
 
   function setupHoverEffects(container, isDraggingFn, isResizingFn) {
     container.addEventListener("mouseenter", () => {
-      container.style.border = "2px solid #007cba";
+      container.style.border = CONFIG.BORDER_WIDTH + "px solid " + CONFIG.ACCENT_COLOR;
       container
         .querySelectorAll(".resize-handle")
         .forEach((h) => (h.style.opacity = "1"));
@@ -220,7 +250,7 @@ function setupDraggableElt(elt) {
 
     container.addEventListener("mouseleave", () => {
       if (!isDraggingFn() && !isResizingFn()) {
-        container.style.border = "2px solid transparent";
+        container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
         container
           .querySelectorAll(".resize-handle")
           .forEach((h) => (h.style.opacity = "0"));
@@ -337,11 +367,11 @@ function setupDraggableElt(elt) {
     if (preserveAspectRatio) {
       if (resizeHandle.includes("e") || resizeHandle.includes("w")) {
         const widthChange = resizeHandle.includes("e") ? deltaX : -deltaX;
-        newWidth = Math.max(50, initialWidth + widthChange);
+        newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialWidth + widthChange);
         newHeight = newWidth / aspectRatio;
       } else if (resizeHandle.includes("s") || resizeHandle.includes("n")) {
         const heightChange = resizeHandle.includes("s") ? deltaY : -deltaY;
-        newHeight = Math.max(50, initialHeight + heightChange);
+        newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialHeight + heightChange);
         newWidth = newHeight * aspectRatio;
       }
 
@@ -353,17 +383,17 @@ function setupDraggableElt(elt) {
       }
     } else {
       if (resizeHandle.includes("e")) {
-        newWidth = Math.max(50, initialWidth + deltaX);
+        newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialWidth + deltaX);
       }
       if (resizeHandle.includes("w")) {
-        newWidth = Math.max(50, initialWidth - deltaX);
+        newWidth = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialWidth - deltaX);
         newX = initialX + (initialWidth - newWidth);
       }
       if (resizeHandle.includes("s")) {
-        newHeight = Math.max(50, initialHeight + deltaY);
+        newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialHeight + deltaY);
       }
       if (resizeHandle.includes("n")) {
-        newHeight = Math.max(50, initialHeight - deltaY);
+        newHeight = Math.max(CONFIG.MIN_ELEMENT_SIZE, initialHeight - deltaY);
         newY = initialY + (initialHeight - newHeight);
       }
     }
@@ -380,14 +410,14 @@ function setupDraggableElt(elt) {
     if (isDragging || isResizing) {
       setTimeout(() => {
         if (!container.matches(":hover")) {
-          container.style.border = "2px solid transparent";
+          container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
           container
             .querySelectorAll(".resize-handle")
             .forEach((h) => (h.style.opacity = "0"));
           const fontControls = container.querySelector(".font-controls");
           if (fontControls) fontControls.style.opacity = "0";
         }
-      }, 500);
+      }, CONFIG.HOVER_TIMEOUT);
     }
 
     isDragging = false;
@@ -397,8 +427,8 @@ function setupDraggableElt(elt) {
 
   function changeFontSize(element, delta) {
     const currentFontSize =
-      parseFloat(window.getComputedStyle(element).fontSize) || 16;
-    const newFontSize = Math.max(8, currentFontSize + delta);
+      parseFloat(window.getComputedStyle(element).fontSize) || CONFIG.DEFAULT_FONT_SIZE;
+    const newFontSize = Math.max(CONFIG.MIN_FONT_SIZE, currentFontSize + delta);
     element.style.fontSize = newFontSize + "px";
   }
 
@@ -407,11 +437,11 @@ function setupDraggableElt(elt) {
     button.textContent = text;
     button.style.fontSize = fontSize;
     button.style.padding = padding;
-    button.style.backgroundColor = "#007cba";
+    button.style.backgroundColor = CONFIG.ACCENT_COLOR;
     button.style.color = "white";
     button.style.border = "none";
     button.style.cursor = "pointer";
-    button.style.borderRadius = "3px";
+    button.style.borderRadius = CONFIG.BUTTON_BORDER_RADIUS + "px";
     return button;
   }
 }
