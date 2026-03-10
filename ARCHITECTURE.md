@@ -56,6 +56,8 @@ The JavaScript code is organized into several interconnected systems:
 │  ControlRegistry        UI button definitions                   │
 │  PropertySerializers    State-to-QMD conversion                 │
 ├─────────────────────────────────────────────────────────────────┤
+│  Undo/Redo System       undoStack, redoStack, state snapshots   │
+├─────────────────────────────────────────────────────────────────┤
 │  Utility Functions      round, getSlideScale, createButton, etc.│
 ├─────────────────────────────────────────────────────────────────┤
 │  setupDraggableElt      Main element setup function             │
@@ -196,6 +198,36 @@ const PropertySerializers = {
 ```
 {.absolute width=200px height=150px left=100px top=50px style="font-size: 18px;"}
 ```
+
+### 5. Undo/Redo System
+
+The Undo/Redo system tracks state changes and allows users to revert or replay edits.
+
+```javascript
+const undoStack = [];  // Stack of previous states
+const redoStack = [];  // Stack of undone states (cleared on new action)
+```
+
+**Key functions:**
+- `captureAllState()` - Creates snapshot of all elements' current state
+- `restoreState(snapshots)` - Restores all elements to a previous snapshot
+- `pushUndoState()` - Captures current state before an action (called at start of drag/resize/button clicks)
+- `undo()` - Pops from undoStack, pushes current to redoStack, restores
+- `redo()` - Pops from redoStack, pushes current to undoStack, restores
+- `canUndo()` / `canRedo()` - Check if stacks have entries
+
+**Keyboard shortcuts:**
+- `Ctrl+Z` / `Cmd+Z` - Undo
+- `Ctrl+Y` / `Ctrl+Shift+Z` / `Cmd+Shift+Z` - Redo
+
+**Integration points:**
+State is captured at the START of actions, before changes occur:
+- `Capabilities.move` - `pushUndoState()` called in `startDrag()`
+- `Capabilities.resize` - `pushUndoState()` called in `startResize()`
+- `ControlRegistry` buttons - `pushUndoState()` called in each `onClick`
+- Keyboard handlers - `pushUndoState()` called before arrow key moves
+
+**Note:** Text editing via contentEditable uses the browser's native undo, which operates separately from this system.
 
 ---
 
@@ -434,6 +466,7 @@ Styles use CSS custom properties for easy theming:
 - Keyboard navigation
 - Accessibility attributes
 - CSS classes applied correctly
+- Undo/redo functionality
 
 Run tests:
 ```bash
@@ -460,3 +493,4 @@ cd testing && npm run test:e2e
 2. **Check capabilities:** `console.log(ELEMENT_CAPABILITIES)` to see element-capability mapping
 3. **Check controls:** `console.log(ControlRegistry.controls)` to see registered controls
 4. **Inspect state:** `editableRegistry.get(element).getState()` for element state
+5. **Check undo/redo:** `console.log(canUndo(), canRedo())` to check stack status

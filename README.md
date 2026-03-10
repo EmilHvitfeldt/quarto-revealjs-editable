@@ -59,6 +59,21 @@ Editable elements support keyboard navigation for accessibility:
 - **Shift + Tab** to exit and return to normal slide navigation
 - All control buttons are keyboard accessible
 
+## Undo/Redo
+
+Made a mistake? Use keyboard shortcuts to undo and redo your changes:
+
+- **Ctrl+Z** (or **Cmd+Z** on Mac) to undo the last action
+- **Ctrl+Y** or **Ctrl+Shift+Z** (or **Cmd+Shift+Z** on Mac) to redo
+
+Undo/redo tracks:
+- Element position changes (drag)
+- Element size changes (resize)
+- Font size changes
+- Text alignment changes
+
+Note: Text content editing (in edit mode) uses the browser's native undo, which is separate from the extension's undo stack.
+
 Note that this extension adds the file name of the slides qmd file to the document itself, if you don't want that you happen, remove `editable` from `filters` before making the document public. And rerender the document.
 
 > [!TIP]
