@@ -1,0 +1,11 @@
+---
+title: "Colons Test"
+---
+
+## Slide with colons in content
+
+::: {.editable}
+Time: 12:30 PM
+Date: 2024-01-15
+URL: https://example.com
+:::

@@ -62,8 +62,13 @@ function Pandoc(doc)
 
   -- Encode qmd source as base64 and inject into <head>
   local filename = quarto.doc.input_file
-  local text = assert(io.open(filename, "r")):read("a")
+  local f = assert(io.open(filename, "r"))
+  local text = f:read("a")
+  f:close()
   local encoded = b64encode(text)
+
+  -- Escape backslashes and single quotes in filename for safe JS string
+  local escaped_filename = filename:gsub("\\", "\\\\"):gsub("'", "\\'")
 
   local script = "<script>\n"
   -- Use TextDecoder to properly handle UTF-8 encoded characters (accents, etc.)
@@ -71,7 +76,7 @@ function Pandoc(doc)
   script = script .. "window._input_file = new TextDecoder('utf-8').decode(\n"
   script = script .. "  Uint8Array.from(atob('" .. encoded .. "'), function(c) { return c.charCodeAt(0); })\n"
   script = script .. ");\n"
-  script = script .. "window._input_filename = '" .. filename .. "';\n"
+  script = script .. "window._input_filename = '" .. escaped_filename .. "';\n"
   script = script .. "</script>"
 
   quarto.doc.include_text("in-header", script)

@@ -44,6 +44,8 @@ npm run test:e2e
 | `round-trip.qmd`         | LaTeX + shortcodes + backslashes together | #15, #16      |
 | `latex.qmd`              | Complex LaTeX equations                   | #16           |
 | `multiple-elements.qmd`  | Multiple images and divs in one document  | -             |
+| `colons-in-content.qmd`  | Content with colons (regex fix)           | -             |
+| `bare-syntax.qmd`        | Both `::: editable` and `::: {.editable}` | -             |
 
 ### What the shell tests check
 
@@ -70,7 +72,7 @@ npm run test:e2e
 
 ### E2E Test Files
 
-**`e2e/save-edits.spec.js`** - Core save functionality (6 tests):
+**`e2e/save-edits.spec.js`** - Core save functionality (8 tests):
 
 | Test                          | What it verifies                                   |
 |-------------------------------|---------------------------------------------------|
@@ -78,10 +80,12 @@ npm run test:e2e
 | Containers wrapped correctly  | `position: absolute` and resize handles            |
 | Dimensions extracted          | `extracteditableEltDimensions()` returns valid data |
 | Clipboard works               | `copyQmdToClipboard()` writes to clipboard         |
-| Shortcodes preserved          | `{{< meta title >}}` survives save                 |
+| Shortcodes in base64          | `{{< meta title >}}` preserved in source           |
+| Content with colons           | Div content with `:` handled correctly (regex fix) |
+| Both div syntaxes work        | `::: editable` and `::: {.editable}` both work     |
 | LaTeX preserved               | `\dfrac`, `\lambda` survive save                   |
 
-**`e2e/ui-controls.spec.js`** - UI elements (20 tests):
+**`e2e/ui-controls.spec.js`** - UI elements (21 tests):
 
 | Test                             | What it verifies                                  |
 |----------------------------------|---------------------------------------------------|
@@ -103,6 +107,7 @@ npm run test:e2e
 | Edit mode button                 | Edit button toggles `contentEditable`             |
 | Multiple elements independent    | Each element has its own container and handlers   |
 | Multiple elements dimensions     | `extracteditableEltDimensions()` returns all      |
+| No global variable pollution     | Save functions don't leak globals                 |
 | htmlToQuarto conversion          | `<strong>`→`**`, `<em>`→`*`, `<code>`→backticks   |
 | Strikethrough conversion         | `<del>`→`~~`                                      |
 

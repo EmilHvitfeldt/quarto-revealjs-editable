@@ -201,8 +201,15 @@ run_render_test "Test 10: Multiple elements" "multiple-elements.qmd" "inject"
 check_multiple_elements "Test 10a: Element count" "multiple-elements.html" 4
 
 echo ""
+echo "--- Regression Tests ---"
+run_render_test "Test 11: Content with colons (regex fix)" "colons-in-content.qmd" "inject"
+verify_content_preserved "Test 11a: Colons preserved" "colons-in-content.qmd" 'Time: 12:30'
+run_render_test "Test 12: Bare ::: editable syntax" "bare-syntax.qmd" "inject"
+check_multiple_elements "Test 12a: Both syntaxes create elements" "bare-syntax.html" 2
+
+echo ""
 echo "--- Feature Tests ---"
-check_clipboard_feature "Test 11: Clipboard feature (#8)" "basic.html"
+check_clipboard_feature "Test 13: Clipboard feature (#8)" "basic.html"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

@@ -298,13 +298,19 @@ test.describe('Drag and Resize', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
+    // Wait for image to have valid dimensions
+    await page.waitForFunction(() => {
+      const img = document.querySelector('img.editable');
+      return img && img.offsetWidth > 0 && img.offsetHeight > 0;
+    });
+
     // Simulate resize with shift key
     const result = await page.evaluate(() => {
       const img = document.querySelector('img.editable');
       const container = img.parentNode;
       const handle = container.querySelector('.resize-handle[data-position="se"]');
-      const initialWidth = img.offsetWidth;
-      const initialHeight = img.offsetHeight;
+      const initialWidth = parseFloat(img.style.width) || img.offsetWidth;
+      const initialHeight = parseFloat(img.style.height) || img.offsetHeight;
       const initialAspectRatio = initialWidth / initialHeight;
 
       // Dispatch mousedown on SE handle
@@ -669,6 +675,46 @@ test.describe('Multiple Elements', () => {
 
     expect(result.dimensionCount).toBe(result.elementCount);
     expect(result.allHaveDimensions).toBe(true);
+  });
+});
+
+test.describe('Code Quality', () => {
+
+  test('No global variable pollution', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Call save functions and verify no globals are leaked
+    const globalsCheck = await page.evaluate(() => {
+      // Record initial window properties
+      const initialProps = new Set(Object.keys(window));
+
+      // Trigger save logic
+      const index = window._input_file;
+      const Elt_dim = extracteditableEltDimensions();
+      const result = updateTextDivs(index);
+      const Elt_attr = formateditableEltStrings(Elt_dim);
+      replaceeditableOccurrences(result, Elt_attr);
+
+      // Check for new global variables (excluding expected ones)
+      const afterProps = Object.keys(window);
+      const newGlobals = afterProps.filter(p => !initialProps.has(p));
+
+      // These should not exist as globals
+      const badGlobals = ['Elt_dim', 'Elt_attr', 'divs', 'replacements', 'text', 'filename'];
+      const leakedGlobals = badGlobals.filter(g => g in window);
+
+      return {
+        newGlobals,
+        leakedGlobals,
+        hasLeaks: leakedGlobals.length > 0
+      };
+    });
+
+    expect(globalsCheck.hasLeaks).toBe(false);
+    expect(globalsCheck.leakedGlobals).toEqual([]);
   });
 });
 

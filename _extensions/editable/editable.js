@@ -418,11 +418,11 @@ function setupDraggableElt(elt) {
 
 function saveMovedElts() {
   let index = readIndexQmd();
-  Elt_dim = extracteditableEltDimensions();
+  const Elt_dim = extracteditableEltDimensions();
 
-  index = udpdateTextDivs(index);
+  index = updateTextDivs(index);
 
-  Elt_attr = formateditableEltStrings(Elt_dim);
+  const Elt_attr = formateditableEltStrings(Elt_dim);
   index = replaceeditableOccurrences(index, Elt_attr);
 
   downloadString(index);
@@ -436,11 +436,11 @@ function readIndexQmd() {
 // Function to copy the modified qmd content to clipboard (closes #8)
 function copyQmdToClipboard() {
   let index = readIndexQmd();
-  Elt_dim = extracteditableEltDimensions();
+  const Elt_dim = extracteditableEltDimensions();
 
-  index = udpdateTextDivs(index);
+  index = updateTextDivs(index);
 
-  Elt_attr = formateditableEltStrings(Elt_dim);
+  const Elt_attr = formateditableEltStrings(Elt_dim);
   index = replaceeditableOccurrences(index, Elt_attr);
 
   navigator.clipboard.writeText(index).then(function () {
@@ -496,11 +496,13 @@ function extracteditableEltDimensions() {
   return dimensions;
 }
 
-function udpdateTextDivs(text) {
-  divs = getEditableDivs();
-  replacements = Array.from(divs).map(htmlToQuarto);
+function updateTextDivs(text) {
+  const divs = getEditableDivs();
+  const replacements = Array.from(divs).map(htmlToQuarto);
 
-  const regex = /::: ?(?:\{\.editable[^}]*\}|editable)[^:::]*\:::/g;
+  // Match fenced divs: ::: {.editable} or ::: editable followed by content and closing :::
+  // Using [\s\S]*? for non-greedy match of any character including newlines
+  const regex = /::: ?(?:\{\.editable[^}]*\}|editable)[\s\S]*?\n:::/g;
 
   let index = 0;
   return text.replace(regex, () => {
@@ -509,7 +511,7 @@ function udpdateTextDivs(text) {
 }
 
 function htmlToQuarto(div) {
-  text = div.innerHTML;
+  let text = div.innerHTML;
 
   text = text.trim();
   text = text.replaceAll("<p>", "");
@@ -560,7 +562,7 @@ function formateditableEltStrings(dimensions) {
 }
 
 async function downloadString(content, mimeType = "text/plain") {
-  filename = geteditableFilename();
+  const filename = geteditableFilename();
   if ("showSaveFilePicker" in window) {
     try {
       const fileHandle = await window.showSaveFilePicker({
