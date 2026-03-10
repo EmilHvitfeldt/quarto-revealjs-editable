@@ -138,46 +138,51 @@ test.describe('Drag and Resize', () => {
 
     // Simulate drag using dispatchEvent to bypass reveal.js overlays
     const result = await page.evaluate(() => {
-      const img = document.querySelector('img.editable');
-      const container = img.parentNode;
-      const initialLeft = container.offsetLeft;
-      const initialTop = container.offsetTop;
+      return new Promise(resolve => {
+        const img = document.querySelector('img.editable');
+        const container = img.parentNode;
+        const initialLeft = container.offsetLeft;
+        const initialTop = container.offsetTop;
 
-      // Dispatch mousedown on the image
-      const mousedown = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100
+        // Dispatch mousedown on the image
+        const mousedown = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100
+        });
+        img.dispatchEvent(mousedown);
+
+        // Dispatch mousemove on document (simulating drag)
+        const mousemove = new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 200,
+          clientY: 150
+        });
+        document.dispatchEvent(mousemove);
+
+        // Wait for requestAnimationFrame to process
+        requestAnimationFrame(() => {
+          // Dispatch mouseup on document
+          const mouseup = new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true
+          });
+          document.dispatchEvent(mouseup);
+
+          const finalLeft = parseFloat(container.style.left) || container.offsetLeft;
+          const finalTop = parseFloat(container.style.top) || container.offsetTop;
+
+          resolve({
+            initialLeft,
+            initialTop,
+            finalLeft,
+            finalTop,
+            moved: finalLeft !== initialLeft || finalTop !== initialTop
+          });
+        });
       });
-      img.dispatchEvent(mousedown);
-
-      // Dispatch mousemove on document (simulating drag)
-      const mousemove = new MouseEvent('mousemove', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 200,
-        clientY: 150
-      });
-      document.dispatchEvent(mousemove);
-
-      // Dispatch mouseup on document
-      const mouseup = new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true
-      });
-      document.dispatchEvent(mouseup);
-
-      const finalLeft = parseFloat(container.style.left) || container.offsetLeft;
-      const finalTop = parseFloat(container.style.top) || container.offsetTop;
-
-      return {
-        initialLeft,
-        initialTop,
-        finalLeft,
-        finalTop,
-        moved: finalLeft !== initialLeft || finalTop !== initialTop
-      };
     });
 
     expect(result.moved).toBe(true);
@@ -191,47 +196,52 @@ test.describe('Drag and Resize', () => {
 
     // Simulate resize using dispatchEvent
     const result = await page.evaluate(() => {
-      const img = document.querySelector('img.editable');
-      const container = img.parentNode;
-      const handle = container.querySelector('.resize-handle[data-position="se"]');
-      const initialWidth = img.offsetWidth;
-      const initialHeight = img.offsetHeight;
+      return new Promise(resolve => {
+        const img = document.querySelector('img.editable');
+        const container = img.parentNode;
+        const handle = container.querySelector('.resize-handle[data-position="se"]');
+        const initialWidth = img.offsetWidth;
+        const initialHeight = img.offsetHeight;
 
-      // Dispatch mousedown on the SE handle
-      const mousedown = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100
+        // Dispatch mousedown on the SE handle
+        const mousedown = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100
+        });
+        handle.dispatchEvent(mousedown);
+
+        // Dispatch mousemove (dragging handle outward)
+        const mousemove = new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 200,
+          clientY: 180
+        });
+        document.dispatchEvent(mousemove);
+
+        // Wait for requestAnimationFrame to process
+        requestAnimationFrame(() => {
+          // Dispatch mouseup
+          const mouseup = new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true
+          });
+          document.dispatchEvent(mouseup);
+
+          const finalWidth = parseFloat(img.style.width) || img.offsetWidth;
+          const finalHeight = parseFloat(img.style.height) || img.offsetHeight;
+
+          resolve({
+            initialWidth,
+            initialHeight,
+            finalWidth,
+            finalHeight,
+            resized: finalWidth !== initialWidth || finalHeight !== initialHeight
+          });
+        });
       });
-      handle.dispatchEvent(mousedown);
-
-      // Dispatch mousemove (dragging handle outward)
-      const mousemove = new MouseEvent('mousemove', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 200,
-        clientY: 180
-      });
-      document.dispatchEvent(mousemove);
-
-      // Dispatch mouseup
-      const mouseup = new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true
-      });
-      document.dispatchEvent(mouseup);
-
-      const finalWidth = parseFloat(img.style.width) || img.offsetWidth;
-      const finalHeight = parseFloat(img.style.height) || img.offsetHeight;
-
-      return {
-        initialWidth,
-        initialHeight,
-        finalWidth,
-        finalHeight,
-        resized: finalWidth !== initialWidth || finalHeight !== initialHeight
-      };
     });
 
     expect(result.resized).toBe(true);
@@ -247,46 +257,51 @@ test.describe('Drag and Resize', () => {
 
     // Simulate drag on div element
     const result = await page.evaluate(() => {
-      const div = document.querySelector('div.editable');
-      const container = div.parentNode;
-      const initialLeft = container.offsetLeft;
-      const initialTop = container.offsetTop;
+      return new Promise(resolve => {
+        const div = document.querySelector('div.editable');
+        const container = div.parentNode;
+        const initialLeft = container.offsetLeft;
+        const initialTop = container.offsetTop;
 
-      // Dispatch mousedown on the div
-      const mousedown = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100
+        // Dispatch mousedown on the div
+        const mousedown = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100
+        });
+        div.dispatchEvent(mousedown);
+
+        // Dispatch mousemove
+        const mousemove = new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 175,
+          clientY: 140
+        });
+        document.dispatchEvent(mousemove);
+
+        // Wait for requestAnimationFrame to process
+        requestAnimationFrame(() => {
+          // Dispatch mouseup
+          const mouseup = new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true
+          });
+          document.dispatchEvent(mouseup);
+
+          const finalLeft = parseFloat(container.style.left) || container.offsetLeft;
+          const finalTop = parseFloat(container.style.top) || container.offsetTop;
+
+          resolve({
+            initialLeft,
+            initialTop,
+            finalLeft,
+            finalTop,
+            moved: finalLeft !== initialLeft || finalTop !== initialTop
+          });
+        });
       });
-      div.dispatchEvent(mousedown);
-
-      // Dispatch mousemove
-      const mousemove = new MouseEvent('mousemove', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 175,
-        clientY: 140
-      });
-      document.dispatchEvent(mousemove);
-
-      // Dispatch mouseup
-      const mouseup = new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true
-      });
-      document.dispatchEvent(mouseup);
-
-      const finalLeft = parseFloat(container.style.left) || container.offsetLeft;
-      const finalTop = parseFloat(container.style.top) || container.offsetTop;
-
-      return {
-        initialLeft,
-        initialTop,
-        finalLeft,
-        finalTop,
-        moved: finalLeft !== initialLeft || finalTop !== initialTop
-      };
     });
 
     expect(result.moved).toBe(true);
@@ -306,52 +321,57 @@ test.describe('Drag and Resize', () => {
 
     // Simulate resize with shift key
     const result = await page.evaluate(() => {
-      const img = document.querySelector('img.editable');
-      const container = img.parentNode;
-      const handle = container.querySelector('.resize-handle[data-position="se"]');
-      const initialWidth = parseFloat(img.style.width) || img.offsetWidth;
-      const initialHeight = parseFloat(img.style.height) || img.offsetHeight;
-      const initialAspectRatio = initialWidth / initialHeight;
+      return new Promise(resolve => {
+        const img = document.querySelector('img.editable');
+        const container = img.parentNode;
+        const handle = container.querySelector('.resize-handle[data-position="se"]');
+        const initialWidth = parseFloat(img.style.width) || img.offsetWidth;
+        const initialHeight = parseFloat(img.style.height) || img.offsetHeight;
+        const initialAspectRatio = initialWidth / initialHeight;
 
-      // Dispatch mousedown on SE handle
-      const mousedown = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100
+        // Dispatch mousedown on SE handle
+        const mousedown = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100
+        });
+        handle.dispatchEvent(mousedown);
+
+        // Dispatch mousemove with shiftKey
+        const mousemove = new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 250,
+          clientY: 250,
+          shiftKey: true
+        });
+        document.dispatchEvent(mousemove);
+
+        // Wait for requestAnimationFrame to process
+        requestAnimationFrame(() => {
+          // Dispatch mouseup
+          const mouseup = new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true
+          });
+          document.dispatchEvent(mouseup);
+
+          const finalWidth = parseFloat(img.style.width) || img.offsetWidth;
+          const finalHeight = parseFloat(img.style.height) || img.offsetHeight;
+          const finalAspectRatio = finalWidth / finalHeight;
+
+          resolve({
+            initialWidth,
+            initialHeight,
+            initialAspectRatio,
+            finalWidth,
+            finalHeight,
+            finalAspectRatio,
+            resized: finalWidth !== initialWidth
+          });
+        });
       });
-      handle.dispatchEvent(mousedown);
-
-      // Dispatch mousemove with shiftKey
-      const mousemove = new MouseEvent('mousemove', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 250,
-        clientY: 250,
-        shiftKey: true
-      });
-      document.dispatchEvent(mousemove);
-
-      // Dispatch mouseup
-      const mouseup = new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true
-      });
-      document.dispatchEvent(mouseup);
-
-      const finalWidth = parseFloat(img.style.width) || img.offsetWidth;
-      const finalHeight = parseFloat(img.style.height) || img.offsetHeight;
-      const finalAspectRatio = finalWidth / finalHeight;
-
-      return {
-        initialWidth,
-        initialHeight,
-        initialAspectRatio,
-        finalWidth,
-        finalHeight,
-        finalAspectRatio,
-        resized: finalWidth !== initialWidth
-      };
     });
 
     expect(result.resized).toBe(true);
@@ -370,46 +390,51 @@ test.describe('Resize Edge Cases', () => {
 
     // Resizing from NW should change both position and size
     const result = await page.evaluate(() => {
-      const img = document.querySelector('img.editable');
-      const container = img.parentNode;
-      const handle = container.querySelector('.resize-handle[data-position="nw"]');
-      const initialWidth = img.offsetWidth;
-      const initialHeight = img.offsetHeight;
-      const initialLeft = container.offsetLeft;
-      const initialTop = container.offsetTop;
+      return new Promise(resolve => {
+        const img = document.querySelector('img.editable');
+        const container = img.parentNode;
+        const handle = container.querySelector('.resize-handle[data-position="nw"]');
+        const initialWidth = img.offsetWidth;
+        const initialHeight = img.offsetHeight;
+        const initialLeft = container.offsetLeft;
+        const initialTop = container.offsetTop;
 
-      // Dispatch mousedown on NW handle
-      const mousedown = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 100,
-        clientY: 100
+        // Dispatch mousedown on NW handle
+        const mousedown = new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 100,
+          clientY: 100
+        });
+        handle.dispatchEvent(mousedown);
+
+        // Drag NW handle up and left (making element larger)
+        const mousemove = new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 50,
+          clientY: 50
+        });
+        document.dispatchEvent(mousemove);
+
+        // Wait for requestAnimationFrame to process
+        requestAnimationFrame(() => {
+          const mouseup = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
+          document.dispatchEvent(mouseup);
+
+          const finalWidth = parseFloat(img.style.width) || img.offsetWidth;
+          const finalHeight = parseFloat(img.style.height) || img.offsetHeight;
+          const finalLeft = parseFloat(container.style.left);
+          const finalTop = parseFloat(container.style.top);
+
+          resolve({
+            initialWidth, initialHeight, initialLeft, initialTop,
+            finalWidth, finalHeight, finalLeft, finalTop,
+            sizeChanged: finalWidth !== initialWidth || finalHeight !== initialHeight,
+            positionChanged: finalLeft !== initialLeft || finalTop !== initialTop
+          });
+        });
       });
-      handle.dispatchEvent(mousedown);
-
-      // Drag NW handle up and left (making element larger)
-      const mousemove = new MouseEvent('mousemove', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 50,
-        clientY: 50
-      });
-      document.dispatchEvent(mousemove);
-
-      const mouseup = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
-      document.dispatchEvent(mouseup);
-
-      const finalWidth = parseFloat(img.style.width) || img.offsetWidth;
-      const finalHeight = parseFloat(img.style.height) || img.offsetHeight;
-      const finalLeft = parseFloat(container.style.left);
-      const finalTop = parseFloat(container.style.top);
-
-      return {
-        initialWidth, initialHeight, initialLeft, initialTop,
-        finalWidth, finalHeight, finalLeft, finalTop,
-        sizeChanged: finalWidth !== initialWidth || finalHeight !== initialHeight,
-        positionChanged: finalLeft !== initialLeft || finalTop !== initialTop
-      };
     });
 
     expect(result.sizeChanged).toBe(true);
@@ -595,51 +620,56 @@ test.describe('Multiple Elements', () => {
     await page.waitForTimeout(500);
 
     const result = await page.evaluate(() => {
-      const editables = document.querySelectorAll('.editable');
-      const count = editables.length;
+      return new Promise(resolve => {
+        const editables = document.querySelectorAll('.editable');
+        const count = editables.length;
 
-      // Each editable should have its own container
-      const containers = [];
-      editables.forEach((elt, i) => {
-        const container = elt.parentNode;
-        containers.push({
-          index: i,
-          hasContainer: container.classList.contains('editable-container'),
-          hasHandles: container.querySelectorAll('.resize-handle').length === 4
+        // Each editable should have its own container
+        const containers = [];
+        editables.forEach((elt, i) => {
+          const container = elt.parentNode;
+          containers.push({
+            index: i,
+            hasContainer: container.classList.contains('editable-container'),
+            hasHandles: container.querySelectorAll('.resize-handle').length === 4
+          });
+        });
+
+        // Move first element
+        const firstElt = editables[0];
+        const firstContainer = firstElt.parentNode;
+        const firstInitialLeft = firstContainer.offsetLeft;
+
+        const mousedown = new MouseEvent('mousedown', {
+          bubbles: true, cancelable: true, clientX: 100, clientY: 100
+        });
+        firstElt.dispatchEvent(mousedown);
+
+        const mousemove = new MouseEvent('mousemove', {
+          bubbles: true, cancelable: true, clientX: 150, clientY: 120
+        });
+        document.dispatchEvent(mousemove);
+
+        // Wait for requestAnimationFrame to process
+        requestAnimationFrame(() => {
+          const mouseup = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
+          document.dispatchEvent(mouseup);
+
+          const firstFinalLeft = parseFloat(firstContainer.style.left) || firstContainer.offsetLeft;
+
+          // Check second element didn't move
+          const secondElt = editables[1];
+          const secondContainer = secondElt.parentNode;
+          const secondLeft = secondContainer.offsetLeft;
+
+          resolve({
+            count,
+            containers,
+            firstMoved: firstFinalLeft !== firstInitialLeft,
+            secondUnchanged: true // Second element should not have been affected
+          });
         });
       });
-
-      // Move first element
-      const firstElt = editables[0];
-      const firstContainer = firstElt.parentNode;
-      const firstInitialLeft = firstContainer.offsetLeft;
-
-      const mousedown = new MouseEvent('mousedown', {
-        bubbles: true, cancelable: true, clientX: 100, clientY: 100
-      });
-      firstElt.dispatchEvent(mousedown);
-
-      const mousemove = new MouseEvent('mousemove', {
-        bubbles: true, cancelable: true, clientX: 150, clientY: 120
-      });
-      document.dispatchEvent(mousemove);
-
-      const mouseup = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
-      document.dispatchEvent(mouseup);
-
-      const firstFinalLeft = parseFloat(firstContainer.style.left) || firstContainer.offsetLeft;
-
-      // Check second element didn't move
-      const secondElt = editables[1];
-      const secondContainer = secondElt.parentNode;
-      const secondLeft = secondContainer.offsetLeft;
-
-      return {
-        count,
-        containers,
-        firstMoved: firstFinalLeft !== firstInitialLeft,
-        secondUnchanged: true // Second element should not have been affected
-      };
     });
 
     expect(result.count).toBeGreaterThan(1);

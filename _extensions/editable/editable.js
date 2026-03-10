@@ -95,6 +95,8 @@ function setupDraggableElt(elt) {
   let isResizing = false;
   let startX, startY, initialX, initialY, initialWidth, initialHeight;
   let resizeHandle = null;
+  let rafId = null; // For requestAnimationFrame throttling
+  let cachedScale = 1; // Cache scale during drag/resize
 
   const container = createEltContainer(elt);
   setupEltStyles(elt);
@@ -326,12 +328,17 @@ function setupDraggableElt(elt) {
     document.addEventListener("touchend", stopAction);
   }
 
-  function getClientCoordinates(e) {
-    const isTouch = e.type.startsWith("touch");
+  function getSlideScale() {
     const slidesContainerEl = document.querySelector(".slides");
-    const scale = slidesContainerEl
+    return slidesContainerEl
       ? parseFloat(window.getComputedStyle(slidesContainerEl).getPropertyValue("--slide-scale")) || 1
       : 1;
+  }
+
+  function getClientCoordinates(e) {
+    const isTouch = e.type.startsWith("touch");
+    // Use cached scale during drag/resize for performance
+    const scale = (isDragging || isResizing) ? cachedScale : getSlideScale();
 
     return {
       clientX: (isTouch ? e.touches[0].clientX : e.clientX) / scale,
@@ -343,6 +350,8 @@ function setupDraggableElt(elt) {
     if (e.target.parentElement.contentEditable === "true") return;
     if (e.target.classList.contains("resize-handle")) return;
 
+    // Cache scale at start of drag for consistent coordinates
+    cachedScale = getSlideScale();
     isDragging = true;
     const { clientX, clientY } = getClientCoordinates(e);
 
@@ -355,6 +364,8 @@ function setupDraggableElt(elt) {
   }
 
   function startResize(e) {
+    // Cache scale at start of resize for consistent coordinates
+    cachedScale = getSlideScale();
     isResizing = true;
     resizeHandle = e.target.dataset.position;
 
@@ -372,19 +383,41 @@ function setupDraggableElt(elt) {
   }
 
   function handleMouseMove(e) {
-    if (isDragging) {
-      drag(e);
-    } else if (isResizing) {
-      resize(e);
+    if (!isDragging && !isResizing) return;
+
+    // Cancel any pending frame to avoid queuing multiple updates
+    if (rafId) {
+      cancelAnimationFrame(rafId);
     }
+
+    // Schedule update on next animation frame for smooth performance
+    rafId = requestAnimationFrame(() => {
+      if (isDragging) {
+        drag(e);
+      } else if (isResizing) {
+        resize(e);
+      }
+      rafId = null;
+    });
   }
 
   function handleTouchMove(e) {
-    if (isDragging) {
-      drag(e);
-    } else if (isResizing) {
-      resize(e);
+    if (!isDragging && !isResizing) return;
+
+    // Cancel any pending frame to avoid queuing multiple updates
+    if (rafId) {
+      cancelAnimationFrame(rafId);
     }
+
+    // Schedule update on next animation frame for smooth performance
+    rafId = requestAnimationFrame(() => {
+      if (isDragging) {
+        drag(e);
+      } else if (isResizing) {
+        resize(e);
+      }
+      rafId = null;
+    });
   }
 
   function drag(e) {
@@ -464,6 +497,12 @@ function setupDraggableElt(elt) {
           container.classList.remove("active");
         }
       }, CONFIG.HOVER_TIMEOUT);
+    }
+
+    // Cancel any pending animation frame
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
 
     isDragging = false;
