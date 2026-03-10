@@ -1,31 +1,16 @@
-// Configuration constants
+// Configuration constants (only runtime values - visual styling is in editable.css)
 const CONFIG = {
-  // Sizing
+  // Sizing constraints
   MIN_ELEMENT_SIZE: 50,
-  HANDLE_SIZE: 10,
   KEYBOARD_MOVE_STEP: 10,
-  HANDLE_OFFSET: -6,
-  BORDER_WIDTH: 2,
 
-  // Font
+  // Font constraints
   MIN_FONT_SIZE: 8,
   DEFAULT_FONT_SIZE: 16,
   FONT_SIZE_STEP: 2,
 
-  // Colors
-  ACCENT_COLOR: "#007cba",
-  ACCENT_COLOR_ACTIVE: "#28a745",
-  HANDLE_BORDER_COLOR: "#fff",
-
   // Timing
-  TRANSITION_DURATION: "0.2s",
   HOVER_TIMEOUT: 500,
-
-  // UI
-  FONT_CONTROLS_OFFSET: -30,
-  FONT_CONTROLS_GAP: 5,
-  BUTTON_BORDER_RADIUS: 3,
-  BUTTON_MARGIN: 10,
 };
 
 window.Revealeditable = function () {
@@ -123,9 +108,7 @@ function setupDraggableElt(elt) {
 
   function createEltContainer(elt) {
     const container = document.createElement("div");
-    container.style.position = "absolute";
-    container.style.display = "inline-block";
-    container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
+    container.className = "editable-container";
     elt.parentNode.insertBefore(container, elt);
     container.appendChild(elt);
     return container;
@@ -156,25 +139,12 @@ function setupDraggableElt(elt) {
 
     handles.forEach((position) => {
       const handle = document.createElement("div");
-      handle.className = "resize-handle";
-      handle.style.position = "absolute";
-      handle.style.width = CONFIG.HANDLE_SIZE + "px";
-      handle.style.height = CONFIG.HANDLE_SIZE + "px";
-      handle.style.backgroundColor = CONFIG.ACCENT_COLOR;
-      handle.style.border = "1px solid " + CONFIG.HANDLE_BORDER_COLOR;
-      handle.style.cursor = position + "-resize";
-      handle.style.opacity = "0";
-      handle.style.transition = "opacity " + CONFIG.TRANSITION_DURATION;
+      handle.className = "resize-handle handle-" + position;
 
       // Accessibility attributes
       handle.setAttribute("role", "slider");
       handle.setAttribute("aria-label", handleLabels[position]);
       handle.setAttribute("tabindex", "-1");
-
-      if (position.includes("n")) handle.style.top = CONFIG.HANDLE_OFFSET + "px";
-      if (position.includes("s")) handle.style.bottom = CONFIG.HANDLE_OFFSET + "px";
-      if (position.includes("w")) handle.style.left = CONFIG.HANDLE_OFFSET + "px";
-      if (position.includes("e")) handle.style.right = CONFIG.HANDLE_OFFSET + "px";
 
       handle.dataset.position = position;
       container.appendChild(handle);
@@ -182,39 +152,29 @@ function setupDraggableElt(elt) {
 
     if (elt.tagName.toLowerCase() === "div") {
       const fontControls = document.createElement("div");
-      fontControls.className = "font-controls";
-      fontControls.style.position = "absolute";
-      fontControls.style.top = CONFIG.FONT_CONTROLS_OFFSET + "px";
-      fontControls.style.left = "0";
-      fontControls.style.opacity = "0";
-      fontControls.style.transition = "opacity " + CONFIG.TRANSITION_DURATION;
-      fontControls.style.display = "flex";
-      fontControls.style.gap = CONFIG.FONT_CONTROLS_GAP + "px";
+      fontControls.className = "editable-font-controls";
 
-      const decreaseBtn = createButton("A-", "24px", "4px 12px");
-      decreaseBtn.style.marginRight = "0";
+      const decreaseBtn = createButton("A-", "editable-button-font editable-button-decrease");
       decreaseBtn.setAttribute("aria-label", "Decrease font size");
       decreaseBtn.title = "Decrease font size";
 
-      const increaseBtn = createButton("A+", "24px", "4px 12px");
-      increaseBtn.style.marginRight = CONFIG.BUTTON_MARGIN + "px";
+      const increaseBtn = createButton("A+", "editable-button-font editable-button-increase");
       increaseBtn.setAttribute("aria-label", "Increase font size");
       increaseBtn.title = "Increase font size";
 
-      const alignLeftBtn = createButton("⇤", "20px", "4px 12px");
+      const alignLeftBtn = createButton("⇤", "editable-button-align");
       alignLeftBtn.setAttribute("aria-label", "Align text left");
       alignLeftBtn.title = "Align Left";
 
-      const alignCenterBtn = createButton("⇔", "20px", "4px 12px");
+      const alignCenterBtn = createButton("⇔", "editable-button-align");
       alignCenterBtn.setAttribute("aria-label", "Align text center");
       alignCenterBtn.title = "Align Center";
 
-      const alignRightBtn = createButton("⇥", "20px", "4px 12px");
+      const alignRightBtn = createButton("⇥", "editable-button-align");
       alignRightBtn.setAttribute("aria-label", "Align text right");
       alignRightBtn.title = "Align Right";
 
-      const editBtn = createButton("✎", "20px", "4px 12px");
-      editBtn.style.marginLeft = CONFIG.BUTTON_MARGIN + "px";
+      const editBtn = createButton("✎", "editable-button-edit");
       editBtn.setAttribute("aria-label", "Toggle edit mode");
       editBtn.title = "Toggle Edit Mode";
 
@@ -255,7 +215,7 @@ function setupDraggableElt(elt) {
         e.stopPropagation();
         const isEditable = elt.contentEditable === "true";
         elt.contentEditable = !isEditable;
-        editBtn.style.backgroundColor = !isEditable ? CONFIG.ACCENT_COLOR_ACTIVE : CONFIG.ACCENT_COLOR;
+        editBtn.classList.toggle("active", !isEditable);
         editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
         if (!isEditable) {
           elt.focus();
@@ -266,21 +226,11 @@ function setupDraggableElt(elt) {
 
   function setupHoverEffects(container, isDraggingFn, isResizingFn) {
     function showControls() {
-      container.style.border = CONFIG.BORDER_WIDTH + "px solid " + CONFIG.ACCENT_COLOR;
-      container
-        .querySelectorAll(".resize-handle")
-        .forEach((h) => (h.style.opacity = "1"));
-      const fontControls = container.querySelector(".font-controls");
-      if (fontControls) fontControls.style.opacity = "1";
+      container.classList.add("active");
     }
 
     function hideControls() {
-      container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
-      container
-        .querySelectorAll(".resize-handle")
-        .forEach((h) => (h.style.opacity = "0"));
-      const fontControls = container.querySelector(".font-controls");
-      if (fontControls) fontControls.style.opacity = "0";
+      container.classList.remove("active");
     }
 
     container.addEventListener("mouseenter", showControls);
@@ -511,12 +461,7 @@ function setupDraggableElt(elt) {
     if (isDragging || isResizing) {
       setTimeout(() => {
         if (!container.matches(":hover")) {
-          container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
-          container
-            .querySelectorAll(".resize-handle")
-            .forEach((h) => (h.style.opacity = "0"));
-          const fontControls = container.querySelector(".font-controls");
-          if (fontControls) fontControls.style.opacity = "0";
+          container.classList.remove("active");
         }
       }, CONFIG.HOVER_TIMEOUT);
     }
@@ -533,16 +478,10 @@ function setupDraggableElt(elt) {
     element.style.fontSize = newFontSize + "px";
   }
 
-  function createButton(text, fontSize, padding) {
+  function createButton(text, additionalClasses) {
     const button = document.createElement("button");
     button.textContent = text;
-    button.style.fontSize = fontSize;
-    button.style.padding = padding;
-    button.style.backgroundColor = CONFIG.ACCENT_COLOR;
-    button.style.color = "white";
-    button.style.border = "none";
-    button.style.cursor = "pointer";
-    button.style.borderRadius = CONFIG.BUTTON_BORDER_RADIUS + "px";
+    button.className = "editable-button " + additionalClasses;
     return button;
   }
 }

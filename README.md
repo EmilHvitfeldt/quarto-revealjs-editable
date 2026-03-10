@@ -70,6 +70,21 @@ Note that this extension adds the file name of the slides qmd file to the docume
 > }
 > ```
 
+## Customizing Appearance
+
+You can customize the appearance of editable controls using CSS custom properties. Add these to your custom SCSS/CSS file:
+
+```scss
+:root {
+  --editable-accent-color: #ff6600;      /* Main accent color (handles, buttons, border) */
+  --editable-accent-active: #00cc00;     /* Color when edit mode is active */
+  --editable-handle-size: 12px;            /* Size of resize corner handles */
+  --editable-handle-border-color: #000;  /* Border color around handles */
+  --editable-border-width: 3px;            /* Border width when hovering */
+  --editable-transition: 0.3s;             /* Animation duration */
+}
+```
+
 ## Demo Video
 
 ![](demo-text.gif)

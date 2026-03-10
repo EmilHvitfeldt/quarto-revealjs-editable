@@ -57,18 +57,18 @@ test.describe('Save Edits Feature', () => {
     // Wait for editable elements to be set up
     await page.waitForTimeout(500);
 
-    // Verify the editable image is wrapped in a container with absolute positioning
+    // Verify the editable image is wrapped in a container with editable-container class
     const containerStyle = await page.evaluate(() => {
       const img = document.querySelector('img.editable');
       const container = img.parentNode;
       return {
-        position: container.style.position,
+        hasContainerClass: container.classList.contains('editable-container'),
         hasResizeHandles: container.querySelectorAll('.resize-handle').length,
         imgCursor: img.style.cursor
       };
     });
 
-    expect(containerStyle.position).toBe('absolute');
+    expect(containerStyle.hasContainerClass).toBe(true);
     expect(containerStyle.hasResizeHandles).toBe(4); // nw, ne, sw, se
     expect(containerStyle.imgCursor).toBe('move');
   });
@@ -194,7 +194,7 @@ test.describe('Save Edits Feature', () => {
       return {
         count: editables.length,
         allHaveContainers: Array.from(editables).every(el =>
-          el.parentNode.style.position === 'absolute'
+          el.parentNode.classList.contains('editable-container')
         )
       };
     });

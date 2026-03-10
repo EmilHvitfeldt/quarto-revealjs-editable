@@ -9,3 +9,5 @@ contributes:
     - name: Revealeditable
       script:
         - editable.js
+      stylesheet:
+        - editable.css

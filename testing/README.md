@@ -113,7 +113,7 @@ npm run test:e2e
 | htmlToQuarto conversion          | `<strong>`→`**`, `<em>`→`*`, `<code>`→backticks   |
 | Strikethrough conversion         | `<del>`→`~~`                                      |
 
-**`e2e/ui-controls.spec.js`** - Accessibility (7 tests):
+**`e2e/ui-controls.spec.js`** - Accessibility (8 tests):
 
 | Test                             | What it verifies                                  |
 |----------------------------------|---------------------------------------------------|
@@ -124,6 +124,19 @@ npm run test:e2e
 | Arrow keys move element          | Keyboard navigation moves element by 10px         |
 | Shift+Arrow keys resize          | Keyboard navigation resizes element               |
 | Keyboard resize min size         | Cannot resize below 50px with keyboard            |
+| Shift+Tab blurs container        | Returns to normal slide navigation                |
+
+**`e2e/ui-controls.spec.js`** - CSS Customization (7 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Container class                  | `.editable-container` class applied               |
+| Handle position classes          | `.handle-nw`, `.handle-ne`, etc. classes          |
+| Font controls class              | `.editable-font-controls` class applied           |
+| Button class                     | `.editable-button` class on all buttons           |
+| CSS custom properties loaded     | Default values from editable.css                  |
+| CSS properties overridable       | Custom values can override defaults               |
+| Active class toggle              | `.active` class can be toggled                    |
 
 ---
 

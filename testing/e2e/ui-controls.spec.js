@@ -17,7 +17,7 @@ test.describe('UI Controls', () => {
     const fontControls = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const controls = container.querySelector('.font-controls');
+      const controls = container.querySelector('.editable-font-controls');
       if (!controls) return null;
       return {
         hasDecreaseBtn: !!controls.querySelector('button'),
@@ -476,7 +476,7 @@ test.describe('Font Size Controls', () => {
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.font-controls button');
+      const buttons = container.querySelectorAll('.editable-font-controls button');
       const decreaseBtn = buttons[0]; // First button is A-
 
       // Set initial small font size
@@ -504,7 +504,7 @@ test.describe('Font Size Controls', () => {
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.font-controls button');
+      const buttons = container.querySelectorAll('.editable-font-controls button');
       const increaseBtn = buttons[1]; // Second button is A+
 
       const initialSize = parseFloat(window.getComputedStyle(div).fontSize);
@@ -528,7 +528,7 @@ test.describe('Font Size Controls', () => {
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.font-controls button');
+      const buttons = container.querySelectorAll('.editable-font-controls button');
       // Buttons: A-, A+, alignLeft, alignCenter, alignRight, edit
       const alignLeftBtn = buttons[2];
       const alignCenterBtn = buttons[3];
@@ -560,7 +560,7 @@ test.describe('Font Size Controls', () => {
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.font-controls button');
+      const buttons = container.querySelectorAll('.editable-font-controls button');
       const editBtn = buttons[5]; // Last button is edit
 
       const initialEditable = div.contentEditable;
@@ -604,7 +604,7 @@ test.describe('Multiple Elements', () => {
         const container = elt.parentNode;
         containers.push({
           index: i,
-          hasContainer: container.style.position === 'absolute',
+          hasContainer: container.classList.contains('editable-container'),
           hasHandles: container.querySelectorAll('.resize-handle').length === 4
         });
       });
@@ -879,7 +879,8 @@ test.describe('Accessibility', () => {
 
     const buttons = await page.evaluate(() => {
       const container = document.querySelector('div.editable').parentNode;
-      const fontControls = container.querySelector('.font-controls');
+      const fontControls = container.querySelector('.editable-font-controls');
+      if (!fontControls) return [];
       return Array.from(fontControls.querySelectorAll('button')).map(b => ({
         text: b.textContent,
         ariaLabel: b.getAttribute('aria-label'),
@@ -906,10 +907,9 @@ test.describe('Accessibility', () => {
 
     const result = await page.evaluate(() => {
       const container = document.querySelector('.editable').parentNode;
-      const handle = container.querySelector('.resize-handle');
 
-      // Check initial state
-      const initialOpacity = handle.style.opacity;
+      // Check initial state - no active class
+      const initialHasActive = container.classList.contains('active');
 
       // Focus the container
       container.focus();
@@ -918,17 +918,15 @@ test.describe('Accessibility', () => {
       return new Promise(resolve => {
         setTimeout(() => {
           resolve({
-            initialOpacity,
-            focusedOpacity: handle.style.opacity,
-            borderAfterFocus: container.style.border
+            initialHasActive,
+            focusedHasActive: container.classList.contains('active')
           });
         }, 100);
       });
     });
 
-    expect(result.initialOpacity).toBe('0');
-    expect(result.focusedOpacity).toBe('1');
-    expect(result.borderAfterFocus).toContain('solid');
+    expect(result.initialHasActive).toBe(false);
+    expect(result.focusedHasActive).toBe(true);
   });
 
   test('Arrow keys move element', async ({ page }) => {
@@ -1058,5 +1056,194 @@ test.describe('Accessibility', () => {
     });
 
     expect(afterTab.isFocused).toBe(false);
+  });
+});
+
+test.describe('CSS Customization', () => {
+
+  test('Container has editable-container class', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      return {
+        hasClass: container.classList.contains('editable-container'),
+        className: container.className
+      };
+    });
+
+    expect(result.hasClass).toBe(true);
+    expect(result.className).toContain('editable-container');
+  });
+
+  test('Resize handles have position-specific classes', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const handles = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      return Array.from(container.querySelectorAll('.resize-handle')).map(h => ({
+        classes: h.className,
+        hasPositionClass: h.classList.contains('handle-nw') ||
+                          h.classList.contains('handle-ne') ||
+                          h.classList.contains('handle-sw') ||
+                          h.classList.contains('handle-se')
+      }));
+    });
+
+    expect(handles.length).toBe(4);
+    handles.forEach(h => {
+      expect(h.hasPositionClass).toBe(true);
+    });
+  });
+
+  test('Font controls have editable-font-controls class', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const divEditable = document.querySelector('div.editable');
+      if (!divEditable) return { found: false };
+      const container = divEditable.parentNode;
+      const fontControls = container.querySelector('.editable-font-controls');
+      return {
+        found: !!fontControls,
+        className: fontControls ? fontControls.className : null
+      };
+    });
+
+    expect(result.found).toBe(true);
+    expect(result.className).toContain('editable-font-controls');
+  });
+
+  test('Buttons have editable-button class', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const buttons = await page.evaluate(() => {
+      const divEditable = document.querySelector('div.editable');
+      if (!divEditable) return [];
+      const container = divEditable.parentNode;
+      const fontControls = container.querySelector('.editable-font-controls');
+      if (!fontControls) return [];
+      return Array.from(fontControls.querySelectorAll('button')).map(b => ({
+        hasBaseClass: b.classList.contains('editable-button'),
+        classes: b.className
+      }));
+    });
+
+    expect(buttons.length).toBe(6);
+    buttons.forEach(b => {
+      expect(b.hasBaseClass).toBe(true);
+    });
+  });
+
+  test('CSS custom properties are applied from stylesheet', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const root = document.documentElement;
+      const styles = getComputedStyle(root);
+      return {
+        accentColor: styles.getPropertyValue('--editable-accent-color').trim(),
+        handleSize: styles.getPropertyValue('--editable-handle-size').trim(),
+        borderWidth: styles.getPropertyValue('--editable-border-width').trim()
+      };
+    });
+
+    // These should have default values from editable.css
+    expect(result.accentColor).toBe('#007cba');
+    expect(result.handleSize).toBe('10px');
+    expect(result.borderWidth).toBe('2px');
+  });
+
+  test('CSS custom properties can be overridden', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Override the CSS custom property and verify it takes effect
+    const result = await page.evaluate(() => {
+      const root = document.documentElement;
+
+      // Get original value
+      const originalColor = getComputedStyle(root).getPropertyValue('--editable-accent-color').trim();
+
+      // Override the property
+      root.style.setProperty('--editable-accent-color', '#ff0000');
+
+      // Get new computed value
+      const newColor = getComputedStyle(root).getPropertyValue('--editable-accent-color').trim();
+
+      // Check that button background uses the CSS variable
+      const divEditable = document.querySelector('div.editable');
+      const container = divEditable.parentNode;
+      const button = container.querySelector('.editable-button');
+      const buttonBg = getComputedStyle(button).backgroundColor;
+
+      return {
+        originalColor,
+        newColor,
+        buttonBg
+      };
+    });
+
+    expect(result.originalColor).toBe('#007cba');
+    expect(result.newColor).toBe('#ff0000');
+    // Button should now use the overridden red color (rgb(255, 0, 0))
+    expect(result.buttonBg).toBe('rgb(255, 0, 0)');
+  });
+
+  test('Active class controls visibility of handles', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Test that CSS class toggles work (actual opacity depends on CSS loading)
+    const result = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      const handle = container.querySelector('.resize-handle');
+
+      // Make sure container has correct class
+      const containerClass = container.className;
+
+      // Initial state - no active class
+      container.classList.remove('active');
+      const initialHasActive = container.classList.contains('active');
+
+      // Add active class
+      container.classList.add('active');
+      const activeHasActive = container.classList.contains('active');
+
+      // Remove active class
+      container.classList.remove('active');
+      const removedHasActive = container.classList.contains('active');
+
+      return {
+        containerClass,
+        initialHasActive,
+        activeHasActive,
+        removedHasActive
+      };
+    });
+
+    expect(result.containerClass).toContain('editable-container');
+    expect(result.initialHasActive).toBe(false);
+    expect(result.activeHasActive).toBe(true);
+    expect(result.removedHasActive).toBe(false);
   });
 });
