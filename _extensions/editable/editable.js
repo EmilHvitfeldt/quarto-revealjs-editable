@@ -536,7 +536,9 @@ function htmlToQuarto(div) {
 }
 
 function replaceeditableOccurrences(text, replacements) {
-  const regex = /\{\.editable[^}]*\}|::: ?editable/g;
+  // Match {.editable} or {.editable ...} patterns
+  // Note: ::: editable divs are normalized to {.editable} by updateTextDivs first
+  const regex = /\{\.editable[^}]*\}/g;
 
   let index = 0;
   return text.replace(regex, () => {
