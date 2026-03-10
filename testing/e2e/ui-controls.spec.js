@@ -1494,3 +1494,243 @@ test.describe('Undo/Redo', () => {
     expect(result.left).not.toBe(200);
   });
 });
+
+// Rotation Tests
+test.describe('Rotation', () => {
+  test('Rotate handle is created for elements', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const img = document.querySelector('img.editable');
+      const container = img.parentNode;
+      const rotateHandle = container.querySelector('.rotate-handle');
+      return {
+        exists: !!rotateHandle,
+        ariaLabel: rotateHandle?.getAttribute('aria-label'),
+        role: rotateHandle?.getAttribute('role'),
+        title: rotateHandle?.title
+      };
+    });
+
+    expect(result.exists).toBe(true);
+    expect(result.ariaLabel).toBe('Rotate element');
+    expect(result.role).toBe('slider');
+    expect(result.title).toContain('Rotate');
+  });
+
+  test('Rotate handle exists for div elements too', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Navigate to slide with div.editable
+    await page.evaluate(() => Reveal.slide(1));
+    await page.waitForTimeout(300);
+
+    const result = await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      const container = div.parentNode;
+      const rotateHandle = container.querySelector('.rotate-handle');
+      return {
+        exists: !!rotateHandle
+      };
+    });
+
+    expect(result.exists).toBe(true);
+  });
+
+  test('Rotation state is included in EditableElement', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const img = document.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+      return {
+        hasRotation: 'rotation' in editableElt.state,
+        initialRotation: editableElt.state.rotation
+      };
+    });
+
+    expect(result.hasRotation).toBe(true);
+    expect(result.initialRotation).toBe(0);
+  });
+
+  test('Rotation can be set via setState', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const img = document.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+      const container = editableElt.container;
+
+      // Set rotation
+      editableElt.setState({ rotation: 45 });
+
+      return {
+        stateRotation: editableElt.state.rotation,
+        transform: container.style.transform
+      };
+    });
+
+    expect(result.stateRotation).toBe(45);
+    expect(result.transform).toBe('rotate(45deg)');
+  });
+
+  test('Rotation is serialized to QMD style attribute', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const dimensions = {
+        width: 100,
+        height: 100,
+        left: 50,
+        top: 50,
+        rotation: 30
+      };
+      return serializeToQmd(dimensions);
+    });
+
+    expect(result).toContain('transform: rotate(30deg)');
+    expect(result).toContain('style=');
+  });
+
+  test('Rotation is not serialized when 0', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const dimensions = {
+        width: 100,
+        height: 100,
+        left: 50,
+        top: 50,
+        rotation: 0
+      };
+      return serializeToQmd(dimensions);
+    });
+
+    expect(result).not.toContain('transform');
+    expect(result).not.toContain('rotate');
+  });
+
+  test('Ctrl+Arrow rotates element via keyboard', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Focus container
+    await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      container.focus();
+    });
+
+    // Press Ctrl+Right to rotate
+    await page.keyboard.press('Control+ArrowRight');
+
+    const result = await page.evaluate(() => {
+      const img = document.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+      return {
+        rotation: editableElt.state.rotation
+      };
+    });
+
+    // Should have rotated by 5 degrees (default step)
+    expect(result.rotation).toBe(5);
+  });
+
+  test('Ctrl+Shift+Arrow rotates by larger step', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Focus container
+    await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      container.focus();
+    });
+
+    // Press Ctrl+Shift+Right to rotate by larger step
+    await page.keyboard.press('Control+Shift+ArrowRight');
+
+    const result = await page.evaluate(() => {
+      const img = document.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+      return {
+        rotation: editableElt.state.rotation
+      };
+    });
+
+    // Should have rotated by 15 degrees (shift step)
+    expect(result.rotation).toBe(15);
+  });
+
+  test('Rotation is included in undo/redo', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(async () => {
+      const img = document.querySelector('img.editable');
+      const editableElt = editableRegistry.get(img);
+
+      // Initial rotation
+      const initialRotation = editableElt.state.rotation;
+
+      // Capture state and rotate
+      pushUndoState();
+      editableElt.setState({ rotation: 45 });
+      const afterRotate = editableElt.state.rotation;
+
+      // Undo
+      undo();
+      await new Promise(r => requestAnimationFrame(r));
+      const afterUndo = editableElt.state.rotation;
+
+      return {
+        initialRotation,
+        afterRotate,
+        afterUndo
+      };
+    });
+
+    expect(result.initialRotation).toBe(0);
+    expect(result.afterRotate).toBe(45);
+    expect(result.afterUndo).toBe(0);
+  });
+
+  test('CSS custom property for rotate color exists', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const root = document.documentElement;
+      const styles = getComputedStyle(root);
+      return {
+        rotateColor: styles.getPropertyValue('--editable-rotate-color').trim()
+      };
+    });
+
+    expect(result.rotateColor).toBe('#ff6600');
+  });
+});

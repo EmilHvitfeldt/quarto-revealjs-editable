@@ -1,6 +1,6 @@
 # editable Extension For Quarto Revealjs
 
-This Revealjs plugin allows the repositioning and resizing of images and text divs directly in the previewed slides.
+This Revealjs plugin allows the repositioning, resizing, and rotating of images and text divs directly in the previewed slides.
 
 ## Installing
 
@@ -44,8 +44,11 @@ some text here
 
 Note that this extension will completely rewrite the `{}`.
 
-Once you have rerendered the slides, each image with the id should be movable and resizable using the corners.
-Holding shift while pulling the corners respects aspect ratios.
+Once you have rerendered the slides, each image with the id should be movable, resizable, and rotatable.
+
+- **Move**: Drag the element to reposition it
+- **Resize**: Use the corner handles (hold Shift to preserve aspect ratio)
+- **Rotate**: Use the orange circular handle at the top center (hold Shift to snap to 15° increments)
 
 Once you are happy with the sizes, open the menu (M), go to tools, and click "Save Edits". This will prompt you to save a file. Choose the same folder you are working in to overwrite the document you are in. Rerender, and the elements should be locked in place.
 
@@ -56,6 +59,8 @@ Editable elements support keyboard navigation for accessibility:
 - **Tab** to focus an editable element (controls will appear)
 - **Arrow keys** to move the element (10px per press)
 - **Shift + Arrow keys** to resize the element
+- **Ctrl/Cmd + Left/Right arrows** to rotate (5° per press)
+- **Ctrl/Cmd + Shift + Left/Right arrows** to rotate by larger steps (15°)
 - **Shift + Tab** to exit and return to normal slide navigation
 - All control buttons are keyboard accessible
 
@@ -69,6 +74,7 @@ Made a mistake? Use keyboard shortcuts to undo and redo your changes:
 Undo/redo tracks:
 - Element position changes (drag)
 - Element size changes (resize)
+- Element rotation changes
 - Font size changes
 - Text alignment changes
 
@@ -93,6 +99,7 @@ You can customize the appearance of editable controls using CSS custom propertie
 :root {
   --editable-accent-color: #ff6600;      /* Main accent color (handles, buttons, border) */
   --editable-accent-active: #00cc00;     /* Color when edit mode is active */
+  --editable-rotate-color: #ff6600;      /* Color of the rotation handle */
   --editable-handle-size: 12px;            /* Size of resize corner handles */
   --editable-handle-border-color: #000;  /* Border color around handles */
   --editable-border-width: 3px;            /* Border width when hovering */

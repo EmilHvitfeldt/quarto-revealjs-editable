@@ -85,6 +85,7 @@ class EditableElement {
       y: 0,                      // Container top position
       width: 0,                  // Element width
       height: 0,                 // Element height
+      rotation: 0,               // Rotation angle in degrees
       fontSize: null,            // Font size (div only)
       textAlign: null,           // Text alignment (div only)
     };
@@ -120,6 +121,13 @@ const Capabilities = {
     handleKeyboard(context, e, editableElt) { },  // Handle arrow keys
   },
   resize: { /* similar interface */ },
+  rotate: {
+    name: "rotate",
+    createHandles(context) { },  // Create rotation handle at top center
+    // Uses angle calculation from center to mouse position
+    // Shift key snaps to 15° increments
+    // Ctrl/Cmd + arrow keys for keyboard rotation
+  },
   fontControls: {
     createControls(context) { }, // Create UI elements
   },
@@ -130,8 +138,8 @@ const Capabilities = {
 **Element type mapping:**
 ```javascript
 const ELEMENT_CAPABILITIES = {
-  img: ["move", "resize"],
-  div: ["move", "resize", "fontControls", "editText"],
+  img: ["move", "resize", "rotate"],
+  div: ["move", "resize", "rotate", "fontControls", "editText"],
 };
 ```
 
@@ -190,6 +198,10 @@ const PropertySerializers = {
   fontSize: {
     type: "style", // Goes in style attribute
     serialize: (v) => v ? `font-size: ${v}px;` : null,
+  },
+  rotation: {
+    type: "style",
+    serialize: (v) => v ? `transform: rotate(${round(v)}deg);` : null,
   },
 };
 ```
@@ -332,46 +344,48 @@ ControlRegistry.register("decreaseOpacity", {
 });
 ```
 
-### Adding a New Capability (e.g., rotation)
+### Adding a New Capability (e.g., skew)
+
+> **Note:** Rotation is now built-in. This example shows how to add a hypothetical "skew" capability.
 
 1. **Define the capability:**
 ```javascript
-Capabilities.rotate = {
-  name: "rotate",
+Capabilities.skew = {
+  name: "skew",
 
   init(context) {
-    context.isRotating = false;
-    context.rotationStart = 0;
-    context.initialRotation = 0;
+    context.isSkewing = false;
+    context.skewStartX = 0;
+    context.initialSkewX = 0;
   },
 
   createHandles(context) {
     const handle = document.createElement("div");
-    handle.className = "rotate-handle";
-    handle.setAttribute("aria-label", "Rotate element");
+    handle.className = "skew-handle";
+    handle.setAttribute("aria-label", "Skew element");
     context.container.appendChild(handle);
   },
 
   attachEvents(context) {
-    const handle = context.container.querySelector(".rotate-handle");
+    const handle = context.container.querySelector(".skew-handle");
     handle.addEventListener("mousedown", (e) => {
-      context.isRotating = true;
-      // ... rotation start logic
+      context.isSkewing = true;
+      // ... skew start logic
     });
   },
 
   onMove(context, e) {
-    if (!context.isRotating) return;
-    // ... calculate rotation angle
-    context.container.style.transform = `rotate(${angle}deg)`;
+    if (!context.isSkewing) return;
+    // ... calculate skew angle
+    context.element.style.transform = `skewX(${angle}deg)`;
   },
 
   onStop(context) {
-    context.isRotating = false;
+    context.isSkewing = false;
   },
 
   isActive(context) {
-    return context.isRotating;
+    return context.isSkewing;
   },
 };
 ```
@@ -379,28 +393,28 @@ Capabilities.rotate = {
 2. **Register for element types:**
 ```javascript
 const ELEMENT_CAPABILITIES = {
-  img: ["move", "resize", "rotate"],  // Add rotate
-  div: ["move", "resize", "fontControls", "editText", "rotate"],
+  img: ["move", "resize", "rotate", "skew"],  // Add skew
+  div: ["move", "resize", "rotate", "fontControls", "editText", "skew"],
 };
 ```
 
 3. **Add state and serializer:**
 ```javascript
 // In EditableElement
-this.state = { /* ... */ rotation: 0 };
+this.state = { /* ... */ skewX: 0 };
 
 // In PropertySerializers
-PropertySerializers.rotation = {
-  type: "attr",
-  serialize: (v) => v !== 0 ? `data-rotation="${v}"` : null,
+PropertySerializers.skewX = {
+  type: "style",
+  serialize: (v) => v !== 0 ? `transform: skewX(${v}deg);` : null,
 };
 ```
 
 4. **Add CSS for the handle:**
 ```css
-.rotate-handle {
+.skew-handle {
   position: absolute;
-  top: -25px;
+  bottom: -20px;
   left: 50%;
   transform: translateX(-50%);
   /* ... styling */
@@ -419,9 +433,9 @@ function getEditableElements() {
 2. **Register capabilities:**
 ```javascript
 const ELEMENT_CAPABILITIES = {
-  img: ["move", "resize"],
-  div: ["move", "resize", "fontControls", "editText"],
-  video: ["move", "resize"],  // New element type
+  img: ["move", "resize", "rotate"],
+  div: ["move", "resize", "rotate", "fontControls", "editText"],
+  video: ["move", "resize", "rotate"],  // New element type
 };
 ```
 

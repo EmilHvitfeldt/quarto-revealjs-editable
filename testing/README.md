@@ -86,7 +86,7 @@ npm run test:e2e
 | Both div syntaxes work        | `::: editable` and `::: {.editable}` both work     |
 | LaTeX preserved               | `\dfrac`, `\lambda` survive save                   |
 
-**`e2e/ui-controls.spec.js`** - UI elements (23 tests):
+**`e2e/ui-controls.spec.js`** - UI elements (23 tests + see sections below):
 
 | Test                             | What it verifies                                  |
 |----------------------------------|---------------------------------------------------|
@@ -139,6 +139,33 @@ npm run test:e2e
 | CSS properties overridable       | Custom values can override defaults               |
 | Active class toggle              | `.active` class can be toggled                    |
 
+**`e2e/ui-controls.spec.js`** - Undo/Redo (7 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Undo stack functions exist       | `undo`, `redo`, `canUndo`, `canRedo` available    |
+| Undo reverts drag position       | Position restored after undo                      |
+| Redo restores undone action      | Redo brings back undone changes                   |
+| canUndo false when empty         | Returns false when stack is empty                 |
+| canUndo true after action        | Returns true after pushUndoState                  |
+| New action clears redo stack     | Redo stack cleared when new action taken          |
+| Ctrl+Z triggers undo             | Keyboard shortcut works                           |
+
+**`e2e/ui-controls.spec.js`** - Rotation (10 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Rotate handle created            | `.rotate-handle` exists with proper ARIA          |
+| Rotate handle for div            | Divs also have rotate handles                     |
+| Rotation state in EditableElement| `rotation` property in state                      |
+| setState for rotation            | Rotation updates DOM transform                    |
+| Rotation serialized to QMD       | `transform: rotate(Xdeg)` in style attribute      |
+| Zero rotation not serialized     | No transform when rotation is 0                   |
+| Ctrl+Arrow rotates               | 5° rotation per keypress                          |
+| Ctrl+Shift+Arrow rotates 15°     | Larger rotation step with Shift                   |
+| Rotation in undo/redo            | Rotation changes can be undone                    |
+| Rotate color CSS property        | `--editable-rotate-color` custom property         |
+
 ---
 
 ## CI Workflow
@@ -174,3 +201,4 @@ On GitHub Actions:
 | #15   | Shortcodes resolved incorrectly      | `shortcode.qmd`, `round-trip.qmd`, E2E    |
 | #16   | Backslashes removed (LaTeX)          | `special-chars.qmd`, `latex.qmd`, E2E     |
 | #21   | Content leaks with include-in-header | `include-header.qmd`                      |
+| #26   | Undo/redo support                    | E2E (Undo/Redo section)                   |
