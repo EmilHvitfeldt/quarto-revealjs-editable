@@ -12,6 +12,26 @@ echo ""
 
 FAILED=0
 
+# Cross-platform base64 decode function
+# Handles differences between macOS, Linux, and other platforms
+base64_decode() {
+  local input="$1"
+
+  # Try different base64 decode flags
+  # macOS and most Linux: -d
+  # Some Linux: --decode
+  # OpenSSL fallback for maximum compatibility
+  if echo "$input" | base64 -d 2>/dev/null; then
+    return 0
+  elif echo "$input" | base64 --decode 2>/dev/null; then
+    return 0
+  elif echo "$input" | openssl base64 -d 2>/dev/null; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 # Helper function to run a render test
 run_render_test() {
   local test_name="$1"
@@ -86,9 +106,15 @@ verify_content_preserved() {
     return
   fi
 
-  # Decode and check for pattern
+  # Decode and check for pattern (using cross-platform decode)
   local decoded
-  decoded=$(echo "$encoded" | base64 -d 2>/dev/null)
+  decoded=$(base64_decode "$encoded")
+
+  if [ -z "$decoded" ]; then
+    echo "  ✗ Failed to decode base64 content"
+    FAILED=1
+    return
+  fi
 
   if echo "$decoded" | grep -q "$pattern"; then
     echo "  ✓ Pass (content preserved)"
@@ -121,8 +147,9 @@ check_clipboard_feature() {
     return
   fi
 
-  # Make path relative to current directory
-  local js_path="${html_file%.html}_files/libs/revealjs/plugin/revealeditable/editable.js"
+  # Make path relative to current directory (handles spaces in filename)
+  local base_name="${html_file%.html}"
+  local js_path="${base_name}_files/libs/revealjs/plugin/revealeditable/editable.js"
 
   if [ ! -f "$js_path" ]; then
     echo "  ✗ editable.js not found at $js_path"
@@ -210,6 +237,11 @@ check_multiple_elements "Test 12a: Both syntaxes create elements" "bare-syntax.h
 echo ""
 echo "--- Feature Tests ---"
 check_clipboard_feature "Test 13: Clipboard feature (#8)" "basic.html"
+
+echo ""
+echo "--- Path Handling Tests ---"
+run_render_test "Test 14: Spaces in filename" "space in name.qmd" "inject"
+check_multiple_elements "Test 14a: Elements in spaced file" "space in name.html" 2
 
 echo ""
 if [ $FAILED -eq 0 ]; then

@@ -46,6 +46,7 @@ npm run test:e2e
 | `multiple-elements.qmd`  | Multiple images and divs in one document  | -             |
 | `colons-in-content.qmd`  | Content with colons (regex fix)           | -             |
 | `bare-syntax.qmd`        | Both `::: editable` and `::: {.editable}` | -             |
+| `space in name.qmd`      | Filenames with spaces handled correctly   | -             |
 
 ### What the shell tests check
 

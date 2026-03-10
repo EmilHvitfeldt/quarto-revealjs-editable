@@ -1,0 +1,16 @@
+---
+title: "Space in Name Test"
+format: revealjs
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+---
+
+## Slide with spaces
+
+![](https://placehold.co/200x150){.editable}
+
+::: {.editable}
+This file has spaces in its name.
+:::
