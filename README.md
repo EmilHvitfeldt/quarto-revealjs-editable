@@ -56,6 +56,7 @@ Editable elements support keyboard navigation for accessibility:
 - **Tab** to focus an editable element (controls will appear)
 - **Arrow keys** to move the element (10px per press)
 - **Shift + Arrow keys** to resize the element
+- **Shift + Tab** to exit and return to normal slide navigation
 - All control buttons are keyboard accessible
 
 Note that this extension adds the file name of the slides qmd file to the document itself, if you don't want that you happen, remove `editable` from `filters` before making the document public. And rerender the document.

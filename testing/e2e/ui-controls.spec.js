@@ -1031,4 +1031,32 @@ test.describe('Accessibility', () => {
     expect(afterShrink.width).toBe(50);
     expect(afterShrink.height).toBe(50);
   });
+
+  test('Shift+Tab blurs container to return to slide navigation', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Focus the container
+    const focused = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      container.focus();
+      return document.activeElement === container;
+    });
+    expect(focused).toBe(true);
+
+    // Press Shift+Tab to exit
+    await page.keyboard.press('Shift+Tab');
+
+    // Container should no longer be focused
+    const afterTab = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      return {
+        isFocused: document.activeElement === container
+      };
+    });
+
+    expect(afterTab.isFocused).toBe(false);
+  });
 });

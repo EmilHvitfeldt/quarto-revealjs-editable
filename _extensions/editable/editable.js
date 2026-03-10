@@ -300,8 +300,24 @@ function setupDraggableElt(elt) {
       }
     });
 
-    // Keyboard navigation
+    // Keyboard navigation - stop propagation to prevent reveal.js slide navigation
     container.addEventListener("keydown", (e) => {
+      // Shift+Tab blurs the container to return to normal slide navigation
+      if (e.key === "Tab" && e.shiftKey) {
+        container.blur();
+        e.preventDefault();
+        return;
+      }
+
+      // Only handle arrow keys
+      if (!["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) {
+        return;
+      }
+
+      // Stop reveal.js from handling arrow keys when container is focused
+      e.preventDefault();
+      e.stopPropagation();
+
       const step = CONFIG.KEYBOARD_MOVE_STEP || 10;
       const currentLeft = parseFloat(container.style.left) || container.offsetLeft;
       const currentTop = parseFloat(container.style.top) || container.offsetTop;
@@ -314,19 +330,15 @@ function setupDraggableElt(elt) {
         switch (e.key) {
           case "ArrowRight":
             elt.style.width = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentWidth + step) + "px";
-            e.preventDefault();
             break;
           case "ArrowLeft":
             elt.style.width = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentWidth - step) + "px";
-            e.preventDefault();
             break;
           case "ArrowDown":
             elt.style.height = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentHeight + step) + "px";
-            e.preventDefault();
             break;
           case "ArrowUp":
             elt.style.height = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentHeight - step) + "px";
-            e.preventDefault();
             break;
         }
       } else {
@@ -334,19 +346,15 @@ function setupDraggableElt(elt) {
         switch (e.key) {
           case "ArrowRight":
             container.style.left = (currentLeft + step) + "px";
-            e.preventDefault();
             break;
           case "ArrowLeft":
             container.style.left = (currentLeft - step) + "px";
-            e.preventDefault();
             break;
           case "ArrowDown":
             container.style.top = (currentTop + step) + "px";
-            e.preventDefault();
             break;
           case "ArrowUp":
             container.style.top = (currentTop - step) + "px";
-            e.preventDefault();
             break;
         }
       }
