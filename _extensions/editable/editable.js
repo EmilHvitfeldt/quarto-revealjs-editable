@@ -379,72 +379,28 @@ const Capabilities = {
 
     createControls(context) {
       const { container, element } = context;
+      const elementType = element.tagName.toLowerCase();
 
+      // Create font controls container
       const fontControls = document.createElement("div");
       fontControls.className = "editable-font-controls";
 
-      // Font size buttons
-      const decreaseBtn = createButton("A-", "editable-button-font editable-button-decrease");
-      decreaseBtn.setAttribute("aria-label", "Decrease font size");
-      decreaseBtn.title = "Decrease font size";
-      decreaseBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        changeFontSize(element, -CONFIG.FONT_SIZE_STEP);
-      });
-
-      const increaseBtn = createButton("A+", "editable-button-font editable-button-increase");
-      increaseBtn.setAttribute("aria-label", "Increase font size");
-      increaseBtn.title = "Increase font size";
-      increaseBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        changeFontSize(element, CONFIG.FONT_SIZE_STEP);
-      });
-
-      // Alignment buttons
-      function setAlignment(alignment) {
-        element.style.textAlign = alignment;
-        const editableElt = editableRegistry.get(element);
-        if (editableElt) {
-          editableElt.state.textAlign = alignment;
+      // Get controls from registry for this element type
+      const controlNames = ["decreaseFont", "increaseFont", "alignLeft", "alignCenter", "alignRight"];
+      controlNames.forEach((name) => {
+        const config = ControlRegistry.controls.get(name);
+        if (config && config.appliesTo.includes(elementType)) {
+          const btn = ControlRegistry.createButton(config, element);
+          fontControls.appendChild(btn);
         }
-      }
-
-      const alignLeftBtn = createButton("⇤", "editable-button-align");
-      alignLeftBtn.setAttribute("aria-label", "Align text left");
-      alignLeftBtn.title = "Align Left";
-      alignLeftBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setAlignment("left");
       });
 
-      const alignCenterBtn = createButton("⇔", "editable-button-align");
-      alignCenterBtn.setAttribute("aria-label", "Align text center");
-      alignCenterBtn.title = "Align Center";
-      alignCenterBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setAlignment("center");
-      });
-
-      const alignRightBtn = createButton("⇥", "editable-button-align");
-      alignRightBtn.setAttribute("aria-label", "Align text right");
-      alignRightBtn.title = "Align Right";
-      alignRightBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setAlignment("right");
-      });
-
-      fontControls.appendChild(decreaseBtn);
-      fontControls.appendChild(increaseBtn);
-      fontControls.appendChild(alignLeftBtn);
-      fontControls.appendChild(alignCenterBtn);
-      fontControls.appendChild(alignRightBtn);
       container.appendChild(fontControls);
-
       return fontControls;
     },
 
     attachEvents(context) {
-      // Events are attached in createControls
+      // Events are attached via ControlRegistry.createButton
     },
   },
 
@@ -458,6 +414,7 @@ const Capabilities = {
 
     createControls(context) {
       const { container, element } = context;
+      const elementType = element.tagName.toLowerCase();
 
       // Find font controls container to append to
       let fontControls = container.querySelector(".editable-font-controls");
@@ -467,26 +424,18 @@ const Capabilities = {
         container.appendChild(fontControls);
       }
 
-      const editBtn = createButton("✎", "editable-button-edit");
-      editBtn.setAttribute("aria-label", "Toggle edit mode");
-      editBtn.title = "Toggle Edit Mode";
-      editBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isEditable = element.contentEditable === "true";
-        element.contentEditable = !isEditable;
-        editBtn.classList.toggle("active", !isEditable);
-        editBtn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
-        if (!isEditable) {
-          element.focus();
-        }
-      });
-
-      fontControls.appendChild(editBtn);
-      return editBtn;
+      // Get edit mode control from registry
+      const config = ControlRegistry.controls.get("editMode");
+      if (config && config.appliesTo.includes(elementType)) {
+        const btn = ControlRegistry.createButton(config, element);
+        fontControls.appendChild(btn);
+        return btn;
+      }
+      return null;
     },
 
     attachEvents(context) {
-      // Events are attached in createControls
+      // Events are attached via ControlRegistry.createButton
     },
   },
 };
@@ -501,6 +450,183 @@ const ELEMENT_CAPABILITIES = {
 function getCapabilitiesFor(elementType) {
   const capabilityNames = ELEMENT_CAPABILITIES[elementType] || ["move", "resize"];
   return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);
+}
+
+// =============================================================================
+// Control Registry
+// =============================================================================
+
+// Registry for UI controls - allows easy addition of new controls
+const ControlRegistry = {
+  controls: new Map(),
+
+  // Register a new control
+  register(name, config) {
+    // config: { icon, ariaLabel, title, onClick, appliesTo, className }
+    this.controls.set(name, { name, ...config });
+  },
+
+  // Get controls for a specific element type
+  getControlsFor(elementType) {
+    return [...this.controls.values()].filter(
+      (c) => c.appliesTo.includes(elementType)
+    );
+  },
+
+  // Create a button from a control config
+  createButton(config, element) {
+    const btn = createButton(config.icon, config.className || "");
+    btn.setAttribute("aria-label", config.ariaLabel);
+    btn.title = config.title;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      config.onClick(element, btn, e);
+    });
+    return btn;
+  },
+};
+
+// Register built-in controls
+ControlRegistry.register("decreaseFont", {
+  icon: "A-",
+  ariaLabel: "Decrease font size",
+  title: "Decrease font size",
+  className: "editable-button-font editable-button-decrease",
+  appliesTo: ["div"],
+  onClick: (element) => changeFontSize(element, -CONFIG.FONT_SIZE_STEP),
+});
+
+ControlRegistry.register("increaseFont", {
+  icon: "A+",
+  ariaLabel: "Increase font size",
+  title: "Increase font size",
+  className: "editable-button-font editable-button-increase",
+  appliesTo: ["div"],
+  onClick: (element) => changeFontSize(element, CONFIG.FONT_SIZE_STEP),
+});
+
+ControlRegistry.register("alignLeft", {
+  icon: "⇤",
+  ariaLabel: "Align text left",
+  title: "Align Left",
+  className: "editable-button-align",
+  appliesTo: ["div"],
+  onClick: (element) => {
+    element.style.textAlign = "left";
+    const editableElt = editableRegistry.get(element);
+    if (editableElt) editableElt.state.textAlign = "left";
+  },
+});
+
+ControlRegistry.register("alignCenter", {
+  icon: "⇔",
+  ariaLabel: "Align text center",
+  title: "Align Center",
+  className: "editable-button-align",
+  appliesTo: ["div"],
+  onClick: (element) => {
+    element.style.textAlign = "center";
+    const editableElt = editableRegistry.get(element);
+    if (editableElt) editableElt.state.textAlign = "center";
+  },
+});
+
+ControlRegistry.register("alignRight", {
+  icon: "⇥",
+  ariaLabel: "Align text right",
+  title: "Align Right",
+  className: "editable-button-align",
+  appliesTo: ["div"],
+  onClick: (element) => {
+    element.style.textAlign = "right";
+    const editableElt = editableRegistry.get(element);
+    if (editableElt) editableElt.state.textAlign = "right";
+  },
+});
+
+ControlRegistry.register("editMode", {
+  icon: "✎",
+  ariaLabel: "Toggle edit mode",
+  title: "Toggle Edit Mode",
+  className: "editable-button-edit",
+  appliesTo: ["div"],
+  onClick: (element, btn) => {
+    const isEditable = element.contentEditable === "true";
+    element.contentEditable = !isEditable;
+    btn.classList.toggle("active", !isEditable);
+    btn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
+    if (!isEditable) {
+      element.focus();
+    }
+  },
+});
+
+// =============================================================================
+// Property Serializers
+// =============================================================================
+
+// Serializers for converting state to QMD attributes
+const PropertySerializers = {
+  // Core position/size properties (go in attribute list)
+  width: {
+    type: "attr",
+    serialize: (v) => `width=${round(v)}px`,
+  },
+  height: {
+    type: "attr",
+    serialize: (v) => `height=${round(v)}px`,
+  },
+  left: {
+    type: "attr",
+    serialize: (v) => `left=${round(v)}px`,
+  },
+  top: {
+    type: "attr",
+    serialize: (v) => `top=${round(v)}px`,
+  },
+
+  // Style properties (go in style attribute)
+  fontSize: {
+    type: "style",
+    serialize: (v) => (v ? `font-size: ${v}px;` : null),
+  },
+  textAlign: {
+    type: "style",
+    serialize: (v) => (v ? `text-align: ${v};` : null),
+  },
+
+  // Future properties can be added here:
+  // rotation: {
+  //   type: "attr",
+  //   serialize: (v) => v !== 0 ? `data-rotation="${v}"` : null,
+  // },
+};
+
+// Serialize dimensions to QMD attribute string
+function serializeToQmd(dimensions) {
+  const attrs = [];
+  const styles = [];
+
+  for (const [key, value] of Object.entries(dimensions)) {
+    const serializer = PropertySerializers[key];
+    if (serializer && value != null) {
+      const result = serializer.serialize(value);
+      if (result) {
+        if (serializer.type === "style") {
+          styles.push(result);
+        } else {
+          attrs.push(result);
+        }
+      }
+    }
+  }
+
+  let str = `{.absolute ${attrs.join(" ")}`;
+  if (styles.length > 0) {
+    str += ` style="${styles.join(" ")}"`;
+  }
+  str += "}";
+  return str;
 }
 
 // =============================================================================
@@ -966,24 +1092,7 @@ function replaceEditableOccurrences(text, replacements) {
 }
 
 function formatEditableEltStrings(dimensions) {
-  return dimensions.map((dim) => {
-    let str = `{.absolute width=${round(dim.width)}px height=${round(dim.height)}px left=${round(dim.left)}px top=${round(dim.top)}px`;
-
-    // Add style attribute if needed
-    const styles = [];
-    if (dim.fontSize) {
-      styles.push(`font-size: ${dim.fontSize}px;`);
-    }
-    if (dim.textAlign) {
-      styles.push(`text-align: ${dim.textAlign};`);
-    }
-    if (styles.length > 0) {
-      str += ` style="${styles.join(' ')}"`;
-    }
-
-    str += "}";
-    return str;
-  });
+  return dimensions.map((dim) => serializeToQmd(dim));
 }
 
 // =============================================================================
