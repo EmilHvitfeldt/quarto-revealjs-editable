@@ -113,6 +113,18 @@ npm run test:e2e
 | htmlToQuarto conversion          | `<strong>`→`**`, `<em>`→`*`, `<code>`→backticks   |
 | Strikethrough conversion         | `<del>`→`~~`                                      |
 
+**`e2e/ui-controls.spec.js`** - Accessibility (7 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Containers focusable             | `tabindex="0"`, `role`, `aria-label` attributes   |
+| Resize handles ARIA labels       | Each handle has `role="slider"` and label         |
+| Font buttons ARIA labels         | All 6 buttons have `aria-label` attributes        |
+| Focus shows controls             | Controls appear on focus (not just hover)         |
+| Arrow keys move element          | Keyboard navigation moves element by 10px         |
+| Shift+Arrow keys resize          | Keyboard navigation resizes element               |
+| Keyboard resize min size         | Cannot resize below 50px with keyboard            |
+
 ---
 
 ## CI Workflow

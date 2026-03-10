@@ -819,3 +819,216 @@ test.describe('htmlToQuarto Conversion', () => {
     expect(result).toContain('~~deleted~~');
   });
 });
+
+test.describe('Accessibility', () => {
+
+  test('Containers are focusable with proper ARIA attributes', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      return {
+        tabindex: container.getAttribute('tabindex'),
+        role: container.getAttribute('role'),
+        ariaLabel: container.getAttribute('aria-label'),
+        isFocusable: container.tabIndex >= 0
+      };
+    });
+
+    expect(result.tabindex).toBe('0');
+    expect(result.role).toBe('application');
+    expect(result.ariaLabel).toContain('arrow keys');
+    expect(result.isFocusable).toBe(true);
+  });
+
+  test('Resize handles have ARIA labels', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const handles = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      return Array.from(container.querySelectorAll('.resize-handle')).map(h => ({
+        position: h.dataset.position,
+        role: h.getAttribute('role'),
+        ariaLabel: h.getAttribute('aria-label')
+      }));
+    });
+
+    expect(handles.length).toBe(4);
+    handles.forEach(h => {
+      expect(h.role).toBe('slider');
+      expect(h.ariaLabel).toContain('Resize');
+      expect(h.ariaLabel).toContain('corner');
+    });
+  });
+
+  test('Font control buttons have ARIA labels', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Navigate to slide with div.editable
+    await page.evaluate(() => Reveal.slide(1));
+    await page.waitForTimeout(300);
+
+    const buttons = await page.evaluate(() => {
+      const container = document.querySelector('div.editable').parentNode;
+      const fontControls = container.querySelector('.font-controls');
+      return Array.from(fontControls.querySelectorAll('button')).map(b => ({
+        text: b.textContent,
+        ariaLabel: b.getAttribute('aria-label'),
+        title: b.title
+      }));
+    });
+
+    expect(buttons.length).toBe(6);
+    buttons.forEach(b => {
+      expect(b.ariaLabel).toBeTruthy();
+      expect(b.ariaLabel.length).toBeGreaterThan(0);
+    });
+
+    // Check specific labels
+    expect(buttons.find(b => b.text === 'A-').ariaLabel).toContain('Decrease');
+    expect(buttons.find(b => b.text === 'A+').ariaLabel).toContain('Increase');
+  });
+
+  test('Focus shows controls like hover does', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    const result = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      const handle = container.querySelector('.resize-handle');
+
+      // Check initial state
+      const initialOpacity = handle.style.opacity;
+
+      // Focus the container
+      container.focus();
+
+      // Small delay for event to process
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve({
+            initialOpacity,
+            focusedOpacity: handle.style.opacity,
+            borderAfterFocus: container.style.border
+          });
+        }, 100);
+      });
+    });
+
+    expect(result.initialOpacity).toBe('0');
+    expect(result.focusedOpacity).toBe('1');
+    expect(result.borderAfterFocus).toContain('solid');
+  });
+
+  test('Arrow keys move element', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Get initial position and focus container
+    const initial = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      container.focus();
+      return {
+        left: parseFloat(container.style.left) || container.offsetLeft,
+        top: parseFloat(container.style.top) || container.offsetTop
+      };
+    });
+
+    // Press arrow keys
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowDown');
+
+    const afterMove = await page.evaluate(() => {
+      const container = document.querySelector('.editable').parentNode;
+      return {
+        left: parseFloat(container.style.left),
+        top: parseFloat(container.style.top)
+      };
+    });
+
+    // Should have moved by KEYBOARD_MOVE_STEP (10px)
+    expect(afterMove.left).toBe(initial.left + 10);
+    expect(afterMove.top).toBe(initial.top + 10);
+  });
+
+  test('Shift+Arrow keys resize element', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Get initial size and focus container
+    const initial = await page.evaluate(() => {
+      const elt = document.querySelector('.editable');
+      const container = elt.parentNode;
+      container.focus();
+      return {
+        width: parseFloat(elt.style.width) || elt.offsetWidth,
+        height: parseFloat(elt.style.height) || elt.offsetHeight
+      };
+    });
+
+    // Press Shift+Arrow keys
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('Shift+ArrowDown');
+
+    const afterResize = await page.evaluate(() => {
+      const elt = document.querySelector('.editable');
+      return {
+        width: parseFloat(elt.style.width),
+        height: parseFloat(elt.style.height)
+      };
+    });
+
+    // Should have resized by KEYBOARD_MOVE_STEP (10px)
+    expect(afterResize.width).toBe(initial.width + 10);
+    expect(afterResize.height).toBe(initial.height + 10);
+  });
+
+  test('Keyboard resize respects minimum size', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Set element to minimum size and try to shrink further
+    await page.evaluate(() => {
+      const elt = document.querySelector('.editable');
+      const container = elt.parentNode;
+
+      // Set to just above minimum
+      elt.style.width = '55px';
+      elt.style.height = '55px';
+      container.focus();
+    });
+
+    // Try to shrink below minimum
+    await page.keyboard.press('Shift+ArrowLeft');
+    await page.keyboard.press('Shift+ArrowUp');
+
+    const afterShrink = await page.evaluate(() => {
+      const elt = document.querySelector('.editable');
+      return {
+        width: parseFloat(elt.style.width),
+        height: parseFloat(elt.style.height)
+      };
+    });
+
+    // Should not go below 50px (MIN_ELEMENT_SIZE)
+    expect(afterShrink.width).toBe(50);
+    expect(afterShrink.height).toBe(50);
+  });
+});

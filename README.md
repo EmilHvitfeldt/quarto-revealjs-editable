@@ -49,10 +49,16 @@ Holding shift while pulling the corners respects aspect ratios.
 
 Once you are happy with the sizes, open the menu (M), go to tools, and click "Save Edits". This will prompt you to save a file. Choose the same folder you are working in to overwrite the document you are in. Rerender, and the elements should be locked in place.
 
-Note that this extension adds the file name of the slides qmd file to the document itself, if you don't want that you happen, remove `editable` from `filters` before making the document public. And rerender the document.
+## Keyboard Navigation
 
-> [!WARNING]  
-> This extension does NOT work with [shortcodes](https://quarto.org/docs/authoring/shortcodes.html). See [issue #15](https://github.com/EmilHvitfeldt/quarto-revealjs-editable/issues/15) for progress.
+Editable elements support keyboard navigation for accessibility:
+
+- **Tab** to focus an editable element (controls will appear)
+- **Arrow keys** to move the element (10px per press)
+- **Shift + Arrow keys** to resize the element
+- All control buttons are keyboard accessible
+
+Note that this extension adds the file name of the slides qmd file to the document itself, if you don't want that you happen, remove `editable` from `filters` before making the document public. And rerender the document.
 
 > [!TIP]
 > sometimes you might find that images don't stay the size that you dragged them to be. this is because the default is to set `max-width` and `max-height` to `95%`. We can undo that by adding the following to out scss file.

@@ -3,6 +3,7 @@ const CONFIG = {
   // Sizing
   MIN_ELEMENT_SIZE: 50,
   HANDLE_SIZE: 10,
+  KEYBOARD_MOVE_STEP: 10,
   HANDLE_OFFSET: -6,
   BORDER_WIDTH: 2,
 
@@ -140,7 +141,19 @@ function setupDraggableElt(elt) {
   }
 
   function createResizeHandles(container) {
+    // Make container focusable for keyboard navigation
+    container.setAttribute("tabindex", "0");
+    container.setAttribute("role", "application");
+    container.setAttribute("aria-label", "Editable element. Use arrow keys to move, Shift+arrows to resize.");
+
     const handles = ["nw", "ne", "sw", "se"];
+    const handleLabels = {
+      nw: "Resize from top-left corner",
+      ne: "Resize from top-right corner",
+      sw: "Resize from bottom-left corner",
+      se: "Resize from bottom-right corner"
+    };
+
     handles.forEach((position) => {
       const handle = document.createElement("div");
       handle.className = "resize-handle";
@@ -152,6 +165,11 @@ function setupDraggableElt(elt) {
       handle.style.cursor = position + "-resize";
       handle.style.opacity = "0";
       handle.style.transition = "opacity " + CONFIG.TRANSITION_DURATION;
+
+      // Accessibility attributes
+      handle.setAttribute("role", "slider");
+      handle.setAttribute("aria-label", handleLabels[position]);
+      handle.setAttribute("tabindex", "-1");
 
       if (position.includes("n")) handle.style.top = CONFIG.HANDLE_OFFSET + "px";
       if (position.includes("s")) handle.style.bottom = CONFIG.HANDLE_OFFSET + "px";
@@ -175,21 +193,29 @@ function setupDraggableElt(elt) {
 
       const decreaseBtn = createButton("A-", "24px", "4px 12px");
       decreaseBtn.style.marginRight = "0";
+      decreaseBtn.setAttribute("aria-label", "Decrease font size");
+      decreaseBtn.title = "Decrease font size";
 
       const increaseBtn = createButton("A+", "24px", "4px 12px");
       increaseBtn.style.marginRight = CONFIG.BUTTON_MARGIN + "px";
+      increaseBtn.setAttribute("aria-label", "Increase font size");
+      increaseBtn.title = "Increase font size";
 
       const alignLeftBtn = createButton("⇤", "20px", "4px 12px");
+      alignLeftBtn.setAttribute("aria-label", "Align text left");
       alignLeftBtn.title = "Align Left";
 
       const alignCenterBtn = createButton("⇔", "20px", "4px 12px");
+      alignCenterBtn.setAttribute("aria-label", "Align text center");
       alignCenterBtn.title = "Align Center";
 
       const alignRightBtn = createButton("⇥", "20px", "4px 12px");
+      alignRightBtn.setAttribute("aria-label", "Align text right");
       alignRightBtn.title = "Align Right";
 
       const editBtn = createButton("✎", "20px", "4px 12px");
       editBtn.style.marginLeft = CONFIG.BUTTON_MARGIN + "px";
+      editBtn.setAttribute("aria-label", "Toggle edit mode");
       editBtn.title = "Toggle Edit Mode";
 
       fontControls.appendChild(decreaseBtn);
@@ -239,23 +265,90 @@ function setupDraggableElt(elt) {
   }
 
   function setupHoverEffects(container, isDraggingFn, isResizingFn) {
-    container.addEventListener("mouseenter", () => {
+    function showControls() {
       container.style.border = CONFIG.BORDER_WIDTH + "px solid " + CONFIG.ACCENT_COLOR;
       container
         .querySelectorAll(".resize-handle")
         .forEach((h) => (h.style.opacity = "1"));
       const fontControls = container.querySelector(".font-controls");
       if (fontControls) fontControls.style.opacity = "1";
-    });
+    }
+
+    function hideControls() {
+      container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
+      container
+        .querySelectorAll(".resize-handle")
+        .forEach((h) => (h.style.opacity = "0"));
+      const fontControls = container.querySelector(".font-controls");
+      if (fontControls) fontControls.style.opacity = "0";
+    }
+
+    container.addEventListener("mouseenter", showControls);
 
     container.addEventListener("mouseleave", () => {
       if (!isDraggingFn() && !isResizingFn()) {
-        container.style.border = CONFIG.BORDER_WIDTH + "px solid transparent";
-        container
-          .querySelectorAll(".resize-handle")
-          .forEach((h) => (h.style.opacity = "0"));
-        const fontControls = container.querySelector(".font-controls");
-        if (fontControls) fontControls.style.opacity = "0";
+        hideControls();
+      }
+    });
+
+    // Show controls on focus for keyboard users
+    container.addEventListener("focus", showControls);
+    container.addEventListener("blur", (e) => {
+      // Don't hide if focus moved to a child element (button)
+      if (!container.contains(e.relatedTarget)) {
+        hideControls();
+      }
+    });
+
+    // Keyboard navigation
+    container.addEventListener("keydown", (e) => {
+      const step = CONFIG.KEYBOARD_MOVE_STEP || 10;
+      const currentLeft = parseFloat(container.style.left) || container.offsetLeft;
+      const currentTop = parseFloat(container.style.top) || container.offsetTop;
+
+      if (e.shiftKey) {
+        // Shift + arrows = resize
+        const currentWidth = parseFloat(elt.style.width) || elt.offsetWidth;
+        const currentHeight = parseFloat(elt.style.height) || elt.offsetHeight;
+
+        switch (e.key) {
+          case "ArrowRight":
+            elt.style.width = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentWidth + step) + "px";
+            e.preventDefault();
+            break;
+          case "ArrowLeft":
+            elt.style.width = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentWidth - step) + "px";
+            e.preventDefault();
+            break;
+          case "ArrowDown":
+            elt.style.height = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentHeight + step) + "px";
+            e.preventDefault();
+            break;
+          case "ArrowUp":
+            elt.style.height = Math.max(CONFIG.MIN_ELEMENT_SIZE, currentHeight - step) + "px";
+            e.preventDefault();
+            break;
+        }
+      } else {
+        // Arrows = move
+        switch (e.key) {
+          case "ArrowRight":
+            container.style.left = (currentLeft + step) + "px";
+            e.preventDefault();
+            break;
+          case "ArrowLeft":
+            container.style.left = (currentLeft - step) + "px";
+            e.preventDefault();
+            break;
+          case "ArrowDown":
+            container.style.top = (currentTop + step) + "px";
+            e.preventDefault();
+            break;
+          case "ArrowUp":
+            container.style.top = (currentTop - step) + "px";
+            e.preventDefault();
+            break;
+        }
       }
     });
   }
