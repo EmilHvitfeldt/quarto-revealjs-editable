@@ -2,7 +2,6 @@
 const CONFIG = {
   // Sizing
   MIN_ELEMENT_SIZE: 50,
-  INITIAL_SIZE_SCALE: 0.5,
   HANDLE_SIZE: 10,
   HANDLE_OFFSET: -6,
   BORDER_WIDTH: 2,
@@ -134,8 +133,9 @@ function setupDraggableElt(elt) {
   function setupEltStyles(elt) {
     elt.style.cursor = "move";
     elt.style.position = "relative";
-    elt.style.width = (elt.naturalWidth || elt.offsetWidth) * CONFIG.INITIAL_SIZE_SCALE + "px";
-    elt.style.height = (elt.naturalHeight || elt.offsetHeight) * CONFIG.INITIAL_SIZE_SCALE + "px";
+    // Preserve current rendered size (computed by CSS/reveal.js) rather than scaling
+    elt.style.width = elt.offsetWidth + "px";
+    elt.style.height = elt.offsetHeight + "px";
     elt.style.display = "block";
   }
 
