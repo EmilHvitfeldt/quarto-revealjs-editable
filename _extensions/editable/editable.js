@@ -69,6 +69,64 @@ function loadQuill() {
 // Store Quill instances per element
 const quillInstances = new Map();
 
+// Default color palette for the color pickers
+const DEFAULT_COLOR_PALETTE = [
+  "#000000", "#434343", "#666666", "#999999", "#cccccc", "#ffffff",
+  "#e60000", "#ff9900", "#ffff00", "#008a00", "#0066cc", "#9933ff",
+  "#ff99cc", "#ffcc99", "#ffff99", "#99ff99", "#99ccff", "#cc99ff",
+];
+
+// Get color palette - uses brand colors if available, otherwise defaults
+function getColorPalette() {
+  // Check if brand palette colors were injected by Quarto
+  if (window._quarto_brand_palette && Array.isArray(window._quarto_brand_palette) && window._quarto_brand_palette.length > 0) {
+    return window._quarto_brand_palette;
+  }
+  return DEFAULT_COLOR_PALETTE;
+}
+
+// Convert RGB color string to hex format
+function rgbToHex(rgb) {
+  // Match rgb(r, g, b) or rgba(r, g, b, a)
+  const match = rgb.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!match) return null;
+
+  const r = parseInt(match[1], 10);
+  const g = parseInt(match[2], 10);
+  const b = parseInt(match[3], 10);
+
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+// Convert a color value to brand shortcode if it's a brand color, otherwise return as-is
+// Uses placeholder to avoid being stripped by HTML cleanup regex
+function getBrandColorOutput(colorVal) {
+  if (!window._quarto_brand_color_names) {
+    return colorVal;
+  }
+
+  // Normalize the color value
+  let normalizedColor = colorVal.toLowerCase().trim();
+
+  // Convert RGB to hex if needed
+  if (normalizedColor.startsWith('rgb')) {
+    const hexColor = rgbToHex(normalizedColor);
+    if (hexColor) {
+      normalizedColor = hexColor.toLowerCase();
+    }
+  }
+
+  // Check if this color has a brand name
+  const brandName = window._quarto_brand_color_names[normalizedColor];
+  if (brandName) {
+    // Use placeholder that won't be stripped by HTML cleanup
+    return `__BRAND_SHORTCODE_${brandName}__`;
+  }
+
+  // Return original value (not converted) to preserve format
+  return colorVal;
+}
+
 // Initialize Quill for an editable div element (called at page load)
 async function initializeQuillForElement(element) {
   // Only for div elements
@@ -86,6 +144,13 @@ async function initializeQuillForElement(element) {
     // Clear and set up structure for Quill
     element.innerHTML = "";
 
+    // Get colors - brand palette if available, otherwise defaults
+    const presetColors = getColorPalette();
+
+    // Build color options HTML
+    const colorOptions = presetColors.map(c => `<option value="${c}"></option>`).join("");
+    const colorOptionsWithExtras = `<option value="unset"></option>` + colorOptions + `<option value="custom">⋯</option>`;
+
     // Create toolbar container
     const toolbarContainer = document.createElement("div");
     toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
@@ -94,13 +159,24 @@ async function initializeQuillForElement(element) {
       <button class="ql-italic">I</button>
       <button class="ql-underline">U</button>
       <button class="ql-strike">S</button>
-      <select class="ql-color"></select>
-      <select class="ql-background"></select>
+      <select class="ql-color">${colorOptionsWithExtras}</select>
+      <select class="ql-background">${colorOptionsWithExtras}</select>
       <button class="ql-align" value=""></button>
       <button class="ql-align" value="center"></button>
       <button class="ql-align" value="right"></button>
     `;
     element.appendChild(toolbarContainer);
+
+    // Create hidden color picker inputs for custom colors
+    const textColorPicker = document.createElement("input");
+    textColorPicker.type = "color";
+    textColorPicker.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;";
+    element.appendChild(textColorPicker);
+
+    const bgColorPicker = document.createElement("input");
+    bgColorPicker.type = "color";
+    bgColorPicker.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;";
+    element.appendChild(bgColorPicker);
 
     // Create editor container
     const editorWrapper = document.createElement("div");
@@ -108,12 +184,38 @@ async function initializeQuillForElement(element) {
     editorWrapper.innerHTML = originalContent;
     element.appendChild(editorWrapper);
 
-    // Initialize Quill with the toolbar we created
+    // Custom color handler factory
+    function createColorHandler(picker, formatName) {
+      return function(value) {
+        if (value === "unset") {
+          // Remove the color formatting
+          this.quill.format(formatName, false);
+        } else if (value === "custom") {
+          // Save current selection
+          const range = this.quill.getSelection();
+          picker.click();
+          picker.onchange = () => {
+            if (range) {
+              this.quill.setSelection(range);
+            }
+            this.quill.format(formatName, picker.value);
+          };
+        } else {
+          this.quill.format(formatName, value);
+        }
+      };
+    }
+
+    // Initialize Quill with the toolbar and custom handlers
     const quill = new Quill(editorWrapper, {
       theme: "snow",
       modules: {
         toolbar: {
           container: "#" + toolbarContainer.id,
+          handlers: {
+            color: createColorHandler(textColorPicker, "color"),
+            background: createColorHandler(bgColorPicker, "background"),
+          },
         },
       },
       placeholder: "",
@@ -2237,10 +2339,11 @@ function htmlToQuarto(div) {
   text = text.replace(/<\/i>/gi, "*");
 
   // Strikethrough: <del> and <s> and <strike> → ~~text~~
+  // Note: <s> regex must not match <span> or <strike>, use negative lookahead
   text = text.replace(/<del[^>]*>/gi, "~~");
   text = text.replace(/<\/del>/gi, "~~");
-  text = text.replace(/<s[^>]*>/gi, "~~");
-  text = text.replace(/<\/s>/gi, "~~");
+  text = text.replace(/<s(?![a-z])[^>]*>/gi, "~~");
+  text = text.replace(/<\/s(?![a-z])>/gi, "~~");
   text = text.replace(/<strike[^>]*>/gi, "~~");
   text = text.replace(/<\/strike>/gi, "~~");
 
@@ -2249,14 +2352,20 @@ function htmlToQuarto(div) {
   text = text.replace(/<u[^>]*>/gi, "[");
   text = text.replace(/<\/u>/gi, "]{.underline}");
 
-  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
-  // Handle by replacing open/close separately, then cleaning up
-  text = text.replace(/<span[^>]*style="[^"]*color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__COLOR_START__$1__');
-  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, '$2]{style="color: $1"}');
-
-  // Background color spans
+  // Background color spans (must be processed BEFORE color to avoid false matches)
   text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
-  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, '$2]{style="background-color: $1"}');
+  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
+    const colorOutput = getBrandColorOutput(colorVal);
+    return `${content}]{style='background-color: ${colorOutput}'}`;
+  });
+
+  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
+  // Use negative lookbehind to not match background-color
+  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__COLOR_START__$1__');
+  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
+    const colorOutput = getBrandColorOutput(colorVal);
+    return `${content}]{style='color: ${colorOutput}'}`;
+  });
 
   // Links: <a href="url">text</a> → [text](url)
   text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
@@ -2274,6 +2383,9 @@ function htmlToQuarto(div) {
 
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");
+
+  // Convert brand color placeholders back to shortcodes
+  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
 
   // Use appropriate fence length for content
   const fence = getFenceForContent(text);

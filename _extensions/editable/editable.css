@@ -440,6 +440,16 @@
 .quill-toolbar-container .ql-color-picker .ql-picker-options,
 .quill-toolbar-container .ql-background .ql-picker-options {
   width: auto !important;
+  min-width: 130px !important;
+  max-width: 200px !important;
+  flex-wrap: wrap !important;
+  padding: 6px !important;
+}
+
+/* Only show as flex when expanded */
+.quill-toolbar-container .ql-color-picker.ql-expanded .ql-picker-options,
+.quill-toolbar-container .ql-background.ql-expanded .ql-picker-options {
+  display: flex !important;
 }
 
 .quill-toolbar-container .ql-color-picker .ql-picker-item,
@@ -449,6 +459,57 @@
   border-radius: 3px !important;
   margin: 2px !important;
   padding: 0 !important;
+}
+
+/* Unset color option */
+.quill-toolbar-container .ql-picker-item[data-value="unset"] {
+  width: 100% !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  margin-bottom: 4px !important;
+  border-bottom: 1px solid #444 !important;
+  background: repeating-linear-gradient(
+    45deg,
+    #444,
+    #444 4px,
+    #333 4px,
+    #333 8px
+  ) !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="unset"]::before {
+  content: "Unset" !important;
+  color: #fff !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="unset"]:hover {
+  filter: brightness(1.2) !important;
+}
+
+/* Custom color picker option */
+.quill-toolbar-container .ql-picker-item[data-value="custom"] {
+  width: 100% !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  margin-top: 4px !important;
+  border-top: 1px solid #444 !important;
+  background: linear-gradient(to right,
+    #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #8000ff, #ff0080
+  ) !important;
+  color: #000 !important;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff !important;
+  font-size: 12px !important;
+  text-align: center !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="custom"]::before {
+  content: "Custom..." !important;
+  color: #fff !important;
+  text-shadow: 0 0 3px #000, 0 0 3px #000 !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="custom"]:hover {
+  filter: brightness(1.2) !important;
 }
 
 /* Size picker */

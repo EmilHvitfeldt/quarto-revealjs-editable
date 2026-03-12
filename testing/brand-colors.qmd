@@ -1,0 +1,18 @@
+---
+title: "Brand Colors Test"
+format: revealjs
+revealjs-plugins:
+  - editable
+---
+
+## Test Brand Colors
+
+::: {.editable}
+Edit this text and check the color picker - it should show brand colors (coral, teal, navy, gold, purple, mint) plus black and white.
+:::
+
+## Another Slide
+
+::: {.editable}
+More editable text to test with.
+:::
