@@ -2,6 +2,42 @@
 
 All notable changes to the quarto-revealjs-editable extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Floating toolbar** with quick access to common actions
+  - Draggable toolbar on the right side of slides
+  - Save button (💾) to download edited QMD
+  - Copy button (📋) to copy QMD to clipboard
+  - Add Text button (📝) to create new editable text on current slide
+  - Add Slide button (➕) to insert new slide after current
+  - Customizable colors via CSS custom properties
+- **Add new text elements** directly in the browser
+  - New elements appear centered on the slide
+  - Full functionality: move, resize, rotate, font controls, edit mode
+  - Marked with dashed border to distinguish from original content
+- **Add new slides** directly in the browser
+  - New slides inserted after current slide
+  - Automatically navigates to the new slide
+  - Saved with `## New Slide` heading
+
+### Fixed
+
+- **Standalone `:::` in user text content** no longer breaks document structure
+  - Uses longer fences (`::::` or more) when content contains `:::`
+- **`::: {.editable}` in user text content** no longer gets incorrectly replaced
+  - Regex now only matches in valid contexts (div fence or image syntax)
+- **HTML entities** in user content (like `>`) are now properly decoded when saving
+- **Newlines in user content** (via `<br>` tags) are properly preserved when saving
+
+### Changed
+
+- Save flow now processes new elements alongside original elements
+- `replaceEditableOccurrences` uses context-aware matching to avoid false positives
+
+---
+
 ## [5.0.0] - 2026-03-09
 
 ### Added
