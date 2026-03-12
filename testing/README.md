@@ -73,6 +73,8 @@ npm run test:e2e
 
 ### E2E Test Files
 
+**Total: 139 E2E tests across 3 spec files**
+
 **`e2e/save-edits.spec.js`** - Core save functionality (8 tests):
 
 | Test                          | What it verifies                                   |
@@ -165,6 +167,134 @@ npm run test:e2e
 | Ctrl+Shift+Arrow rotates 15°     | Larger rotation step with Shift                   |
 | Rotation in undo/redo            | Rotation changes can be undone                    |
 | Rotate color CSS property        | `--editable-rotate-color` custom property         |
+
+**`e2e/toolbar.spec.js`** - Floating Toolbar (4 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Toolbar is created and visible   | Toolbar exists with handle, buttons, role="toolbar"|
+| Toolbar has all expected buttons | Save, copy, add-text, add-slide buttons with ARIA |
+| Toolbar is draggable             | Drag handle changes toolbar position              |
+| Toolbar buttons have hover labels| Each button has .toolbar-icon and .toolbar-label  |
+
+**`e2e/toolbar.spec.js`** - Add Text Element (7 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| addNewTextElement creates element| Element count increases, has .editable-new class  |
+| New text element has resize handles| 4 resize handles, rotate handle, font controls   |
+| New text element tracked in registry| NewElementRegistry tracks with correct count    |
+| New text element edit mode works | contentEditable="true" when edit button clicked   |
+| New text element can be edited   | Text content changes when typing in edit mode     |
+| Arrow keys don't move in edit mode| Element position unchanged when editing text     |
+| New text element centered on slide| Positioned within 30-70% of slide width/height   |
+
+**`e2e/toolbar.spec.js`** - Add Slide (3 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| addNewSlide creates a new slide  | Slide count increases, has .editable-new-slide    |
+| New slide tracked in registry    | NewElementRegistry tracks with correct count      |
+| Reveal.js navigates to new slide | Reveal.getIndices().h incremented by 1            |
+
+**`e2e/toolbar.spec.js`** - NewElementRegistry (4 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Registry starts empty            | newDivs/newSlides empty, hasNewElements() false   |
+| addDiv tracks divs               | Count, slideIndex, content stored correctly       |
+| addSlide tracks slides           | Count and afterSlideIndex stored correctly        |
+| clear resets state               | hasNewElements() changes from true to false       |
+
+**`e2e/toolbar.spec.js`** - ToolbarRegistry (2 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| Has expected actions             | getActions() returns save, copy, addText, addSlide|
+| createButton creates valid button| Correct tagName, classes, ARIA, title attributes  |
+
+**`e2e/toolbar.spec.js`** - Save Integration for New Elements (30 tests):
+
+| Test                             | What it verifies                                  |
+|----------------------------------|---------------------------------------------------|
+| New text excluded from original processing | getOriginalEditableElements() excludes new |
+| getTransformedQmd includes new divs | QMD contains text and `::: {.absolute` syntax  |
+| getTransformedQmd includes new slides | QMD contains `## New Slide` heading          |
+| Multiple new elements saved correctly | Correct count of each element type           |
+| Save includes new text in download | Downloaded QMD contains text with positioning  |
+| Save includes new slide in download | Downloaded QMD contains `## New Slide`        |
+| New slide at correct position    | `## New Slide` appears after correct slide heading|
+| Add slide then add text to it    | Text appears after slide heading, before next    |
+| Complex ordering (4,1,3,2)       | Slides inserted at various positions maintain order|
+| 3 slides with text on 2nd        | All slides and markers in correct order (1,2,3)  |
+| Text on original after adding new| Text on original slide, not new slide            |
+| Multiple text on same new slide  | All 3 elements saved after slide heading         |
+| New slides at different positions| Each group positioned correctly                  |
+| Text positioning preserved       | x/y/width/height attributes saved                |
+| Empty text element content       | Div block still saved when content cleared       |
+| Special characters preserved     | Colons, braces, markdown, fences preserved       |
+| Deep nesting of new slides       | 4 slides A→B→C→D in chain, correct order         |
+| Mixed positions with text        | Slides with text after multiple originals        |
+| Text only on last slide in chain | Text appears after third heading                 |
+| Original modifications alongside | Both moved element AND new elements saved        |
+| New slide after last original    | New slide appears at end of document             |
+| Font styling saved               | fontSize and textAlign in saved QMD              |
+| Rotation saved                   | `transform: rotate(45deg)` in saved QMD          |
+| Copy to clipboard includes new   | Clipboard contains new elements                  |
+| New slide with no content        | Empty slide heading still saved                  |
+| Interleaved operations           | Add slide → text original → slide → text correct |
+| Unicode and emoji preserved      | 中文, émojis 🎉 preserved in saved content       |
+| Multi-line text preserved        | Newlines in content preserved                    |
+| New slide between middle slides  | Correct position in multi-slide document         |
+| Multiple text on different slides| Each text on correct corresponding slide         |
+
+---
+
+---
+
+## Testing Conventions
+
+### Save Integration Tests Must Verify Ordering
+
+When writing tests for new element save functionality, **always verify the order** of elements in the saved QMD, not just their presence. Use `indexOf()` comparisons:
+
+```javascript
+// ✗ BAD: Only checks presence
+expect(qmd).toContain('## New Slide');
+expect(qmd).toContain('TEXT_MARKER');
+
+// ✓ GOOD: Checks presence AND order
+expect(qmd).toContain('## New Slide');
+expect(qmd).toContain('TEXT_MARKER');
+const slidePos = qmd.indexOf('## New Slide');
+const textPos = qmd.indexOf('TEXT_MARKER');
+expect(textPos).toBeGreaterThan(slidePos); // Text appears AFTER slide heading
+```
+
+For multiple elements, verify relative positions:
+```javascript
+const pos1 = qmd.indexOf('MARKER_1');
+const pos2 = qmd.indexOf('MARKER_2');
+const pos3 = qmd.indexOf('MARKER_3');
+expect(pos1).toBeLessThan(pos2);
+expect(pos2).toBeLessThan(pos3);
+```
+
+See `toolbar.spec.js` "New Elements in Save Flow" section for 30 examples.
+
+### Edge Case Tests
+
+`toolbar.spec.js` includes 26 edge case tests covering:
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| Content that could break parsing | 6 | Fake headings, fence syntax, code blocks, list markers |
+| Document structure | 1 | Title-only documents with no ## headings |
+| Numeric/positioning | 6 | Negative rotation, boundary positions, decimal rounding |
+| Insertion order | 4 | Deep nesting, wide trees, chained vs direct insertion |
+| State management | 3 | Multiple saves, registry clearing, no-new-elements save |
+| Text content | 4 | Whitespace, paragraphs, long text, HTML-like content |
+| Output format | 2 | Fence closure validation, blank line formatting |
 
 ---
 

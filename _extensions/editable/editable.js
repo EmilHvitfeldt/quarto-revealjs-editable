@@ -14,6 +14,12 @@ const CONFIG = {
 
   // Undo/Redo
   MAX_UNDO_STACK_SIZE: 50,
+
+  // New element defaults
+  NEW_TEXT_CONTENT: "New text",
+  NEW_TEXT_WIDTH: 200,
+  NEW_TEXT_HEIGHT: 50,
+  NEW_SLIDE_HEADING: "## New Slide",
 };
 
 // =============================================================================
@@ -290,7 +296,8 @@ const Capabilities = {
       const { element, container } = context;
 
       const startDrag = (e) => {
-        if (e.target.parentElement.contentEditable === "true") return;
+        // Don't start drag if element is in edit mode (contentEditable)
+        if (element.contentEditable === "true") return;
         if (e.target.classList.contains("resize-handle")) return;
 
         // Capture state for undo before starting drag
@@ -851,6 +858,123 @@ ControlRegistry.register("editMode", {
 });
 
 // =============================================================================
+// New Element Registry - Tracks dynamically added elements and slides
+// =============================================================================
+
+const NewElementRegistry = {
+  // Track new text divs added during the session
+  newDivs: [],
+
+  // Track new slides added during the session
+  newSlides: [],
+
+  // Add a new text div
+  // newSlideRef is a reference to the new slide entry if this div is on a new slide
+  addDiv(div, slideIndex, newSlideRef = null) {
+    this.newDivs.push({
+      element: div,
+      slideIndex: slideIndex,
+      content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
+      newSlideRef: newSlideRef, // Reference to NewElementRegistry.newSlides entry if on a new slide
+    });
+  },
+
+  // Add a new slide
+  // insertAfterNewSlide: reference to another newSlides entry if this slide comes after a new slide
+  addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
+    this.newSlides.push({
+      element: slide,
+      afterSlideIndex: afterSlideIndex,
+      insertAfterNewSlide: insertAfterNewSlide, // Reference to parent new slide, or null
+      insertionOrder: this.newSlides.length,
+    });
+  },
+
+  // Get count of new slides before a given index (for offset calculation)
+  countNewSlidesBefore(index) {
+    return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
+  },
+
+  // Clear all tracked elements (e.g., after save)
+  clear() {
+    this.newDivs = [];
+    this.newSlides = [];
+  },
+
+  // Check if there are any new elements
+  hasNewElements() {
+    return this.newDivs.length > 0 || this.newSlides.length > 0;
+  },
+};
+
+// =============================================================================
+// Toolbar Registry - Manages floating toolbar actions
+// =============================================================================
+
+const ToolbarRegistry = {
+  actions: new Map(),
+
+  // Register a toolbar action
+  register(name, config) {
+    // config: { icon, label, title, onClick, className }
+    this.actions.set(name, { name, ...config });
+  },
+
+  // Get all registered actions
+  getActions() {
+    return [...this.actions.values()];
+  },
+
+  // Create a button from an action config
+  createButton(config) {
+    const btn = document.createElement("button");
+    btn.className = "editable-toolbar-button " + (config.className || "");
+    btn.setAttribute("aria-label", config.label);
+    btn.title = config.title;
+    btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      config.onClick(e);
+    });
+    return btn;
+  },
+};
+
+// Register toolbar actions
+ToolbarRegistry.register("save", {
+  icon: "💾",
+  label: "Save",
+  title: "Save edits to file",
+  className: "toolbar-save",
+  onClick: () => saveMovedElts(),
+});
+
+ToolbarRegistry.register("copy", {
+  icon: "📋",
+  label: "Copy",
+  title: "Copy QMD to clipboard",
+  className: "toolbar-copy",
+  onClick: () => copyQmdToClipboard(),
+});
+
+ToolbarRegistry.register("addText", {
+  icon: "📝",
+  label: "Text",
+  title: "Add editable text to current slide",
+  className: "toolbar-add-text",
+  onClick: () => addNewTextElement(),
+});
+
+ToolbarRegistry.register("addSlide", {
+  icon: "➕",
+  label: "Slide",
+  title: "Add new slide after current",
+  className: "toolbar-add-slide",
+  onClick: () => addNewSlide(),
+});
+
+// =============================================================================
 // Property Serializers
 // =============================================================================
 
@@ -978,6 +1102,258 @@ function getEditableDivs() {
   return document.querySelectorAll("div.editable");
 }
 
+// Get only original editable elements (exclude dynamically added ones)
+function getOriginalEditableElements() {
+  return document.querySelectorAll("img.editable:not(.editable-new), div.editable:not(.editable-new)");
+}
+
+function getOriginalEditableDivs() {
+  return document.querySelectorAll("div.editable:not(.editable-new)");
+}
+
+// Get current slide index (accounting for title slide)
+function getCurrentSlideIndex() {
+  const indices = Reveal.getIndices();
+  return indices.h;
+}
+
+// Get the current visible slide element
+function getCurrentSlide() {
+  return document.querySelector("section.present:not(.stack)") ||
+         document.querySelector("section.present");
+}
+
+// =============================================================================
+// New Element Creation
+// =============================================================================
+
+function addNewTextElement() {
+  const currentSlide = getCurrentSlide();
+  if (!currentSlide) {
+    console.warn("No current slide found");
+    return null;
+  }
+
+  // Create the new div
+  const newDiv = document.createElement("div");
+  newDiv.className = "editable editable-new";
+  newDiv.textContent = CONFIG.NEW_TEXT_CONTENT;
+  newDiv.style.width = CONFIG.NEW_TEXT_WIDTH + "px";
+  newDiv.style.minHeight = CONFIG.NEW_TEXT_HEIGHT + "px";
+
+  // Insert into current slide
+  currentSlide.appendChild(newDiv);
+
+  // Setup as editable element (registers with editableRegistry)
+  setupDraggableElt(newDiv);
+
+  // Track in NewElementRegistry
+  // Check if current slide is a new slide - if so, associate with that new slide
+  const slideIndex = getCurrentSlideIndex();
+  const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
+
+  if (isOnNewSlide) {
+    // Find which new slide this is and track the div with it
+    const newSlideEntry = NewElementRegistry.newSlides.find(
+      (s) => s.element === currentSlide
+    );
+    if (newSlideEntry) {
+      // Store reference to the new slide this div belongs to
+      NewElementRegistry.addDiv(newDiv, slideIndex, newSlideEntry);
+    } else {
+      NewElementRegistry.addDiv(newDiv, slideIndex, null);
+    }
+  } else {
+    // Calculate original slide index (accounting for new slides before this position)
+    const originalSlideIndex =
+      slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+    NewElementRegistry.addDiv(newDiv, originalSlideIndex, null);
+  }
+
+  // Position in center of slide
+  const editableElt = editableRegistry.get(newDiv);
+  if (editableElt) {
+    const slideWidth = currentSlide.offsetWidth || 960;
+    const slideHeight = currentSlide.offsetHeight || 700;
+    editableElt.setState({
+      x: (slideWidth - CONFIG.NEW_TEXT_WIDTH) / 2,
+      y: (slideHeight - CONFIG.NEW_TEXT_HEIGHT) / 2,
+    });
+  }
+
+  console.log("Added new text element to slide", slideIndex);
+  return newDiv;
+}
+
+function addNewSlide() {
+  const currentSlide = getCurrentSlide();
+  if (!currentSlide) {
+    console.warn("No current slide found");
+    return null;
+  }
+
+  const slideIndex = getCurrentSlideIndex();
+
+  // Calculate original slide index and track parent new slide if applicable
+  let originalSlideIndex;
+  let insertAfterNewSlide = null;
+  const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
+
+  if (isOnNewSlide) {
+    // Find the new slide entry we're on
+    const currentNewSlideEntry = NewElementRegistry.newSlides.find(
+      (s) => s.element === currentSlide
+    );
+    if (currentNewSlideEntry) {
+      // Use the same original slide index, but track that we come after this new slide
+      originalSlideIndex = currentNewSlideEntry.afterSlideIndex;
+      insertAfterNewSlide = currentNewSlideEntry;
+    } else {
+      originalSlideIndex =
+        slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+    }
+  } else {
+    originalSlideIndex =
+      slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+  }
+
+  // Create new slide section
+  const newSlide = document.createElement("section");
+  newSlide.className = "slide level2 editable-new-slide";
+
+  // Add placeholder heading
+  const heading = document.createElement("h2");
+  heading.textContent = "";
+  newSlide.appendChild(heading);
+
+  // Insert after current slide
+  currentSlide.insertAdjacentElement("afterend", newSlide);
+
+  // Track in registry with original slide index, insertion order, and parent reference
+  NewElementRegistry.addSlide(newSlide, originalSlideIndex, insertAfterNewSlide);
+
+  // Sync with Reveal.js and navigate to new slide
+  Reveal.sync();
+  Reveal.next();
+
+  console.log(
+    "Added new slide after original index",
+    originalSlideIndex,
+    "insertAfterNewSlide:",
+    insertAfterNewSlide ? "yes" : "no"
+  );
+  return newSlide;
+}
+
+// =============================================================================
+// Floating Toolbar
+// =============================================================================
+
+function createFloatingToolbar() {
+  // Check if toolbar already exists
+  if (document.getElementById("editable-toolbar")) {
+    return document.getElementById("editable-toolbar");
+  }
+
+  // Create toolbar container
+  const toolbar = document.createElement("div");
+  toolbar.id = "editable-toolbar";
+  toolbar.className = "editable-toolbar";
+  toolbar.setAttribute("role", "toolbar");
+  toolbar.setAttribute("aria-label", "Editable tools");
+
+  // Create drag handle
+  const dragHandle = document.createElement("div");
+  dragHandle.className = "editable-toolbar-handle";
+  dragHandle.innerHTML = "⋮⋮";
+  dragHandle.title = "Drag to move toolbar";
+  toolbar.appendChild(dragHandle);
+
+  // Create buttons container
+  const buttonsContainer = document.createElement("div");
+  buttonsContainer.className = "editable-toolbar-buttons";
+
+  // Add buttons from registry
+  ToolbarRegistry.getActions().forEach((action) => {
+    const btn = ToolbarRegistry.createButton(action);
+    buttonsContainer.appendChild(btn);
+  });
+
+  toolbar.appendChild(buttonsContainer);
+
+  // Make toolbar draggable
+  makeToolbarDraggable(toolbar, dragHandle);
+
+  // Add to document
+  document.body.appendChild(toolbar);
+
+  return toolbar;
+}
+
+function makeToolbarDraggable(toolbar, handle) {
+  let isDragging = false;
+  let startX, startY, initialX, initialY;
+
+  function startDrag(e) {
+    if (e.target !== handle && !handle.contains(e.target)) return;
+
+    isDragging = true;
+    handle.style.cursor = "grabbing";
+
+    const rect = toolbar.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+
+    if (e.type === "touchstart") {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    } else {
+      startX = e.clientX;
+      startY = e.clientY;
+    }
+
+    // Switch from right positioning to left positioning
+    toolbar.style.right = "auto";
+    toolbar.style.left = initialX + "px";
+    toolbar.style.top = initialY + "px";
+
+    e.preventDefault();
+  }
+
+  function drag(e) {
+    if (!isDragging) return;
+
+    let clientX, clientY;
+    if (e.type === "touchmove") {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const deltaX = clientX - startX;
+    const deltaY = clientY - startY;
+
+    toolbar.style.left = (initialX + deltaX) + "px";
+    toolbar.style.top = (initialY + deltaY) + "px";
+  }
+
+  function stopDrag() {
+    if (isDragging) {
+      isDragging = false;
+      handle.style.cursor = "grab";
+    }
+  }
+
+  handle.addEventListener("mousedown", startDrag);
+  handle.addEventListener("touchstart", startDrag);
+  document.addEventListener("mousemove", drag);
+  document.addEventListener("touchmove", drag);
+  document.addEventListener("mouseup", stopDrag);
+  document.addEventListener("touchend", stopDrag);
+}
+
 // =============================================================================
 // Plugin Initialization
 // =============================================================================
@@ -990,6 +1366,7 @@ window.Revealeditable = function () {
         const editableElements = getEditableElements();
         editableElements.forEach(setupDraggableElt);
         addSaveMenuButton();
+        createFloatingToolbar();
         setupUndoRedoKeyboard();
       });
     },
@@ -1188,9 +1565,15 @@ function setupDraggableElt(elt) {
   // -------------------------------------------------------------------------
 
   function setupKeyboardNavigation(context, capabilities, editableElt) {
-    const { container } = context;
+    const { container, element } = context;
 
     container.addEventListener("keydown", (e) => {
+      // Don't intercept keyboard when element is in edit mode (contentEditable)
+      // Allow normal text navigation/editing
+      if (element.contentEditable === "true") {
+        return;
+      }
+
       // Shift+Tab exits to normal slide navigation
       if (e.key === "Tab" && e.shiftKey) {
         container.blur();
@@ -1277,6 +1660,15 @@ function getTransformedQmd() {
   let content = readIndexQmd();
   if (!content) return "";
 
+  // First, insert any new slides into the content
+  const { text: contentWithSlides, slideLinePositions } =
+    insertNewSlides(content);
+  content = contentWithSlides;
+
+  // Then, insert any new text divs (pass slide positions for divs on new slides)
+  content = insertNewDivs(content, slideLinePositions);
+
+  // Now process existing editable elements
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);
   const attributes = formatEditableEltStrings(dimensions);
@@ -1320,7 +1712,8 @@ function getEditableFilename() {
 // =============================================================================
 
 function extractEditableEltDimensions() {
-  const editableElements = getEditableElements();
+  // Only process original elements, not dynamically added ones
+  const editableElements = getOriginalEditableElements();
   const dimensions = [];
 
   editableElements.forEach((elt) => {
@@ -1352,11 +1745,306 @@ function extractEditableEltDimensions() {
 // QMD Transformation
 // =============================================================================
 
+// Get the fence string needed for content (handles ::: in user content)
+// If content contains :::, use :::: (or longer if needed)
+function getFenceForContent(content) {
+  // Find the longest sequence of colons at the start of any line
+  const matches = content.match(/^:+/gm) || [];
+  let maxColons = 3; // Default fence is :::
+  for (const match of matches) {
+    if (match.length >= maxColons) {
+      maxColons = match.length + 1;
+    }
+  }
+  return ":".repeat(maxColons);
+}
+
+// Convert element innerHTML to plain text with proper newlines
+function elementToText(element) {
+  let text = element.innerHTML;
+
+  // Convert HTML tags to plain text equivalents
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<p[^>]*>/gi, "");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<[^>]+>/g, ""); // Remove remaining HTML tags
+
+  // Decode common HTML entities
+  text = text.replace(/&lt;/g, "<");
+  text = text.replace(/&gt;/g, ">");
+  text = text.replace(/&amp;/g, "&");
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&nbsp;/g, " ");
+
+  // Clean up excessive newlines
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  return text.trim();
+}
+
+// Insert new slides (with their associated divs) into QMD content
+function insertNewSlides(text) {
+  if (NewElementRegistry.newSlides.length === 0) {
+    return { text, slideLinePositions: new Map() };
+  }
+
+  const lines = text.split("\n");
+
+  // Find all level-2 heading positions (slide boundaries)
+  const slideHeadingLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const prevLine = i > 0 ? lines[i - 1].trim() : "";
+
+    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+      slideHeadingLines.push(i);
+    }
+  }
+
+  // Build a map of new slides to their associated divs
+  const divsByNewSlide = new Map();
+  for (const divInfo of NewElementRegistry.newDivs) {
+    if (divInfo.newSlideRef) {
+      if (!divsByNewSlide.has(divInfo.newSlideRef)) {
+        divsByNewSlide.set(divInfo.newSlideRef, []);
+      }
+      divsByNewSlide.get(divInfo.newSlideRef).push(divInfo);
+    }
+  }
+
+  // Build tree structure for slides with same afterSlideIndex
+  // Flatten each tree respecting insertion semantics:
+  // - Later roots come before earlier roots (inserted at same position, pushing down)
+  // - Parent comes before its children
+  // - Later children come before earlier children (inserted after parent, pushing siblings down)
+  function flattenSlideTree(slides) {
+    // Build children map
+    const childrenOf = new Map();
+    const roots = [];
+
+    for (const slide of slides) {
+      if (slide.insertAfterNewSlide && slides.includes(slide.insertAfterNewSlide)) {
+        // This slide comes after another new slide in this group
+        if (!childrenOf.has(slide.insertAfterNewSlide)) {
+          childrenOf.set(slide.insertAfterNewSlide, []);
+        }
+        childrenOf.get(slide.insertAfterNewSlide).push(slide);
+      } else {
+        // This is a root (comes directly after original slide)
+        roots.push(slide);
+      }
+    }
+
+    // Sort roots by insertionOrder DESCENDING (later roots first, they pushed earlier ones down)
+    roots.sort((a, b) => b.insertionOrder - a.insertionOrder);
+
+    // Sort children by insertionOrder DESCENDING (later children first)
+    for (const [, children] of childrenOf) {
+      children.sort((a, b) => b.insertionOrder - a.insertionOrder);
+    }
+
+    // DFS to flatten: for each root (in descending order), visit it then its children
+    // But children should come AFTER parent, so we do: parent, then recurse on children
+    const result = [];
+    function visit(slide) {
+      result.push(slide);
+      const children = childrenOf.get(slide) || [];
+      for (const child of children) {
+        visit(child);
+      }
+    }
+    for (const root of roots) {
+      visit(root);
+    }
+    return result;
+  }
+
+  // Group slides by afterSlideIndex
+  const slidesByAfterIndex = new Map();
+  for (const slide of NewElementRegistry.newSlides) {
+    const idx = slide.afterSlideIndex;
+    if (!slidesByAfterIndex.has(idx)) {
+      slidesByAfterIndex.set(idx, []);
+    }
+    slidesByAfterIndex.get(idx).push(slide);
+  }
+
+  // Sort afterSlideIndex values in descending order (insert from end)
+  const afterIndices = [...slidesByAfterIndex.keys()].sort((a, b) => b - a);
+
+  const slideLinePositions = new Map();
+
+  for (const afterIdx of afterIndices) {
+    const slidesForThisIndex = slidesByAfterIndex.get(afterIdx);
+
+    // Flatten the tree for this group - result is in desired final order
+    const orderedSlides = flattenSlideTree(slidesForThisIndex);
+
+    // Find the base insertion point for this afterSlideIndex (before any slides are inserted)
+    const targetHeadingIndex = afterIdx;
+    let baseInsertLineIndex;
+    if (targetHeadingIndex >= slideHeadingLines.length) {
+      baseInsertLineIndex = lines.length;
+    } else if (targetHeadingIndex + 1 < slideHeadingLines.length) {
+      baseInsertLineIndex = slideHeadingLines[targetHeadingIndex + 1];
+    } else {
+      baseInsertLineIndex = lines.length;
+    }
+
+    // Insert slides in REVERSE order of desired final order
+    // Each insert goes at the SAME base position, so later inserts push earlier ones down
+    // Result: first in orderedSlides ends up first in output
+    for (let i = orderedSlides.length - 1; i >= 0; i--) {
+      const newSlide = orderedSlides[i];
+
+      // Build the new slide content
+      const newSlideContent = ["", CONFIG.NEW_SLIDE_HEADING, ""];
+
+      // Add divs for this slide
+      const divsForThisSlide = divsByNewSlide.get(newSlide) || [];
+      for (const divInfo of divsForThisSlide) {
+        const editableElt = editableRegistry.get(divInfo.element);
+        if (editableElt) {
+          const dims = editableElt.toDimensions();
+          const attrStr = serializeToQmd(dims);
+          const textContent =
+            elementToText(divInfo.element) || CONFIG.NEW_TEXT_CONTENT;
+
+          // Determine fence length needed (must be longer than any ::: sequence in content)
+          const fence = getFenceForContent(textContent);
+
+          newSlideContent.push("");
+          newSlideContent.push(`${fence} ${attrStr}`);
+          newSlideContent.push(textContent);
+          newSlideContent.push(fence);
+        }
+      }
+
+      // Track line position (will be at baseInsertLineIndex since we insert there)
+      slideLinePositions.set(newSlide, baseInsertLineIndex + 1);
+
+      // Insert at the base position (not the updated position)
+      lines.splice(baseInsertLineIndex, 0, ...newSlideContent);
+
+      // Update previously tracked positions (but NOT slideHeadingLines within this group)
+      for (const [slide, pos] of slideLinePositions) {
+        if (slide !== newSlide && pos >= baseInsertLineIndex) {
+          slideLinePositions.set(slide, pos + newSlideContent.length);
+        }
+      }
+    }
+
+    // After processing this group, update slideHeadingLines for the total added content
+    const totalLinesAdded = orderedSlides.reduce((sum, slide) => {
+      const divs = divsByNewSlide.get(slide) || [];
+      return sum + 3 + divs.length * 4; // 3 for heading, 4 per div
+    }, 0);
+
+    for (let j = 0; j < slideHeadingLines.length; j++) {
+      if (slideHeadingLines[j] >= baseInsertLineIndex) {
+        slideHeadingLines[j] += totalLinesAdded;
+      }
+    }
+  }
+
+  return { text: lines.join("\n"), slideLinePositions };
+}
+
+// Insert new text divs into QMD content
+// Only handles divs on ORIGINAL slides - divs on new slides are handled by insertNewSlides
+function insertNewDivs(text, slideLinePositions = new Map()) {
+  // Filter to only divs on original slides (not on new slides)
+  const divsOnOriginalSlides = NewElementRegistry.newDivs.filter(
+    (div) => !div.newSlideRef
+  );
+
+  if (divsOnOriginalSlides.length === 0) {
+    return text;
+  }
+
+  const lines = text.split("\n");
+
+  // Find all level-2 heading positions
+  const slideHeadingLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const prevLine = i > 0 ? lines[i - 1].trim() : "";
+
+    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+      slideHeadingLines.push(i);
+    }
+  }
+
+  // Group divs by slide index
+  const divsBySlide = new Map();
+  for (const newDiv of divsOnOriginalSlides) {
+    const slideIdx = newDiv.slideIndex;
+    if (!divsBySlide.has(slideIdx)) {
+      divsBySlide.set(slideIdx, []);
+    }
+    divsBySlide.get(slideIdx).push(newDiv);
+  }
+
+  // Sort slide indices in descending order (insert from end)
+  const slideIndices = [...divsBySlide.keys()].sort((a, b) => b - a);
+
+  for (const slideIdx of slideIndices) {
+    const divsForSlide = divsBySlide.get(slideIdx);
+
+    // Find where to insert (before the next slide or at end)
+    let insertLineIndex;
+    if (slideIdx >= slideHeadingLines.length) {
+      insertLineIndex = lines.length;
+    } else if (slideIdx + 1 < slideHeadingLines.length) {
+      insertLineIndex = slideHeadingLines[slideIdx + 1];
+    } else {
+      insertLineIndex = lines.length;
+    }
+
+    // Create div content for all new divs on this slide
+    const newContent = [];
+    for (const divInfo of divsForSlide) {
+      const editableElt = editableRegistry.get(divInfo.element);
+      if (editableElt) {
+        const dims = editableElt.toDimensions();
+        const attrStr = serializeToQmd(dims);
+        const textContent =
+          elementToText(divInfo.element) || CONFIG.NEW_TEXT_CONTENT;
+
+        // Determine fence length needed (must be longer than any ::: sequence in content)
+        const fence = getFenceForContent(textContent);
+
+        newContent.push("");
+        newContent.push(`${fence} ${attrStr}`);
+        newContent.push(textContent);
+        newContent.push(fence);
+      }
+    }
+
+    if (newContent.length > 0) {
+      lines.splice(insertLineIndex, 0, ...newContent);
+
+      // Update slideHeadingLines for subsequent insertions
+      for (let i = 0; i < slideHeadingLines.length; i++) {
+        if (slideHeadingLines[i] >= insertLineIndex) {
+          slideHeadingLines[i] += newContent.length;
+        }
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function updateTextDivs(text) {
-  const divs = getEditableDivs();
+  // Only process original divs, not dynamically added ones
+  const divs = getOriginalEditableDivs();
   const replacements = Array.from(divs).map(htmlToQuarto);
 
-  const regex = /::: ?(?:\{\.editable[^}]*\}|editable)[\s\S]*?\n:::/g;
+  // Match fenced divs with 3+ colons: ::: {.editable...} ... :::
+  // The closing fence must have the same number of colons as the opening
+  const regex = /^(:{3,}) ?(?:\{\.editable[^}]*\}|editable)\n[\s\S]*?\n\1$/gm;
 
   let index = 0;
   return text.replace(regex, () => {
@@ -1383,15 +2071,27 @@ function htmlToQuarto(div) {
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");
 
-  return "::: {.editable}\n" + text.trim() + "\n:::";
+  // Use appropriate fence length for content
+  const fence = getFenceForContent(text);
+  return `${fence} {.editable}\n` + text.trim() + `\n${fence}`;
 }
 
 function replaceEditableOccurrences(text, replacements) {
-  const regex = /\{\.editable[^}]*\}/g;
+  // Only replace {.editable} in valid contexts:
+  // 1. After "::: " at start of line (div syntax)
+  // 2. After ")" in image syntax like ![](image.png){.editable}
+  // This prevents replacing {.editable} that appears in user text content
+
+  // Use a single regex that matches both valid contexts in document order
+  // This ensures replacements are applied in the correct sequence
+  const regex = /(?:^::: |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
 
   let index = 0;
-  return text.replace(regex, () => {
-    return replacements[index++] || "";
+  return text.replace(regex, (match) => {
+    // Preserve the prefix ("::: " or nothing for image syntax)
+    const isDiv = match.startsWith('::: ');
+    const prefix = isDiv ? '::: ' : '';
+    return prefix + (replacements[index++] || "");
   });
 }
 

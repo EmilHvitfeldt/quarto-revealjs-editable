@@ -1,0 +1,11 @@
+---
+title: "Title Only Presentation"
+---
+
+This presentation has no ## headings.
+
+Just content on the title slide.
+
+::: {.editable}
+Editable content on title slide
+:::

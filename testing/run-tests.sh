@@ -175,6 +175,114 @@ check_clipboard_feature() {
   fi
 }
 
+# Check toolbar feature exists
+check_toolbar_feature() {
+  local test_name="$1"
+  local html_file="$2"
+
+  echo "$test_name..."
+
+  if [ ! -f "$html_file" ]; then
+    echo "  ✗ HTML file not found"
+    FAILED=1
+    return
+  fi
+
+  # Find the editable.js file path from HTML
+  local base_name="${html_file%.html}"
+  local js_path="${base_name}_files/libs/revealjs/plugin/revealeditable/editable.js"
+
+  if [ ! -f "$js_path" ]; then
+    echo "  ✗ editable.js not found at $js_path"
+    FAILED=1
+    return
+  fi
+
+  # Check that ToolbarRegistry exists
+  if grep -q "ToolbarRegistry" "$js_path" 2>/dev/null; then
+    echo "  ✓ ToolbarRegistry present"
+  else
+    echo "  ✗ ToolbarRegistry missing"
+    FAILED=1
+    return
+  fi
+
+  # Check that createFloatingToolbar function exists
+  if grep -q "createFloatingToolbar" "$js_path" 2>/dev/null; then
+    echo "  ✓ createFloatingToolbar function present"
+  else
+    echo "  ✗ createFloatingToolbar function missing"
+    FAILED=1
+    return
+  fi
+
+  # Check that addNewTextElement function exists
+  if grep -q "addNewTextElement" "$js_path" 2>/dev/null; then
+    echo "  ✓ addNewTextElement function present"
+  else
+    echo "  ✗ addNewTextElement function missing"
+    FAILED=1
+    return
+  fi
+
+  # Check that addNewSlide function exists
+  if grep -q "addNewSlide" "$js_path" 2>/dev/null; then
+    echo "  ✓ addNewSlide function present"
+  else
+    echo "  ✗ addNewSlide function missing"
+    FAILED=1
+  fi
+}
+
+# Check NewElementRegistry exists
+check_new_element_registry() {
+  local test_name="$1"
+  local html_file="$2"
+
+  echo "$test_name..."
+
+  if [ ! -f "$html_file" ]; then
+    echo "  ✗ HTML file not found"
+    FAILED=1
+    return
+  fi
+
+  local base_name="${html_file%.html}"
+  local js_path="${base_name}_files/libs/revealjs/plugin/revealeditable/editable.js"
+
+  if [ ! -f "$js_path" ]; then
+    echo "  ✗ editable.js not found"
+    FAILED=1
+    return
+  fi
+
+  # Check that NewElementRegistry exists
+  if grep -q "NewElementRegistry" "$js_path" 2>/dev/null; then
+    echo "  ✓ NewElementRegistry present"
+  else
+    echo "  ✗ NewElementRegistry missing"
+    FAILED=1
+    return
+  fi
+
+  # Check for insertNewSlides function
+  if grep -q "insertNewSlides" "$js_path" 2>/dev/null; then
+    echo "  ✓ insertNewSlides function present"
+  else
+    echo "  ✗ insertNewSlides function missing"
+    FAILED=1
+    return
+  fi
+
+  # Check for insertNewDivs function
+  if grep -q "insertNewDivs" "$js_path" 2>/dev/null; then
+    echo "  ✓ insertNewDivs function present"
+  else
+    echo "  ✗ insertNewDivs function missing"
+    FAILED=1
+  fi
+}
+
 # Check multiple editable elements are detected
 check_multiple_elements() {
   local test_name="$1"
@@ -237,6 +345,12 @@ check_multiple_elements "Test 12a: Both syntaxes create elements" "bare-syntax.h
 echo ""
 echo "--- Feature Tests ---"
 check_clipboard_feature "Test 13: Clipboard feature (#8)" "basic.html"
+
+echo ""
+echo "--- Toolbar Tests ---"
+check_toolbar_feature "Test 15: Toolbar feature" "basic.html"
+check_new_element_registry "Test 16: NewElementRegistry" "basic.html"
+run_render_test "Test 17: Title-only document (no ## headings)" "title-only.qmd" "inject"
 
 echo ""
 echo "--- Path Handling Tests ---"
