@@ -69,6 +69,79 @@ function loadQuill() {
 // Store Quill instances per element
 const quillInstances = new Map();
 
+// Initialize Quill for an editable div element (called at page load)
+async function initializeQuillForElement(element) {
+  // Only for div elements
+  if (element.tagName.toLowerCase() !== "div") return null;
+
+  // Skip if already initialized
+  if (quillInstances.has(element)) return quillInstances.get(element);
+
+  try {
+    await loadQuill();
+
+    // Store original content before any DOM changes
+    const originalContent = element.innerHTML;
+
+    // Clear and set up structure for Quill
+    element.innerHTML = "";
+
+    // Create toolbar container
+    const toolbarContainer = document.createElement("div");
+    toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
+    toolbarContainer.innerHTML = `
+      <button class="ql-bold">B</button>
+      <button class="ql-italic">I</button>
+      <button class="ql-underline">U</button>
+      <button class="ql-strike">S</button>
+      <select class="ql-color"></select>
+      <select class="ql-background"></select>
+      <button class="ql-align" value=""></button>
+      <button class="ql-align" value="center"></button>
+      <button class="ql-align" value="right"></button>
+    `;
+    element.appendChild(toolbarContainer);
+
+    // Create editor container
+    const editorWrapper = document.createElement("div");
+    editorWrapper.className = "quill-wrapper";
+    editorWrapper.innerHTML = originalContent;
+    element.appendChild(editorWrapper);
+
+    // Initialize Quill with the toolbar we created
+    const quill = new Quill(editorWrapper, {
+      theme: "snow",
+      modules: {
+        toolbar: {
+          container: "#" + toolbarContainer.id,
+        },
+      },
+      placeholder: "",
+    });
+
+    // Style the toolbar
+    toolbarContainer.className = "quill-toolbar-container ql-toolbar ql-snow";
+
+    // CRITICAL: Prevent toolbar buttons from stealing focus and losing selection
+    toolbarContainer.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    // Start with editing disabled and toolbar hidden
+    quill.enable(false);
+    // Toolbar starts without 'editing' class, so CSS hides it
+
+    const quillData = { quill, toolbarContainer, editorWrapper, isEditing: false };
+    quillInstances.set(element, quillData);
+
+    return quillData;
+  } catch (err) {
+    console.error("Failed to initialize Quill for element:", err);
+    return null;
+  }
+}
+
 // =============================================================================
 // Element State Management
 // =============================================================================
@@ -343,8 +416,11 @@ const Capabilities = {
       const { element, container } = context;
 
       const startDrag = (e) => {
-        // Don't start drag if element is in edit mode (contentEditable)
+        // Don't start drag if element is in edit mode
         if (element.contentEditable === "true") return;
+        // Check if Quill editor is in edit mode
+        const quillData = quillInstances.get(element);
+        if (quillData && quillData.isEditing) return;
         if (e.target.classList.contains("resize-handle")) return;
         // Don't start drag if clicking on Quill toolbar
         if (e.target.closest(".ql-toolbar") || e.target.closest(".quill-toolbar-container")) return;
@@ -885,101 +961,31 @@ ControlRegistry.register("editMode", {
   title: "Edit Text",
   className: "editable-button-edit",
   appliesTo: ["div"],
-  onClick: async (element, btn) => {
-    const container = element.parentNode;
-
+  onClick: (element, btn) => {
     // Use button's active class as the source of truth for edit state
     const isEditing = btn.classList.contains("active");
 
+    // Quill should already be initialized at page load
+    const quillData = quillInstances.get(element);
+
     if (!isEditing) {
-      // Entering edit mode - initialize Quill
-      try {
-        await loadQuill();
-
-        // Check if we already have an instance for this element
-        let quillData = quillInstances.get(element);
-        if (!quillData) {
-          // Store original content
-          const originalContent = element.innerHTML;
-
-          // Clear and set up structure for Quill
-          element.innerHTML = "";
-
-          // Create toolbar container
-          const toolbarContainer = document.createElement("div");
-          toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
-          toolbarContainer.innerHTML = `
-            <button class="ql-bold">B</button>
-            <button class="ql-italic">I</button>
-            <button class="ql-underline">U</button>
-            <button class="ql-strike">S</button>
-            <select class="ql-color"></select>
-            <select class="ql-background"></select>
-            <button class="ql-align" value=""></button>
-            <button class="ql-align" value="center"></button>
-            <button class="ql-align" value="right"></button>
-          `;
-          element.appendChild(toolbarContainer);
-
-          // Create editor container
-          const editorWrapper = document.createElement("div");
-          editorWrapper.className = "quill-wrapper";
-          editorWrapper.innerHTML = originalContent;
-          element.appendChild(editorWrapper);
-
-          // Initialize Quill with the toolbar we created
-          const quill = new Quill(editorWrapper, {
-            theme: "snow",
-            modules: {
-              toolbar: {
-                container: "#" + toolbarContainer.id,
-              },
-            },
-            placeholder: "",
-          });
-
-          // Style the toolbar
-          toolbarContainer.className = "quill-toolbar-container ql-toolbar ql-snow";
-
-          // CRITICAL: Prevent toolbar buttons from stealing focus and losing selection
-          // This must use preventDefault on mousedown to stop the browser from
-          // moving focus away from the editor before Quill can apply formatting
-          toolbarContainer.addEventListener("mousedown", (e) => {
-            e.preventDefault(); // Prevents focus loss!
-            e.stopPropagation();
-          });
-
-          quillData = { quill, toolbarContainer, editorWrapper, isEditing: false };
-          quillInstances.set(element, quillData);
-        }
-
+      // Entering edit mode
+      if (quillData) {
         // Show toolbar and enable editing
         if (quillData.toolbarContainer) {
           quillData.toolbarContainer.classList.add("editing");
         }
         quillData.isEditing = true;
         quillData.quill.enable(true);
-
-        element.contentEditable = "true";
-        btn.classList.add("active");
-        btn.title = "Exit Edit Mode";
-
-        // Focus the Quill editor
         quillData.quill.focus();
-      } catch (err) {
-        console.error("Failed to load Quill:", err);
-        // Fallback to basic contentEditable
-        element.contentEditable = "true";
-        btn.classList.add("active");
-        btn.title = "Exit Edit Mode";
-        element.focus();
       }
+
+      btn.classList.add("active");
+      btn.title = "Exit Edit Mode";
     } else {
       // Exiting edit mode
-      const quillData = quillInstances.get(element);
-
-      // Hide toolbar and disable editing
       if (quillData) {
+        // Hide toolbar and disable editing
         if (quillData.toolbarContainer) {
           quillData.toolbarContainer.classList.remove("editing");
         }
@@ -987,7 +993,6 @@ ControlRegistry.register("editMode", {
         quillData.quill.enable(false);
       }
 
-      element.contentEditable = "false";
       btn.classList.remove("active");
       btn.title = "Edit Text";
 
@@ -1267,7 +1272,7 @@ function getCurrentSlide() {
 // New Element Creation
 // =============================================================================
 
-function addNewTextElement() {
+async function addNewTextElement() {
   const currentSlide = getCurrentSlide();
   if (!currentSlide) {
     console.warn("No current slide found");
@@ -1283,6 +1288,9 @@ function addNewTextElement() {
 
   // Insert into current slide
   currentSlide.appendChild(newDiv);
+
+  // Initialize Quill for the new element before setting up draggable
+  await initializeQuillForElement(newDiv);
 
   // Setup as editable element (registers with editableRegistry)
   setupDraggableElt(newDiv);
@@ -1502,8 +1510,17 @@ window.Revealeditable = function () {
   return {
     id: "Revealeditable",
     init: function (deck) {
-      deck.on("ready", function () {
+      deck.on("ready", async function () {
         const editableElements = getEditableElements();
+
+        // First initialize Quill for all div elements (before setting up draggable)
+        // This ensures DOM structure is stable before any interaction
+        const editableDivs = Array.from(editableElements).filter(
+          (el) => el.tagName.toLowerCase() === "div"
+        );
+        await Promise.all(editableDivs.map(initializeQuillForElement));
+
+        // Now set up draggable elements
         editableElements.forEach(setupDraggableElt);
         addSaveMenuButton();
         createFloatingToolbar();

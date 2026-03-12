@@ -281,6 +281,12 @@
    Quill Editor Integration
    ============================================================================= */
 
+/* Ensure text doesn't shift when entering edit mode */
+.editable-container > div.editable,
+.editable-container > .editable {
+  position: relative !important;
+}
+
 /* Toolbar - Quill generates .ql-toolbar.ql-snow */
 .editable-container .ql-toolbar.ql-snow {
   position: absolute !important;
@@ -460,11 +466,37 @@
   color: var(--editable-accent-color) !important;
 }
 
-/* Make the Quill wrapper fill the container */
+/* Make the Quill wrapper fill the container - no extra space */
 .quill-wrapper {
   width: 100%;
   height: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  display: block !important;
+  line-height: inherit !important;
+  vertical-align: top !important;
+  box-sizing: border-box !important;
 }
+
+/* Ensure Quill container doesn't shift text vertically */
+.quill-wrapper .ql-container,
+.editable-container .ql-container {
+  line-height: inherit !important;
+  vertical-align: top !important;
+  display: block !important;
+}
+
+.quill-wrapper .ql-editor,
+.editable-container .ql-editor {
+  line-height: inherit !important;
+  vertical-align: top !important;
+}
+
+/* Debug: uncomment to see element boundaries */
+/* .quill-wrapper { outline: 1px solid red !important; }
+.ql-container { outline: 1px solid blue !important; }
+.ql-editor { outline: 1px solid green !important; } */
 
 /* Remove Quill's default border on container */
 .quill-wrapper .ql-container.ql-snow,
@@ -472,12 +504,15 @@
   border: none !important;
   font-size: inherit !important;
   font-family: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Style the Quill editor area - inherit all styles from parent */
 .quill-wrapper .ql-editor,
 .editable-container .ql-editor {
   padding: 0 !important;
+  margin: 0 !important;
   overflow: visible !important;
   min-height: auto !important;
   font-size: inherit !important;
@@ -488,10 +523,16 @@
 
 /* Ensure paragraphs in Quill don't add extra margins or change size */
 .quill-wrapper .ql-editor p,
-.editable-container .ql-editor p {
+.editable-container .ql-editor p,
+.reveal .ql-editor p {
   margin: 0 !important;
+  margin-block-start: 0 !important;
+  margin-block-end: 0 !important;
   padding: 0 !important;
   font-size: inherit !important;
+  line-height: inherit !important;
+  vertical-align: top !important;
+  display: block !important;
 }
 
 /* Quill size classes - override to use relative sizing */
