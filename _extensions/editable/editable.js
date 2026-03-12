@@ -20,7 +20,54 @@ const CONFIG = {
   NEW_TEXT_WIDTH: 200,
   NEW_TEXT_HEIGHT: 50,
   NEW_SLIDE_HEADING: "## New Slide",
+
+  // Quill Editor CDN
+  QUILL_CSS:
+    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
+  QUILL_JS:
+    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js",
 };
+
+// =============================================================================
+// Quill Editor Loader
+// =============================================================================
+
+let quillLoaded = false;
+let quillLoading = null;
+
+function loadQuill() {
+  if (quillLoaded) {
+    return Promise.resolve();
+  }
+  if (quillLoading) {
+    return quillLoading;
+  }
+
+  quillLoading = new Promise((resolve, reject) => {
+    // Load CSS
+    const cssLink = document.createElement("link");
+    cssLink.rel = "stylesheet";
+    cssLink.href = CONFIG.QUILL_CSS;
+    document.head.appendChild(cssLink);
+
+    // Load JS
+    const script = document.createElement("script");
+    script.src = CONFIG.QUILL_JS;
+    script.onload = () => {
+      quillLoaded = true;
+      resolve();
+    };
+    script.onerror = () => {
+      reject(new Error("Failed to load Quill"));
+    };
+    document.head.appendChild(script);
+  });
+
+  return quillLoading;
+}
+
+// Store Quill instances per element
+const quillInstances = new Map();
 
 // =============================================================================
 // Element State Management
@@ -299,6 +346,9 @@ const Capabilities = {
         // Don't start drag if element is in edit mode (contentEditable)
         if (element.contentEditable === "true") return;
         if (e.target.classList.contains("resize-handle")) return;
+        // Don't start drag if clicking on Quill toolbar
+        if (e.target.closest(".ql-toolbar") || e.target.closest(".quill-toolbar-container")) return;
+        if (e.target.closest(".ql-picker") || e.target.classList.contains("ql-picker-item")) return;
 
         // Capture state for undo before starting drag
         pushUndoState();
@@ -535,7 +585,8 @@ const Capabilities = {
     },
   },
 
-  // Font controls capability - font size and alignment (div only)
+  // Font controls capability - now just creates the container for edit button
+  // All formatting (font size, alignment, colors) is handled by Quill toolbar
   fontControls: {
     name: "fontControls",
 
@@ -544,23 +595,11 @@ const Capabilities = {
     },
 
     createControls(context) {
-      const { container, element } = context;
-      const elementType = element.tagName.toLowerCase();
+      const { container } = context;
 
-      // Create font controls container
+      // Create font controls container (holds only the edit button now)
       const fontControls = document.createElement("div");
       fontControls.className = "editable-font-controls";
-
-      // Get controls from registry for this element type
-      const controlNames = ["decreaseFont", "increaseFont", "alignLeft", "alignCenter", "alignRight"];
-      controlNames.forEach((name) => {
-        const config = ControlRegistry.controls.get(name);
-        if (config && config.appliesTo.includes(elementType)) {
-          const btn = ControlRegistry.createButton(config, element);
-          fontControls.appendChild(btn);
-        }
-      });
-
       container.appendChild(fontControls);
       return fontControls;
     },
@@ -843,16 +882,108 @@ ControlRegistry.register("alignRight", {
 ControlRegistry.register("editMode", {
   icon: "✎",
   ariaLabel: "Toggle edit mode",
-  title: "Toggle Edit Mode",
+  title: "Edit Text",
   className: "editable-button-edit",
   appliesTo: ["div"],
-  onClick: (element, btn) => {
+  onClick: async (element, btn) => {
+    const container = element.parentNode;
     const isEditable = element.contentEditable === "true";
-    element.contentEditable = !isEditable;
-    btn.classList.toggle("active", !isEditable);
-    btn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
+
     if (!isEditable) {
-      element.focus();
+      // Entering edit mode - initialize Quill
+      try {
+        await loadQuill();
+
+        // Check if we already have an instance for this element
+        let quillData = quillInstances.get(element);
+        if (!quillData) {
+          // Store original content
+          const originalContent = element.innerHTML;
+
+          // Clear and set up structure for Quill
+          element.innerHTML = "";
+
+          // Create toolbar container
+          const toolbarContainer = document.createElement("div");
+          toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
+          toolbarContainer.innerHTML = `
+            <button class="ql-bold">B</button>
+            <button class="ql-italic">I</button>
+            <button class="ql-underline">U</button>
+            <button class="ql-strike">S</button>
+            <select class="ql-color"></select>
+            <select class="ql-background"></select>
+            <button class="ql-align" value=""></button>
+            <button class="ql-align" value="center"></button>
+            <button class="ql-align" value="right"></button>
+          `;
+          element.appendChild(toolbarContainer);
+
+          // Create editor container
+          const editorWrapper = document.createElement("div");
+          editorWrapper.className = "quill-wrapper";
+          editorWrapper.innerHTML = originalContent;
+          element.appendChild(editorWrapper);
+
+          // Initialize Quill with the toolbar we created
+          const quill = new Quill(editorWrapper, {
+            theme: "snow",
+            modules: {
+              toolbar: {
+                container: "#" + toolbarContainer.id,
+              },
+            },
+            placeholder: "",
+          });
+
+          // Style the toolbar
+          toolbarContainer.className = "quill-toolbar-container ql-toolbar ql-snow";
+
+          // CRITICAL: Prevent toolbar buttons from stealing focus and losing selection
+          // This must use preventDefault on mousedown to stop the browser from
+          // moving focus away from the editor before Quill can apply formatting
+          toolbarContainer.addEventListener("mousedown", (e) => {
+            e.preventDefault(); // Prevents focus loss!
+            e.stopPropagation();
+          });
+
+          quillData = { quill, toolbarContainer, editorWrapper };
+          quillInstances.set(element, quillData);
+        }
+
+        // Show toolbar
+        if (quillData.toolbarContainer) {
+          quillData.toolbarContainer.style.display = "flex";
+        }
+
+        element.contentEditable = "true";
+        btn.classList.add("active");
+        btn.title = "Exit Edit Mode";
+
+        // Focus the Quill editor
+        quillData.quill.focus();
+      } catch (err) {
+        console.error("Failed to load Quill:", err);
+        // Fallback to basic contentEditable
+        element.contentEditable = "true";
+        btn.classList.add("active");
+        btn.title = "Exit Edit Mode";
+        element.focus();
+      }
+    } else {
+      // Exiting edit mode
+      element.contentEditable = "false";
+      btn.classList.remove("active");
+      btn.title = "Edit Text";
+
+      // Hide toolbar
+      const quillData = quillInstances.get(element);
+      if (quillData && quillData.toolbarContainer) {
+        quillData.toolbarContainer.style.display = "none";
+      }
+
+      // Deselect any selected text
+      window.getSelection().removeAllRanges();
     }
   },
 });
@@ -1761,7 +1892,9 @@ function getFenceForContent(content) {
 
 // Convert element innerHTML to plain text with proper newlines
 function elementToText(element) {
-  let text = element.innerHTML;
+  // If Quill was used, get content from .ql-editor
+  const quillEditor = element.querySelector(".ql-editor");
+  let text = quillEditor ? quillEditor.innerHTML : element.innerHTML;
 
   // Convert HTML tags to plain text equivalents
   text = text.replace(/<br\s*\/?>/gi, "\n");
@@ -2053,7 +2186,9 @@ function updateTextDivs(text) {
 }
 
 function htmlToQuarto(div) {
-  let text = div.innerHTML.trim();
+  // If Quill was used, get content from .ql-editor
+  const quillEditor = div.querySelector(".ql-editor");
+  let text = quillEditor ? quillEditor.innerHTML.trim() : div.innerHTML.trim();
 
   // Convert HTML tags to Quarto/Markdown equivalents
   text = text.replace(/<br\s*\/?>/gi, "\n");
@@ -2061,12 +2196,55 @@ function htmlToQuarto(div) {
   text = text.replace(/<\/p>/gi, "\n\n");
   text = text.replace(/<code[^>]*>/gi, "`");
   text = text.replace(/<\/code>/gi, "`");
+
+  // Bold: <strong> and <b>
   text = text.replace(/<strong[^>]*>/gi, "**");
   text = text.replace(/<\/strong>/gi, "**");
+  text = text.replace(/<b[^>]*>/gi, "**");
+  text = text.replace(/<\/b>/gi, "**");
+
+  // Italic: <em> and <i>
   text = text.replace(/<em[^>]*>/gi, "*");
   text = text.replace(/<\/em>/gi, "*");
+  text = text.replace(/<i[^>]*>/gi, "*");
+  text = text.replace(/<\/i>/gi, "*");
+
+  // Strikethrough: <del> and <s> and <strike>
   text = text.replace(/<del[^>]*>/gi, "~~");
   text = text.replace(/<\/del>/gi, "~~");
+  text = text.replace(/<s[^>]*>/gi, "~~");
+  text = text.replace(/<\/s>/gi, "~~");
+  text = text.replace(/<strike[^>]*>/gi, "~~");
+  text = text.replace(/<\/strike>/gi, "~~");
+
+  // Underline: <u> → Quarto span with underline class
+  text = text.replace(/<u[^>]*>([^<]*)<\/u>/gi, "[$1]{.underline}");
+
+  // Color spans: <span style="color: rgb(...)">text</span> → [text]{style="color: ..."}
+  text = text.replace(
+    /<span[^>]*style="[^"]*color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+    '[$2]{style="color: $1"}'
+  );
+
+  // Background color spans: <span style="background-color: rgb(...)">text</span>
+  text = text.replace(
+    /<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+    '[$2]{style="background-color: $1"}'
+  );
+
+  // Links: <a href="url">text</a> → [text](url)
+  text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
+
+  // Remove any remaining HTML tags (cleanup)
+  text = text.replace(/<[^>]+>/g, "");
+
+  // Decode HTML entities
+  text = text.replace(/&lt;/g, "<");
+  text = text.replace(/&gt;/g, ">");
+  text = text.replace(/&amp;/g, "&");
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&nbsp;/g, " ");
 
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");

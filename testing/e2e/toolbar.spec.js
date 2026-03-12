@@ -219,23 +219,36 @@ test.describe('Add Text Element', () => {
     await page.click('.toolbar-add-text');
     await page.waitForTimeout(300);
 
-    // Find the edit mode button for the new element
+    // Click the edit button
+    const hasEditButton = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const container = newElement.parentNode;
+      const editBtn = container.querySelector('.editable-button-edit');
+      if (editBtn) {
+        editBtn.click();
+        return true;
+      }
+      return false;
+    });
+    expect(hasEditButton).toBe(true);
+
+    // Wait for Medium Editor to load and contentEditable to become true
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.contentEditable === 'true';
+    }, { timeout: 5000 });
+
+    // Check final state
     const result = await page.evaluate(() => {
       const newElement = document.querySelector('.editable-new');
       const container = newElement.parentNode;
       const editBtn = container.querySelector('.editable-button-edit');
-
-      // Click the edit button
-      editBtn.click();
-
       return {
-        hasEditButton: !!editBtn,
         isContentEditable: newElement.contentEditable === "true",
         buttonIsActive: editBtn.classList.contains('active'),
       };
     });
 
-    expect(result.hasEditButton).toBe(true);
     expect(result.isContentEditable).toBe(true);
     expect(result.buttonIsActive).toBe(true);
   });
@@ -250,25 +263,38 @@ test.describe('Add Text Element', () => {
     await page.click('.toolbar-add-text');
     await page.waitForTimeout(300);
 
-    // Enable edit mode, select all text, and replace it
-    const newText = await page.evaluate(() => {
+    // Click edit button
+    await page.evaluate(() => {
       const newElement = document.querySelector('.editable-new');
       const container = newElement.parentNode;
       const editBtn = container.querySelector('.editable-button-edit');
       editBtn.click();
+    });
+
+    // Wait for Quill to load and contentEditable to become true
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.contentEditable === 'true';
+    }, { timeout: 5000 });
+
+    // Now edit the text - Quill puts content in .ql-editor
+    const newText = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      // With Quill, the editable content is in .ql-editor
+      const editor = newElement.querySelector('.ql-editor') || newElement;
 
       // Focus and select all text
-      newElement.focus();
+      editor.focus();
       const selection = window.getSelection();
       const range = document.createRange();
-      range.selectNodeContents(newElement);
+      range.selectNodeContents(editor);
       selection.removeAllRanges();
       selection.addRange(range);
 
       // Replace with new text using execCommand (works in contentEditable)
       document.execCommand('insertText', false, 'Custom edited text');
 
-      return newElement.textContent;
+      return editor.textContent;
     });
 
     expect(newText).toBe('Custom edited text');

@@ -7,26 +7,28 @@ const TESTING_DIR = path.join(__dirname, '..');
 
 test.describe('UI Controls', () => {
 
-  test('Font controls exist for div elements', async ({ page }) => {
+  test('Edit button exists for div elements', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'basic.html');
     await page.goto(`file://${htmlPath}`);
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    // Check that font controls are created for div.editable
+    // Check that edit button is created for div.editable
+    // Note: Font size and alignment controls are now in Quill toolbar (appears on edit)
     const fontControls = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
       const controls = container.querySelector('.editable-font-controls');
       if (!controls) return null;
       return {
-        hasDecreaseBtn: !!controls.querySelector('button'),
+        hasEditBtn: !!controls.querySelector('.editable-button-edit'),
         buttonCount: controls.querySelectorAll('button').length
       };
     });
 
     expect(fontControls).not.toBeNull();
-    expect(fontControls.buttonCount).toBe(6); // A-, A+, left, center, right, edit
+    expect(fontControls.hasEditBtn).toBe(true);
+    expect(fontControls.buttonCount).toBe(1); // Only edit button (font/align now in Quill toolbar)
   });
 
   test('changeFontSize function works', async ({ page }) => {
@@ -520,60 +522,82 @@ test.describe('Font Size Controls', () => {
     expect(result.finalSize).toBeGreaterThanOrEqual(8);
   });
 
-  test('Font size increase button works', async ({ page }) => {
+  test('Quill toolbar appears when entering edit mode', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'basic.html');
     await page.goto(`file://${htmlPath}`);
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    const result = await page.evaluate(() => {
+    // Click edit button
+    await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.editable-font-controls button');
-      const increaseBtn = buttons[1]; // Second button is A+
-
-      const initialSize = parseFloat(window.getComputedStyle(div).fontSize);
-
-      increaseBtn.click();
-      increaseBtn.click();
-
-      const finalSize = parseFloat(div.style.fontSize);
-      return { initialSize, finalSize };
+      const editBtn = container.querySelector('.editable-button-edit');
+      editBtn.click();
     });
 
-    expect(result.finalSize).toBeGreaterThan(result.initialSize);
+    // Wait for Quill to load and toolbar to appear
+    await page.waitForFunction(() => {
+      const div = document.querySelector('div.editable');
+      return div.contentEditable === 'true';
+    }, { timeout: 5000 });
+
+    const result = await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      const toolbar = div.querySelector('.quill-toolbar-container');
+      const quillWrapper = div.querySelector('.quill-wrapper');
+      return {
+        hasToolbar: !!toolbar,
+        hasQuillWrapper: !!quillWrapper,
+        toolbarVisible: toolbar ? toolbar.style.display !== 'none' : false,
+      };
+    });
+
+    expect(result.hasToolbar).toBe(true);
+    expect(result.hasQuillWrapper).toBe(true);
+    expect(result.toolbarVisible).toBe(true);
   });
 
-  test('Alignment buttons work', async ({ page }) => {
+  test('Quill toolbar has formatting buttons', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'basic.html');
     await page.goto(`file://${htmlPath}`);
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    const result = await page.evaluate(() => {
+    // Click edit button and wait for Quill
+    await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.editable-font-controls button');
-      // Buttons: A-, A+, alignLeft, alignCenter, alignRight, edit
-      const alignLeftBtn = buttons[2];
-      const alignCenterBtn = buttons[3];
-      const alignRightBtn = buttons[4];
-
-      alignLeftBtn.click();
-      const leftAlign = div.style.textAlign;
-
-      alignCenterBtn.click();
-      const centerAlign = div.style.textAlign;
-
-      alignRightBtn.click();
-      const rightAlign = div.style.textAlign;
-
-      return { leftAlign, centerAlign, rightAlign };
+      const editBtn = container.querySelector('.editable-button-edit');
+      editBtn.click();
     });
 
-    expect(result.leftAlign).toBe('left');
-    expect(result.centerAlign).toBe('center');
-    expect(result.rightAlign).toBe('right');
+    await page.waitForFunction(() => {
+      const div = document.querySelector('div.editable');
+      return div.querySelector('.quill-toolbar-container');
+    }, { timeout: 5000 });
+
+    const result = await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      const toolbar = div.querySelector('.quill-toolbar-container');
+      return {
+        hasBold: !!toolbar.querySelector('.ql-bold'),
+        hasItalic: !!toolbar.querySelector('.ql-italic'),
+        hasUnderline: !!toolbar.querySelector('.ql-underline'),
+        hasColor: !!toolbar.querySelector('.ql-color'),
+        hasSize: !!toolbar.querySelector('.ql-size'),
+        hasAlign: !!toolbar.querySelector('.ql-align'),
+        hasLink: !!toolbar.querySelector('.ql-link'),
+      };
+    });
+
+    expect(result.hasBold).toBe(true);
+    expect(result.hasItalic).toBe(true);
+    expect(result.hasUnderline).toBe(true);
+    expect(result.hasColor).toBe(true);
+    expect(result.hasSize).toBe(true);
+    expect(result.hasAlign).toBe(true);
+    expect(result.hasLink).toBe(true);
   });
 
   test('Edit mode button toggles contentEditable', async ({ page }) => {
@@ -582,26 +606,49 @@ test.describe('Font Size Controls', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    const result = await page.evaluate(() => {
+    // Get initial state
+    const initialEditable = await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      return div.contentEditable;
+    });
+    expect(initialEditable).toBe('inherit');
+
+    // Click edit button and wait for async Quill to load
+    await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
-      const buttons = container.querySelectorAll('.editable-font-controls button');
-      const editBtn = buttons[5]; // Last button is edit
-
-      const initialEditable = div.contentEditable;
-
+      const editBtn = container.querySelector('.editable-button-edit');
       editBtn.click();
-      const afterFirstClick = div.contentEditable;
-
-      editBtn.click();
-      const afterSecondClick = div.contentEditable;
-
-      return { initialEditable, afterFirstClick, afterSecondClick };
     });
 
-    expect(result.initialEditable).toBe('inherit');
-    expect(result.afterFirstClick).toBe('true');
-    expect(result.afterSecondClick).toBe('false');
+    // Wait for contentEditable to become true (async due to Medium Editor loading)
+    await page.waitForFunction(() => {
+      const div = document.querySelector('div.editable');
+      return div.contentEditable === 'true';
+    }, { timeout: 5000 });
+
+    const afterFirstClick = await page.evaluate(() => {
+      return document.querySelector('div.editable').contentEditable;
+    });
+    expect(afterFirstClick).toBe('true');
+
+    // Click again to exit edit mode
+    await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      const container = div.parentNode;
+      const editBtn = container.querySelector('.editable-button-edit');
+      editBtn.click();
+    });
+
+    await page.waitForFunction(() => {
+      const div = document.querySelector('div.editable');
+      return div.contentEditable === 'false';
+    }, { timeout: 2000 });
+
+    const afterSecondClick = await page.evaluate(() => {
+      return document.querySelector('div.editable').contentEditable;
+    });
+    expect(afterSecondClick).toBe('false');
   });
 });
 
@@ -897,7 +944,7 @@ test.describe('Accessibility', () => {
     });
   });
 
-  test('Font control buttons have ARIA labels', async ({ page }) => {
+  test('Edit button has ARIA label', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'basic.html');
     await page.goto(`file://${htmlPath}`);
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
@@ -914,19 +961,16 @@ test.describe('Accessibility', () => {
       return Array.from(fontControls.querySelectorAll('button')).map(b => ({
         text: b.textContent,
         ariaLabel: b.getAttribute('aria-label'),
-        title: b.title
+        title: b.title,
+        className: b.className
       }));
     });
 
-    expect(buttons.length).toBe(6);
-    buttons.forEach(b => {
-      expect(b.ariaLabel).toBeTruthy();
-      expect(b.ariaLabel.length).toBeGreaterThan(0);
-    });
-
-    // Check specific labels
-    expect(buttons.find(b => b.text === 'A-').ariaLabel).toContain('Decrease');
-    expect(buttons.find(b => b.text === 'A+').ariaLabel).toContain('Increase');
+    // Now only edit button remains (font/align controls are in Quill toolbar)
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].ariaLabel).toBeTruthy();
+    expect(buttons[0].ariaLabel).toContain('edit');
+    expect(buttons[0].className).toContain('editable-button-edit');
   });
 
   test('Focus shows controls like hover does', async ({ page }) => {
@@ -1153,7 +1197,7 @@ test.describe('CSS Customization', () => {
     expect(result.className).toContain('editable-font-controls');
   });
 
-  test('Buttons have editable-button class', async ({ page }) => {
+  test('Edit button has editable-button class', async ({ page }) => {
     const htmlPath = path.join(TESTING_DIR, 'basic.html');
     await page.goto(`file://${htmlPath}`);
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
@@ -1171,10 +1215,9 @@ test.describe('CSS Customization', () => {
       }));
     });
 
-    expect(buttons.length).toBe(6);
-    buttons.forEach(b => {
-      expect(b.hasBaseClass).toBe(true);
-    });
+    // Now only edit button (font/align controls are in Quill toolbar)
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].hasBaseClass).toBe(true);
   });
 
   test('CSS custom properties are applied from stylesheet', async ({ page }) => {

@@ -276,3 +276,314 @@
 .editable-new-slide {
   min-height: 200px;
 }
+
+/* =============================================================================
+   Quill Editor Integration
+   ============================================================================= */
+
+/* Toolbar - Quill generates .ql-toolbar.ql-snow */
+.editable-container .ql-toolbar.ql-snow {
+  position: absolute !important;
+  bottom: 100% !important;
+  top: auto !important;
+  left: 0 !important;
+  margin-bottom: 35px !important; /* Space for the edit button */
+  background: #1a1a1a !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  z-index: 10000 !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid #333 !important;
+  display: flex !important;
+  width: max-content !important;
+}
+
+.quill-toolbar-container .ql-formats {
+  margin-right: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* All SVG icons - make them visible */
+.quill-toolbar-container svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.quill-toolbar-container .ql-stroke {
+  stroke: #ffffff !important;
+  stroke-width: 2 !important;
+}
+
+.quill-toolbar-container .ql-fill {
+  fill: #ffffff !important;
+}
+
+.quill-toolbar-container .ql-thin {
+  stroke-width: 1 !important;
+}
+
+.quill-toolbar-container .ql-even {
+  stroke-width: 1 !important;
+}
+
+/* Toolbar buttons */
+.quill-toolbar-container button {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.quill-toolbar-container button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.quill-toolbar-container button:hover .ql-stroke,
+.quill-toolbar-container button.ql-active .ql-stroke {
+  stroke: var(--editable-accent-color) !important;
+}
+
+.quill-toolbar-container button:hover .ql-fill,
+.quill-toolbar-container button.ql-active .ql-fill {
+  fill: var(--editable-accent-color) !important;
+}
+
+.quill-toolbar-container button.ql-active {
+  background: rgba(0, 124, 186, 0.2) !important;
+}
+
+/* Dropdown pickers (color, size, etc.) */
+.quill-toolbar-container .ql-picker {
+  color: #ffffff !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.quill-toolbar-container .ql-picker-label {
+  border: 1px solid #444 !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.quill-toolbar-container .ql-picker-label:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.quill-toolbar-container .ql-picker-label svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.quill-toolbar-container .ql-picker-label .ql-stroke {
+  stroke: #ffffff !important;
+}
+
+/* Dropdown options panel */
+.quill-toolbar-container .ql-picker-options {
+  background: #1a1a1a !important;
+  border: 1px solid #444 !important;
+  border-radius: 4px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  z-index: 10001 !important;
+}
+
+.quill-toolbar-container .ql-picker-item {
+  color: #ffffff !important;
+  padding: 4px 8px !important;
+  border-radius: 3px !important;
+}
+
+.quill-toolbar-container .ql-picker-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--editable-accent-color) !important;
+}
+
+/* Color picker specific styles */
+.quill-toolbar-container .ql-color-picker .ql-picker-label,
+.quill-toolbar-container .ql-background .ql-picker-label {
+  padding: 2px !important;
+  width: 28px !important;
+}
+
+.quill-toolbar-container .ql-color-picker .ql-picker-options,
+.quill-toolbar-container .ql-background .ql-picker-options {
+  width: auto !important;
+}
+
+.quill-toolbar-container .ql-color-picker .ql-picker-item,
+.quill-toolbar-container .ql-background .ql-picker-item {
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 3px !important;
+  margin: 2px !important;
+  padding: 0 !important;
+}
+
+/* Size picker */
+.quill-toolbar-container .ql-size .ql-picker-label {
+  width: auto !important;
+  min-width: 60px !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label::before,
+.quill-toolbar-container .ql-size .ql-picker-item::before {
+  color: #ffffff !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-item:hover::before {
+  color: var(--editable-accent-color) !important;
+}
+
+/* Make the Quill wrapper fill the container */
+.quill-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* Remove Quill's default border on container */
+.quill-wrapper .ql-container.ql-snow,
+.editable-container .ql-container.ql-snow {
+  border: none !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+}
+
+/* Style the Quill editor area - inherit all styles from parent */
+.quill-wrapper .ql-editor,
+.editable-container .ql-editor {
+  padding: 0 !important;
+  overflow: visible !important;
+  min-height: auto !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
+  color: inherit !important;
+}
+
+/* Ensure paragraphs in Quill don't add extra margins or change size */
+.quill-wrapper .ql-editor p,
+.editable-container .ql-editor p {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+}
+
+/* Quill size classes - override to use relative sizing */
+.ql-editor .ql-size-small {
+  font-size: 0.75em !important;
+}
+
+.ql-editor .ql-size-large {
+  font-size: 1.5em !important;
+}
+
+.ql-editor .ql-size-huge {
+  font-size: 2em !important;
+}
+
+/* Ensure Quill doesn't override text alignment */
+.quill-wrapper .ql-editor.ql-blank::before {
+  font-style: normal !important;
+  color: inherit !important;
+  opacity: 0.5;
+}
+
+/* Make sure bold and other formatting shows - high specificity to override reveal.js */
+.reveal .ql-editor strong,
+.reveal .ql-editor b,
+.reveal section .ql-editor strong,
+.reveal section .ql-editor b {
+  font-weight: bold !important;
+}
+
+.reveal .ql-editor em,
+.reveal .ql-editor i,
+.reveal section .ql-editor em,
+.reveal section .ql-editor i {
+  font-style: italic !important;
+}
+
+.reveal .ql-editor u,
+.reveal section .ql-editor u {
+  text-decoration: underline !important;
+}
+
+.reveal .ql-editor s,
+.reveal .ql-editor strike,
+.reveal section .ql-editor s,
+.reveal section .ql-editor strike {
+  text-decoration: line-through !important;
+}
+
+/* Ensure color spans work */
+.reveal .ql-editor span[style*="color"],
+.reveal .ql-editor span[style*="background"] {
+  /* Allow inline styles to work */
+}
+
+/* Style the editable element when in edit mode */
+.editable-container [contenteditable="true"] {
+  outline: none;
+  cursor: text;
+}
+
+/* Ensure text selection is visible */
+.editable-container [contenteditable="true"]::selection,
+.ql-editor::selection,
+.ql-editor *::selection {
+  background: var(--editable-accent-color);
+  color: white;
+}
+
+/* Color picker improvements */
+.ql-color-picker,
+.ql-icon-picker {
+  width: 28px !important;
+}
+
+.ql-color-picker .ql-picker-label,
+.ql-background .ql-picker-label {
+  padding: 2px 4px !important;
+}
+
+/* Ensure dropdowns appear above everything */
+.ql-picker-options {
+  z-index: 10001 !important;
+}
+
+/* Size dropdown styling */
+.quill-toolbar-container .ql-size .ql-picker-label::before,
+.quill-toolbar-container .ql-size .ql-picker-item::before {
+  content: 'Normal' !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label[data-value="small"]::before,
+.quill-toolbar-container .ql-size .ql-picker-item[data-value="small"]::before {
+  content: 'Small' !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label[data-value="large"]::before,
+.quill-toolbar-container .ql-size .ql-picker-item[data-value="large"]::before {
+  content: 'Large' !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label[data-value="huge"]::before,
+.quill-toolbar-container .ql-size .ql-picker-item[data-value="huge"]::before {
+  content: 'Huge' !important;
+}
