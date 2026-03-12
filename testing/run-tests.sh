@@ -350,6 +350,7 @@ echo ""
 echo "--- Toolbar Tests ---"
 check_toolbar_feature "Test 15: Toolbar feature" "basic.html"
 check_new_element_registry "Test 16: NewElementRegistry" "basic.html"
+run_render_test "Test 17: Title-only document (no ## headings)" "title-only.qmd" "inject"
 
 echo ""
 echo "--- Path Handling Tests ---"
