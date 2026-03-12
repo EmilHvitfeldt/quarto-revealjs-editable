@@ -211,7 +211,61 @@ const PropertySerializers = {
 {.absolute width=200px height=150px left=100px top=50px style="font-size: 18px;"}
 ```
 
-### 5. Undo/Redo System
+### 5. New Element Registry
+
+The New Element Registry tracks elements and slides added dynamically during a session.
+
+```javascript
+const NewElementRegistry = {
+  newDivs: [],      // Dynamically added text divs
+  newSlides: [],    // Dynamically added slides
+
+  addDiv(div, slideIndex) { },
+  addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) { },
+  countNewSlidesBefore(index) { },
+  clear() { },
+  hasNewElements() { },
+};
+```
+
+**Stored data for each new slide:**
+```javascript
+{
+  element: slideElement,        // The DOM element
+  afterSlideIndex: 0,           // Original slide index to insert after
+  insertAfterNewSlide: null,    // Parent new slide (for chained insertions)
+  insertionOrder: 0,            // Creation order for sorting
+}
+```
+
+**Tree-based ordering:** When new slides are inserted after other new slides (chained insertions), a tree structure is built using `insertAfterNewSlide` as parent references. The `flattenSlideTree()` function performs a depth-first traversal to determine correct output order, ensuring slides like A→B→C maintain their chain relationship in the saved document.
+
+New elements are marked with the `editable-new` class to distinguish them from original elements during save.
+
+### 6. Toolbar Registry
+
+The Toolbar Registry manages the floating toolbar actions.
+
+```javascript
+const ToolbarRegistry = {
+  actions: new Map(),
+
+  register(name, config) {
+    // config: { icon, label, title, onClick, className }
+  },
+
+  getActions() { },           // Get all registered actions
+  createButton(config) { },   // Create a button element
+};
+```
+
+**Registered actions:**
+- `save` - Save edits to file
+- `copy` - Copy QMD to clipboard
+- `addText` - Add new editable text to current slide
+- `addSlide` - Add new slide after current
+
+### 7. Undo/Redo System
 
 The Undo/Redo system tracks state changes and allows users to revert or replay edits.
 
@@ -269,6 +323,10 @@ State is captured at the START of actions, before changes occur:
    ├─▶ Attach event listeners
    │
    └─▶ Setup hover/focus/keyboard handlers
+   │
+4. Create floating toolbar (from ToolbarRegistry)
+   │
+5. Setup undo/redo keyboard shortcuts
 ```
 
 ### Save Flow
@@ -280,7 +338,13 @@ State is captured at the START of actions, before changes occur:
    │
    ├─▶ Read original QMD from window._input_file
    │
-   ├─▶ extractEditableEltDimensions()
+   ├─▶ insertNewSlides() - Add new slide headings at correct positions
+   │   └─▶ Uses NewElementRegistry.newSlides
+   │
+   ├─▶ insertNewDivs() - Add new text elements to their slides
+   │   └─▶ Uses NewElementRegistry.newDivs
+   │
+   ├─▶ extractEditableEltDimensions() (original elements only)
    │   └─▶ For each element: editableElt.toDimensions()
    │
    ├─▶ updateTextDivs() - Convert div innerHTML to Quarto markdown
@@ -421,6 +485,28 @@ PropertySerializers.skewX = {
 }
 ```
 
+### Adding a New Toolbar Action
+
+1. **Register the action:**
+```javascript
+ToolbarRegistry.register("myAction", {
+  icon: "🔧",
+  label: "My Action",
+  title: "Description of my action",
+  className: "toolbar-my-action",
+  onClick: () => {
+    // Action implementation
+  },
+});
+```
+
+2. **Add CSS for the button:**
+```css
+.editable-toolbar-button.toolbar-my-action {
+  background-color: #your-color;
+}
+```
+
 ### Adding a New Element Type (e.g., video)
 
 1. **Update DOM query:**
@@ -449,11 +535,21 @@ Styles use CSS custom properties for easy theming:
 
 ```css
 :root {
+  /* Element controls */
   --editable-accent-color: #007cba;
   --editable-accent-active: #28a745;
   --editable-handle-size: 10px;
   --editable-border-width: 2px;
   --editable-transition: 0.2s;
+
+  /* Floating toolbar */
+  --editable-toolbar-bg: rgba(255, 255, 255, 0.95);
+  --editable-toolbar-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  --editable-toolbar-border-radius: 8px;
+  --editable-toolbar-save-color: #007cba;
+  --editable-toolbar-copy-color: #6c757d;
+  --editable-toolbar-add-text-color: #28a745;
+  --editable-toolbar-add-slide-color: #17a2b8;
 }
 ```
 
@@ -464,6 +560,10 @@ Styles use CSS custom properties for easy theming:
 - `.handle-nw`, `.handle-ne`, `.handle-sw`, `.handle-se` - Position-specific
 - `.editable-font-controls` - Container for text controls
 - `.editable-button` - Base button class
+- `.editable-toolbar` - Floating toolbar container
+- `.editable-toolbar-button` - Toolbar action buttons
+- `.editable-new` - Marker for dynamically added elements
+- `.editable-new-slide` - Marker for dynamically added slides
 
 ---
 
@@ -473,14 +573,24 @@ Styles use CSS custom properties for easy theming:
 - Verify Quarto rendering works
 - Check content preservation (LaTeX, shortcodes, backslashes)
 - Test base64 encoding/decoding
+- Verify toolbar and registry functions exist
 
-### E2E Tests (Playwright)
+### E2E Tests (Playwright) - 139 tests across 3 spec files
+
+**save-edits.spec.js** - Core save functionality (8 tests)
+**ui-controls.spec.js** - UI elements, accessibility, CSS, undo/redo, rotation (55 tests)
+**toolbar.spec.js** - Floating toolbar, new elements, save integration, edge cases (76 tests)
+
+Key test areas:
 - UI controls exist and function
 - Drag and resize work correctly
 - Keyboard navigation
 - Accessibility attributes
 - CSS classes applied correctly
 - Undo/redo functionality
+- Floating toolbar actions
+- New element creation and tracking
+- Save integration with correct ordering (30 tests verifying element positions in saved QMD)
 
 Run tests:
 ```bash
