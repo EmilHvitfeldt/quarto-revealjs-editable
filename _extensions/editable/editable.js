@@ -887,9 +887,11 @@ ControlRegistry.register("editMode", {
   appliesTo: ["div"],
   onClick: async (element, btn) => {
     const container = element.parentNode;
-    const isEditable = element.contentEditable === "true";
 
-    if (!isEditable) {
+    // Use button's active class as the source of truth for edit state
+    const isEditing = btn.classList.contains("active");
+
+    if (!isEditing) {
       // Entering edit mode - initialize Quill
       try {
         await loadQuill();
@@ -947,14 +949,16 @@ ControlRegistry.register("editMode", {
             e.stopPropagation();
           });
 
-          quillData = { quill, toolbarContainer, editorWrapper };
+          quillData = { quill, toolbarContainer, editorWrapper, isEditing: false };
           quillInstances.set(element, quillData);
         }
 
-        // Show toolbar
+        // Show toolbar and enable editing
         if (quillData.toolbarContainer) {
-          quillData.toolbarContainer.style.display = "flex";
+          quillData.toolbarContainer.classList.add("editing");
         }
+        quillData.isEditing = true;
+        quillData.quill.enable(true);
 
         element.contentEditable = "true";
         btn.classList.add("active");
@@ -972,15 +976,20 @@ ControlRegistry.register("editMode", {
       }
     } else {
       // Exiting edit mode
+      const quillData = quillInstances.get(element);
+
+      // Hide toolbar and disable editing
+      if (quillData) {
+        if (quillData.toolbarContainer) {
+          quillData.toolbarContainer.classList.remove("editing");
+        }
+        quillData.isEditing = false;
+        quillData.quill.enable(false);
+      }
+
       element.contentEditable = "false";
       btn.classList.remove("active");
       btn.title = "Edit Text";
-
-      // Hide toolbar
-      const quillData = quillInstances.get(element);
-      if (quillData && quillData.toolbarContainer) {
-        quillData.toolbarContainer.style.display = "none";
-      }
 
       // Deselect any selected text
       window.getSelection().removeAllRanges();

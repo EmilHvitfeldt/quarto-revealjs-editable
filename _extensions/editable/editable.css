@@ -296,8 +296,18 @@
   gap: 4px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
   border: 1px solid #333 !important;
-  display: flex !important;
   width: max-content !important;
+  /* Note: display is controlled via inline style in JS, don't use !important here */
+}
+
+/* Show toolbar when editing */
+.editable-container .ql-toolbar.ql-snow.editing {
+  display: flex !important;
+}
+
+/* Hide toolbar when not editing */
+.editable-container .ql-toolbar.ql-snow:not(.editing) {
+  display: none !important;
 }
 
 .quill-toolbar-container .ql-formats {
