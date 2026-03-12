@@ -2197,19 +2197,20 @@ function htmlToQuarto(div) {
   text = text.replace(/<code[^>]*>/gi, "`");
   text = text.replace(/<\/code>/gi, "`");
 
-  // Bold: <strong> and <b>
+  // Bold: <strong> and <b> → **text**
+  // Replace opening and closing tags separately to handle nested content
   text = text.replace(/<strong[^>]*>/gi, "**");
   text = text.replace(/<\/strong>/gi, "**");
   text = text.replace(/<b[^>]*>/gi, "**");
   text = text.replace(/<\/b>/gi, "**");
 
-  // Italic: <em> and <i>
+  // Italic: <em> and <i> → *text*
   text = text.replace(/<em[^>]*>/gi, "*");
   text = text.replace(/<\/em>/gi, "*");
   text = text.replace(/<i[^>]*>/gi, "*");
   text = text.replace(/<\/i>/gi, "*");
 
-  // Strikethrough: <del> and <s> and <strike>
+  // Strikethrough: <del> and <s> and <strike> → ~~text~~
   text = text.replace(/<del[^>]*>/gi, "~~");
   text = text.replace(/<\/del>/gi, "~~");
   text = text.replace(/<s[^>]*>/gi, "~~");
@@ -2217,20 +2218,19 @@ function htmlToQuarto(div) {
   text = text.replace(/<strike[^>]*>/gi, "~~");
   text = text.replace(/<\/strike>/gi, "~~");
 
-  // Underline: <u> → Quarto span with underline class
-  text = text.replace(/<u[^>]*>([^<]*)<\/u>/gi, "[$1]{.underline}");
+  // Underline: <u> → [text]{.underline}
+  // Handle nested content by using a more flexible approach
+  text = text.replace(/<u[^>]*>/gi, "[");
+  text = text.replace(/<\/u>/gi, "]{.underline}");
 
-  // Color spans: <span style="color: rgb(...)">text</span> → [text]{style="color: ..."}
-  text = text.replace(
-    /<span[^>]*style="[^"]*color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
-    '[$2]{style="color: $1"}'
-  );
+  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
+  // Handle by replacing open/close separately, then cleaning up
+  text = text.replace(/<span[^>]*style="[^"]*color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__COLOR_START__$1__');
+  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, '$2]{style="color: $1"}');
 
-  // Background color spans: <span style="background-color: rgb(...)">text</span>
-  text = text.replace(
-    /<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
-    '[$2]{style="background-color: $1"}'
-  );
+  // Background color spans
+  text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
+  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, '$2]{style="background-color: $1"}');
 
   // Links: <a href="url">text</a> → [text](url)
   text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
