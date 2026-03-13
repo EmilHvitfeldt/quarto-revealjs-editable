@@ -8,7 +8,6 @@
   --editable-handle-border-color: #fff;
   --editable-border-width: 2px;
   --editable-transition: 0.2s;
-  --editable-font-controls-offset: -30px;
   --editable-font-controls-gap: 5px;
   --editable-button-border-radius: 3px;
   --editable-button-margin: 10px;
@@ -110,8 +109,9 @@
 /* Font controls for text divs */
 .editable-font-controls {
   position: absolute;
-  top: var(--editable-font-controls-offset);
+  bottom: 100%;
   left: 0;
+  margin-bottom: 8px;
   opacity: 0;
   transition: opacity var(--editable-transition);
   display: flex;
@@ -153,8 +153,14 @@
 
 .editable-button-edit {
   font-size: 20px;
-  padding: 4px 12px;
+  padding: 8px 16px;
   margin-left: var(--editable-button-margin);
+  height: 48px;
+  min-width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .editable-button-decrease {
@@ -292,8 +298,9 @@
   position: absolute !important;
   bottom: 100% !important;
   top: auto !important;
-  left: 0 !important;
-  margin-bottom: 35px !important; /* Space for the edit button */
+  /* Position after edit button with gap */
+  left: 70px !important;
+  margin-bottom: 8px !important;
   background: #1a1a1a !important;
   border-radius: 6px !important;
   padding: 8px 12px !important;
