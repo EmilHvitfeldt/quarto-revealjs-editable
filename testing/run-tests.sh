@@ -358,6 +358,98 @@ run_render_test "Test 14: Spaces in filename" "space in name.qmd" "inject"
 check_multiple_elements "Test 14a: Elements in spaced file" "space in name.html" 2
 
 echo ""
+echo "--- Quill Editor Tests ---"
+run_render_test "Test 18: Quill editor rendering" "quill-editor.qmd" "inject"
+
+# Check Quill integration
+check_quill_feature() {
+  local test_name="$1"
+  local html_file="$2"
+
+  echo "$test_name..."
+
+  if [ ! -f "$html_file" ]; then
+    echo "  ✗ HTML file not found"
+    FAILED=1
+    return
+  fi
+
+  local base_name="${html_file%.html}"
+  local js_path="${base_name}_files/libs/revealjs/plugin/revealeditable/editable.js"
+
+  if [ ! -f "$js_path" ]; then
+    echo "  ✗ editable.js not found"
+    FAILED=1
+    return
+  fi
+
+  # Check for Quill initialization
+  if grep -q "initializeQuillForElement" "$js_path" 2>/dev/null; then
+    echo "  ✓ initializeQuillForElement function present"
+  else
+    echo "  ✗ initializeQuillForElement function missing"
+    FAILED=1
+    return
+  fi
+
+  # Check for Quill CDN
+  if grep -q "quill@" "$js_path" 2>/dev/null; then
+    echo "  ✓ Quill CDN reference present"
+  else
+    echo "  ✗ Quill CDN reference missing"
+    FAILED=1
+    return
+  fi
+
+  # Check for color handler
+  if grep -q "getBrandColorOutput" "$js_path" 2>/dev/null; then
+    echo "  ✓ getBrandColorOutput function present"
+  else
+    echo "  ✗ getBrandColorOutput function missing"
+    FAILED=1
+  fi
+}
+
+check_quill_feature "Test 19: Quill integration" "quill-editor.html"
+
+echo ""
+echo "--- Brand Color Tests ---"
+run_render_test "Test 20: Brand colors rendering" "brand-colors.qmd" "inject"
+
+# Check brand color injection
+check_brand_colors() {
+  local test_name="$1"
+  local html_file="$2"
+
+  echo "$test_name..."
+
+  if [ ! -f "$html_file" ]; then
+    echo "  ✗ HTML file not found"
+    FAILED=1
+    return
+  fi
+
+  # Check for brand palette injection
+  if grep -q "_quarto_brand_palette" "$html_file" 2>/dev/null; then
+    echo "  ✓ Brand palette injected"
+  else
+    echo "  ✗ Brand palette not found (expected with _brand.yml)"
+    FAILED=1
+    return
+  fi
+
+  # Check for brand color names
+  if grep -q "_quarto_brand_color_names" "$html_file" 2>/dev/null; then
+    echo "  ✓ Brand color names injected"
+  else
+    echo "  ✗ Brand color names not found"
+    FAILED=1
+  fi
+}
+
+check_brand_colors "Test 21: Brand color injection" "brand-colors.html"
+
+echo ""
 if [ $FAILED -eq 0 ]; then
   echo "=== All tests passed! ==="
   exit 0

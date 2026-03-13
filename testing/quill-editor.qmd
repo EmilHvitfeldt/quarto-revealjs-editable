@@ -1,0 +1,40 @@
+---
+title: "Quill Editor Test"
+format: revealjs
+revealjs-plugins:
+  - editable
+---
+
+## Basic Text Editing
+
+::: {.editable}
+Click the edit button to test basic text editing. Type here and verify changes are saved.
+:::
+
+## Formatting Tests
+
+::: {.editable}
+Test **bold**, *italic*, [underline]{.underline}, and ~~strikethrough~~ formatting.
+:::
+
+## Color Tests
+
+::: {.editable}
+Test text color and background color. Apply colors and verify they save correctly.
+:::
+
+## Alignment Tests
+
+::: {.editable}
+Test left, center, and right alignment using the toolbar buttons.
+:::
+
+## Multiple Elements
+
+::: {.editable}
+First editable element on this slide.
+:::
+
+::: {.editable}
+Second editable element on this slide.
+:::
