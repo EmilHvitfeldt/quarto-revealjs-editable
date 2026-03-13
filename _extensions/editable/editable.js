@@ -272,12 +272,20 @@ class EditableElement {
     this.container = null;
     this.type = element.tagName.toLowerCase();
 
+    // Get dimensions - for images, use naturalWidth/naturalHeight if offset values are 0
+    let width = element.offsetWidth;
+    let height = element.offsetHeight;
+    if (this.type === "img" && (width === 0 || height === 0)) {
+      width = element.naturalWidth || width;
+      height = element.naturalHeight || height;
+    }
+
     // Initialize state from current element
     this.state = {
       x: 0,
       y: 0,
-      width: element.offsetWidth,
-      height: element.offsetHeight,
+      width: width,
+      height: height,
       rotation: 0,
       // Div-specific properties
       fontSize: null,
@@ -1637,7 +1645,15 @@ window.Revealeditable = function () {
         await Promise.all(editableDivs.map(initializeQuillForElement));
 
         // Now set up draggable elements
-        editableElements.forEach(setupDraggableElt);
+        editableElements.forEach((elt) => {
+          // For images, wait until loaded before setup
+          if (elt.tagName.toLowerCase() === "img") {
+            setupImageWhenReady(elt);
+          } else {
+            // Non-image elements can be set up immediately
+            setupDraggableElt(elt);
+          }
+        });
         addSaveMenuButton();
         createFloatingToolbar();
         setupUndoRedoKeyboard();
@@ -1645,6 +1661,44 @@ window.Revealeditable = function () {
     },
   };
 };
+
+// Helper to set up an image once it has valid dimensions
+function setupImageWhenReady(img) {
+  // Check if image already has valid dimensions
+  if (img.complete && img.naturalWidth > 0 && img.offsetWidth > 0) {
+    setupDraggableElt(img);
+    return;
+  }
+
+  // For data-src images, Reveal.js sets src lazily
+  // We need to handle: load event, and polling as fallback
+  let setupDone = false;
+
+  const doSetup = () => {
+    if (setupDone) return;
+    if (img.naturalWidth > 0 && img.offsetWidth > 0) {
+      setupDone = true;
+      setupDraggableElt(img);
+    }
+  };
+
+  // Listen for load event
+  img.addEventListener("load", doSetup, { once: true });
+
+  // Also poll periodically as fallback (for edge cases with data-src)
+  let attempts = 0;
+  const maxAttempts = 50; // 5 seconds max
+  const poll = () => {
+    if (setupDone || attempts >= maxAttempts) return;
+    attempts++;
+    if (img.naturalWidth > 0 && img.offsetWidth > 0) {
+      doSetup();
+    } else {
+      setTimeout(poll, 100);
+    }
+  };
+  poll();
+}
 
 // =============================================================================
 // Menu Button Setup
@@ -1788,8 +1842,17 @@ function setupDraggableElt(elt) {
   function setupEltStyles(elt) {
     elt.style.cursor = "move";
     elt.style.position = "relative";
-    elt.style.width = elt.offsetWidth + "px";
-    elt.style.height = elt.offsetHeight + "px";
+
+    // For images, use naturalWidth/naturalHeight if offsetWidth/offsetHeight are 0
+    let width = elt.offsetWidth;
+    let height = elt.offsetHeight;
+    if (elt.tagName.toLowerCase() === "img" && (width === 0 || height === 0)) {
+      width = elt.naturalWidth || width;
+      height = elt.naturalHeight || height;
+    }
+
+    elt.style.width = width + "px";
+    elt.style.height = height + "px";
     elt.style.display = "block";
   }
 
