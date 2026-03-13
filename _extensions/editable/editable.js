@@ -1644,13 +1644,14 @@ window.Revealeditable = function () {
         );
         await Promise.all(editableDivs.map(initializeQuillForElement));
 
-        // Now set up draggable elements
+        // Now set up draggable elements, waiting for proper dimensions
         editableElements.forEach((elt) => {
-          // For images, wait until loaded before setup
-          if (elt.tagName.toLowerCase() === "img") {
+          const tagName = elt.tagName.toLowerCase();
+          if (tagName === "img") {
             setupImageWhenReady(elt);
+          } else if (tagName === "div") {
+            setupDivWhenReady(elt);
           } else {
-            // Non-image elements can be set up immediately
             setupDraggableElt(elt);
           }
         });
@@ -1698,6 +1699,41 @@ function setupImageWhenReady(img) {
     }
   };
   poll();
+}
+
+// Helper to set up a div once it has valid dimensions
+function setupDivWhenReady(div) {
+  // Check if div already has valid dimensions
+  if (div.offsetWidth >= CONFIG.MIN_ELEMENT_SIZE && div.offsetHeight >= CONFIG.MIN_ELEMENT_SIZE) {
+    setupDraggableElt(div);
+    return;
+  }
+
+  // Wait for layout to complete using requestAnimationFrame + polling
+  let setupDone = false;
+  let attempts = 0;
+  const maxAttempts = 50; // 5 seconds max
+
+  const checkAndSetup = () => {
+    if (setupDone || attempts >= maxAttempts) return;
+    attempts++;
+
+    if (div.offsetWidth >= CONFIG.MIN_ELEMENT_SIZE && div.offsetHeight >= CONFIG.MIN_ELEMENT_SIZE) {
+      setupDone = true;
+      setupDraggableElt(div);
+    } else {
+      // Use requestAnimationFrame for the first few attempts (layout timing)
+      // then fall back to setTimeout for longer waits
+      if (attempts < 10) {
+        requestAnimationFrame(checkAndSetup);
+      } else {
+        setTimeout(checkAndSetup, 100);
+      }
+    }
+  };
+
+  // Start checking after next frame (gives CSS time to apply)
+  requestAnimationFrame(checkAndSetup);
 }
 
 // =============================================================================
