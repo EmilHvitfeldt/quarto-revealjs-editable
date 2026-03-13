@@ -49,6 +49,73 @@ local function has_editable_elements(doc)
   return found
 end
 
+-- Extract brand palette colors by reading _brand.yml directly
+-- Returns two values: array of hex colors, and table mapping hex -> name
+local function get_brand_palette_colors()
+  local colors = {}
+  local color_names = {}
+
+  -- Try to find and read _brand.yml in the same directory as the input file
+  local input_file = quarto.doc.input_file
+  local input_dir = input_file:match("(.*/)")
+  if not input_dir then input_dir = "./" end
+
+  local brand_paths = {
+    input_dir .. "_brand.yml",
+    input_dir .. "_brand.yaml",
+    "./_brand.yml",
+    "./_brand.yaml"
+  }
+
+  local brand_content = nil
+  for _, path in ipairs(brand_paths) do
+    local f = io.open(path, "r")
+    if f then
+      brand_content = f:read("*a")
+      f:close()
+      break
+    end
+  end
+
+  if not brand_content then return colors, color_names end
+
+  -- Simple YAML parsing for color palette
+  -- Look for lines under color: palette: that have hex colors
+  local in_color_section = false
+  local in_palette_section = false
+
+  for line in brand_content:gmatch("[^\r\n]+") do
+    -- Check for color: section
+    if line:match("^color:") then
+      in_color_section = true
+      in_palette_section = false
+    elseif line:match("^%S") and not line:match("^color:") then
+      -- New top-level section, exit color section
+      in_color_section = false
+      in_palette_section = false
+    elseif in_color_section and line:match("^%s+palette:") then
+      in_palette_section = true
+    elseif in_color_section and line:match("^%s+%S") and not line:match("^%s+palette:") and in_palette_section then
+      -- Check if this is still in palette (same or deeper indent) or new section
+      local indent = line:match("^(%s+)")
+      if indent and #indent <= 2 then
+        in_palette_section = false
+      end
+    end
+
+    -- Extract color name and hex value from palette entries
+    if in_palette_section then
+      local name, hex = line:match("^%s+(%w+):%s*[\"']?(#%x%x%x%x%x%x)[\"']?")
+      if name and hex then
+        table.insert(colors, hex)
+        color_names[hex:lower()] = name
+      end
+    end
+  end
+
+  return colors, color_names
+end
+
 function Pandoc(doc)
   -- No editable elements found: skip injection entirely.
   -- This keeps the generated HTML clean after a save (when all {.editable}
@@ -73,6 +140,28 @@ function Pandoc(doc)
   script = script .. "  Uint8Array.from(atob('" .. encoded .. "'), function(c) { return c.charCodeAt(0); })\n"
   script = script .. ");\n"
   script = script .. "window._input_filename = '" .. escaped_filename .. "';\n"
+
+  -- Inject brand palette colors if available
+  local brand_colors, color_names = get_brand_palette_colors()
+  if #brand_colors > 0 then
+    script = script .. "window._quarto_brand_palette = ["
+    for i, color in ipairs(brand_colors) do
+      if i > 1 then script = script .. "," end
+      script = script .. "'" .. color .. "'"
+    end
+    script = script .. "];\n"
+
+    -- Also inject the color name mapping (hex -> name)
+    script = script .. "window._quarto_brand_color_names = {"
+    local first = true
+    for hex, name in pairs(color_names) do
+      if not first then script = script .. "," end
+      first = false
+      script = script .. "'" .. hex .. "':'" .. name .. "'"
+    end
+    script = script .. "};\n"
+  end
+
   script = script .. "</script>"
 
   quarto.doc.include_text("in-header", script)

@@ -6,6 +6,19 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Added
 
+- **Quill Rich Text Editor** - Replaced basic contentEditable with full-featured Quill editor
+  - Bold, italic, underline, strikethrough formatting
+  - Text color and background color with color picker
+  - Text alignment (left, center, right)
+  - Formatting saved as Quarto markdown syntax
+- **Color Picker** - New color selection interface
+  - 18 preset color swatches
+  - "Unset" option to remove color formatting
+  - "Custom..." option for full color spectrum via native picker
+- **Brand Color Support** - Automatically uses colors from `_brand.yml` palette
+  - Detects `color.palette` in `_brand.yml`
+  - Shows brand colors in picker instead of defaults
+  - Saves brand colors as `{{< brand color name >}}` shortcodes
 - **Floating toolbar** with quick access to common actions
   - Draggable toolbar on the right side of slides
   - Save button (💾) to download edited QMD
@@ -24,6 +37,12 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Fixed
 
+- **Unedited content preserved** - Divs that aren't modified keep their original content (preserves LaTeX, shortcodes, etc.)
+- **Text shifting** when entering edit mode fixed (Quill initialized at page load)
+- **Drag handler** no longer blocks text editing in edit mode
+- **Strikethrough regex** no longer incorrectly matches `<span>` tags
+- **Background-color** no longer saved as color
+- **Shortcodes** no longer stripped by HTML cleanup
 - **Standalone `:::` in user text content** no longer breaks document structure
   - Uses longer fences (`::::` or more) when content contains `:::`
 - **`::: {.editable}` in user text content** no longer gets incorrectly replaced
@@ -33,6 +52,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Changed
 
+- Color style attributes now use single quotes for shortcode compatibility
 - Save flow now processes new elements alongside original elements
 - `replaceEditableOccurrences` uses context-aware matching to avoid false positives
 

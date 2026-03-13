@@ -20,7 +20,243 @@ const CONFIG = {
   NEW_TEXT_WIDTH: 200,
   NEW_TEXT_HEIGHT: 50,
   NEW_SLIDE_HEADING: "## New Slide",
+
+  // Quill Editor CDN
+  QUILL_CSS:
+    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
+  QUILL_JS:
+    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js",
 };
+
+// =============================================================================
+// Quill Editor Loader
+// =============================================================================
+
+let quillLoaded = false;
+let quillLoading = null;
+
+function loadQuill() {
+  if (quillLoaded) {
+    return Promise.resolve();
+  }
+  if (quillLoading) {
+    return quillLoading;
+  }
+
+  quillLoading = new Promise((resolve, reject) => {
+    // Load CSS
+    const cssLink = document.createElement("link");
+    cssLink.rel = "stylesheet";
+    cssLink.href = CONFIG.QUILL_CSS;
+    document.head.appendChild(cssLink);
+
+    // Load JS
+    const script = document.createElement("script");
+    script.src = CONFIG.QUILL_JS;
+    script.onload = () => {
+      quillLoaded = true;
+      resolve();
+    };
+    script.onerror = () => {
+      reject(new Error("Failed to load Quill"));
+    };
+    document.head.appendChild(script);
+  });
+
+  return quillLoading;
+}
+
+// Store Quill instances per element
+const quillInstances = new Map();
+
+// Default color palette for the color pickers
+const DEFAULT_COLOR_PALETTE = [
+  "#000000", "#434343", "#666666", "#999999", "#cccccc", "#ffffff",
+  "#e60000", "#ff9900", "#ffff00", "#008a00", "#0066cc", "#9933ff",
+  "#ff99cc", "#ffcc99", "#ffff99", "#99ff99", "#99ccff", "#cc99ff",
+];
+
+// Get color palette - uses brand colors if available, otherwise defaults
+function getColorPalette() {
+  // Check if brand palette colors were injected by Quarto
+  if (window._quarto_brand_palette && Array.isArray(window._quarto_brand_palette) && window._quarto_brand_palette.length > 0) {
+    return window._quarto_brand_palette;
+  }
+  return DEFAULT_COLOR_PALETTE;
+}
+
+// Convert RGB color string to hex format
+function rgbToHex(rgb) {
+  // Match rgb(r, g, b) or rgba(r, g, b, a)
+  const match = rgb.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!match) return null;
+
+  const r = parseInt(match[1], 10);
+  const g = parseInt(match[2], 10);
+  const b = parseInt(match[3], 10);
+
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+// Convert a color value to brand shortcode if it's a brand color, otherwise return as-is
+// Uses placeholder to avoid being stripped by HTML cleanup regex
+function getBrandColorOutput(colorVal) {
+  if (!window._quarto_brand_color_names) {
+    return colorVal;
+  }
+
+  // Normalize the color value
+  let normalizedColor = colorVal.toLowerCase().trim();
+
+  // Convert RGB to hex if needed
+  if (normalizedColor.startsWith('rgb')) {
+    const hexColor = rgbToHex(normalizedColor);
+    if (hexColor) {
+      normalizedColor = hexColor.toLowerCase();
+    }
+  }
+
+  // Check if this color has a brand name
+  const brandName = window._quarto_brand_color_names[normalizedColor];
+  if (brandName) {
+    // Use placeholder that won't be stripped by HTML cleanup
+    return `__BRAND_SHORTCODE_${brandName}__`;
+  }
+
+  // Return original value (not converted) to preserve format
+  return colorVal;
+}
+
+// Initialize Quill for an editable div element (called at page load)
+async function initializeQuillForElement(element) {
+  // Only for div elements
+  if (element.tagName.toLowerCase() !== "div") return null;
+
+  // Skip if already initialized
+  if (quillInstances.has(element)) return quillInstances.get(element);
+
+  try {
+    await loadQuill();
+
+    // Store original content before any DOM changes
+    const originalContent = element.innerHTML;
+
+    // Clear and set up structure for Quill
+    element.innerHTML = "";
+
+    // Get colors - brand palette if available, otherwise defaults
+    const presetColors = getColorPalette();
+
+    // Build color options HTML
+    const colorOptions = presetColors.map(c => `<option value="${c}"></option>`).join("");
+    const colorOptionsWithExtras = `<option value="unset"></option>` + colorOptions + `<option value="custom">⋯</option>`;
+
+    // Create toolbar container
+    const toolbarContainer = document.createElement("div");
+    toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
+    toolbarContainer.innerHTML = `
+      <button class="ql-bold">B</button>
+      <button class="ql-italic">I</button>
+      <button class="ql-underline">U</button>
+      <button class="ql-strike">S</button>
+      <select class="ql-color">${colorOptionsWithExtras}</select>
+      <select class="ql-background">${colorOptionsWithExtras}</select>
+      <button class="ql-align" value=""></button>
+      <button class="ql-align" value="center"></button>
+      <button class="ql-align" value="right"></button>
+    `;
+    element.appendChild(toolbarContainer);
+
+    // Create hidden color picker inputs for custom colors
+    const textColorPicker = document.createElement("input");
+    textColorPicker.type = "color";
+    textColorPicker.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;";
+    element.appendChild(textColorPicker);
+
+    const bgColorPicker = document.createElement("input");
+    bgColorPicker.type = "color";
+    bgColorPicker.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;";
+    element.appendChild(bgColorPicker);
+
+    // Create editor container
+    const editorWrapper = document.createElement("div");
+    editorWrapper.className = "quill-wrapper";
+    editorWrapper.innerHTML = originalContent;
+    element.appendChild(editorWrapper);
+
+    // Custom color handler factory
+    function createColorHandler(picker, formatName) {
+      return function(value) {
+        if (value === "unset") {
+          // Remove the color formatting
+          this.quill.format(formatName, false);
+        } else if (value === "custom") {
+          // Save current selection
+          const range = this.quill.getSelection();
+          picker.click();
+          picker.onchange = () => {
+            if (range) {
+              this.quill.setSelection(range);
+            }
+            this.quill.format(formatName, picker.value);
+          };
+        } else {
+          this.quill.format(formatName, value);
+        }
+      };
+    }
+
+    // Initialize Quill with the toolbar and custom handlers
+    const quill = new Quill(editorWrapper, {
+      theme: "snow",
+      modules: {
+        toolbar: {
+          container: "#" + toolbarContainer.id,
+          handlers: {
+            color: createColorHandler(textColorPicker, "color"),
+            background: createColorHandler(bgColorPicker, "background"),
+          },
+        },
+      },
+      placeholder: "",
+    });
+
+    // Style the toolbar
+    toolbarContainer.className = "quill-toolbar-container ql-toolbar ql-snow";
+
+    // CRITICAL: Prevent toolbar buttons from stealing focus and losing selection
+    toolbarContainer.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    // Start with editing disabled and toolbar hidden
+    quill.enable(false);
+    // Toolbar starts without 'editing' class, so CSS hides it
+
+    // Track original content and whether it was modified
+    const quillData = {
+      quill,
+      toolbarContainer,
+      editorWrapper,
+      isEditing: false,
+      originalContent: originalContent,  // Preserve for unedited divs
+      isDirty: false,  // Track if content was modified
+    };
+
+    // Mark as dirty when content changes (any source - user or API)
+    quill.on('text-change', () => {
+      quillData.isDirty = true;
+    });
+
+    quillInstances.set(element, quillData);
+
+    return quillData;
+  } catch (err) {
+    console.error("Failed to initialize Quill for element:", err);
+    return null;
+  }
+}
 
 // =============================================================================
 // Element State Management
@@ -296,9 +532,15 @@ const Capabilities = {
       const { element, container } = context;
 
       const startDrag = (e) => {
-        // Don't start drag if element is in edit mode (contentEditable)
+        // Don't start drag if element is in edit mode
         if (element.contentEditable === "true") return;
+        // Check if Quill editor is in edit mode
+        const quillData = quillInstances.get(element);
+        if (quillData && quillData.isEditing) return;
         if (e.target.classList.contains("resize-handle")) return;
+        // Don't start drag if clicking on Quill toolbar
+        if (e.target.closest(".ql-toolbar") || e.target.closest(".quill-toolbar-container")) return;
+        if (e.target.closest(".ql-picker") || e.target.classList.contains("ql-picker-item")) return;
 
         // Capture state for undo before starting drag
         pushUndoState();
@@ -535,7 +777,8 @@ const Capabilities = {
     },
   },
 
-  // Font controls capability - font size and alignment (div only)
+  // Font controls capability - now just creates the container for edit button
+  // All formatting (font size, alignment, colors) is handled by Quill toolbar
   fontControls: {
     name: "fontControls",
 
@@ -544,23 +787,11 @@ const Capabilities = {
     },
 
     createControls(context) {
-      const { container, element } = context;
-      const elementType = element.tagName.toLowerCase();
+      const { container } = context;
 
-      // Create font controls container
+      // Create font controls container (holds only the edit button now)
       const fontControls = document.createElement("div");
       fontControls.className = "editable-font-controls";
-
-      // Get controls from registry for this element type
-      const controlNames = ["decreaseFont", "increaseFont", "alignLeft", "alignCenter", "alignRight"];
-      controlNames.forEach((name) => {
-        const config = ControlRegistry.controls.get(name);
-        if (config && config.appliesTo.includes(elementType)) {
-          const btn = ControlRegistry.createButton(config, element);
-          fontControls.appendChild(btn);
-        }
-      });
-
       container.appendChild(fontControls);
       return fontControls;
     },
@@ -843,16 +1074,46 @@ ControlRegistry.register("alignRight", {
 ControlRegistry.register("editMode", {
   icon: "✎",
   ariaLabel: "Toggle edit mode",
-  title: "Toggle Edit Mode",
+  title: "Edit Text",
   className: "editable-button-edit",
   appliesTo: ["div"],
   onClick: (element, btn) => {
-    const isEditable = element.contentEditable === "true";
-    element.contentEditable = !isEditable;
-    btn.classList.toggle("active", !isEditable);
-    btn.title = !isEditable ? "Exit Edit Mode" : "Toggle Edit Mode";
-    if (!isEditable) {
-      element.focus();
+    // Use button's active class as the source of truth for edit state
+    const isEditing = btn.classList.contains("active");
+
+    // Quill should already be initialized at page load
+    const quillData = quillInstances.get(element);
+
+    if (!isEditing) {
+      // Entering edit mode
+      if (quillData) {
+        // Show toolbar and enable editing
+        if (quillData.toolbarContainer) {
+          quillData.toolbarContainer.classList.add("editing");
+        }
+        quillData.isEditing = true;
+        quillData.quill.enable(true);
+        quillData.quill.focus();
+      }
+
+      btn.classList.add("active");
+      btn.title = "Exit Edit Mode";
+    } else {
+      // Exiting edit mode
+      if (quillData) {
+        // Hide toolbar and disable editing
+        if (quillData.toolbarContainer) {
+          quillData.toolbarContainer.classList.remove("editing");
+        }
+        quillData.isEditing = false;
+        quillData.quill.enable(false);
+      }
+
+      btn.classList.remove("active");
+      btn.title = "Edit Text";
+
+      // Deselect any selected text
+      window.getSelection().removeAllRanges();
     }
   },
 });
@@ -1127,7 +1388,7 @@ function getCurrentSlide() {
 // New Element Creation
 // =============================================================================
 
-function addNewTextElement() {
+async function addNewTextElement() {
   const currentSlide = getCurrentSlide();
   if (!currentSlide) {
     console.warn("No current slide found");
@@ -1143,6 +1404,9 @@ function addNewTextElement() {
 
   // Insert into current slide
   currentSlide.appendChild(newDiv);
+
+  // Initialize Quill for the new element before setting up draggable
+  await initializeQuillForElement(newDiv);
 
   // Setup as editable element (registers with editableRegistry)
   setupDraggableElt(newDiv);
@@ -1362,8 +1626,17 @@ window.Revealeditable = function () {
   return {
     id: "Revealeditable",
     init: function (deck) {
-      deck.on("ready", function () {
+      deck.on("ready", async function () {
         const editableElements = getEditableElements();
+
+        // First initialize Quill for all div elements (before setting up draggable)
+        // This ensures DOM structure is stable before any interaction
+        const editableDivs = Array.from(editableElements).filter(
+          (el) => el.tagName.toLowerCase() === "div"
+        );
+        await Promise.all(editableDivs.map(initializeQuillForElement));
+
+        // Now set up draggable elements
         editableElements.forEach(setupDraggableElt);
         addSaveMenuButton();
         createFloatingToolbar();
@@ -1761,7 +2034,9 @@ function getFenceForContent(content) {
 
 // Convert element innerHTML to plain text with proper newlines
 function elementToText(element) {
-  let text = element.innerHTML;
+  // If Quill was used, get content from .ql-editor
+  const quillEditor = element.querySelector(".ql-editor");
+  let text = quillEditor ? quillEditor.innerHTML : element.innerHTML;
 
   // Convert HTML tags to plain text equivalents
   text = text.replace(/<br\s*\/?>/gi, "\n");
@@ -2044,32 +2319,126 @@ function updateTextDivs(text) {
 
   // Match fenced divs with 3+ colons: ::: {.editable...} ... :::
   // The closing fence must have the same number of colons as the opening
-  const regex = /^(:{3,}) ?(?:\{\.editable[^}]*\}|editable)\n[\s\S]*?\n\1$/gm;
+  // Capture: (1) opening fence, (2) content between fences
+  const regex = /^(:{3,}) ?(?:\{\.editable[^}]*\}|editable)\n([\s\S]*?)\n\1$/gm;
 
   let index = 0;
-  return text.replace(regex, () => {
-    return replacements[index++] || "";
+  return text.replace(regex, (match, fence, originalContent) => {
+    const replacement = replacements[index++];
+    // If null, div wasn't edited - keep original content but use standard fence format
+    // so that replaceEditableOccurrences can still add positioning attributes
+    if (replacement === null) {
+      const contentFence = getFenceForContent(originalContent);
+      return `${contentFence} {.editable}\n${originalContent}\n${contentFence}`;
+    }
+    return replacement || "";
   });
 }
 
 function htmlToQuarto(div) {
-  let text = div.innerHTML.trim();
+  // Check if this div was edited - if not, return null to signal "keep original"
+  const quillData = quillInstances.get(div);
+  if (quillData && !quillData.isDirty) {
+    // Content wasn't modified - return null so updateTextDivs keeps original source
+    return null;
+  }
+
+  // If Quill was used, get content from .ql-editor
+  const quillEditor = div.querySelector(".ql-editor");
+  let text = quillEditor ? quillEditor.innerHTML.trim() : div.innerHTML.trim();
 
   // Convert HTML tags to Quarto/Markdown equivalents
   text = text.replace(/<br\s*\/?>/gi, "\n");
+
+  // Handle Quill alignment classes on paragraphs using placeholder approach
+  // <p class="ql-align-center">...</p> → fenced div with style
+  text = text.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
+    (match, align) => `__ALIGN_START_${align}__`);
+  // Convert closing </p> after alignment start
+  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
+    (match, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__\n\n`);
+
+  // Handle remaining p tags (left-aligned or no alignment)
   text = text.replace(/<p[^>]*>/gi, "");
   text = text.replace(/<\/p>/gi, "\n\n");
   text = text.replace(/<code[^>]*>/gi, "`");
   text = text.replace(/<\/code>/gi, "`");
+
+  // Bold: <strong> and <b> → **text**
+  // Replace opening and closing tags separately to handle nested content
   text = text.replace(/<strong[^>]*>/gi, "**");
   text = text.replace(/<\/strong>/gi, "**");
+  text = text.replace(/<b[^>]*>/gi, "**");
+  text = text.replace(/<\/b>/gi, "**");
+
+  // Italic: <em> and <i> → *text*
   text = text.replace(/<em[^>]*>/gi, "*");
   text = text.replace(/<\/em>/gi, "*");
+  text = text.replace(/<i[^>]*>/gi, "*");
+  text = text.replace(/<\/i>/gi, "*");
+
+  // Strikethrough: <del> and <s> and <strike> → ~~text~~
+  // Note: <s> regex must not match <span> or <strike>, use negative lookahead
   text = text.replace(/<del[^>]*>/gi, "~~");
   text = text.replace(/<\/del>/gi, "~~");
+  text = text.replace(/<s(?![a-z])[^>]*>/gi, "~~");
+  text = text.replace(/<\/s(?![a-z])>/gi, "~~");
+  text = text.replace(/<strike[^>]*>/gi, "~~");
+  text = text.replace(/<\/strike>/gi, "~~");
+
+  // Underline: <u> → [text]{.underline}
+  // Handle nested content by using a more flexible approach
+  text = text.replace(/<u[^>]*>/gi, "[");
+  text = text.replace(/<\/u>/gi, "]{.underline}");
+
+  // Background color spans (must be processed BEFORE color to avoid false matches)
+  text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
+  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
+    const colorOutput = getBrandColorOutput(colorVal);
+    return `${content}]{style='background-color: ${colorOutput}'}`;
+  });
+
+  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
+  // Use negative lookbehind to not match background-color
+  // Skip "inherit" colors (used by MathJax) as they don't represent actual formatting
+  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match, colorVal) => {
+    if (colorVal.trim().toLowerCase() === 'inherit') {
+      return ''; // Strip the span, don't create color formatting
+    }
+    return `[__COLOR_START__${colorVal}__`;
+  });
+  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
+    const colorOutput = getBrandColorOutput(colorVal);
+    return `${content}]{style='color: ${colorOutput}'}`;
+  });
+
+  // Links: <a href="url">text</a> → [text](url)
+  text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
+
+  // Remove any remaining HTML tags (cleanup)
+  text = text.replace(/<[^>]+>/g, "");
+
+  // Decode HTML entities
+  text = text.replace(/&lt;/g, "<");
+  text = text.replace(/&gt;/g, ">");
+  text = text.replace(/&amp;/g, "&");
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&nbsp;/g, " ");
 
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");
+
+  // Convert brand color placeholders back to shortcodes
+  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
+
+  // Convert alignment placeholders to fenced div syntax
+  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
+    (match, align, content) => {
+      const trimmed = content.trim();
+      const innerFence = getFenceForContent(trimmed);
+      return `${innerFence} {style="text-align: ${align}"}\n${trimmed}\n${innerFence}`;
+    });
 
   // Use appropriate fence length for content
   const fence = getFenceForContent(text);
@@ -2078,19 +2447,19 @@ function htmlToQuarto(div) {
 
 function replaceEditableOccurrences(text, replacements) {
   // Only replace {.editable} in valid contexts:
-  // 1. After "::: " at start of line (div syntax)
+  // 1. After ":::+ " at start of line (div syntax with 3+ colons)
   // 2. After ")" in image syntax like ![](image.png){.editable}
   // This prevents replacing {.editable} that appears in user text content
 
   // Use a single regex that matches both valid contexts in document order
   // This ensures replacements are applied in the correct sequence
-  const regex = /(?:^::: |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
+  const regex = /(?:^(:{3,}) |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
 
   let index = 0;
-  return text.replace(regex, (match) => {
-    // Preserve the prefix ("::: " or nothing for image syntax)
-    const isDiv = match.startsWith('::: ');
-    const prefix = isDiv ? '::: ' : '';
+  return text.replace(regex, (match, fenceColons) => {
+    // Preserve the prefix (fence colons + space, or nothing for image syntax)
+    const isDiv = fenceColons !== undefined;
+    const prefix = isDiv ? fenceColons + ' ' : '';
     return prefix + (replacements[index++] || "");
   });
 }

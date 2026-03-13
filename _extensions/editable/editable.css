@@ -8,7 +8,6 @@
   --editable-handle-border-color: #fff;
   --editable-border-width: 2px;
   --editable-transition: 0.2s;
-  --editable-font-controls-offset: -30px;
   --editable-font-controls-gap: 5px;
   --editable-button-border-radius: 3px;
   --editable-button-margin: 10px;
@@ -110,8 +109,9 @@
 /* Font controls for text divs */
 .editable-font-controls {
   position: absolute;
-  top: var(--editable-font-controls-offset);
+  bottom: 100%;
   left: 0;
+  margin-bottom: 8px;
   opacity: 0;
   transition: opacity var(--editable-transition);
   display: flex;
@@ -153,8 +153,14 @@
 
 .editable-button-edit {
   font-size: 20px;
-  padding: 4px 12px;
+  padding: 8px 16px;
   margin-left: var(--editable-button-margin);
+  height: 48px;
+  min-width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .editable-button-decrease {
@@ -275,4 +281,428 @@
 
 .editable-new-slide {
   min-height: 200px;
+}
+
+/* =============================================================================
+   Quill Editor Integration
+   ============================================================================= */
+
+/* Ensure text doesn't shift when entering edit mode */
+.editable-container > div.editable,
+.editable-container > .editable {
+  position: relative !important;
+}
+
+/* Toolbar - Quill generates .ql-toolbar.ql-snow */
+.editable-container .ql-toolbar.ql-snow {
+  position: absolute !important;
+  bottom: 100% !important;
+  top: auto !important;
+  /* Position after edit button with gap */
+  left: 70px !important;
+  margin-bottom: 8px !important;
+  background: #1a1a1a !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  z-index: 10000 !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid #333 !important;
+  width: max-content !important;
+  /* Note: display is controlled via inline style in JS, don't use !important here */
+}
+
+/* Show toolbar when editing */
+.editable-container .ql-toolbar.ql-snow.editing {
+  display: flex !important;
+}
+
+/* Hide toolbar when not editing */
+.editable-container .ql-toolbar.ql-snow:not(.editing) {
+  display: none !important;
+}
+
+.quill-toolbar-container .ql-formats {
+  margin-right: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* All SVG icons - make them visible */
+.quill-toolbar-container svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.quill-toolbar-container .ql-stroke {
+  stroke: #ffffff !important;
+  stroke-width: 2 !important;
+}
+
+.quill-toolbar-container .ql-fill {
+  fill: #ffffff !important;
+}
+
+.quill-toolbar-container .ql-thin {
+  stroke-width: 1 !important;
+}
+
+.quill-toolbar-container .ql-even {
+  stroke-width: 1 !important;
+}
+
+/* Toolbar buttons */
+.quill-toolbar-container button {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.quill-toolbar-container button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.quill-toolbar-container button:hover .ql-stroke,
+.quill-toolbar-container button.ql-active .ql-stroke {
+  stroke: var(--editable-accent-color) !important;
+}
+
+.quill-toolbar-container button:hover .ql-fill,
+.quill-toolbar-container button.ql-active .ql-fill {
+  fill: var(--editable-accent-color) !important;
+}
+
+.quill-toolbar-container button.ql-active {
+  background: rgba(0, 124, 186, 0.2) !important;
+}
+
+/* Dropdown pickers (color, size, etc.) */
+.quill-toolbar-container .ql-picker {
+  color: #ffffff !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.quill-toolbar-container .ql-picker-label {
+  border: 1px solid #444 !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.quill-toolbar-container .ql-picker-label:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.quill-toolbar-container .ql-picker-label svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.quill-toolbar-container .ql-picker-label .ql-stroke {
+  stroke: #ffffff !important;
+}
+
+/* Dropdown options panel */
+.quill-toolbar-container .ql-picker-options {
+  background: #1a1a1a !important;
+  border: 1px solid #444 !important;
+  border-radius: 4px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  z-index: 10001 !important;
+}
+
+.quill-toolbar-container .ql-picker-item {
+  color: #ffffff !important;
+  padding: 4px 8px !important;
+  border-radius: 3px !important;
+}
+
+.quill-toolbar-container .ql-picker-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--editable-accent-color) !important;
+}
+
+/* Color picker specific styles */
+.quill-toolbar-container .ql-color-picker .ql-picker-label,
+.quill-toolbar-container .ql-background .ql-picker-label {
+  padding: 2px !important;
+  width: 28px !important;
+}
+
+.quill-toolbar-container .ql-color-picker .ql-picker-options,
+.quill-toolbar-container .ql-background .ql-picker-options {
+  width: auto !important;
+  min-width: 130px !important;
+  max-width: 200px !important;
+  flex-wrap: wrap !important;
+  padding: 6px !important;
+}
+
+/* Only show as flex when expanded */
+.quill-toolbar-container .ql-color-picker.ql-expanded .ql-picker-options,
+.quill-toolbar-container .ql-background.ql-expanded .ql-picker-options {
+  display: flex !important;
+}
+
+.quill-toolbar-container .ql-color-picker .ql-picker-item,
+.quill-toolbar-container .ql-background .ql-picker-item {
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 3px !important;
+  margin: 2px !important;
+  padding: 0 !important;
+}
+
+/* Unset color option */
+.quill-toolbar-container .ql-picker-item[data-value="unset"] {
+  width: 100% !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  margin-bottom: 4px !important;
+  border-bottom: 1px solid #444 !important;
+  background: repeating-linear-gradient(
+    45deg,
+    #444,
+    #444 4px,
+    #333 4px,
+    #333 8px
+  ) !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="unset"]::before {
+  content: "Unset" !important;
+  color: #fff !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="unset"]:hover {
+  filter: brightness(1.2) !important;
+}
+
+/* Custom color picker option */
+.quill-toolbar-container .ql-picker-item[data-value="custom"] {
+  width: 100% !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  margin-top: 4px !important;
+  border-top: 1px solid #444 !important;
+  background: linear-gradient(to right,
+    #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #8000ff, #ff0080
+  ) !important;
+  color: #000 !important;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff !important;
+  font-size: 12px !important;
+  text-align: center !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="custom"]::before {
+  content: "Custom..." !important;
+  color: #fff !important;
+  text-shadow: 0 0 3px #000, 0 0 3px #000 !important;
+}
+
+.quill-toolbar-container .ql-picker-item[data-value="custom"]:hover {
+  filter: brightness(1.2) !important;
+}
+
+/* Size picker */
+.quill-toolbar-container .ql-size .ql-picker-label {
+  width: auto !important;
+  min-width: 60px !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label::before,
+.quill-toolbar-container .ql-size .ql-picker-item::before {
+  color: #ffffff !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-item:hover::before {
+  color: var(--editable-accent-color) !important;
+}
+
+/* Make the Quill wrapper fill the container - no extra space */
+.quill-wrapper {
+  width: 100%;
+  height: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  display: block !important;
+  line-height: inherit !important;
+  vertical-align: top !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure Quill container doesn't shift text vertically */
+.quill-wrapper .ql-container,
+.editable-container .ql-container {
+  line-height: inherit !important;
+  vertical-align: top !important;
+  display: block !important;
+}
+
+.quill-wrapper .ql-editor,
+.editable-container .ql-editor {
+  line-height: inherit !important;
+  vertical-align: top !important;
+}
+
+/* Debug: uncomment to see element boundaries */
+/* .quill-wrapper { outline: 1px solid red !important; }
+.ql-container { outline: 1px solid blue !important; }
+.ql-editor { outline: 1px solid green !important; } */
+
+/* Remove Quill's default border on container */
+.quill-wrapper .ql-container.ql-snow,
+.editable-container .ql-container.ql-snow {
+  border: none !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Style the Quill editor area - inherit all styles from parent */
+.quill-wrapper .ql-editor,
+.editable-container .ql-editor {
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  min-height: auto !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
+  color: inherit !important;
+}
+
+/* Ensure paragraphs in Quill don't add extra margins or change size */
+.quill-wrapper .ql-editor p,
+.editable-container .ql-editor p,
+.reveal .ql-editor p {
+  margin: 0 !important;
+  margin-block-start: 0 !important;
+  margin-block-end: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  vertical-align: top !important;
+  display: block !important;
+}
+
+/* Quill size classes - override to use relative sizing */
+.ql-editor .ql-size-small {
+  font-size: 0.75em !important;
+}
+
+.ql-editor .ql-size-large {
+  font-size: 1.5em !important;
+}
+
+.ql-editor .ql-size-huge {
+  font-size: 2em !important;
+}
+
+/* Ensure Quill doesn't override text alignment */
+.quill-wrapper .ql-editor.ql-blank::before {
+  font-style: normal !important;
+  color: inherit !important;
+  opacity: 0.5;
+}
+
+/* Make sure bold and other formatting shows - high specificity to override reveal.js */
+.reveal .ql-editor strong,
+.reveal .ql-editor b,
+.reveal section .ql-editor strong,
+.reveal section .ql-editor b {
+  font-weight: bold !important;
+}
+
+.reveal .ql-editor em,
+.reveal .ql-editor i,
+.reveal section .ql-editor em,
+.reveal section .ql-editor i {
+  font-style: italic !important;
+}
+
+.reveal .ql-editor u,
+.reveal section .ql-editor u {
+  text-decoration: underline !important;
+}
+
+.reveal .ql-editor s,
+.reveal .ql-editor strike,
+.reveal section .ql-editor s,
+.reveal section .ql-editor strike {
+  text-decoration: line-through !important;
+}
+
+/* Ensure color spans work */
+.reveal .ql-editor span[style*="color"],
+.reveal .ql-editor span[style*="background"] {
+  /* Allow inline styles to work */
+}
+
+/* Style the editable element when in edit mode */
+.editable-container [contenteditable="true"] {
+  outline: none;
+  cursor: text;
+}
+
+/* Ensure text selection is visible */
+.editable-container [contenteditable="true"]::selection,
+.ql-editor::selection,
+.ql-editor *::selection {
+  background: var(--editable-accent-color);
+  color: white;
+}
+
+/* Color picker improvements */
+.ql-color-picker,
+.ql-icon-picker {
+  width: 28px !important;
+}
+
+.ql-color-picker .ql-picker-label,
+.ql-background .ql-picker-label {
+  padding: 2px 4px !important;
+}
+
+/* Ensure dropdowns appear above everything */
+.ql-picker-options {
+  z-index: 10001 !important;
+}
+
+/* Size dropdown styling */
+.quill-toolbar-container .ql-size .ql-picker-label::before,
+.quill-toolbar-container .ql-size .ql-picker-item::before {
+  content: 'Normal' !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label[data-value="small"]::before,
+.quill-toolbar-container .ql-size .ql-picker-item[data-value="small"]::before {
+  content: 'Small' !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label[data-value="large"]::before,
+.quill-toolbar-container .ql-size .ql-picker-item[data-value="large"]::before {
+  content: 'Large' !important;
+}
+
+.quill-toolbar-container .ql-size .ql-picker-label[data-value="huge"]::before,
+.quill-toolbar-container .ql-size .ql-picker-item[data-value="huge"]::before {
+  content: 'Huge' !important;
 }
