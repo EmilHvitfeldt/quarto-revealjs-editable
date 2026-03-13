@@ -873,21 +873,23 @@ const Capabilities = {
         // Capture state for undo before starting rotate
         pushUndoState();
 
-        context.cachedScale = getSlideScale();
         context.isRotating = true;
 
-        // Get center of container
+        // Get center of container in screen coordinates
         const rect = container.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         context.rotateCenterX = centerX;
         context.rotateCenterY = centerY;
 
+        // Get mouse position in screen coordinates (no scaling needed)
+        const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
+
         // Calculate starting angle from center to mouse
-        const coords = getClientCoordinates(e, 1); // Don't scale for angle calculation
         context.rotateStartAngle = Math.atan2(
-          coords.clientY * context.cachedScale - centerY,
-          coords.clientX * context.cachedScale - centerX
+          clientY - centerY,
+          clientX - centerX
         );
 
         // Get current rotation from state
@@ -908,12 +910,14 @@ const Capabilities = {
     onMove(context, e) {
       if (!context.isRotating) return;
 
-      const coords = getClientCoordinates(e, 1); // Don't scale for angle calculation
+      // Get mouse position in screen coordinates (no scaling needed)
+      const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
 
       // Calculate current angle from center to mouse
       const currentAngle = Math.atan2(
-        coords.clientY * context.cachedScale - context.rotateCenterY,
-        coords.clientX * context.cachedScale - context.rotateCenterX
+        clientY - context.rotateCenterY,
+        clientX - context.rotateCenterX
       );
 
       // Calculate rotation difference in degrees
@@ -1585,7 +1589,9 @@ function makeToolbarDraggable(toolbar, handle) {
     }
 
     // Switch from right positioning to left positioning
+    // Clear the transform that was used for initial centering
     toolbar.style.right = "auto";
+    toolbar.style.transform = "none";
     toolbar.style.left = initialX + "px";
     toolbar.style.top = initialY + "px";
 
