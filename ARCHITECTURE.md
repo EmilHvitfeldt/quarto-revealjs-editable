@@ -265,7 +265,115 @@ const ToolbarRegistry = {
 - `addText` - Add new editable text to current slide
 - `addSlide` - Add new slide after current
 
-### 7. Undo/Redo System
+### 7. Quill Rich Text Editor
+
+The extension uses Quill.js for rich text editing of div elements. Quill is loaded dynamically from CDN when needed.
+
+**Initialization flow:**
+```
+1. Page loads → Quill CSS/JS loaded from CDN
+2. For each div.editable:
+   │
+   ├─▶ Create Quill instance (disabled by default)
+   │
+   ├─▶ Store in quillInstances Map
+   │
+   └─▶ Quill initialized at page load to prevent text shifting
+3. User clicks edit button (✎):
+   │
+   ├─▶ Enable Quill editing
+   │
+   ├─▶ Show formatting toolbar
+   │
+   └─▶ Disable drag capability
+4. User clicks edit button again:
+   │
+   ├─▶ Disable Quill editing
+   │
+   ├─▶ Hide formatting toolbar
+   │
+   └─▶ Re-enable drag capability
+```
+
+**Key data structure:**
+```javascript
+const quillInstances = new Map();  // DOM element -> { quill, isEditing }
+```
+
+**Toolbar modules:**
+- Bold, Italic, Underline, Strikethrough
+- Text color (with custom color picker)
+- Background color (with custom color picker)
+- Text alignment (left, center, right)
+
+### 8. Color Picker System
+
+The color picker provides preset colors, an "unset" option, and a custom color picker.
+
+**Color palette detection:**
+```javascript
+function getColorPalette() {
+  // If brand colors injected by Lua filter, use those
+  if (window._quarto_brand_palette && window._quarto_brand_palette.length > 0) {
+    return window._quarto_brand_palette;
+  }
+  // Otherwise use default 18-color palette
+  return DEFAULT_COLOR_PALETTE;
+}
+```
+
+**Brand color integration:**
+1. Lua filter reads `_brand.yml` at build time
+2. Extracts `color.palette` entries
+3. Injects two globals into HTML:
+   - `window._quarto_brand_palette` - Array of hex colors
+   - `window._quarto_brand_color_names` - Map of hex → name
+
+**RGB to hex conversion:**
+```javascript
+function rgbToHex(rgb) {
+  // Quill outputs rgb(), but brand colors are hex
+  // Convert for matching: rgb(255, 107, 107) → #ff6b6b
+}
+```
+
+**Brand shortcode output:**
+```javascript
+function getBrandColorOutput(colorVal) {
+  // If color matches a brand color, return placeholder
+  // __BRAND_SHORTCODE_primary__ → {{< brand color primary >}}
+  // Non-brand colors returned as-is
+}
+```
+
+### 9. HTML to Quarto Conversion
+
+The `htmlToQuarto()` function converts Quill's HTML output to Quarto markdown syntax.
+
+**Conversion mappings:**
+| HTML | Quarto |
+|------|--------|
+| `<strong>text</strong>` | `**text**` |
+| `<em>text</em>` | `*text*` |
+| `<u>text</u>` | `[text]{.underline}` |
+| `<s>text</s>` | `~~text~~` |
+| `<span style="color: X">` | `[text]{style='color: X'}` |
+| `<span style="background-color: X">` | `[text]{style='background-color: X'}` |
+
+**Placeholder system for shortcodes:**
+```
+1. During conversion, brand colors become placeholders:
+   color: #ff6b6b → color: __BRAND_SHORTCODE_coral__
+
+2. HTML cleanup runs (removes remaining tags)
+
+3. Placeholders converted to shortcodes:
+   __BRAND_SHORTCODE_coral__ → {{< brand color coral >}}
+```
+
+This prevents the shortcode syntax `{{< >}}` from being stripped during HTML cleanup.
+
+### 10. Undo/Redo System
 
 The Undo/Redo system tracks state changes and allows users to revert or replay edits.
 
@@ -575,11 +683,12 @@ Styles use CSS custom properties for easy theming:
 - Test base64 encoding/decoding
 - Verify toolbar and registry functions exist
 
-### E2E Tests (Playwright) - 139 tests across 3 spec files
+### E2E Tests (Playwright) - 149 tests across 4 spec files
 
 **save-edits.spec.js** - Core save functionality (8 tests)
 **ui-controls.spec.js** - UI elements, accessibility, CSS, undo/redo, rotation (55 tests)
 **toolbar.spec.js** - Floating toolbar, new elements, save integration, edge cases (76 tests)
+**quill-formatting.spec.js** - Rich text formatting and save pipeline (10 tests)
 
 Key test areas:
 - UI controls exist and function
@@ -591,6 +700,9 @@ Key test areas:
 - Floating toolbar actions
 - New element creation and tracking
 - Save integration with correct ordering (30 tests verifying element positions in saved QMD)
+- Quill formatting (bold, italic, underline, strikethrough, colors)
+- Brand color shortcode output
+- Full save pipeline verification
 
 Run tests:
 ```bash

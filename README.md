@@ -72,6 +72,58 @@ You can add new content directly from the toolbar:
 
 New elements are marked with a dashed border to distinguish them from original content.
 
+## Rich Text Editing
+
+Click the edit button (✎) on any editable text element to open the Quill rich text editor with a formatting toolbar:
+
+| Button | Format | Saved As |
+|--------|--------|----------|
+| **B** | Bold | `**text**` |
+| **I** | Italic | `*text*` |
+| **U** | Underline | `[text]{.underline}` |
+| **S** | Strikethrough | `~~text~~` |
+| 🎨 | Text Color | `[text]{style='color: ...'}` |
+| 🖌️ | Background Color | `[text]{style='background-color: ...'}` |
+| ⇤ ⇔ ⇥ | Alignment | Left, center, right |
+
+Click the edit button again to exit edit mode.
+
+## Color Picker
+
+The color picker provides three ways to select colors:
+
+1. **Unset** - Remove any color formatting (returns to default)
+2. **Preset Colors** - A palette of 18 commonly used colors
+3. **Custom...** - Opens the system color picker for any color
+
+The preset palette appears when you click the color or background color button in the toolbar.
+
+## Brand Color Support
+
+If your project uses Quarto's brand system with a `_brand.yml` file, the color picker will automatically use your brand palette instead of the default colors.
+
+### Setup
+
+Create a `_brand.yml` file in your project directory:
+
+```yaml
+color:
+  palette:
+    primary: "#FF6B6B"
+    secondary: "#4ECDC4"
+    accent: "#2C3E50"
+```
+
+### Shortcode Output
+
+When you use a brand color, it saves using Quarto's brand shortcode syntax:
+
+```markdown
+[text]{style='color: {{< brand color primary >}}'}
+```
+
+This ensures your colors stay synchronized with your brand definition. Non-brand colors (from the custom picker) save as raw values.
+
 ## Saving
 
 Once you are happy with the layout, use the toolbar or menu to save:
