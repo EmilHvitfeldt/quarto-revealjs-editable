@@ -84,7 +84,7 @@ Click the edit button (✎) on any editable text element to open the Quill rich 
 | **S** | Strikethrough | `~~text~~` |
 | 🎨 | Text Color | `[text]{style='color: ...'}` |
 | 🖌️ | Background Color | `[text]{style='background-color: ...'}` |
-| ⇤ ⇔ ⇥ | Alignment | Left, center, right |
+| ⇤ ⇔ ⇥ | Alignment | Fenced div with `style="text-align: ..."` |
 
 Click the edit button again to exit edit mode.
 

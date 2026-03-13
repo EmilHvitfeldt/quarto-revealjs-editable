@@ -536,10 +536,11 @@ test.describe('Font Size Controls', () => {
       editBtn.click();
     });
 
-    // Wait for Quill to load and toolbar to appear
+    // Wait for Quill to enable editing (contentEditable is on .ql-editor, not the div)
     await page.waitForFunction(() => {
       const div = document.querySelector('div.editable');
-      return div.contentEditable === 'true';
+      const editor = div.querySelector('.ql-editor');
+      return editor && editor.contentEditable === 'true';
     }, { timeout: 5000 });
 
     const result = await page.evaluate(() => {
@@ -584,20 +585,20 @@ test.describe('Font Size Controls', () => {
         hasBold: !!toolbar.querySelector('.ql-bold'),
         hasItalic: !!toolbar.querySelector('.ql-italic'),
         hasUnderline: !!toolbar.querySelector('.ql-underline'),
+        hasStrike: !!toolbar.querySelector('.ql-strike'),
         hasColor: !!toolbar.querySelector('.ql-color'),
-        hasSize: !!toolbar.querySelector('.ql-size'),
+        hasBackground: !!toolbar.querySelector('.ql-background'),
         hasAlign: !!toolbar.querySelector('.ql-align'),
-        hasLink: !!toolbar.querySelector('.ql-link'),
       };
     });
 
     expect(result.hasBold).toBe(true);
     expect(result.hasItalic).toBe(true);
     expect(result.hasUnderline).toBe(true);
+    expect(result.hasStrike).toBe(true);
     expect(result.hasColor).toBe(true);
-    expect(result.hasSize).toBe(true);
+    expect(result.hasBackground).toBe(true);
     expect(result.hasAlign).toBe(true);
-    expect(result.hasLink).toBe(true);
   });
 
   test('Edit mode button toggles contentEditable', async ({ page }) => {
@@ -606,14 +607,15 @@ test.describe('Font Size Controls', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    // Get initial state
+    // Get initial state - Quill editor should be disabled initially
     const initialEditable = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
-      return div.contentEditable;
+      const editor = div.querySelector('.ql-editor');
+      return editor ? editor.contentEditable : 'no-editor';
     });
-    expect(initialEditable).toBe('inherit');
+    expect(initialEditable).toBe('false');
 
-    // Click edit button and wait for async Quill to load
+    // Click edit button and wait for Quill to enable
     await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const container = div.parentNode;
@@ -621,14 +623,17 @@ test.describe('Font Size Controls', () => {
       editBtn.click();
     });
 
-    // Wait for contentEditable to become true (async due to Medium Editor loading)
+    // Wait for contentEditable to become true on .ql-editor
     await page.waitForFunction(() => {
       const div = document.querySelector('div.editable');
-      return div.contentEditable === 'true';
+      const editor = div.querySelector('.ql-editor');
+      return editor && editor.contentEditable === 'true';
     }, { timeout: 5000 });
 
     const afterFirstClick = await page.evaluate(() => {
-      return document.querySelector('div.editable').contentEditable;
+      const div = document.querySelector('div.editable');
+      const editor = div.querySelector('.ql-editor');
+      return editor.contentEditable;
     });
     expect(afterFirstClick).toBe('true');
 
@@ -642,11 +647,14 @@ test.describe('Font Size Controls', () => {
 
     await page.waitForFunction(() => {
       const div = document.querySelector('div.editable');
-      return div.contentEditable === 'false';
+      const editor = div.querySelector('.ql-editor');
+      return editor && editor.contentEditable === 'false';
     }, { timeout: 2000 });
 
     const afterSecondClick = await page.evaluate(() => {
-      return document.querySelector('div.editable').contentEditable;
+      const div = document.querySelector('div.editable');
+      const editor = div.querySelector('.ql-editor');
+      return editor.contentEditable;
     });
     expect(afterSecondClick).toBe('false');
   });

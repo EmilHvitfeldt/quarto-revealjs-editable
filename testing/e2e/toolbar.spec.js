@@ -137,17 +137,25 @@ test.describe('Add Text Element', () => {
 
     // Click add text button
     await page.click('.toolbar-add-text');
-    await page.waitForTimeout(300);
+
+    // Wait for new element to be created with Quill initialized
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
 
     // Verify new element was created
     const result = await page.evaluate(() => {
       const editables = document.querySelectorAll('.editable');
       const newElement = document.querySelector('.editable-new');
+      const quillEditor = newElement ? newElement.querySelector('.ql-editor') : null;
       return {
         newCount: editables.length,
         hasNewClass: !!newElement,
-        newElementText: newElement ? newElement.textContent : null,
+        // Check text inside Quill editor, which wraps in <p> tags
+        newElementText: quillEditor ? quillEditor.textContent.trim() : null,
         hasContainer: newElement ? newElement.parentNode.classList.contains('editable-container') : false,
+        hasQuillEditor: !!quillEditor,
       };
     });
 
@@ -155,6 +163,7 @@ test.describe('Add Text Element', () => {
     expect(result.hasNewClass).toBe(true);
     expect(result.newElementText).toBe('New text');
     expect(result.hasContainer).toBe(true);
+    expect(result.hasQuillEditor).toBe(true);
   });
 
   test('New text element has resize handles', async ({ page }) => {
@@ -215,9 +224,12 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    // Add a new text element
+    // Add a new text element and wait for Quill
     await page.click('.toolbar-add-text');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
 
     // Click the edit button
     const hasEditButton = await page.evaluate(() => {
@@ -232,10 +244,11 @@ test.describe('Add Text Element', () => {
     });
     expect(hasEditButton).toBe(true);
 
-    // Wait for Medium Editor to load and contentEditable to become true
+    // Wait for Quill editor to become editable (contentEditable is on .ql-editor)
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
-      return newElement && newElement.contentEditable === 'true';
+      const editor = newElement ? newElement.querySelector('.ql-editor') : null;
+      return editor && editor.contentEditable === 'true';
     }, { timeout: 5000 });
 
     // Check final state
@@ -243,8 +256,9 @@ test.describe('Add Text Element', () => {
       const newElement = document.querySelector('.editable-new');
       const container = newElement.parentNode;
       const editBtn = container.querySelector('.editable-button-edit');
+      const editor = newElement.querySelector('.ql-editor');
       return {
-        isContentEditable: newElement.contentEditable === "true",
+        isContentEditable: editor && editor.contentEditable === "true",
         buttonIsActive: editBtn.classList.contains('active'),
       };
     });
@@ -259,9 +273,12 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    // Add a new text element
+    // Add a new text element and wait for Quill
     await page.click('.toolbar-add-text');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
 
     // Click edit button
     await page.evaluate(() => {
@@ -271,17 +288,18 @@ test.describe('Add Text Element', () => {
       editBtn.click();
     });
 
-    // Wait for Quill to load and contentEditable to become true
+    // Wait for Quill editor to become editable (contentEditable is on .ql-editor)
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
-      return newElement && newElement.contentEditable === 'true';
+      const editor = newElement ? newElement.querySelector('.ql-editor') : null;
+      return editor && editor.contentEditable === 'true';
     }, { timeout: 5000 });
 
     // Now edit the text - Quill puts content in .ql-editor
     const newText = await page.evaluate(() => {
       const newElement = document.querySelector('.editable-new');
       // With Quill, the editable content is in .ql-editor
-      const editor = newElement.querySelector('.ql-editor') || newElement;
+      const editor = newElement.querySelector('.ql-editor');
 
       // Focus and select all text
       editor.focus();

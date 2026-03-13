@@ -234,7 +234,21 @@ async function initializeQuillForElement(element) {
     quill.enable(false);
     // Toolbar starts without 'editing' class, so CSS hides it
 
-    const quillData = { quill, toolbarContainer, editorWrapper, isEditing: false };
+    // Track original content and whether it was modified
+    const quillData = {
+      quill,
+      toolbarContainer,
+      editorWrapper,
+      isEditing: false,
+      originalContent: originalContent,  // Preserve for unedited divs
+      isDirty: false,  // Track if content was modified
+    };
+
+    // Mark as dirty when content changes (any source - user or API)
+    quill.on('text-change', () => {
+      quillData.isDirty = true;
+    });
+
     quillInstances.set(element, quillData);
 
     return quillData;
@@ -2305,21 +2319,46 @@ function updateTextDivs(text) {
 
   // Match fenced divs with 3+ colons: ::: {.editable...} ... :::
   // The closing fence must have the same number of colons as the opening
-  const regex = /^(:{3,}) ?(?:\{\.editable[^}]*\}|editable)\n[\s\S]*?\n\1$/gm;
+  // Capture: (1) opening fence, (2) content between fences
+  const regex = /^(:{3,}) ?(?:\{\.editable[^}]*\}|editable)\n([\s\S]*?)\n\1$/gm;
 
   let index = 0;
-  return text.replace(regex, () => {
-    return replacements[index++] || "";
+  return text.replace(regex, (match, fence, originalContent) => {
+    const replacement = replacements[index++];
+    // If null, div wasn't edited - keep original content but use standard fence format
+    // so that replaceEditableOccurrences can still add positioning attributes
+    if (replacement === null) {
+      const contentFence = getFenceForContent(originalContent);
+      return `${contentFence} {.editable}\n${originalContent}\n${contentFence}`;
+    }
+    return replacement || "";
   });
 }
 
 function htmlToQuarto(div) {
+  // Check if this div was edited - if not, return null to signal "keep original"
+  const quillData = quillInstances.get(div);
+  if (quillData && !quillData.isDirty) {
+    // Content wasn't modified - return null so updateTextDivs keeps original source
+    return null;
+  }
+
   // If Quill was used, get content from .ql-editor
   const quillEditor = div.querySelector(".ql-editor");
   let text = quillEditor ? quillEditor.innerHTML.trim() : div.innerHTML.trim();
 
   // Convert HTML tags to Quarto/Markdown equivalents
   text = text.replace(/<br\s*\/?>/gi, "\n");
+
+  // Handle Quill alignment classes on paragraphs using placeholder approach
+  // <p class="ql-align-center">...</p> → fenced div with style
+  text = text.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
+    (match, align) => `__ALIGN_START_${align}__`);
+  // Convert closing </p> after alignment start
+  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
+    (match, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__\n\n`);
+
+  // Handle remaining p tags (left-aligned or no alignment)
   text = text.replace(/<p[^>]*>/gi, "");
   text = text.replace(/<\/p>/gi, "\n\n");
   text = text.replace(/<code[^>]*>/gi, "`");
@@ -2361,7 +2400,13 @@ function htmlToQuarto(div) {
 
   // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
   // Use negative lookbehind to not match background-color
-  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__COLOR_START__$1__');
+  // Skip "inherit" colors (used by MathJax) as they don't represent actual formatting
+  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match, colorVal) => {
+    if (colorVal.trim().toLowerCase() === 'inherit') {
+      return ''; // Strip the span, don't create color formatting
+    }
+    return `[__COLOR_START__${colorVal}__`;
+  });
   text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
     const colorOutput = getBrandColorOutput(colorVal);
     return `${content}]{style='color: ${colorOutput}'}`;
@@ -2387,6 +2432,14 @@ function htmlToQuarto(div) {
   // Convert brand color placeholders back to shortcodes
   text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
 
+  // Convert alignment placeholders to fenced div syntax
+  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
+    (match, align, content) => {
+      const trimmed = content.trim();
+      const innerFence = getFenceForContent(trimmed);
+      return `${innerFence} {style="text-align: ${align}"}\n${trimmed}\n${innerFence}`;
+    });
+
   // Use appropriate fence length for content
   const fence = getFenceForContent(text);
   return `${fence} {.editable}\n` + text.trim() + `\n${fence}`;
@@ -2394,19 +2447,19 @@ function htmlToQuarto(div) {
 
 function replaceEditableOccurrences(text, replacements) {
   // Only replace {.editable} in valid contexts:
-  // 1. After "::: " at start of line (div syntax)
+  // 1. After ":::+ " at start of line (div syntax with 3+ colons)
   // 2. After ")" in image syntax like ![](image.png){.editable}
   // This prevents replacing {.editable} that appears in user text content
 
   // Use a single regex that matches both valid contexts in document order
   // This ensures replacements are applied in the correct sequence
-  const regex = /(?:^::: |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
+  const regex = /(?:^(:{3,}) |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
 
   let index = 0;
-  return text.replace(regex, (match) => {
-    // Preserve the prefix ("::: " or nothing for image syntax)
-    const isDiv = match.startsWith('::: ');
-    const prefix = isDiv ? '::: ' : '';
+  return text.replace(regex, (match, fenceColons) => {
+    // Preserve the prefix (fence colons + space, or nothing for image syntax)
+    const isDiv = fenceColons !== undefined;
+    const prefix = isDiv ? fenceColons + ' ' : '';
     return prefix + (replacements[index++] || "");
   });
 }

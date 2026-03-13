@@ -683,12 +683,12 @@ Styles use CSS custom properties for easy theming:
 - Test base64 encoding/decoding
 - Verify toolbar and registry functions exist
 
-### E2E Tests (Playwright) - 149 tests across 4 spec files
+### E2E Tests (Playwright) - 168 tests across 4 spec files
 
 **save-edits.spec.js** - Core save functionality (8 tests)
 **ui-controls.spec.js** - UI elements, accessibility, CSS, undo/redo, rotation (55 tests)
 **toolbar.spec.js** - Floating toolbar, new elements, save integration, edge cases (76 tests)
-**quill-formatting.spec.js** - Rich text formatting and save pipeline (10 tests)
+**quill-formatting.spec.js** - Rich text formatting, alignment, content preservation, source integrity (29 tests)
 
 Key test areas:
 - UI controls exist and function

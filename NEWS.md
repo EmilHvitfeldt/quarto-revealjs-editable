@@ -37,6 +37,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Fixed
 
+- **Unedited content preserved** - Divs that aren't modified keep their original content (preserves LaTeX, shortcodes, etc.)
 - **Text shifting** when entering edit mode fixed (Quill initialized at page load)
 - **Drag handler** no longer blocks text editing in edit mode
 - **Strikethrough regex** no longer incorrectly matches `<span>` tags
