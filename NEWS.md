@@ -37,6 +37,8 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Fixed
 
+- **Images not appearing on first load** - Images now wait until fully loaded before setup, preventing 0x0 sizing (#33)
+- **Text fields with tiny dimensions** - Divs now wait for CSS layout to complete before setup, preventing 1x1 pixel sizing (#34)
 - **Unedited content preserved** - Divs that aren't modified keep their original content (preserves LaTeX, shortcodes, etc.)
 - **Text shifting** when entering edit mode fixed (Quill initialized at page load)
 - **Drag handler** no longer blocks text editing in edit mode
