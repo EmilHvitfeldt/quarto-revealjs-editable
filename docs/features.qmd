@@ -1,0 +1,125 @@
+---
+title: "Features"
+---
+
+## Floating Toolbar
+
+A floating toolbar appears on the right side of the slides with quick access to common actions:
+
+| Button | Action                                 |
+|--------|----------------------------------------|
+| Save   | Save edits to file                     |
+| Copy   | Copy QMD to clipboard                  |
+| Text   | Add new editable text to current slide |
+| Slide  | Add new slide after current            |
+
+The toolbar is draggable - grab the handle at the top to reposition it.
+
+![](media/move-menu.mp4)
+
+## Adding New Elements
+
+You can add new content directly from the toolbar:
+
+- **Add Text**: Creates a new editable text block on the current slide. Position and style it like any other editable element.
+- **Add Slide**: Inserts a new blank slide after the current one. The slide will be saved with a `## New Slide` heading.
+
+New elements are marked with a dashed border to distinguish them from original content.
+
+![](media/insert-text-and-slide.mp4)
+
+## Rich Text Editing
+
+Click the edit button on any editable text element to open the Quill rich text editor with a formatting toolbar:
+
+| Button     | Format           | Saved As                                    |
+|------------|------------------|---------------------------------------------|
+| **B**      | Bold             | `**text**`                                  |
+| **I**      | Italic           | `*text*`                                    |
+| **U**      | Underline        | `[text]{.underline}`                        |
+| **S**      | Strikethrough    | `~~text~~`                                  |
+| Color      | Text Color       | `[text]{style='color: ...'}`                |
+| Background | Background Color | `[text]{style='background-color: ...'}`     |
+| Alignment  | Left/Center/Right| Fenced div with `style="text-align: ..."` |
+
+Click the edit button again to exit edit mode.
+
+::: {.callout-tip}
+## Interactive Demo
+
+```{=html}
+<div style="position: relative; width: 100%; padding-bottom: 56.25%; border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">
+  <iframe src="example.html" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>
+</div>
+```
+
+Note: In this demo, the Save button will download a file. With `quarto preview`, it saves directly to your `.qmd` file.
+:::
+
+## Color Picker
+
+The color picker provides three ways to select colors:
+
+1. **Unset** - Remove any color formatting (returns to default)
+2. **Preset Colors** - A palette of 18 commonly used colors
+3. **Custom...** - Opens the system color picker for any color
+
+The preset palette appears when you click the color or background color button in the toolbar.
+
+![](media/color-support.mp4)
+
+## Brand Color Support
+
+If your project uses Quarto's brand system with a `_brand.yml` file, the color picker will automatically use your brand palette instead of the default colors.
+
+### Setup
+
+Create a `_brand.yml` file in your project directory:
+
+```yaml
+color:
+  palette:
+    primary: "#FF6B6B"
+    secondary: "#4ECDC4"
+    accent: "#2C3E50"
+```
+
+### Shortcode Output
+
+When you use a brand color, it saves using Quarto's brand shortcode syntax:
+
+```markdown
+[text]{style='color: {{</* brand color primary */>}}'}
+```
+
+This ensures your colors stay synchronized with your brand definition. Non-brand colors (from the custom picker) save as raw values.
+
+## Undo/Redo
+
+Made a mistake? Use keyboard shortcuts to undo and redo your changes:
+
+- **Ctrl+Z** (or **Cmd+Z** on Mac) to undo the last action
+- **Ctrl+Y** or **Ctrl+Shift+Z** (or **Cmd+Shift+Z** on Mac) to redo
+
+Undo/redo tracks:
+
+- Element position changes (drag)
+- Element size changes (resize)
+- Element rotation changes
+- Font size changes
+- Text alignment changes
+
+::: {.callout-note}
+Text content editing (in edit mode) uses the browser's native undo, which is separate from the extension's undo stack.
+:::
+
+## Image Sizing Tip
+
+Sometimes you might find that images don't stay the size that you dragged them to be. This is because the default is to set `max-width` and `max-height` to `95%`. You can fix this by adding the following to your SCSS file:
+
+```scss
+.reveal img {
+  max-width: unset;
+  max-height: unset;
+}
+```

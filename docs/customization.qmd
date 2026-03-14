@@ -1,0 +1,59 @@
+---
+title: "Customization"
+---
+
+You can customize the appearance of editable controls using CSS custom properties. Add these to your custom SCSS/CSS file:
+
+## Element Controls
+
+```scss
+:root {
+  /* Main accent color (handles, buttons, border) */
+  --editable-accent-color: #ff6600;
+
+  /* Color when edit mode is active */
+  --editable-accent-active: #00cc00;
+
+  /* Color of the rotation handle */
+  --editable-rotate-color: #ff6600;
+
+  /* Size of resize corner handles */
+  --editable-handle-size: 12px;
+
+  /* Border color around handles */
+  --editable-handle-border-color: #000;
+
+  /* Border width when hovering */
+  --editable-border-width: 3px;
+
+  /* Animation duration */
+  --editable-transition: 0.3s;
+}
+```
+
+## Floating Toolbar
+
+```scss
+:root {
+  /* Toolbar background */
+  --editable-toolbar-bg: rgba(0, 0, 0, 0.9);
+
+  /* Toolbar shadow */
+  --editable-toolbar-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+  /* Toolbar border radius */
+  --editable-toolbar-border-radius: 12px;
+
+  /* Save button color */
+  --editable-toolbar-save-color: #28a745;
+
+  /* Copy button color */
+  --editable-toolbar-copy-color: #6c757d;
+
+  /* Add text button color */
+  --editable-toolbar-add-text-color: #007cba;
+
+  /* Add slide button color */
+  --editable-toolbar-add-slide-color: #17a2b8;
+}
+```

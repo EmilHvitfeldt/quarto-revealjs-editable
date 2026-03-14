@@ -2,3 +2,11 @@
 *_files/
 /.luarc.json
 .claude/settings.local.json
+
+# Docs site output
+docs/_site/
+
+# Symlinks for local docs development (workflow copies actual files)
+docs/_extensions
+docs/image.png
+docs/demo-text.gif
