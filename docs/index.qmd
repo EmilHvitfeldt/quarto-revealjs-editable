@@ -1,0 +1,60 @@
+---
+title: "Editable Extension for Quarto Revealjs"
+---
+
+This Revealjs plugin allows the repositioning, resizing, and rotating of images and text divs directly in the previewed slides.
+
+## Try It Out
+
+Click inside the embedded presentation below to interact with the editable elements:
+
+```{=html}
+<div style="position: relative; width: 100%; padding-bottom: 56.25%; border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">
+  <iframe src="example.html" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>
+</div>
+```
+
+Or [open in a new tab](example.html){target="_blank"} for the full experience.
+
+## Key Features
+
+- **Move** elements by dragging them to reposition
+- **Resize** elements using corner handles (hold Shift to preserve aspect ratio)
+- **Rotate** elements using the orange circular handle (hold Shift to snap to 15° increments)
+- **Rich text editing** with formatting toolbar
+- **Brand color support** via Quarto's `_brand.yml`
+- **Keyboard navigation** for accessibility
+- **Undo/Redo** support
+
+## Quick Start
+
+Install the extension:
+
+```bash
+quarto add emilhvitfeldt/quarto-revealjs-editable
+```
+
+Add to your YAML header:
+
+```yaml
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+```
+
+Mark elements as editable:
+
+```markdown
+![](image.png){.editable}
+
+::: {.editable}
+some text here
+:::
+```
+
+See the [Getting Started](getting-started.qmd) guide for more details.
+
+## Demo
+
+![](demo-text.gif)

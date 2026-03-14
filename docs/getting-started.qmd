@@ -1,0 +1,151 @@
+---
+title: "Getting Started"
+---
+
+## Installation
+
+Install the extension from the command line:
+
+```bash
+quarto add emilhvitfeldt/quarto-revealjs-editable
+```
+
+This will install the extension under the `_extensions` subdirectory. If you're using version control, you will want to check in this directory.
+
+## Basic Setup
+
+Add the extension to your Quarto revealjs presentation by including both the plugin and filter in your YAML header:
+
+```yaml
+---
+title: "My Presentation"
+format: revealjs
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+---
+```
+
+## Making Elements Editable
+
+### Images
+
+Add the `.editable` class to any image:
+
+```markdown
+![](image.png){.editable}
+```
+
+### Text Blocks
+
+Wrap text in a fenced div with the `.editable` class:
+
+```markdown
+::: {.editable}
+some text here
+:::
+```
+
+Or use the shorthand syntax:
+
+```markdown
+::: editable
+some text here
+:::
+```
+
+::: {.callout-note}
+The extension will completely rewrite the `{}` attributes when saving, so any custom attributes you add will be replaced with the positioning information.
+:::
+
+## Interacting with Elements
+
+Once you have re-rendered the slides, each element with the `.editable` class becomes interactive:
+
+- **Move**: Drag the element to reposition it
+- **Resize**: Use the corner handles (hold Shift to preserve aspect ratio)
+- **Rotate**: Use the orange circular handle at the top center (hold Shift to snap to 15° increments)
+
+::: {.callout-tip}
+## Interactive Demo
+
+```{=html}
+<div style="position: relative; width: 100%; padding-bottom: 56.25%; border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">
+  <iframe src="example.html" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>
+</div>
+```
+:::
+
+## Saving Your Changes
+
+Once you are happy with the layout, save using one of these methods:
+
+- **Toolbar**: Click the Save button in the floating toolbar
+- **Menu**: Press M, go to Tools, click "Save Edits"
+
+This will prompt you to save a file. Choose the same folder you are working in to overwrite the document. Re-render, and the elements should be locked in place.
+
+## Example
+
+Here is a minimal example document:
+
+```markdown
+---
+title: "Editable Demo"
+format: revealjs
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+---
+
+## Slide with Editable Image
+
+![](image.png){.editable}
+
+## Slide with Editable Text
+
+::: {.editable}
+This text can be moved, resized, and rotated!
+:::
+```
+
+## Preparing for Final Presentation
+
+Once you're done editing and want to present your final slides without the editing UI:
+
+### Option 1: Remove the extension (recommended)
+
+Remove both the plugin and filter from your YAML:
+
+```yaml
+# Remove these lines:
+# revealjs-plugins:
+#   - editable
+# filters:
+#   - editable
+```
+
+Then re-render. Your saved positions use `.absolute` positioning which works without the extension.
+
+### Option 2: Hide the toolbar with CSS
+
+If you want to keep the extension installed but hide the toolbar, add to your custom CSS:
+
+```scss
+#editable-toolbar {
+  display: none;
+}
+
+/* Optionally also hide the edit controls on elements */
+.editable-container:hover .resize-handle,
+.editable-container:hover .rotate-handle,
+.editable-container:hover .editable-font-controls {
+  display: none;
+}
+```
+
+### Security Note
+
+The extension embeds the source QMD filename in the HTML for the save feature. If you don't want this in your public slides, remove `editable` from `filters` before your final render.

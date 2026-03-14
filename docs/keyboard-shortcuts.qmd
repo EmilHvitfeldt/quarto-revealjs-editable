@@ -1,0 +1,43 @@
+---
+title: "Keyboard Shortcuts"
+---
+
+Editable elements support keyboard navigation for accessibility and efficient editing.
+
+## Element Navigation
+
+| Key           | Action                                            |
+|---------------|---------------------------------------------------|
+| Tab           | Focus an editable element (controls will appear)  |
+| Shift + Tab   | Exit and return to normal slide navigation        |
+
+## Moving Elements
+
+| Key        | Action                            |
+|------------|-----------------------------------|
+| Arrow keys | Move the element (10px per press) |
+
+## Resizing Elements
+
+| Key                | Action             |
+|--------------------|---------------------|
+| Shift + Arrow keys | Resize the element |
+
+## Rotating Elements
+
+| Key                                  | Action        |
+|--------------------------------------|---------------|
+| Ctrl/Cmd + Left/Right arrows         | Rotate by 5°  |
+| Ctrl/Cmd + Shift + Left/Right arrows | Rotate by 15° |
+
+## Undo/Redo
+
+| Key                                         | Action           |
+|---------------------------------------------|------------------|
+| Ctrl+Z (Cmd+Z on Mac)                       | Undo last action |
+| Ctrl+Y or Ctrl+Shift+Z (Cmd+Shift+Z on Mac) | Redo             |
+
+## Notes
+
+- All control buttons on editable elements are keyboard accessible
+- Text content editing (in edit mode) uses the browser's native undo, which is separate from the extension's undo stack

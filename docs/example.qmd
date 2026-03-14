@@ -1,0 +1,34 @@
+---
+title: "Interactive Demo"
+format: revealjs
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+---
+
+## Try Moving This Image
+
+Drag the image to reposition it.
+
+![](image.png){.editable width="200"}
+
+## Edit This Text
+
+Click the edit button to open the rich text editor.
+
+::: {.editable}
+**Try editing me!**
+
+You can make text *italic*, **bold**, or ~~strikethrough~~.
+:::
+
+## Multiple Elements
+
+::: {.editable}
+Element 1
+:::
+
+::: {.editable}
+Element 2
+:::

@@ -1,0 +1,34 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Editable Extension"
+  description: "A Quarto Revealjs extension for repositioning, resizing, and rotating images and text"
+  site-url: https://emilhvitfeldt.github.io/quarto-revealjs-editable/
+  repo-url: https://github.com/EmilHvitfeldt/quarto-revealjs-editable
+  repo-actions: [issue]
+
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: getting-started.qmd
+        text: Getting Started
+      - href: features.qmd
+        text: Features
+      - href: customization.qmd
+        text: Customization
+      - href: keyboard-shortcuts.qmd
+        text: Keyboard Shortcuts
+    right:
+      - icon: github
+        href: https://github.com/EmilHvitfeldt/quarto-revealjs-editable
+
+  page-footer:
+    center: "Made with [Quarto](https://quarto.org)"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
