@@ -14,6 +14,10 @@ Click inside the embedded presentation below to interact with the editable eleme
 </div>
 ```
 
+::: {.callout-note}
+In this demo, the Save button will download a file. In your own projects with `quarto preview`, it will save changes directly back to your `.qmd` file.
+:::
+
 Or [open in a new tab](example.html){target="_blank"} for the full experience.
 
 ## Key Features

@@ -52,6 +52,8 @@ Click the edit button again to exit edit mode.
   <iframe src="example.html" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>
 </div>
 ```
+
+Note: In this demo, the Save button will download a file. With `quarto preview`, it saves directly to your `.qmd` file.
 :::
 
 ## Color Picker
