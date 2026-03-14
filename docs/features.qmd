@@ -15,7 +15,7 @@ A floating toolbar appears on the right side of the slides with quick access to 
 
 The toolbar is draggable - grab the handle at the top to reposition it.
 
-<!-- TODO: Add GIF showing toolbar interaction (dragging, button clicks) -->
+![](media/move-menu.mp4)
 
 ## Adding New Elements
 
@@ -26,7 +26,7 @@ You can add new content directly from the toolbar:
 
 New elements are marked with a dashed border to distinguish them from original content.
 
-<!-- TODO: Add GIF showing adding new text element and new slide -->
+![](media/insert-text-and-slide.mp4)
 
 ## Rich Text Editing
 
@@ -64,7 +64,7 @@ The color picker provides three ways to select colors:
 
 The preset palette appears when you click the color or background color button in the toolbar.
 
-<!-- TODO: Add GIF showing color picker usage -->
+![](media/color-support.mp4)
 
 ## Brand Color Support
 
