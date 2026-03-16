@@ -223,6 +223,7 @@
 .editable-toolbar-button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: var(--editable-toolbar-button-padding);
   border: none;
@@ -233,31 +234,36 @@
   color: white;
   transition: all var(--editable-transition);
   white-space: nowrap;
+  min-width: 40px;
+  box-sizing: border-box;
 }
 
 .editable-toolbar-button:hover {
   filter: brightness(1.1);
-  transform: translateX(-2px);
 }
 
 .editable-toolbar-button:active {
-  transform: translateX(0);
+  filter: brightness(0.95);
 }
 
 .editable-toolbar-button .toolbar-icon {
   font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
 }
 
 .editable-toolbar-button .toolbar-label {
   opacity: 0;
-  max-width: 0;
+  width: 0;
   overflow: hidden;
   transition: all var(--editable-transition);
 }
 
-.editable-toolbar-button:hover .toolbar-label {
+/* Show all labels when hovering anywhere on the toolbar buttons */
+.editable-toolbar-buttons:hover .toolbar-label {
   opacity: 1;
-  max-width: 100px;
+  width: 36px;
 }
 
 /* Toolbar button colors */
@@ -306,6 +312,7 @@
 .editable-toolbar-submenu-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   padding: var(--editable-toolbar-button-padding);
   border: none;
@@ -316,20 +323,24 @@
   color: white;
   transition: all var(--editable-transition);
   white-space: nowrap;
+  min-width: 80px;
+  box-sizing: border-box;
 }
 
 .editable-toolbar-submenu-item:hover {
   filter: brightness(1.1);
-  transform: translateX(-2px);
 }
 
 .editable-toolbar-submenu-item .toolbar-icon {
   font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
 }
 
 .editable-toolbar-submenu-item .toolbar-label {
   opacity: 1;
-  max-width: 100px;
+  flex-grow: 1;
 }
 
 /* Submenu item colors */
