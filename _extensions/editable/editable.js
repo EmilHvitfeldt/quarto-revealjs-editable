@@ -2137,19 +2137,77 @@ function getFenceForContent(content) {
   return ":".repeat(maxColons);
 }
 
-// Convert element innerHTML to plain text with proper newlines
+// Convert element innerHTML to Quarto/Markdown text with proper formatting
 function elementToText(element) {
   // If Quill was used, get content from .ql-editor
   const quillEditor = element.querySelector(".ql-editor");
-  let text = quillEditor ? quillEditor.innerHTML : element.innerHTML;
+  let text = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
 
-  // Convert HTML tags to plain text equivalents
+  // Convert HTML tags to Quarto/Markdown equivalents
   text = text.replace(/<br\s*\/?>/gi, "\n");
+
+  // Handle Quill alignment classes on paragraphs using placeholder approach
+  text = text.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
+    (match, align) => `__ALIGN_START_${align}__`);
+  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
+    (match, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__\n\n`);
+
+  // Handle remaining p tags (left-aligned or no alignment)
   text = text.replace(/<p[^>]*>/gi, "");
   text = text.replace(/<\/p>/gi, "\n\n");
-  text = text.replace(/<[^>]+>/g, ""); // Remove remaining HTML tags
+  text = text.replace(/<code[^>]*>/gi, "`");
+  text = text.replace(/<\/code>/gi, "`");
 
-  // Decode common HTML entities
+  // Bold: <strong> and <b> → **text**
+  text = text.replace(/<strong[^>]*>/gi, "**");
+  text = text.replace(/<\/strong>/gi, "**");
+  text = text.replace(/<b[^>]*>/gi, "**");
+  text = text.replace(/<\/b>/gi, "**");
+
+  // Italic: <em> and <i> → *text*
+  text = text.replace(/<em[^>]*>/gi, "*");
+  text = text.replace(/<\/em>/gi, "*");
+  text = text.replace(/<i[^>]*>/gi, "*");
+  text = text.replace(/<\/i>/gi, "*");
+
+  // Strikethrough: <del> and <s> and <strike> → ~~text~~
+  text = text.replace(/<del[^>]*>/gi, "~~");
+  text = text.replace(/<\/del>/gi, "~~");
+  text = text.replace(/<s(?![a-z])[^>]*>/gi, "~~");
+  text = text.replace(/<\/s(?![a-z])>/gi, "~~");
+  text = text.replace(/<strike[^>]*>/gi, "~~");
+  text = text.replace(/<\/strike>/gi, "~~");
+
+  // Underline: <u> → [text]{.underline}
+  text = text.replace(/<u[^>]*>/gi, "[");
+  text = text.replace(/<\/u>/gi, "]{.underline}");
+
+  // Background color spans (must be processed BEFORE color to avoid false matches)
+  text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
+  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
+    const colorOutput = getBrandColorOutput(colorVal);
+    return `${content}]{style='background-color: ${colorOutput}'}`;
+  });
+
+  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
+  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match, colorVal) => {
+    if (colorVal.trim().toLowerCase() === 'inherit') {
+      return '';
+    }
+    return `[__COLOR_START__${colorVal}__`;
+  });
+  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
+    const colorOutput = getBrandColorOutput(colorVal);
+    return `${content}]{style='color: ${colorOutput}'}`;
+  });
+
+  // Links: <a href="url">text</a> → [text](url)
+  text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
+
+  // Remove any remaining HTML tags (cleanup)
+  text = text.replace(/<[^>]+>/g, "");
+
+  // Decode HTML entities
   text = text.replace(/&lt;/g, "<");
   text = text.replace(/&gt;/g, ">");
   text = text.replace(/&amp;/g, "&");
@@ -2159,6 +2217,17 @@ function elementToText(element) {
 
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");
+
+  // Convert brand color placeholders back to shortcodes
+  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
+
+  // Convert alignment placeholders to fenced div syntax
+  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
+    (match, align, content) => {
+      const trimmed = content.trim();
+      const innerFence = getFenceForContent(trimmed);
+      return `${innerFence} {style="text-align: ${align}"}\n${trimmed}\n${innerFence}`;
+    });
 
   return text.trim();
 }
