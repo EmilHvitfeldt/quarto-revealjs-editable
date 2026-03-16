@@ -25,6 +25,8 @@
   --editable-toolbar-copy-color: #6c757d;
   --editable-toolbar-add-text-color: #28a745;
   --editable-toolbar-add-slide-color: #17a2b8;
+  --editable-toolbar-add-color: #28a745;
+  /* TODO: Add --editable-toolbar-modify-color for issue #48 */
 }
 
 /* Container for editable elements */
@@ -267,11 +269,75 @@
   background-color: var(--editable-toolbar-copy-color);
 }
 
-.editable-toolbar-button.toolbar-add-text {
+.editable-toolbar-button.toolbar-add {
+  background-color: var(--editable-toolbar-add-color);
+}
+
+/* TODO: Add .toolbar-modify styles for issue #48 */
+
+/* Submenu wrapper */
+.editable-toolbar-submenu-wrapper {
+  position: relative;
+}
+
+/* Submenu container */
+.editable-toolbar-submenu {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 8px;
+  display: none;
+  flex-direction: column;
+  gap: var(--editable-toolbar-gap);
+  background: var(--editable-toolbar-bg);
+  padding: var(--editable-toolbar-padding);
+  border-radius: var(--editable-toolbar-border-radius);
+  box-shadow: var(--editable-toolbar-shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1001;
+}
+
+.editable-toolbar-submenu.open {
+  display: flex;
+}
+
+/* Submenu items */
+.editable-toolbar-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--editable-toolbar-button-padding);
+  border: none;
+  border-radius: var(--editable-button-border-radius);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  transition: all var(--editable-transition);
+  white-space: nowrap;
+}
+
+.editable-toolbar-submenu-item:hover {
+  filter: brightness(1.1);
+  transform: translateX(-2px);
+}
+
+.editable-toolbar-submenu-item .toolbar-icon {
+  font-size: 16px;
+}
+
+.editable-toolbar-submenu-item .toolbar-label {
+  opacity: 1;
+  max-width: 100px;
+}
+
+/* Submenu item colors */
+.editable-toolbar-submenu-item.toolbar-add-text {
   background-color: var(--editable-toolbar-add-text-color);
 }
 
-.editable-toolbar-button.toolbar-add-slide {
+.editable-toolbar-submenu-item.toolbar-add-slide {
   background-color: var(--editable-toolbar-add-slide-color);
 }
 
