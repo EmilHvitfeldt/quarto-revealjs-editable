@@ -2517,104 +2517,10 @@ function htmlToQuarto(div) {
     return null;
   }
 
-  // If Quill was used, get content from .ql-editor
-  const quillEditor = div.querySelector(".ql-editor");
-  let text = quillEditor ? quillEditor.innerHTML.trim() : div.innerHTML.trim();
+  // Use shared conversion function
+  const text = elementToText(div);
 
-  // Convert HTML tags to Quarto/Markdown equivalents
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-
-  // Handle Quill alignment classes on paragraphs using placeholder approach
-  // <p class="ql-align-center">...</p> → fenced div with style
-  text = text.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
-    (match, align) => `__ALIGN_START_${align}__`);
-  // Convert closing </p> after alignment start
-  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
-    (match, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__\n\n`);
-
-  // Handle remaining p tags (left-aligned or no alignment)
-  text = text.replace(/<p[^>]*>/gi, "");
-  text = text.replace(/<\/p>/gi, "\n\n");
-  text = text.replace(/<code[^>]*>/gi, "`");
-  text = text.replace(/<\/code>/gi, "`");
-
-  // Bold: <strong> and <b> → **text**
-  // Replace opening and closing tags separately to handle nested content
-  text = text.replace(/<strong[^>]*>/gi, "**");
-  text = text.replace(/<\/strong>/gi, "**");
-  text = text.replace(/<b[^>]*>/gi, "**");
-  text = text.replace(/<\/b>/gi, "**");
-
-  // Italic: <em> and <i> → *text*
-  text = text.replace(/<em[^>]*>/gi, "*");
-  text = text.replace(/<\/em>/gi, "*");
-  text = text.replace(/<i[^>]*>/gi, "*");
-  text = text.replace(/<\/i>/gi, "*");
-
-  // Strikethrough: <del> and <s> and <strike> → ~~text~~
-  // Note: <s> regex must not match <span> or <strike>, use negative lookahead
-  text = text.replace(/<del[^>]*>/gi, "~~");
-  text = text.replace(/<\/del>/gi, "~~");
-  text = text.replace(/<s(?![a-z])[^>]*>/gi, "~~");
-  text = text.replace(/<\/s(?![a-z])>/gi, "~~");
-  text = text.replace(/<strike[^>]*>/gi, "~~");
-  text = text.replace(/<\/strike>/gi, "~~");
-
-  // Underline: <u> → [text]{.underline}
-  // Handle nested content by using a more flexible approach
-  text = text.replace(/<u[^>]*>/gi, "[");
-  text = text.replace(/<\/u>/gi, "]{.underline}");
-
-  // Background color spans (must be processed BEFORE color to avoid false matches)
-  text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
-  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
-    const colorOutput = getBrandColorOutput(colorVal);
-    return `${content}]{style='background-color: ${colorOutput}'}`;
-  });
-
-  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
-  // Use negative lookbehind to not match background-color
-  // Skip "inherit" colors (used by MathJax) as they don't represent actual formatting
-  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match, colorVal) => {
-    if (colorVal.trim().toLowerCase() === 'inherit') {
-      return ''; // Strip the span, don't create color formatting
-    }
-    return `[__COLOR_START__${colorVal}__`;
-  });
-  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
-    const colorOutput = getBrandColorOutput(colorVal);
-    return `${content}]{style='color: ${colorOutput}'}`;
-  });
-
-  // Links: <a href="url">text</a> → [text](url)
-  text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
-
-  // Remove any remaining HTML tags (cleanup)
-  text = text.replace(/<[^>]+>/g, "");
-
-  // Decode HTML entities
-  text = text.replace(/&lt;/g, "<");
-  text = text.replace(/&gt;/g, ">");
-  text = text.replace(/&amp;/g, "&");
-  text = text.replace(/&quot;/g, '"');
-  text = text.replace(/&#39;/g, "'");
-  text = text.replace(/&nbsp;/g, " ");
-
-  // Clean up excessive newlines
-  text = text.replace(/\n{3,}/g, "\n\n");
-
-  // Convert brand color placeholders back to shortcodes
-  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
-
-  // Convert alignment placeholders to fenced div syntax
-  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
-    (match, align, content) => {
-      const trimmed = content.trim();
-      const innerFence = getFenceForContent(trimmed);
-      return `${innerFence} {style="text-align: ${align}"}\n${trimmed}\n${innerFence}`;
-    });
-
-  // Use appropriate fence length for content
+  // Wrap in fenced div
   const fence = getFenceForContent(text);
   return `${fence} {.editable}\n` + text.trim() + `\n${fence}`;
 }
