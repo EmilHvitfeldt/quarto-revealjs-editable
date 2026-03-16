@@ -32,7 +32,7 @@ jobs:
         run: |
           cp -r _extensions docs/
           cp image.png docs/
-          cp demo-text.gif docs/
+          cp demo-text.mp4 docs/
 
       - name: Render embedded example
         run: |
