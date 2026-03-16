@@ -440,6 +440,187 @@ test.describe('Add Text Element', () => {
     expect(position.isCenteredVertically).toBe(true);
   });
 
+  // Tests for issue #44: New text elements should preserve formatting when saved
+  test('New text element preserves bold formatting when saved', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Add a new text element and wait for Quill
+    await page.click('.toolbar-add-text');
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
+
+    // Apply bold formatting via Quill API
+    const savedContent = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const quillData = quillInstances.get(newElement);
+      if (!quillData) return { error: 'No Quill instance' };
+
+      quillData.quill.enable(true);
+      quillData.quill.setText('test bold text');
+      quillData.quill.setSelection(5, 4); // Select "bold"
+      quillData.quill.format('bold', true);
+
+      return getTransformedQmd();
+    });
+
+    expect(savedContent).toContain('**bold**');
+  });
+
+  test('New text element preserves italic formatting when saved', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    await page.click('.toolbar-add-text');
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
+
+    const savedContent = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const quillData = quillInstances.get(newElement);
+      if (!quillData) return { error: 'No Quill instance' };
+
+      quillData.quill.enable(true);
+      quillData.quill.setText('test italic text');
+      quillData.quill.setSelection(5, 6); // Select "italic"
+      quillData.quill.format('italic', true);
+
+      return getTransformedQmd();
+    });
+
+    expect(savedContent).toContain('*italic*');
+    expect(savedContent).not.toContain('**italic**');
+  });
+
+  test('New text element preserves underline formatting when saved', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    await page.click('.toolbar-add-text');
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
+
+    const savedContent = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const quillData = quillInstances.get(newElement);
+      if (!quillData) return { error: 'No Quill instance' };
+
+      quillData.quill.enable(true);
+      quillData.quill.setText('test underline text');
+      quillData.quill.setSelection(5, 9); // Select "underline"
+      quillData.quill.format('underline', true);
+
+      return getTransformedQmd();
+    });
+
+    expect(savedContent).toContain('[underline]{.underline}');
+  });
+
+  test('New text element preserves strikethrough formatting when saved', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    await page.click('.toolbar-add-text');
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
+
+    const savedContent = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const quillData = quillInstances.get(newElement);
+      if (!quillData) return { error: 'No Quill instance' };
+
+      quillData.quill.enable(true);
+      quillData.quill.setText('test strike text');
+      quillData.quill.setSelection(5, 6); // Select "strike"
+      quillData.quill.format('strike', true);
+
+      return getTransformedQmd();
+    });
+
+    expect(savedContent).toContain('~~strike~~');
+  });
+
+  test('New text element preserves text color when saved', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    await page.click('.toolbar-add-text');
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
+
+    const savedContent = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const quillData = quillInstances.get(newElement);
+      if (!quillData) return { error: 'No Quill instance' };
+
+      quillData.quill.enable(true);
+      quillData.quill.setText('test colored text');
+      quillData.quill.setSelection(5, 7); // Select "colored"
+      quillData.quill.format('color', '#ff0000');
+
+      return getTransformedQmd();
+    });
+
+    expect(savedContent).toMatch(/\[colored\]\{style='color:[^']+'\}/);
+  });
+
+  test('New text element preserves combined formatting when saved', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    await page.click('.toolbar-add-text');
+    await page.waitForFunction(() => {
+      const newElement = document.querySelector('.editable-new');
+      return newElement && newElement.querySelector('.ql-editor');
+    }, { timeout: 5000 });
+
+    const savedContent = await page.evaluate(() => {
+      const newElement = document.querySelector('.editable-new');
+      const quillData = quillInstances.get(newElement);
+      if (!quillData) return { error: 'No Quill instance' };
+
+      quillData.quill.enable(true);
+      quillData.quill.setText('normal bold italic strike end');
+      // Apply bold to "bold"
+      quillData.quill.setSelection(7, 4);
+      quillData.quill.format('bold', true);
+      // Apply italic to "italic"
+      quillData.quill.setSelection(12, 6);
+      quillData.quill.format('italic', true);
+      // Apply strike to "strike"
+      quillData.quill.setSelection(19, 6);
+      quillData.quill.format('strike', true);
+
+      return getTransformedQmd();
+    });
+
+    expect(savedContent).toContain('**bold**');
+    expect(savedContent).toContain('*italic*');
+    expect(savedContent).toContain('~~strike~~');
+  });
+
 });
 
 test.describe('Add Slide', () => {
