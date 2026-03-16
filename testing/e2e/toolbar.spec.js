@@ -448,7 +448,7 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element and wait for Quill
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -477,7 +477,7 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -506,7 +506,7 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -534,7 +534,7 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -562,7 +562,7 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -590,7 +590,7 @@ test.describe('Add Text Element', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
