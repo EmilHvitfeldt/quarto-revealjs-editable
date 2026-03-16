@@ -50,10 +50,11 @@ You can customize the appearance of editable controls using CSS custom propertie
   /* Copy button color */
   --editable-toolbar-copy-color: #6c757d;
 
-  /* Add text button color */
-  --editable-toolbar-add-text-color: #007cba;
+  /* Add button color (main button) */
+  --editable-toolbar-add-color: #28a745;
 
-  /* Add slide button color */
+  /* Add submenu item colors */
+  --editable-toolbar-add-text-color: #28a745;
   --editable-toolbar-add-slide-color: #17a2b8;
 }
 ```
