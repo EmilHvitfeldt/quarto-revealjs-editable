@@ -20,7 +20,7 @@ A poem lovely as a tree.
 From "Trees" by Joyce Kilmer
 :::
 
-## More text
+## text
 
 ::: editable
 Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit. Praesent sed diam rutrum, porta nulla vitae, elementum lacus.
