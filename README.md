@@ -4,7 +4,7 @@ This Revealjs plugin allows the repositioning, resizing, and rotating of images 
 
 **[View Full Documentation](https://emilhvitfeldt.github.io/quarto-revealjs-editable/)**
 
-![](demo-text.gif)
+![](demo-text.mp4)
 
 ## Installing
 

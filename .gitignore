@@ -9,4 +9,4 @@ docs/_site/
 # Symlinks for local docs development (workflow copies actual files)
 docs/_extensions
 docs/image.png
-docs/demo-text.gif
+docs/demo-text.mp4

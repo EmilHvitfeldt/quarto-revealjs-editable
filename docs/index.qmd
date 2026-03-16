@@ -61,4 +61,4 @@ See the [Getting Started](getting-started.qmd) guide for more details.
 
 ## Demo
 
-![](demo-text.gif)
+![](demo-text.mp4)
