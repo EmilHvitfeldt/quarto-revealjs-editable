@@ -25,6 +25,8 @@
   --editable-toolbar-copy-color: #6c757d;
   --editable-toolbar-add-text-color: #28a745;
   --editable-toolbar-add-slide-color: #17a2b8;
+  --editable-toolbar-add-color: #28a745;
+  /* TODO: Add --editable-toolbar-modify-color for issue #48 */
 }
 
 /* Container for editable elements */
@@ -221,6 +223,7 @@
 .editable-toolbar-button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: var(--editable-toolbar-button-padding);
   border: none;
@@ -231,31 +234,36 @@
   color: white;
   transition: all var(--editable-transition);
   white-space: nowrap;
+  min-width: 40px;
+  box-sizing: border-box;
 }
 
 .editable-toolbar-button:hover {
   filter: brightness(1.1);
-  transform: translateX(-2px);
 }
 
 .editable-toolbar-button:active {
-  transform: translateX(0);
+  filter: brightness(0.95);
 }
 
 .editable-toolbar-button .toolbar-icon {
   font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
 }
 
 .editable-toolbar-button .toolbar-label {
   opacity: 0;
-  max-width: 0;
+  width: 0;
   overflow: hidden;
   transition: all var(--editable-transition);
 }
 
-.editable-toolbar-button:hover .toolbar-label {
+/* Show all labels when hovering anywhere on the toolbar buttons */
+.editable-toolbar-buttons:hover .toolbar-label {
   opacity: 1;
-  max-width: 100px;
+  width: 36px;
 }
 
 /* Toolbar button colors */
@@ -267,11 +275,80 @@
   background-color: var(--editable-toolbar-copy-color);
 }
 
-.editable-toolbar-button.toolbar-add-text {
+.editable-toolbar-button.toolbar-add {
+  background-color: var(--editable-toolbar-add-color);
+}
+
+/* TODO: Add .toolbar-modify styles for issue #48 */
+
+/* Submenu wrapper */
+.editable-toolbar-submenu-wrapper {
+  position: relative;
+}
+
+/* Submenu container */
+.editable-toolbar-submenu {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 8px;
+  display: none;
+  flex-direction: column;
+  gap: var(--editable-toolbar-gap);
+  background: var(--editable-toolbar-bg);
+  padding: var(--editable-toolbar-padding);
+  border-radius: var(--editable-toolbar-border-radius);
+  box-shadow: var(--editable-toolbar-shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1001;
+}
+
+.editable-toolbar-submenu.open {
+  display: flex;
+}
+
+/* Submenu items */
+.editable-toolbar-submenu-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: var(--editable-toolbar-button-padding);
+  border: none;
+  border-radius: var(--editable-button-border-radius);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  transition: all var(--editable-transition);
+  white-space: nowrap;
+  min-width: 80px;
+  box-sizing: border-box;
+}
+
+.editable-toolbar-submenu-item:hover {
+  filter: brightness(1.1);
+}
+
+.editable-toolbar-submenu-item .toolbar-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.editable-toolbar-submenu-item .toolbar-label {
+  opacity: 1;
+  flex-grow: 1;
+}
+
+/* Submenu item colors */
+.editable-toolbar-submenu-item.toolbar-add-text {
   background-color: var(--editable-toolbar-add-text-color);
 }
 
-.editable-toolbar-button.toolbar-add-slide {
+.editable-toolbar-submenu-item.toolbar-add-slide {
   background-color: var(--editable-toolbar-add-slide-color);
 }
 

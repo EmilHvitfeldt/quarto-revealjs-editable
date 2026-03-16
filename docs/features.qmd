@@ -6,23 +6,22 @@ title: "Features"
 
 A floating toolbar appears on the right side of the slides with quick access to common actions:
 
-| Button | Action                                 |
-|--------|----------------------------------------|
-| Save   | Save edits to file                     |
-| Copy   | Copy QMD to clipboard                  |
-| Text   | Add new editable text to current slide |
-| Slide  | Add new slide after current            |
+| Button | Action                                    |
+|--------|-------------------------------------------|
+| Save   | Save edits to file                        |
+| Copy   | Copy QMD to clipboard                     |
+| Add    | Opens submenu with Text and Slide options |
 
-The toolbar is draggable - grab the handle at the top to reposition it.
+The toolbar is draggable—grab the handle at the top to reposition it.
 
 ![](media/move-menu.mp4)
 
 ## Adding New Elements
 
-You can add new content directly from the toolbar:
+Click the **Add** button to open a submenu with options:
 
-- **Add Text**: Creates a new editable text block on the current slide. Position and style it like any other editable element.
-- **Add Slide**: Inserts a new blank slide after the current one. The slide will be saved with a `## New Slide` heading.
+- **Text**: Creates a new editable text block on the current slide. Position and style it like any other editable element.
+- **Slide**: Inserts a new blank slide after the current one. The slide will be saved with a `## New Slide` heading.
 
 New elements are marked with a dashed border to distinguish them from original content.
 

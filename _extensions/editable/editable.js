@@ -1188,8 +1188,9 @@ const ToolbarRegistry = {
   actions: new Map(),
 
   // Register a toolbar action
+  // config: { icon, label, title, onClick, className }
+  // For submenu groups: { icon, label, title, className, submenu: [...configs] }
   register(name, config) {
-    // config: { icon, label, title, onClick, className }
     this.actions.set(name, { name, ...config });
   },
 
@@ -1212,6 +1213,64 @@ const ToolbarRegistry = {
     });
     return btn;
   },
+
+  // Create a button with submenu
+  createSubmenuButton(config) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "editable-toolbar-submenu-wrapper";
+
+    // Main button that toggles the submenu
+    const btn = document.createElement("button");
+    btn.className = "editable-toolbar-button " + (config.className || "");
+    btn.setAttribute("aria-label", config.label);
+    btn.setAttribute("aria-haspopup", "true");
+    btn.setAttribute("aria-expanded", "false");
+    btn.title = config.title;
+    btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+
+    // Create submenu container
+    const submenu = document.createElement("div");
+    submenu.className = "editable-toolbar-submenu";
+    submenu.setAttribute("role", "menu");
+
+    // Add submenu items
+    config.submenu.forEach((itemConfig) => {
+      const item = document.createElement("button");
+      item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
+      item.setAttribute("role", "menuitem");
+      item.title = itemConfig.title;
+      item.innerHTML = `<span class="toolbar-icon">${itemConfig.icon}</span><span class="toolbar-label">${itemConfig.label}</span>`;
+      item.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        itemConfig.onClick(e);
+        // Close submenu after click
+        submenu.classList.remove("open");
+        btn.setAttribute("aria-expanded", "false");
+      });
+      submenu.appendChild(item);
+    });
+
+    // Toggle submenu on button click
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isOpen = submenu.classList.toggle("open");
+      btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+
+    // Close submenu when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!wrapper.contains(e.target)) {
+        submenu.classList.remove("open");
+        btn.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    wrapper.appendChild(btn);
+    wrapper.appendChild(submenu);
+    return wrapper;
+  },
 };
 
 // Register toolbar actions
@@ -1231,21 +1290,32 @@ ToolbarRegistry.register("copy", {
   onClick: () => copyQmdToClipboard(),
 });
 
-ToolbarRegistry.register("addText", {
-  icon: "📝",
-  label: "Text",
-  title: "Add editable text to current slide",
-  className: "toolbar-add-text",
-  onClick: () => addNewTextElement(),
+// Add submenu: groups "Add Text" and "Add Slide"
+ToolbarRegistry.register("add", {
+  icon: "➕",
+  label: "Add",
+  title: "Add new elements",
+  className: "toolbar-add",
+  submenu: [
+    {
+      icon: "📝",
+      label: "Text",
+      title: "Add editable text to current slide",
+      className: "toolbar-add-text",
+      onClick: () => addNewTextElement(),
+    },
+    {
+      icon: "🖼️",
+      label: "Slide",
+      title: "Add new slide after current",
+      className: "toolbar-add-slide",
+      onClick: () => addNewSlide(),
+    },
+  ],
 });
 
-ToolbarRegistry.register("addSlide", {
-  icon: "➕",
-  label: "Slide",
-  title: "Add new slide after current",
-  className: "toolbar-add-slide",
-  onClick: () => addNewSlide(),
-});
+// TODO: Add "modify" button for issue #48
+// This will allow making any element editable without needing .editable class in source
 
 // =============================================================================
 // Property Serializers
@@ -1551,8 +1621,15 @@ function createFloatingToolbar() {
 
   // Add buttons from registry
   ToolbarRegistry.getActions().forEach((action) => {
-    const btn = ToolbarRegistry.createButton(action);
-    buttonsContainer.appendChild(btn);
+    let element;
+    if (action.submenu) {
+      // Create button with submenu
+      element = ToolbarRegistry.createSubmenuButton(action);
+    } else {
+      // Create regular button
+      element = ToolbarRegistry.createButton(action);
+    }
+    buttonsContainer.appendChild(element);
   });
 
   toolbar.appendChild(buttonsContainer);

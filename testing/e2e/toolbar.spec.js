@@ -5,6 +5,17 @@ const fs = require('fs');
 
 const TESTING_DIR = path.join(__dirname, '..');
 
+// Helper functions to interact with the Add submenu
+async function clickAddText(page) {
+  await page.click('.toolbar-add');
+  await page.click('.editable-toolbar-submenu-item.toolbar-add-text');
+}
+
+async function clickAddSlide(page) {
+  await page.click('.toolbar-add');
+  await page.click('.editable-toolbar-submenu-item.toolbar-add-slide');
+}
+
 test.describe('Floating Toolbar', () => {
 
   test.beforeAll(async () => {
@@ -39,7 +50,7 @@ test.describe('Floating Toolbar', () => {
     expect(structure).not.toBeNull();
     expect(structure.hasHandle).toBe(true);
     expect(structure.hasButtonsContainer).toBe(true);
-    expect(structure.buttonCount).toBe(4); // save, copy, addText, addSlide
+    expect(structure.buttonCount).toBe(3); // save, copy, add (with submenu)
     expect(structure.hasRole).toBe(true);
   });
 
@@ -59,14 +70,42 @@ test.describe('Floating Toolbar', () => {
       }));
     });
 
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(3);
 
     // Check for specific button classes
     const classNames = buttons.map(b => b.className);
     expect(classNames.some(c => c.includes('toolbar-save'))).toBe(true);
     expect(classNames.some(c => c.includes('toolbar-copy'))).toBe(true);
-    expect(classNames.some(c => c.includes('toolbar-add-text'))).toBe(true);
-    expect(classNames.some(c => c.includes('toolbar-add-slide'))).toBe(true);
+    expect(classNames.some(c => c.includes('toolbar-add'))).toBe(true);
+  });
+
+  test('Add button has submenu with Text and Slide options', async ({ page }) => {
+    const htmlPath = path.join(TESTING_DIR, 'basic.html');
+    await page.goto(`file://${htmlPath}`);
+    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await page.waitForTimeout(500);
+
+    // Check submenu exists but is hidden
+    const submenu = await page.locator('.editable-toolbar-submenu');
+    await expect(submenu).toBeHidden();
+
+    // Click add button to open submenu
+    await page.click('.toolbar-add');
+    await expect(submenu).toBeVisible();
+
+    // Check submenu items
+    const submenuItems = await page.evaluate(() => {
+      const items = document.querySelectorAll('.editable-toolbar-submenu-item');
+      return Array.from(items).map(item => item.className);
+    });
+
+    expect(submenuItems.length).toBe(2);
+    expect(submenuItems.some(c => c.includes('toolbar-add-text'))).toBe(true);
+    expect(submenuItems.some(c => c.includes('toolbar-add-slide'))).toBe(true);
+
+    // Click outside to close submenu
+    await page.click('body', { position: { x: 10, y: 10 } });
+    await expect(submenu).toBeHidden();
   });
 
   test('Toolbar is draggable', async ({ page }) => {
@@ -136,7 +175,7 @@ test.describe('Add Text Element', () => {
     });
 
     // Click add text button
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
 
     // Wait for new element to be created with Quill initialized
     await page.waitForFunction(() => {
@@ -173,7 +212,7 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Check it has handles
@@ -201,9 +240,9 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add two text elements
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
 
     // Check registry
@@ -225,7 +264,7 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element and wait for Quill
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -274,7 +313,7 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element and wait for Quill
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForFunction(() => {
       const newElement = document.querySelector('.editable-new');
       return newElement && newElement.querySelector('.ql-editor');
@@ -325,7 +364,7 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Get initial position
@@ -375,7 +414,7 @@ test.describe('Add Text Element', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Check position is roughly centered
@@ -417,7 +456,7 @@ test.describe('Add Slide', () => {
     });
 
     // Click add slide button
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Verify new slide was created
@@ -443,7 +482,7 @@ test.describe('Add Slide', () => {
     await page.waitForTimeout(500);
 
     // Add a slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Check registry
@@ -468,7 +507,7 @@ test.describe('Add Slide', () => {
     const initialIndex = await page.evaluate(() => Reveal.getIndices().h);
 
     // Add a slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Check we navigated to the new slide
@@ -517,7 +556,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Check that getOriginalEditableElements excludes new elements
@@ -540,7 +579,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element and modify its content
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Modify the new element's text
@@ -564,7 +603,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Get transformed QMD
@@ -581,11 +620,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add multiple elements
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
 
     // Get transformed QMD
@@ -606,7 +645,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new text element and modify its content
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Modify the new element's text to something unique
@@ -644,7 +683,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Set up download listener before clicking save
@@ -693,7 +732,7 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add a new slide after slide 1
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Set up download listener and save
@@ -728,7 +767,7 @@ test.describe('New Elements in Save Flow', () => {
     const initialSlideIndex = await page.evaluate(() => Reveal.getIndices().h);
 
     // Add a new slide (this navigates to the new slide)
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Verify we're on the new slide
@@ -736,7 +775,7 @@ test.describe('New Elements in Save Flow', () => {
     expect(newSlideIndex).toBe(initialSlideIndex + 1);
 
     // Add a text element to the new slide
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Modify the text content
@@ -798,9 +837,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(200);
 
     // Insert slide 1 after original
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -808,9 +847,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Insert slide 2 after slide 1 (we're now on slide 1)
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -820,9 +859,9 @@ test.describe('New Elements in Save Flow', () => {
     // Go back one slide (to slide 1), insert slide 3
     await page.evaluate(() => Reveal.prev());
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -832,9 +871,9 @@ test.describe('New Elements in Save Flow', () => {
     // Go back two slides (to original), insert slide 4
     await page.evaluate(() => { Reveal.prev(); Reveal.prev(); });
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -878,11 +917,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add first new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text marker to first new slide
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const newEl = document.querySelector('.editable-new');
@@ -890,11 +929,11 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add second new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text marker to second new slide
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       // Find the most recently added text element (on current slide)
@@ -904,11 +943,11 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add third new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text marker to third new slide
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const currentSlide = document.querySelector('section.present');
@@ -976,7 +1015,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Start on slide 0, add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Go back to original slide 0
@@ -984,7 +1023,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(300);
 
     // Add text to original slide 0
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1019,12 +1058,12 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add 3 text elements to the new slide
     for (let i = 1; i <= 3; i++) {
-      await page.click('.toolbar-add-text');
+      await clickAddText(page);
       await page.waitForTimeout(300);
       await page.evaluate((idx) => {
         const currentSlide = document.querySelector('section.present');
@@ -1075,9 +1114,9 @@ test.describe('New Elements in Save Flow', () => {
     // Add slide after original slide 0
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(200);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1089,9 +1128,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(200);
 
     // Add slide after original slide 1
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1128,11 +1167,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text and move it to specific position
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
 
     // Set specific position via setState
@@ -1182,11 +1221,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text and clear its content
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1230,11 +1269,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text with special characters
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     const specialText = 'Text with: colons, {braces}, **markdown**, and ::: fences';
     await page.evaluate((text) => {
@@ -1273,9 +1312,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add slide A
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1283,9 +1322,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add slide B after A
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1293,9 +1332,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add slide C after B
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1303,9 +1342,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add slide D after C
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1349,9 +1388,9 @@ test.describe('New Elements in Save Flow', () => {
     // Add slide with text after original slide 0
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(200);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1363,9 +1402,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(200);
 
     // Add slide with text after original slide 1
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1402,17 +1441,17 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add 3 slides in sequence, only add text to the last one
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text only to the third (last) new slide
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1467,9 +1506,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add a new slide with text
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1522,9 +1561,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(300);
 
     // Add a new slide after the last slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1559,11 +1598,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text and change font size
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1607,11 +1646,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text and rotate it
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1659,9 +1698,9 @@ test.describe('New Elements in Save Flow', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Add a new slide with text
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1697,7 +1736,7 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide but don't add any text
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Save without adding text
@@ -1731,9 +1770,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // 1. Add slide A
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1743,7 +1782,7 @@ test.describe('New Elements in Save Flow', () => {
     // 2. Go back to original slide 0, add text there
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1751,9 +1790,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // 3. Add another slide B (after original slide 0)
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1764,7 +1803,7 @@ test.describe('New Elements in Save Flow', () => {
     // Slide A should now be at index 2 (original 0, B at 1, A at 2)
     await page.evaluate(() => Reveal.slide(2));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const currentSlide = document.querySelector('section.present');
@@ -1809,11 +1848,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text with unicode and emoji
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     const unicodeText = '中文 日本語 émojis 🎉🚀 Ñoño';
     await page.evaluate((text) => {
@@ -1852,11 +1891,11 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text with multiple lines
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     const multilineText = 'Line one\nLine two\nLine three';
     await page.evaluate((text) => {
@@ -1902,9 +1941,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(300);
 
     // Add a new slide after it
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1944,9 +1983,9 @@ test.describe('New Elements in Save Flow', () => {
     await page.waitForTimeout(500);
 
     // Add slide A with text
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1954,9 +1993,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add slide B with different text
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -1964,9 +2003,9 @@ test.describe('New Elements in Save Flow', () => {
     });
 
     // Add slide C with different text
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2037,8 +2076,7 @@ test.describe('ToolbarRegistry', () => {
 
     expect(actions).toContain('save');
     expect(actions).toContain('copy');
-    expect(actions).toContain('addText');
-    expect(actions).toContain('addSlide');
+    expect(actions).toContain('add'); // add has submenu with addText and addSlide
   });
 
   test('ToolbarRegistry.createButton creates valid button', async ({ page }) => {
@@ -2171,11 +2209,11 @@ test.describe('Edge Cases - Content that could break parsing', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
     // Add text that looks like a heading
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2217,10 +2255,10 @@ test.describe('Edge Cases - Content that could break parsing', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2289,10 +2327,10 @@ test.describe('Edge Cases - Content that could break parsing', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2325,10 +2363,10 @@ test.describe('Edge Cases - Content that could break parsing', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2361,10 +2399,10 @@ test.describe('Edge Cases - Content that could break parsing', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     const codeContent = '```javascript\nconst x = 1;\n```';
     await page.evaluate((text) => {
@@ -2399,10 +2437,10 @@ test.describe('Edge Cases - Content that could break parsing', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2443,10 +2481,10 @@ test.describe('Edge Cases - Document structure', () => {
     await page.waitForTimeout(500);
 
     // Add a new slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2484,10 +2522,10 @@ test.describe('Edge Cases - Numeric/positioning', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2526,10 +2564,10 @@ test.describe('Edge Cases - Numeric/positioning', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2568,10 +2606,10 @@ test.describe('Edge Cases - Numeric/positioning', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2606,10 +2644,10 @@ test.describe('Edge Cases - Numeric/positioning', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2644,10 +2682,10 @@ test.describe('Edge Cases - Numeric/positioning', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2682,10 +2720,10 @@ test.describe('Edge Cases - Numeric/positioning', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2729,9 +2767,9 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Stay on slide 0 and add 5 slides in sequence (no going back)
     for (let i = 1; i <= 5; i++) {
-      await page.click('.toolbar-add-slide');
+      await clickAddSlide(page);
       await page.waitForTimeout(400);
-      await page.click('.toolbar-add-text');
+      await clickAddText(page);
       await page.waitForTimeout(200);
       await page.evaluate((num) => {
         const el = document.querySelector('section.present .editable-new');
@@ -2775,9 +2813,9 @@ test.describe('Edge Cases - Insertion order', () => {
     await page.waitForTimeout(500);
 
     // Add slide 1 from original
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2787,9 +2825,9 @@ test.describe('Edge Cases - Insertion order', () => {
     // Go back to original, add slide 2
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2799,9 +2837,9 @@ test.describe('Edge Cases - Insertion order', () => {
     // Go back to original, add slide 3
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2811,9 +2849,9 @@ test.describe('Edge Cases - Insertion order', () => {
     // Go back to original, add slide 4
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2823,9 +2861,9 @@ test.describe('Edge Cases - Insertion order', () => {
     // Go back to original, add slide 5
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2871,9 +2909,9 @@ test.describe('Edge Cases - Insertion order', () => {
     // Add 6 slides in a chain: A -> B -> C -> D -> E -> F
     const markers = ['DEEP_A', 'DEEP_B', 'DEEP_C', 'DEEP_D', 'DEEP_E', 'DEEP_F'];
     for (const marker of markers) {
-      await page.click('.toolbar-add-slide');
+      await clickAddSlide(page);
       await page.waitForTimeout(400);
-      await page.click('.toolbar-add-text');
+      await clickAddText(page);
       await page.waitForTimeout(200);
       await page.evaluate((m) => {
         const el = document.querySelector('section.present .editable-new');
@@ -2915,9 +2953,9 @@ test.describe('Edge Cases - Insertion order', () => {
     // Pattern: slide1 -> text on original -> slide2 -> text on slide1 -> slide3
 
     // Add slide 1
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2927,7 +2965,7 @@ test.describe('Edge Cases - Insertion order', () => {
     // Go back to original, add text
     await page.evaluate(() => Reveal.slide(0));
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2935,9 +2973,9 @@ test.describe('Edge Cases - Insertion order', () => {
     });
 
     // Add slide 2 (from original)
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -2947,7 +2985,7 @@ test.describe('Edge Cases - Insertion order', () => {
     // Go to slide 1, add text
     await page.evaluate(() => Reveal.slide(2)); // slide 1 is now at index 2
     await page.waitForTimeout(300);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const currentSlide = document.querySelector('section.present');
@@ -2957,9 +2995,9 @@ test.describe('Edge Cases - Insertion order', () => {
     });
 
     // Add slide 3 (from slide 1)
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3047,9 +3085,9 @@ test.describe('Edge Cases - State management', () => {
     await page.waitForTimeout(500);
 
     // First save: add a slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3071,9 +3109,9 @@ test.describe('Edge Cases - State management', () => {
     expect(firstSaveContent).toContain('## New Slide');
 
     // Second save: add another slide
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(400);
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3140,10 +3178,10 @@ test.describe('Edge Cases - Text content', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3177,10 +3215,10 @@ test.describe('Edge Cases - Text content', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3217,10 +3255,10 @@ test.describe('Edge Cases - Text content', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     const longText = 'LONG_START_' + 'x'.repeat(1000) + '_LONG_END';
     await page.evaluate((text) => {
@@ -3251,10 +3289,10 @@ test.describe('Edge Cases - Text content', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     // Set as text content to preserve literal angle brackets
     await page.evaluate(() => {
@@ -3288,10 +3326,10 @@ test.describe('Edge Cases - Output format', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3339,10 +3377,10 @@ test.describe('Edge Cases - Output format', () => {
     await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-slide');
+    await clickAddSlide(page);
     await page.waitForTimeout(500);
 
-    await page.click('.toolbar-add-text');
+    await clickAddText(page);
     await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
