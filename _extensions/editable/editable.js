@@ -21,6 +21,12 @@ const CONFIG = {
   NEW_TEXT_HEIGHT: 50,
   NEW_SLIDE_HEADING: "## New Slide",
 
+  // Arrow defaults
+  NEW_ARROW_LENGTH: 150,
+  ARROW_HANDLE_SIZE: 12,
+  ARROW_DEFAULT_COLOR: "black",
+  ARROW_DEFAULT_WIDTH: 2,
+
   // Quill Editor CDN
   QUILL_CSS:
     "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
@@ -1141,6 +1147,9 @@ const NewElementRegistry = {
   // Track new slides added during the session
   newSlides: [],
 
+  // Track new arrows added during the session
+  newArrows: [],
+
   // Add a new text div
   // newSlideRef is a reference to the new slide entry if this div is on a new slide
   addDiv(div, slideIndex, newSlideRef = null) {
@@ -1163,6 +1172,15 @@ const NewElementRegistry = {
     });
   },
 
+  // Add a new arrow
+  // newSlideRef is a reference to the new slide entry if this arrow is on a new slide
+  // Note: We store the reference directly (not a copy) so handle drag updates are reflected
+  addArrow(arrowData, slideIndex, newSlideRef = null) {
+    arrowData.slideIndex = slideIndex;
+    arrowData.newSlideRef = newSlideRef;
+    this.newArrows.push(arrowData);
+  },
+
   // Get count of new slides before a given index (for offset calculation)
   countNewSlidesBefore(index) {
     return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
@@ -1172,11 +1190,12 @@ const NewElementRegistry = {
   clear() {
     this.newDivs = [];
     this.newSlides = [];
+    this.newArrows = [];
   },
 
   // Check if there are any new elements
   hasNewElements() {
-    return this.newDivs.length > 0 || this.newSlides.length > 0;
+    return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
   },
 };
 
@@ -1290,7 +1309,7 @@ ToolbarRegistry.register("copy", {
   onClick: () => copyQmdToClipboard(),
 });
 
-// Add submenu: groups "Add Text" and "Add Slide"
+// Add submenu: groups "Add Text", "Add Slide", and "Add Arrow"
 ToolbarRegistry.register("add", {
   icon: "➕",
   label: "Add",
@@ -1310,6 +1329,13 @@ ToolbarRegistry.register("add", {
       title: "Add new slide after current",
       className: "toolbar-add-slide",
       onClick: () => addNewSlide(),
+    },
+    {
+      icon: "➡️",
+      label: "Arrow",
+      title: "Add arrow to current slide",
+      className: "toolbar-add-arrow",
+      onClick: () => addNewArrow(),
     },
   ],
 });
@@ -1454,7 +1480,7 @@ function getOriginalEditableDivs() {
   return document.querySelectorAll("div.editable:not(.editable-new)");
 }
 
-// Get current slide index (accounting for title slide)
+// Get current slide index (Reveal.js index)
 function getCurrentSlideIndex() {
   const indices = Reveal.getIndices();
   return indices.h;
@@ -1464,6 +1490,25 @@ function getCurrentSlideIndex() {
 function getCurrentSlide() {
   return document.querySelector("section.present:not(.stack)") ||
          document.querySelector("section.present");
+}
+
+// Check if document has a title slide (from YAML frontmatter)
+// Title slides don't have a ## heading in the QMD source
+function hasTitleSlide() {
+  const firstSlide = Reveal.getSlide(0);
+  if (!firstSlide) return false;
+  // Title slides typically have an h1 with the title, not an h2
+  const h2 = firstSlide.querySelector("h2");
+  return !h2;
+}
+
+// Convert Reveal.js slide index to QMD heading index
+// If there's a title slide, the first ## heading is at Reveal index 1
+function getQmdHeadingIndex(revealIndex) {
+  if (hasTitleSlide()) {
+    return revealIndex - 1;
+  }
+  return revealIndex;
 }
 
 // =============================================================================
@@ -1510,9 +1555,11 @@ async function addNewTextElement() {
       NewElementRegistry.addDiv(newDiv, slideIndex, null);
     }
   } else {
+    // Convert to QMD heading index (accounts for title slide offset)
+    const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
     // Calculate original slide index (accounting for new slides before this position)
     const originalSlideIndex =
-      slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+      qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
     NewElementRegistry.addDiv(newDiv, originalSlideIndex, null);
   }
 
@@ -1539,6 +1586,7 @@ function addNewSlide() {
   }
 
   const slideIndex = getCurrentSlideIndex();
+  const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
 
   // Calculate original slide index and track parent new slide if applicable
   let originalSlideIndex;
@@ -1556,11 +1604,11 @@ function addNewSlide() {
       insertAfterNewSlide = currentNewSlideEntry;
     } else {
       originalSlideIndex =
-        slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+        qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
     }
   } else {
     originalSlideIndex =
-      slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+      qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
   }
 
   // Create new slide section
@@ -1589,6 +1637,230 @@ function addNewSlide() {
     insertAfterNewSlide ? "yes" : "no"
   );
   return newSlide;
+}
+
+// =============================================================================
+// Arrow Creation and Management
+// =============================================================================
+
+function addNewArrow() {
+  const currentSlide = getCurrentSlide();
+  if (!currentSlide) {
+    console.warn("No current slide found");
+    return null;
+  }
+
+  const slideIndex = getCurrentSlideIndex();
+  const slideWidth = currentSlide.offsetWidth || 960;
+  const slideHeight = currentSlide.offsetHeight || 700;
+
+  // Default arrow position: centered, horizontal
+  const centerX = slideWidth / 2;
+  const centerY = slideHeight / 2;
+  const halfLength = CONFIG.NEW_ARROW_LENGTH / 2;
+
+  const arrowData = {
+    fromX: centerX - halfLength,
+    fromY: centerY,
+    toX: centerX + halfLength,
+    toY: centerY,
+  };
+
+  // Create the arrow container element
+  const arrowContainer = createArrowElement(arrowData);
+  currentSlide.appendChild(arrowContainer);
+
+  // Store reference to container in arrowData for later updates
+  arrowData.element = arrowContainer;
+
+  // Track in NewElementRegistry
+  const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
+  if (isOnNewSlide) {
+    const newSlideEntry = NewElementRegistry.newSlides.find(
+      (s) => s.element === currentSlide
+    );
+    NewElementRegistry.addArrow(arrowData, slideIndex, newSlideEntry || null);
+  } else {
+    // Convert to QMD heading index (accounts for title slide offset)
+    const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
+    const originalSlideIndex =
+      qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
+    NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
+  }
+
+  console.log("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+  return arrowContainer;
+}
+
+function createArrowElement(arrowData) {
+  const container = document.createElement("div");
+  container.className = "editable-arrow-container editable-new";
+  container.style.position = "absolute";
+  container.style.left = "0";
+  container.style.top = "0";
+  container.style.width = "100%";
+  container.style.height = "100%";
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "100";
+
+  // Create SVG for the arrow
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.style.position = "absolute";
+  svg.style.left = "0";
+  svg.style.top = "0";
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+  svg.style.overflow = "visible";
+  svg.style.pointerEvents = "none";
+
+  // Create arrowhead marker
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+  const markerId = "arrowhead-" + Math.random().toString(36).substr(2, 9);
+  marker.setAttribute("id", markerId);
+  marker.setAttribute("markerWidth", "10");
+  marker.setAttribute("markerHeight", "10");
+  marker.setAttribute("refX", "0");
+  marker.setAttribute("refY", "5");
+  marker.setAttribute("orient", "auto");
+  marker.setAttribute("markerUnits", "strokeWidth");
+
+  const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+  arrowPath.setAttribute("fill", CONFIG.ARROW_DEFAULT_COLOR);
+  marker.appendChild(arrowPath);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  // Create the arrow line
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("x1", arrowData.fromX);
+  line.setAttribute("y1", arrowData.fromY);
+  line.setAttribute("x2", arrowData.toX);
+  line.setAttribute("y2", arrowData.toY);
+  line.setAttribute("stroke", CONFIG.ARROW_DEFAULT_COLOR);
+  line.setAttribute("stroke-width", CONFIG.ARROW_DEFAULT_WIDTH);
+  line.setAttribute("marker-end", `url(#${markerId})`);
+  line.style.pointerEvents = "stroke";
+  svg.appendChild(line);
+
+  container.appendChild(svg);
+
+  // Store references for updates
+  arrowData._line = line;
+  arrowData._svg = svg;
+  arrowData._markerId = markerId;
+
+  // Create draggable handles for start and end points
+  const startHandle = createArrowHandle(arrowData, "start");
+  const endHandle = createArrowHandle(arrowData, "end");
+  container.appendChild(startHandle);
+  container.appendChild(endHandle);
+
+  arrowData._startHandle = startHandle;
+  arrowData._endHandle = endHandle;
+
+  // Update handle positions
+  updateArrowHandles(arrowData);
+
+  return container;
+}
+
+function createArrowHandle(arrowData, position) {
+  const handle = document.createElement("div");
+  handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
+  handle.style.position = "absolute";
+  handle.style.width = CONFIG.ARROW_HANDLE_SIZE + "px";
+  handle.style.height = CONFIG.ARROW_HANDLE_SIZE + "px";
+  handle.style.borderRadius = "50%";
+  handle.style.backgroundColor = position === "start" ? "#007cba" : "#28a745";
+  handle.style.border = "2px solid white";
+  handle.style.cursor = "move";
+  handle.style.pointerEvents = "auto";
+  handle.style.transform = "translate(-50%, -50%)";
+  handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+  handle.setAttribute("role", "slider");
+  handle.setAttribute("aria-label", `Arrow ${position} point`);
+  handle.setAttribute("tabindex", "0");
+
+  // Add drag functionality
+  let isDragging = false;
+  let cachedScale = 1;
+
+  const startDrag = (e) => {
+    isDragging = true;
+    cachedScale = getSlideScale();
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onDrag = (e) => {
+    if (!isDragging) return;
+
+    const rect = arrowData.element.getBoundingClientRect();
+    const scale = cachedScale;
+
+    let clientX, clientY;
+    if (e.type.startsWith("touch")) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    // Convert to slide coordinates
+    const x = (clientX - rect.left) / scale;
+    const y = (clientY - rect.top) / scale;
+
+    // Update arrow data
+    if (position === "start") {
+      arrowData.fromX = x;
+      arrowData.fromY = y;
+    } else {
+      arrowData.toX = x;
+      arrowData.toY = y;
+    }
+
+    // Update visual
+    updateArrowVisual(arrowData);
+    updateArrowHandles(arrowData);
+
+    e.preventDefault();
+  };
+
+  const stopDrag = () => {
+    isDragging = false;
+  };
+
+  handle.addEventListener("mousedown", startDrag);
+  handle.addEventListener("touchstart", startDrag);
+  document.addEventListener("mousemove", onDrag);
+  document.addEventListener("touchmove", onDrag);
+  document.addEventListener("mouseup", stopDrag);
+  document.addEventListener("touchend", stopDrag);
+
+  return handle;
+}
+
+function updateArrowVisual(arrowData) {
+  if (arrowData._line) {
+    arrowData._line.setAttribute("x1", arrowData.fromX);
+    arrowData._line.setAttribute("y1", arrowData.fromY);
+    arrowData._line.setAttribute("x2", arrowData.toX);
+    arrowData._line.setAttribute("y2", arrowData.toY);
+  }
+}
+
+function updateArrowHandles(arrowData) {
+  if (arrowData._startHandle) {
+    arrowData._startHandle.style.left = arrowData.fromX + "px";
+    arrowData._startHandle.style.top = arrowData.fromY + "px";
+  }
+  if (arrowData._endHandle) {
+    arrowData._endHandle.style.left = arrowData.toX + "px";
+    arrowData._endHandle.style.top = arrowData.toY + "px";
+  }
 }
 
 // =============================================================================
@@ -2123,6 +2395,9 @@ function getTransformedQmd() {
   // Then, insert any new text divs (pass slide positions for divs on new slides)
   content = insertNewDivs(content, slideLinePositions);
 
+  // Insert any new arrows
+  content = insertNewArrows(content, slideLinePositions);
+
   // Now process existing editable elements
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);
@@ -2133,9 +2408,14 @@ function getTransformedQmd() {
 }
 
 function saveMovedElts() {
-  const content = getTransformedQmd();
-  if (content) {
-    downloadString(content);
+  try {
+    const content = getTransformedQmd();
+    if (content) {
+      downloadString(content);
+    }
+  } catch (error) {
+    console.error("Error saving:", error);
+    alert("Error saving: " + error.message);
   }
 }
 
@@ -2339,6 +2619,17 @@ function insertNewSlides(text) {
     }
   }
 
+  // Build a map of new slides to their associated arrows
+  const arrowsByNewSlide = new Map();
+  for (const arrowInfo of NewElementRegistry.newArrows) {
+    if (arrowInfo.newSlideRef) {
+      if (!arrowsByNewSlide.has(arrowInfo.newSlideRef)) {
+        arrowsByNewSlide.set(arrowInfo.newSlideRef, []);
+      }
+      arrowsByNewSlide.get(arrowInfo.newSlideRef).push(arrowInfo);
+    }
+  }
+
   // Build tree structure for slides with same afterSlideIndex
   // Flatten each tree respecting insertion semantics:
   // - Later roots come before earlier roots (inserted at same position, pushing down)
@@ -2447,6 +2738,15 @@ function insertNewSlides(text) {
         }
       }
 
+      // Add arrows for this slide
+      const arrowsForThisSlide = arrowsByNewSlide.get(newSlide) || [];
+      for (const arrowInfo of arrowsForThisSlide) {
+        const shortcode = serializeArrowToShortcode(arrowInfo);
+        newSlideContent.push("");
+        newSlideContent.push(shortcode);
+        newSlideContent.push("");
+      }
+
       // Track line position (will be at baseInsertLineIndex since we insert there)
       slideLinePositions.set(newSlide, baseInsertLineIndex + 1);
 
@@ -2464,7 +2764,8 @@ function insertNewSlides(text) {
     // After processing this group, update slideHeadingLines for the total added content
     const totalLinesAdded = orderedSlides.reduce((sum, slide) => {
       const divs = divsByNewSlide.get(slide) || [];
-      return sum + 3 + divs.length * 4; // 3 for heading, 4 per div
+      const arrows = arrowsByNewSlide.get(slide) || [];
+      return sum + 3 + divs.length * 4 + arrows.length * 3; // 3 for heading, 4 per div, 3 per arrow
     }, 0);
 
     for (let j = 0; j < slideHeadingLines.length; j++) {
@@ -2561,6 +2862,91 @@ function insertNewDivs(text, slideLinePositions = new Map()) {
   }
 
   return lines.join("\n");
+}
+
+// Insert new arrows into QMD content
+// Only handles arrows on ORIGINAL slides - arrows on new slides are handled by insertNewSlides
+function insertNewArrows(text, slideLinePositions = new Map()) {
+  // Filter to only arrows on original slides (not on new slides)
+  const arrowsOnOriginalSlides = NewElementRegistry.newArrows.filter(
+    (arrow) => !arrow.newSlideRef
+  );
+
+  if (arrowsOnOriginalSlides.length === 0) {
+    return text;
+  }
+
+  const lines = text.split("\n");
+
+  // Find all level-2 heading positions
+  const slideHeadingLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const prevLine = i > 0 ? lines[i - 1].trim() : "";
+
+    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+      slideHeadingLines.push(i);
+    }
+  }
+
+  // Group arrows by slide index
+  const arrowsBySlide = new Map();
+  for (const arrow of arrowsOnOriginalSlides) {
+    const slideIdx = arrow.slideIndex;
+    if (!arrowsBySlide.has(slideIdx)) {
+      arrowsBySlide.set(slideIdx, []);
+    }
+    arrowsBySlide.get(slideIdx).push(arrow);
+  }
+
+  // Sort slide indices in descending order (insert from end)
+  const slideIndices = [...arrowsBySlide.keys()].sort((a, b) => b - a);
+
+  for (const slideIdx of slideIndices) {
+    const arrowsForSlide = arrowsBySlide.get(slideIdx);
+
+    // Find where to insert (before the next slide or at end)
+    let insertLineIndex;
+    if (slideIdx >= slideHeadingLines.length) {
+      insertLineIndex = lines.length;
+    } else if (slideIdx + 1 < slideHeadingLines.length) {
+      insertLineIndex = slideHeadingLines[slideIdx + 1];
+    } else {
+      insertLineIndex = lines.length;
+    }
+
+    // Create arrow shortcodes for all new arrows on this slide
+    const newContent = [];
+    for (const arrow of arrowsForSlide) {
+      const shortcode = serializeArrowToShortcode(arrow);
+      newContent.push("");
+      newContent.push(shortcode);
+      newContent.push("");
+    }
+
+    if (newContent.length > 0) {
+      lines.splice(insertLineIndex, 0, ...newContent);
+
+      // Update slideHeadingLines for subsequent insertions
+      for (let i = 0; i < slideHeadingLines.length; i++) {
+        if (slideHeadingLines[i] >= insertLineIndex) {
+          slideHeadingLines[i] += newContent.length;
+        }
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+// Serialize an arrow to quarto-arrows shortcode format
+function serializeArrowToShortcode(arrow) {
+  const fromX = round(arrow.fromX);
+  const fromY = round(arrow.fromY);
+  const toX = round(arrow.toX);
+  const toY = round(arrow.toY);
+
+  return `{{< arrow from="${fromX},${fromY}" to="${toX},${toY}" position="absolute" >}}`;
 }
 
 function updateTextDivs(text) {

@@ -784,3 +784,66 @@
 .quill-toolbar-container .ql-size .ql-picker-item[data-value="huge"]::before {
   content: 'Huge' !important;
 }
+
+/* =============================================================================
+   Arrow Elements
+   ============================================================================= */
+
+:root {
+  --editable-arrow-start-color: #007cba;
+  --editable-arrow-end-color: #28a745;
+  --editable-arrow-handle-size: 12px;
+  --editable-toolbar-add-arrow-color: #6f42c1;
+}
+
+/* Arrow container */
+.editable-arrow-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.editable-arrow-container.editable-new {
+  border: none !important;
+}
+
+/* Arrow handles */
+.editable-arrow-handle {
+  position: absolute;
+  width: var(--editable-arrow-handle-size);
+  height: var(--editable-arrow-handle-size);
+  border-radius: 50%;
+  border: 2px solid white;
+  cursor: move;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  z-index: 101;
+}
+
+.editable-arrow-handle:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.editable-arrow-handle:active {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.editable-arrow-handle-start {
+  background-color: var(--editable-arrow-start-color);
+}
+
+.editable-arrow-handle-end {
+  background-color: var(--editable-arrow-end-color);
+}
+
+/* Arrow submenu item color */
+.editable-toolbar-submenu-item.toolbar-add-arrow {
+  background-color: var(--editable-toolbar-add-arrow-color);
+}
