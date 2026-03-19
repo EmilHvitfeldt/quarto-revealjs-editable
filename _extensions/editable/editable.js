@@ -24,8 +24,11 @@ const CONFIG = {
   // Arrow defaults
   NEW_ARROW_LENGTH: 150,
   ARROW_HANDLE_SIZE: 12,
+  ARROW_CONTROL_HANDLE_SIZE: 10,
   ARROW_DEFAULT_COLOR: "black",
   ARROW_DEFAULT_WIDTH: 2,
+  ARROW_CONTROL1_COLOR: "#ff6600",
+  ARROW_CONTROL2_COLOR: "#9933ff",
 
   // Quill Editor CDN
   QUILL_CSS:
@@ -1664,6 +1667,12 @@ function addNewArrow() {
     fromY: centerY,
     toX: centerX + halfLength,
     toY: centerY,
+    // Control points (null = straight line, set values = curve)
+    control1X: null,
+    control1Y: null,
+    control2X: null,
+    control2Y: null,
+    curveMode: false,
   };
 
   // Create the arrow container element
@@ -1732,24 +1741,41 @@ function createArrowElement(arrowData) {
   defs.appendChild(marker);
   svg.appendChild(defs);
 
-  // Create the arrow line
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  line.setAttribute("x1", arrowData.fromX);
-  line.setAttribute("y1", arrowData.fromY);
-  line.setAttribute("x2", arrowData.toX);
-  line.setAttribute("y2", arrowData.toY);
-  line.setAttribute("stroke", CONFIG.ARROW_DEFAULT_COLOR);
-  line.setAttribute("stroke-width", CONFIG.ARROW_DEFAULT_WIDTH);
-  line.setAttribute("marker-end", `url(#${markerId})`);
-  line.style.pointerEvents = "stroke";
-  svg.appendChild(line);
+  // Create the arrow path (supports both straight lines and Bezier curves)
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("stroke", CONFIG.ARROW_DEFAULT_COLOR);
+  path.setAttribute("stroke-width", CONFIG.ARROW_DEFAULT_WIDTH);
+  path.setAttribute("fill", "none");
+  path.setAttribute("marker-end", `url(#${markerId})`);
+  path.style.pointerEvents = "stroke";
+  svg.appendChild(path);
+
+  // Create control point guide lines (shown in curve mode)
+  const guideLine1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  guideLine1.setAttribute("stroke", CONFIG.ARROW_CONTROL1_COLOR);
+  guideLine1.setAttribute("stroke-width", "1");
+  guideLine1.setAttribute("stroke-dasharray", "4,4");
+  guideLine1.setAttribute("opacity", "0.6");
+  guideLine1.style.display = "none";
+  svg.appendChild(guideLine1);
+
+  const guideLine2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  guideLine2.setAttribute("stroke", CONFIG.ARROW_CONTROL2_COLOR);
+  guideLine2.setAttribute("stroke-width", "1");
+  guideLine2.setAttribute("stroke-dasharray", "4,4");
+  guideLine2.setAttribute("opacity", "0.6");
+  guideLine2.style.display = "none";
+  svg.appendChild(guideLine2);
 
   container.appendChild(svg);
 
   // Store references for updates
-  arrowData._line = line;
+  arrowData._path = path;
   arrowData._svg = svg;
   arrowData._markerId = markerId;
+  arrowData._guideLine1 = guideLine1;
+  arrowData._guideLine2 = guideLine2;
+  arrowData._container = container;
 
   // Create draggable handles for start and end points
   const startHandle = createArrowHandle(arrowData, "start");
@@ -1760,7 +1786,24 @@ function createArrowElement(arrowData) {
   arrowData._startHandle = startHandle;
   arrowData._endHandle = endHandle;
 
-  // Update handle positions
+  // Create control point handles (hidden initially)
+  const control1Handle = createArrowHandle(arrowData, "control1");
+  const control2Handle = createArrowHandle(arrowData, "control2");
+  control1Handle.style.display = "none";
+  control2Handle.style.display = "none";
+  container.appendChild(control1Handle);
+  container.appendChild(control2Handle);
+
+  arrowData._control1Handle = control1Handle;
+  arrowData._control2Handle = control2Handle;
+
+  // Create curve mode toggle button
+  const curveToggle = createCurveModeToggle(arrowData);
+  container.appendChild(curveToggle);
+  arrowData._curveToggle = curveToggle;
+
+  // Update visual
+  updateArrowPath(arrowData);
   updateArrowHandles(arrowData);
 
   return container;
@@ -1770,10 +1813,21 @@ function createArrowHandle(arrowData, position) {
   const handle = document.createElement("div");
   handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
   handle.style.position = "absolute";
-  handle.style.width = CONFIG.ARROW_HANDLE_SIZE + "px";
-  handle.style.height = CONFIG.ARROW_HANDLE_SIZE + "px";
+
+  // Different sizes and colors for different handle types
+  const isControlPoint = position === "control1" || position === "control2";
+  const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
+
+  let bgColor;
+  if (position === "start") bgColor = "#007cba";
+  else if (position === "end") bgColor = "#28a745";
+  else if (position === "control1") bgColor = CONFIG.ARROW_CONTROL1_COLOR;
+  else if (position === "control2") bgColor = CONFIG.ARROW_CONTROL2_COLOR;
+
+  handle.style.width = handleSize + "px";
+  handle.style.height = handleSize + "px";
   handle.style.borderRadius = "50%";
-  handle.style.backgroundColor = position === "start" ? "#007cba" : "#28a745";
+  handle.style.backgroundColor = bgColor;
   handle.style.border = "2px solid white";
   handle.style.cursor = "move";
   handle.style.pointerEvents = "auto";
@@ -1813,18 +1867,25 @@ function createArrowHandle(arrowData, position) {
     const x = (clientX - rect.left) / scale;
     const y = (clientY - rect.top) / scale;
 
-    // Update arrow data
+    // Update arrow data based on which handle
     if (position === "start") {
       arrowData.fromX = x;
       arrowData.fromY = y;
-    } else {
+    } else if (position === "end") {
       arrowData.toX = x;
       arrowData.toY = y;
+    } else if (position === "control1") {
+      arrowData.control1X = x;
+      arrowData.control1Y = y;
+    } else if (position === "control2") {
+      arrowData.control2X = x;
+      arrowData.control2Y = y;
     }
 
     // Update visual
-    updateArrowVisual(arrowData);
+    updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
+    updateCurveTogglePosition(arrowData);
 
     e.preventDefault();
   };
@@ -1843,12 +1904,48 @@ function createArrowHandle(arrowData, position) {
   return handle;
 }
 
-function updateArrowVisual(arrowData) {
-  if (arrowData._line) {
-    arrowData._line.setAttribute("x1", arrowData.fromX);
-    arrowData._line.setAttribute("y1", arrowData.fromY);
-    arrowData._line.setAttribute("x2", arrowData.toX);
-    arrowData._line.setAttribute("y2", arrowData.toY);
+function updateArrowPath(arrowData) {
+  if (!arrowData._path) return;
+
+  const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+  let pathD;
+
+  if (control1X !== null && control2X !== null) {
+    // Cubic Bezier curve (two control points)
+    pathD = `M ${fromX},${fromY} C ${control1X},${control1Y} ${control2X},${control2Y} ${toX},${toY}`;
+  } else if (control1X !== null) {
+    // Quadratic Bezier curve (one control point)
+    pathD = `M ${fromX},${fromY} Q ${control1X},${control1Y} ${toX},${toY}`;
+  } else {
+    // Straight line
+    pathD = `M ${fromX},${fromY} L ${toX},${toY}`;
+  }
+
+  arrowData._path.setAttribute("d", pathD);
+
+  // Update guide lines (show connections from endpoints to control points)
+  if (arrowData._guideLine1 && arrowData.curveMode) {
+    if (control1X !== null) {
+      arrowData._guideLine1.setAttribute("x1", fromX);
+      arrowData._guideLine1.setAttribute("y1", fromY);
+      arrowData._guideLine1.setAttribute("x2", control1X);
+      arrowData._guideLine1.setAttribute("y2", control1Y);
+      arrowData._guideLine1.style.display = "";
+    } else {
+      arrowData._guideLine1.style.display = "none";
+    }
+  }
+
+  if (arrowData._guideLine2 && arrowData.curveMode) {
+    if (control2X !== null) {
+      arrowData._guideLine2.setAttribute("x1", toX);
+      arrowData._guideLine2.setAttribute("y1", toY);
+      arrowData._guideLine2.setAttribute("x2", control2X);
+      arrowData._guideLine2.setAttribute("y2", control2Y);
+      arrowData._guideLine2.style.display = "";
+    } else {
+      arrowData._guideLine2.style.display = "none";
+    }
   }
 }
 
@@ -1861,6 +1958,114 @@ function updateArrowHandles(arrowData) {
     arrowData._endHandle.style.left = arrowData.toX + "px";
     arrowData._endHandle.style.top = arrowData.toY + "px";
   }
+  if (arrowData._control1Handle && arrowData.control1X !== null) {
+    arrowData._control1Handle.style.left = arrowData.control1X + "px";
+    arrowData._control1Handle.style.top = arrowData.control1Y + "px";
+  }
+  if (arrowData._control2Handle && arrowData.control2X !== null) {
+    arrowData._control2Handle.style.left = arrowData.control2X + "px";
+    arrowData._control2Handle.style.top = arrowData.control2Y + "px";
+  }
+}
+
+function createCurveModeToggle(arrowData) {
+  const toggle = document.createElement("button");
+  toggle.className = "editable-arrow-curve-toggle";
+  toggle.innerHTML = "⤴";
+  toggle.title = "Toggle curve mode";
+  toggle.style.position = "absolute";
+  toggle.style.width = "24px";
+  toggle.style.height = "24px";
+  toggle.style.borderRadius = "4px";
+  toggle.style.border = "1px solid #ccc";
+  toggle.style.background = "white";
+  toggle.style.cursor = "pointer";
+  toggle.style.fontSize = "14px";
+  toggle.style.display = "flex";
+  toggle.style.alignItems = "center";
+  toggle.style.justifyContent = "center";
+  toggle.style.pointerEvents = "auto";
+  toggle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+  toggle.style.zIndex = "102";
+
+  toggle.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleCurveMode(arrowData);
+  });
+
+  // Position near the midpoint of the arrow
+  updateCurveTogglePosition(arrowData, toggle);
+
+  return toggle;
+}
+
+function toggleCurveMode(arrowData) {
+  arrowData.curveMode = !arrowData.curveMode;
+
+  if (arrowData.curveMode) {
+    // Enable curve mode - initialize control points at sensible defaults
+    const { fromX, fromY, toX, toY } = arrowData;
+    const midX = (fromX + toX) / 2;
+    const midY = (fromY + toY) / 2;
+
+    // Calculate perpendicular offset for control points
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const perpX = -dy / len * 50; // 50px offset perpendicular to line
+    const perpY = dx / len * 50;
+
+    // Place control points at 1/3 and 2/3 along the line, offset perpendicular
+    arrowData.control1X = fromX + dx / 3 + perpX;
+    arrowData.control1Y = fromY + dy / 3 + perpY;
+    arrowData.control2X = fromX + 2 * dx / 3 + perpX;
+    arrowData.control2Y = fromY + 2 * dy / 3 + perpY;
+
+    // Show control handles
+    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "";
+    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "";
+
+    // Update toggle appearance
+    if (arrowData._curveToggle) {
+      arrowData._curveToggle.style.background = CONFIG.ARROW_CONTROL1_COLOR;
+      arrowData._curveToggle.style.color = "white";
+    }
+  } else {
+    // Disable curve mode - reset to straight line
+    arrowData.control1X = null;
+    arrowData.control1Y = null;
+    arrowData.control2X = null;
+    arrowData.control2Y = null;
+
+    // Hide control handles and guide lines
+    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "none";
+    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "none";
+    if (arrowData._guideLine1) arrowData._guideLine1.style.display = "none";
+    if (arrowData._guideLine2) arrowData._guideLine2.style.display = "none";
+
+    // Update toggle appearance
+    if (arrowData._curveToggle) {
+      arrowData._curveToggle.style.background = "white";
+      arrowData._curveToggle.style.color = "black";
+    }
+  }
+
+  updateArrowPath(arrowData);
+  updateArrowHandles(arrowData);
+}
+
+function updateCurveTogglePosition(arrowData, toggle) {
+  if (!toggle) toggle = arrowData._curveToggle;
+  if (!toggle) return;
+
+  const { fromX, fromY, toX, toY } = arrowData;
+  const midX = (fromX + toX) / 2;
+  const midY = (fromY + toY) / 2;
+
+  // Position toggle slightly offset from midpoint
+  toggle.style.left = (midX + 15) + "px";
+  toggle.style.top = (midY - 20) + "px";
 }
 
 // =============================================================================
@@ -2946,7 +3151,24 @@ function serializeArrowToShortcode(arrow) {
   const toX = round(arrow.toX);
   const toY = round(arrow.toY);
 
-  return `{{< arrow from="${fromX},${fromY}" to="${toX},${toY}" position="absolute" >}}`;
+  let shortcode = `{{< arrow from="${fromX},${fromY}" to="${toX},${toY}"`;
+
+  // Add control points if they exist (curved arrow)
+  if (arrow.control1X !== null && arrow.control1Y !== null) {
+    const c1x = round(arrow.control1X);
+    const c1y = round(arrow.control1Y);
+    shortcode += ` control1="${c1x},${c1y}"`;
+  }
+
+  if (arrow.control2X !== null && arrow.control2Y !== null) {
+    const c2x = round(arrow.control2X);
+    const c2y = round(arrow.control2Y);
+    shortcode += ` control2="${c2x},${c2y}"`;
+  }
+
+  shortcode += ` position="absolute" >}}`;
+
+  return shortcode;
 }
 
 function updateTextDivs(text) {
