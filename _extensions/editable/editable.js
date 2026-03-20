@@ -1671,6 +1671,30 @@ function setActiveArrow(arrowData) {
   updateArrowStylePanel(arrowData);
 }
 
+// Clean up all event listeners for an arrow (call when removing arrow)
+function cleanupArrowListeners(arrowData) {
+  // Abort the main drag controller
+  if (arrowData._dragController) {
+    arrowData._dragController.abort();
+    arrowData._dragController = null;
+  }
+
+  // Abort handle drag controllers
+  const handles = [
+    arrowData._startHandle,
+    arrowData._endHandle,
+    arrowData._control1Handle,
+    arrowData._control2Handle
+  ];
+
+  for (const handle of handles) {
+    if (handle && handle._dragController) {
+      handle._dragController.abort();
+      handle._dragController = null;
+    }
+  }
+}
+
 function createArrowStylePanel() {
   if (arrowStylePanel) return arrowStylePanel;
 
@@ -2243,6 +2267,10 @@ function createArrowElement(arrowData) {
   arrowData._curveToggle = curveToggle;
 
   // Add click and drag handler to select and move arrow (on hit area)
+  // Use AbortController for proper cleanup of document listeners
+  const arrowDragController = new AbortController();
+  arrowData._dragController = arrowDragController;
+
   let isDraggingArrow = false;
   let dragStartX = 0;
   let dragStartY = 0;
@@ -2301,8 +2329,8 @@ function createArrowElement(arrowData) {
   };
 
   hitArea.addEventListener("mousedown", startArrowDrag);
-  document.addEventListener("mousemove", onArrowDrag);
-  document.addEventListener("mouseup", endArrowDrag);
+  document.addEventListener("mousemove", onArrowDrag, { signal: arrowDragController.signal });
+  document.addEventListener("mouseup", endArrowDrag, { signal: arrowDragController.signal });
 
   hitArea.style.cursor = "grab";
 
@@ -2358,6 +2386,10 @@ function createArrowHandle(arrowData, position) {
   handle.setAttribute("tabindex", "0");
 
   // Add drag functionality
+  // Use AbortController for proper cleanup of document listeners
+  const handleDragController = new AbortController();
+  handle._dragController = handleDragController;
+
   let isDragging = false;
   let cachedScale = 1;
 
@@ -2416,10 +2448,10 @@ function createArrowHandle(arrowData, position) {
 
   handle.addEventListener("mousedown", startDrag);
   handle.addEventListener("touchstart", startDrag);
-  document.addEventListener("mousemove", onDrag);
-  document.addEventListener("touchmove", onDrag);
-  document.addEventListener("mouseup", stopDrag);
-  document.addEventListener("touchend", stopDrag);
+  document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
+  document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
+  document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
+  document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
 
   return handle;
 }

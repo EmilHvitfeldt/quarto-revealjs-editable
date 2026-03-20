@@ -2195,4 +2195,129 @@ test.describe('Arrow Feature', () => {
 
   });
 
+  test.describe('Event Listener Cleanup', () => {
+
+    test('Arrow handles have AbortControllers attached to DOM elements', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+
+      // Check that handles have _dragController property (AbortController)
+      const handleControllers = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        if (!container) return { found: false };
+
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        const control1Handle = container.querySelector('.editable-arrow-handle-control1');
+        const control2Handle = container.querySelector('.editable-arrow-handle-control2');
+
+        return {
+          found: true,
+          start: startHandle && startHandle._dragController instanceof AbortController,
+          end: endHandle && endHandle._dragController instanceof AbortController,
+          control1: control1Handle && control1Handle._dragController instanceof AbortController,
+          control2: control2Handle && control2Handle._dragController instanceof AbortController
+        };
+      });
+
+      expect(handleControllers.found).toBe(true);
+      expect(handleControllers.start).toBe(true);
+      expect(handleControllers.end).toBe(true);
+      expect(handleControllers.control1).toBe(true);
+      expect(handleControllers.control2).toBe(true);
+    });
+
+    test('AbortController signals are not aborted initially', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+
+      const signalStates = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        if (!container) return { found: false };
+
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+
+        return {
+          found: true,
+          startNotAborted: startHandle?._dragController && !startHandle._dragController.signal.aborted,
+          endNotAborted: endHandle?._dragController && !endHandle._dragController.signal.aborted
+        };
+      });
+
+      expect(signalStates.found).toBe(true);
+      expect(signalStates.startNotAborted).toBe(true);
+      expect(signalStates.endNotAborted).toBe(true);
+    });
+
+    test('Multiple arrows have separate AbortControllers', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // Create two arrows
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      const controllersUnique = await page.evaluate(() => {
+        const containers = document.querySelectorAll('.editable-arrow-container.editable-new');
+        if (containers.length < 2) return false;
+
+        const handle1 = containers[0].querySelector('.editable-arrow-handle-start');
+        const handle2 = containers[1].querySelector('.editable-arrow-handle-start');
+
+        if (!handle1?._dragController || !handle2?._dragController) return false;
+
+        // Check that controllers are different instances
+        return handle1._dragController !== handle2._dragController;
+      });
+
+      expect(controllersUnique).toBe(true);
+    });
+
+    test('Dragging still works with AbortController setup', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+
+      // Get initial position
+      const initialPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-start');
+        return handle ? { left: handle.style.left, top: handle.style.top } : null;
+      });
+
+      expect(initialPos).not.toBeNull();
+
+      // Drag the handle
+      const handle = await page.$('.editable-arrow-handle-start');
+      const box = await handle.boundingBox();
+
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 50, box.y + 50);
+      await page.mouse.up();
+
+      // Get new position
+      const newPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-start');
+        return handle ? { left: handle.style.left, top: handle.style.top } : null;
+      });
+
+      // Position should have changed
+      expect(newPos.left).not.toBe(initialPos.left);
+      expect(newPos.top).not.toBe(initialPos.top);
+    });
+
+  });
+
 });
