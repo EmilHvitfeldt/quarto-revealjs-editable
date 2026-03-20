@@ -2242,11 +2242,69 @@ function createArrowElement(arrowData) {
   container.appendChild(curveToggle);
   arrowData._curveToggle = curveToggle;
 
-  // Add click handler to select this arrow (on hit area for easier clicking)
-  hitArea.addEventListener("click", (e) => {
+  // Add click and drag handler to select and move arrow (on hit area)
+  let isDraggingArrow = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let arrowDragScale = 1;
+
+  const startArrowDrag = (e) => {
     e.stopPropagation();
     setActiveArrow(arrowData);
-  });
+
+    isDraggingArrow = true;
+    arrowDragScale = getSlideScale();
+
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    dragStartX = clientX;
+    dragStartY = clientY;
+
+    hitArea.style.cursor = "grabbing";
+  };
+
+  const onArrowDrag = (e) => {
+    if (!isDraggingArrow) return;
+    e.preventDefault();
+
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+    const deltaX = (clientX - dragStartX) / arrowDragScale;
+    const deltaY = (clientY - dragStartY) / arrowDragScale;
+
+    // Move all points by the delta
+    arrowData.fromX += deltaX;
+    arrowData.fromY += deltaY;
+    arrowData.toX += deltaX;
+    arrowData.toY += deltaY;
+
+    if (arrowData.control1X !== null) {
+      arrowData.control1X += deltaX;
+      arrowData.control1Y += deltaY;
+    }
+    if (arrowData.control2X !== null) {
+      arrowData.control2X += deltaX;
+      arrowData.control2Y += deltaY;
+    }
+
+    dragStartX = clientX;
+    dragStartY = clientY;
+
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+  };
+
+  const endArrowDrag = () => {
+    isDraggingArrow = false;
+    hitArea.style.cursor = "grab";
+  };
+
+  hitArea.addEventListener("mousedown", startArrowDrag);
+  document.addEventListener("mousemove", onArrowDrag);
+  document.addEventListener("mouseup", endArrowDrag);
+
+  hitArea.style.cursor = "grab";
 
   // Update visual
   updateArrowPath(arrowData);

@@ -1920,6 +1920,208 @@ test.describe('Arrow Feature', () => {
 
   });
 
+  test.describe('Drag Arrow by Body', () => {
+
+    test('Arrow can be dragged by its body', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Get initial positions
+      const initialPos = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        const d = pathEl.getAttribute('d');
+        const match = d.match(/M ([\d.]+),([\d.]+)/);
+        return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+      });
+
+      // Get hit area position and drag it
+      const hitArea = await page.$('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+      const box = await hitArea.boundingBox();
+
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 50, box.y + box.height / 2 + 30);
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+
+      // Get new positions
+      const newPos = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        const d = pathEl.getAttribute('d');
+        const match = d.match(/M ([\d.]+),([\d.]+)/);
+        return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+      });
+
+      // Position should have changed
+      expect(newPos.x).not.toBe(initialPos.x);
+      expect(newPos.y).not.toBe(initialPos.y);
+    });
+
+    test('Dragging arrow body moves all points together', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Get initial start and end positions
+      const initialPositions = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        return {
+          startX: parseFloat(startHandle.style.left),
+          startY: parseFloat(startHandle.style.top),
+          endX: parseFloat(endHandle.style.left),
+          endY: parseFloat(endHandle.style.top)
+        };
+      });
+
+      // Calculate initial length
+      const initialLength = Math.sqrt(
+        Math.pow(initialPositions.endX - initialPositions.startX, 2) +
+        Math.pow(initialPositions.endY - initialPositions.startY, 2)
+      );
+
+      // Drag arrow body
+      const hitArea = await page.$('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+      const box = await hitArea.boundingBox();
+
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2 + 50);
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+
+      // Get new positions
+      const newPositions = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        return {
+          startX: parseFloat(startHandle.style.left),
+          startY: parseFloat(startHandle.style.top),
+          endX: parseFloat(endHandle.style.left),
+          endY: parseFloat(endHandle.style.top)
+        };
+      });
+
+      // Calculate new length - should be same (arrow shape preserved)
+      const newLength = Math.sqrt(
+        Math.pow(newPositions.endX - newPositions.startX, 2) +
+        Math.pow(newPositions.endY - newPositions.startY, 2)
+      );
+
+      expect(Math.abs(newLength - initialLength)).toBeLessThan(1);
+    });
+
+    test('Dragging curved arrow body moves control points too', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Enable curve mode
+      await page.click('.editable-arrow-curve-toggle');
+      await page.waitForTimeout(100);
+
+      // Get initial control point positions
+      const initial = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const c1Handle = container.querySelector('.editable-arrow-handle-control1');
+        const c2Handle = container.querySelector('.editable-arrow-handle-control2');
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        // Calculate midpoint between start and end (center of arrow body)
+        const startX = parseFloat(startHandle.style.left);
+        const startY = parseFloat(startHandle.style.top);
+        const endX = parseFloat(endHandle.style.left);
+        const endY = parseFloat(endHandle.style.top);
+        return {
+          c1X: parseFloat(c1Handle.style.left),
+          c1Y: parseFloat(c1Handle.style.top),
+          c2X: parseFloat(c2Handle.style.left),
+          c2Y: parseFloat(c2Handle.style.top),
+          midX: (startX + endX) / 2,
+          midY: (startY + endY) / 2
+        };
+      });
+
+      // Use evaluate to trigger the drag since the hit area might be tricky to target
+      await page.evaluate((delta) => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const hitArea = container.querySelector('svg path[stroke="transparent"]');
+
+        // Simulate mousedown
+        const downEvent = new MouseEvent('mousedown', {
+          bubbles: true,
+          clientX: 500,
+          clientY: 350
+        });
+        hitArea.dispatchEvent(downEvent);
+
+        // Simulate mousemove
+        const moveEvent = new MouseEvent('mousemove', {
+          bubbles: true,
+          clientX: 500 + delta.x,
+          clientY: 350 + delta.y
+        });
+        document.dispatchEvent(moveEvent);
+
+        // Simulate mouseup
+        const upEvent = new MouseEvent('mouseup', { bubbles: true });
+        document.dispatchEvent(upEvent);
+      }, { x: 80, y: 40 });
+
+      await page.waitForTimeout(50);
+
+      // Get new control point positions
+      const newPositions = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const c1Handle = container.querySelector('.editable-arrow-handle-control1');
+        const c2Handle = container.querySelector('.editable-arrow-handle-control2');
+        return {
+          c1X: parseFloat(c1Handle.style.left),
+          c1Y: parseFloat(c1Handle.style.top),
+          c2X: parseFloat(c2Handle.style.left),
+          c2Y: parseFloat(c2Handle.style.top)
+        };
+      });
+
+      // Control points should have moved
+      expect(newPositions.c1X).not.toBe(initial.c1X);
+      expect(newPositions.c1Y).not.toBe(initial.c1Y);
+      expect(newPositions.c2X).not.toBe(initial.c2X);
+      expect(newPositions.c2Y).not.toBe(initial.c2Y);
+    });
+
+    test('Hit area has grab cursor', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      const cursor = await page.evaluate(() => {
+        const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+        return hitArea.style.cursor;
+      });
+
+      expect(cursor).toBe('grab');
+    });
+
+  });
+
   test.describe('Style Interactions', () => {
 
     test('Changing multiple styles at once applies all correctly', async ({ page }) => {

@@ -153,6 +153,7 @@ Click **Add → Arrow** to create an arrow on the current slide. The arrow appea
 - **Blue handle**: Start point
 - **Green handle**: End point
 - **Curve toggle** (⤴): Switch between straight and curved arrows
+- **Drag body**: Click and drag anywhere on the arrow line to move the entire arrow
 
 ### Curved Arrows
 
