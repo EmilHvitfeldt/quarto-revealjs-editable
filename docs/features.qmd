@@ -6,11 +6,11 @@ title: "Features"
 
 A floating toolbar appears on the right side of the slides with quick access to common actions:
 
-| Button | Action                                    |
-|--------|-------------------------------------------|
-| Save   | Save edits to file                        |
-| Copy   | Copy QMD to clipboard                     |
-| Add    | Opens submenu with Text and Slide options |
+| Button | Action                                              |
+|--------|-----------------------------------------------------|
+| Save   | Save edits to file                                  |
+| Copy   | Copy QMD to clipboard                               |
+| Add    | Opens submenu with Text, Slide, and Arrow options   |
 
 The toolbar is draggable—grab the handle at the top to reposition it.
 
@@ -22,6 +22,7 @@ Click the **Add** button to open a submenu with options:
 
 - **Text**: Creates a new editable text block on the current slide. Position and style it like any other editable element.
 - **Slide**: Inserts a new blank slide after the current one. The slide will be saved with a `## New Slide` heading.
+- **Arrow**: Adds an arrow to the current slide (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension). See [Arrow Support](#arrow-support) below.
 
 New elements are marked with a dashed border to distinguish them from original content.
 
@@ -122,3 +123,59 @@ Sometimes you might find that images don't stay the size that you dragged them t
   max-height: unset;
 }
 ```
+
+## Arrow Support
+
+The extension integrates with [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) to add arrows to your slides visually.
+
+### Setup
+
+First, install the quarto-arrows extension:
+
+```bash
+quarto add EmilHvitfeldt/quarto-arrows
+```
+
+Then add both filters to your YAML header:
+
+```yaml
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+  - arrow
+```
+
+### Using Arrows
+
+Click **Add → Arrow** to create an arrow on the current slide. The arrow appears centered with draggable handles:
+
+- **Blue handle**: Start point
+- **Green handle**: End point
+- **Curve toggle** (⤴): Switch between straight and curved arrows
+
+### Curved Arrows
+
+Click the curve toggle button to enable Bezier curve mode. Two additional control point handles appear:
+
+- **Orange handle**: First control point (influences curve near start)
+- **Purple handle**: Second control point (influences curve near end)
+
+Dashed guide lines show the connection between endpoints and their control points.
+
+### Selection
+
+Only the currently selected arrow shows its handles and controls. Click on an arrow to select it, or click elsewhere to deselect.
+
+### Saved Format
+
+Arrows are saved as quarto-arrows shortcodes:
+
+```markdown
+{{< arrow from="100,200" to="400,300" position="absolute" >}}
+```
+
+Curved arrows include control points:
+
+```markdown
+{{< arrow from="100,200" to="400,300" control1="150,100" control2="350,400" position="absolute" >}}
