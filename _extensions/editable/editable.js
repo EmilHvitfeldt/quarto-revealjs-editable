@@ -1646,6 +1646,66 @@ function addNewSlide() {
 // Arrow Creation and Management
 // =============================================================================
 
+// Track the currently active (selected) arrow
+let activeArrow = null;
+
+function setActiveArrow(arrowData) {
+  // Deactivate previous arrow
+  if (activeArrow && activeArrow !== arrowData) {
+    activeArrow.isActive = false;
+    updateArrowActiveState(activeArrow);
+  }
+
+  // Activate new arrow
+  activeArrow = arrowData;
+  if (arrowData) {
+    arrowData.isActive = true;
+    updateArrowActiveState(arrowData);
+  }
+}
+
+function updateArrowActiveState(arrowData) {
+  if (!arrowData._container) return;
+
+  const showControls = arrowData.isActive;
+
+  // Show/hide endpoint handles
+  if (arrowData._startHandle) {
+    arrowData._startHandle.style.display = showControls ? "" : "none";
+  }
+  if (arrowData._endHandle) {
+    arrowData._endHandle.style.display = showControls ? "" : "none";
+  }
+
+  // Show/hide control point handles (only if in curve mode)
+  if (arrowData._control1Handle) {
+    arrowData._control1Handle.style.display = (showControls && arrowData.curveMode) ? "" : "none";
+  }
+  if (arrowData._control2Handle) {
+    arrowData._control2Handle.style.display = (showControls && arrowData.curveMode) ? "" : "none";
+  }
+
+  // Show/hide curve toggle
+  if (arrowData._curveToggle) {
+    arrowData._curveToggle.style.display = showControls ? "" : "none";
+  }
+
+  // Show/hide guide lines
+  if (arrowData._guideLine1) {
+    arrowData._guideLine1.style.display = (showControls && arrowData.curveMode && arrowData.control1X !== null) ? "" : "none";
+  }
+  if (arrowData._guideLine2) {
+    arrowData._guideLine2.style.display = (showControls && arrowData.curveMode && arrowData.control2X !== null) ? "" : "none";
+  }
+
+  // Update container class
+  if (showControls) {
+    arrowData._container.classList.add("active");
+  } else {
+    arrowData._container.classList.remove("active");
+  }
+}
+
 function addNewArrow() {
   const currentSlide = getCurrentSlide();
   if (!currentSlide) {
@@ -1673,6 +1733,8 @@ function addNewArrow() {
     control2X: null,
     control2Y: null,
     curveMode: false,
+    // UI state
+    isActive: true, // New arrows start active
   };
 
   // Create the arrow container element
@@ -1720,7 +1782,7 @@ function createArrowElement(arrowData) {
   svg.style.width = "100%";
   svg.style.height = "100%";
   svg.style.overflow = "visible";
-  svg.style.pointerEvents = "none";
+  // Don't set pointer-events on SVG - let children handle their own
 
   // Create arrowhead marker
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
@@ -1741,13 +1803,23 @@ function createArrowElement(arrowData) {
   defs.appendChild(marker);
   svg.appendChild(defs);
 
+  // Create invisible hit area for easier clicking (wider stroke)
+  const hitArea = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  hitArea.setAttribute("stroke", "transparent");
+  hitArea.setAttribute("stroke-width", "20");
+  hitArea.setAttribute("stroke-linecap", "round");
+  hitArea.setAttribute("fill", "none");
+  hitArea.style.pointerEvents = "auto";
+  hitArea.style.cursor = "pointer";
+  svg.appendChild(hitArea);
+
   // Create the arrow path (supports both straight lines and Bezier curves)
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("stroke", CONFIG.ARROW_DEFAULT_COLOR);
   path.setAttribute("stroke-width", CONFIG.ARROW_DEFAULT_WIDTH);
   path.setAttribute("fill", "none");
   path.setAttribute("marker-end", `url(#${markerId})`);
-  path.style.pointerEvents = "stroke";
+  path.style.pointerEvents = "none";
   svg.appendChild(path);
 
   // Create control point guide lines (shown in curve mode)
@@ -1771,6 +1843,7 @@ function createArrowElement(arrowData) {
 
   // Store references for updates
   arrowData._path = path;
+  arrowData._hitArea = hitArea;
   arrowData._svg = svg;
   arrowData._markerId = markerId;
   arrowData._guideLine1 = guideLine1;
@@ -1802,9 +1875,29 @@ function createArrowElement(arrowData) {
   container.appendChild(curveToggle);
   arrowData._curveToggle = curveToggle;
 
+  // Add click handler to select this arrow (on hit area for easier clicking)
+  hitArea.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setActiveArrow(arrowData);
+  });
+
   // Update visual
   updateArrowPath(arrowData);
   updateArrowHandles(arrowData);
+
+  // Set as active arrow
+  setActiveArrow(arrowData);
+
+  // Add click-outside handler to deselect (only once per container)
+  if (!container._clickOutsideHandler) {
+    container._clickOutsideHandler = true;
+    document.addEventListener("click", (e) => {
+      // Check if click is outside all arrow containers
+      if (!e.target.closest(".editable-arrow-container") && activeArrow === arrowData) {
+        setActiveArrow(null);
+      }
+    });
+  }
 
   return container;
 }
@@ -1923,6 +2016,11 @@ function updateArrowPath(arrowData) {
 
   arrowData._path.setAttribute("d", pathD);
 
+  // Update hit area path to match
+  if (arrowData._hitArea) {
+    arrowData._hitArea.setAttribute("d", pathD);
+  }
+
   // Update guide lines (show connections from endpoints to control points)
   if (arrowData._guideLine1 && arrowData.curveMode) {
     if (control1X !== null) {
@@ -2006,8 +2104,6 @@ function toggleCurveMode(arrowData) {
   if (arrowData.curveMode) {
     // Enable curve mode - initialize control points at sensible defaults
     const { fromX, fromY, toX, toY } = arrowData;
-    const midX = (fromX + toX) / 2;
-    const midY = (fromY + toY) / 2;
 
     // Calculate perpendicular offset for control points
     const dx = toX - fromX;
@@ -2022,9 +2118,10 @@ function toggleCurveMode(arrowData) {
     arrowData.control2X = fromX + 2 * dx / 3 + perpX;
     arrowData.control2Y = fromY + 2 * dy / 3 + perpY;
 
-    // Show control handles
-    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "";
-    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "";
+    // Add curve-mode class to container
+    if (arrowData._container) {
+      arrowData._container.classList.add("curve-mode");
+    }
 
     // Update toggle appearance
     if (arrowData._curveToggle) {
@@ -2038,9 +2135,12 @@ function toggleCurveMode(arrowData) {
     arrowData.control2X = null;
     arrowData.control2Y = null;
 
-    // Hide control handles and guide lines
-    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "none";
-    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "none";
+    // Remove curve-mode class from container
+    if (arrowData._container) {
+      arrowData._container.classList.remove("curve-mode");
+    }
+
+    // Hide guide lines
     if (arrowData._guideLine1) arrowData._guideLine1.style.display = "none";
     if (arrowData._guideLine2) arrowData._guideLine2.style.display = "none";
 

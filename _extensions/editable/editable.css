@@ -856,16 +856,35 @@
 
 /* Curve mode toggle button */
 .editable-arrow-curve-toggle {
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  display: none;
 }
 
-.editable-arrow-container:hover .editable-arrow-curve-toggle {
-  opacity: 1;
+.editable-arrow-container.active .editable-arrow-curve-toggle {
+  display: flex;
 }
 
 .editable-arrow-curve-toggle:hover {
   transform: scale(1.1);
+}
+
+/* Arrow handles - hidden by default, shown when active */
+.editable-arrow-handle {
+  display: none;
+}
+
+.editable-arrow-container.active .editable-arrow-handle {
+  display: block;
+}
+
+/* Control point handles only shown in curve mode */
+.editable-arrow-handle-control1,
+.editable-arrow-handle-control2 {
+  display: none !important;
+}
+
+.editable-arrow-container.active.curve-mode .editable-arrow-handle-control1,
+.editable-arrow-container.active.curve-mode .editable-arrow-handle-control2 {
+  display: block !important;
 }
 
 /* Arrow submenu item color */
