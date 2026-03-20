@@ -891,3 +891,93 @@
 .editable-toolbar-submenu-item.toolbar-add-arrow {
   background-color: var(--editable-toolbar-add-arrow-color);
 }
+
+/* =============================================================================
+   Arrow Style Panel
+   ============================================================================= */
+
+.arrow-style-panel {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  z-index: 10000;
+  min-width: 160px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.arrow-style-panel-header {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.arrow-style-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.arrow-style-row:last-child {
+  margin-bottom: 0;
+}
+
+.arrow-style-row label {
+  color: #333;
+  font-size: 13px;
+}
+
+.arrow-style-row input[type="color"] {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+}
+
+.arrow-style-row input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.arrow-style-row input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.arrow-style-row select {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.arrow-style-row input[type="number"] {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.arrow-style-row select:focus,
+.arrow-style-row input[type="color"]:focus {
+  outline: none;
+  border-color: var(--editable-accent-color, #007cba);
+  box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.2);
+}

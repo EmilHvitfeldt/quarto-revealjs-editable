@@ -1648,6 +1648,10 @@ function addNewSlide() {
 
 // Track the currently active (selected) arrow
 let activeArrow = null;
+let arrowStylePanel = null;
+
+// Available arrow head styles
+const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
 
 function setActiveArrow(arrowData) {
   // Deactivate previous arrow
@@ -1661,6 +1665,190 @@ function setActiveArrow(arrowData) {
   if (arrowData) {
     arrowData.isActive = true;
     updateArrowActiveState(arrowData);
+  }
+
+  // Show/hide arrow style panel
+  updateArrowStylePanel(arrowData);
+}
+
+function createArrowStylePanel() {
+  if (arrowStylePanel) return arrowStylePanel;
+
+  const panel = document.createElement("div");
+  panel.id = "arrow-style-panel";
+  panel.className = "arrow-style-panel";
+  panel.style.display = "none";
+
+  // Header
+  const header = document.createElement("div");
+  header.className = "arrow-style-panel-header";
+  header.textContent = "Arrow Style";
+  panel.appendChild(header);
+
+  // Color row
+  const colorRow = document.createElement("div");
+  colorRow.className = "arrow-style-row";
+  const colorLabel = document.createElement("label");
+  colorLabel.textContent = "Color";
+  const colorPicker = document.createElement("input");
+  colorPicker.type = "color";
+  colorPicker.id = "arrow-style-color";
+  colorPicker.value = "#000000";
+  colorPicker.addEventListener("input", (e) => {
+    if (activeArrow) {
+      activeArrow.color = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  colorRow.appendChild(colorLabel);
+  colorRow.appendChild(colorPicker);
+  panel.appendChild(colorRow);
+
+  // Width row
+  const widthRow = document.createElement("div");
+  widthRow.className = "arrow-style-row";
+  const widthLabel = document.createElement("label");
+  widthLabel.textContent = "Width";
+  const widthInput = document.createElement("input");
+  widthInput.type = "number";
+  widthInput.id = "arrow-style-width";
+  widthInput.min = "1";
+  widthInput.max = "20";
+  widthInput.value = "2";
+  widthInput.addEventListener("input", (e) => {
+    if (activeArrow) {
+      const val = parseInt(e.target.value) || 1;
+      activeArrow.width = Math.max(1, Math.min(20, val));
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  widthRow.appendChild(widthLabel);
+  widthRow.appendChild(widthInput);
+  panel.appendChild(widthRow);
+
+  // Head style row
+  const headRow = document.createElement("div");
+  headRow.className = "arrow-style-row";
+  const headLabel = document.createElement("label");
+  headLabel.textContent = "Head";
+  const headSelect = document.createElement("select");
+  headSelect.id = "arrow-style-head";
+  ARROW_HEAD_STYLES.forEach(style => {
+    const opt = document.createElement("option");
+    opt.value = style;
+    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+    headSelect.appendChild(opt);
+  });
+  headSelect.addEventListener("change", (e) => {
+    if (activeArrow) {
+      activeArrow.head = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  headRow.appendChild(headLabel);
+  headRow.appendChild(headSelect);
+  panel.appendChild(headRow);
+
+  document.body.appendChild(panel);
+  arrowStylePanel = panel;
+  return panel;
+}
+
+function updateArrowStylePanel(arrowData) {
+  const panel = createArrowStylePanel();
+
+  if (arrowData) {
+    // Update panel values to match selected arrow
+    const colorPicker = panel.querySelector("#arrow-style-color");
+    const widthSelect = panel.querySelector("#arrow-style-width");
+    const headSelect = panel.querySelector("#arrow-style-head");
+
+    if (colorPicker) {
+      colorPicker.value = arrowData.color === "black" ? "#000000" : arrowData.color;
+    }
+    if (widthSelect) {
+      widthSelect.value = arrowData.width.toString();
+    }
+    if (headSelect) {
+      headSelect.value = arrowData.head || "arrow";
+    }
+
+    panel.style.display = "block";
+  } else {
+    panel.style.display = "none";
+  }
+}
+
+function updateArrowAppearance(arrowData) {
+  if (!arrowData._path) return;
+
+  // Update path stroke
+  arrowData._path.setAttribute("stroke", arrowData.color);
+  arrowData._path.setAttribute("stroke-width", arrowData.width);
+
+  // Update arrowhead marker
+  updateArrowheadMarker(arrowData);
+}
+
+function updateArrowheadMarker(arrowData) {
+  if (!arrowData._svg || !arrowData._markerId) return;
+
+  const marker = arrowData._svg.querySelector(`#${arrowData._markerId}`);
+  if (!marker) return;
+
+  const markerPath = marker.querySelector("path");
+  if (!markerPath) return;
+
+  // Update marker color
+  markerPath.setAttribute("fill", arrowData.color);
+
+  // Update marker shape based on head style
+  const size = 10;
+  let pathD;
+  let refX = 0;
+
+  switch (arrowData.head) {
+    case "stealth":
+      const w = size * 1.2;
+      pathD = `M 0 0 L ${w} ${size/2} L 0 ${size} L ${w*0.3} ${size/2} z`;
+      refX = w * 0.3;
+      break;
+    case "diamond":
+      pathD = `M 0 ${size/2} L ${size/2} 0 L ${size} ${size/2} L ${size/2} ${size} z`;
+      refX = size / 2;
+      break;
+    case "circle":
+      const r = size / 2;
+      pathD = `M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${size} A ${r} ${r} 0 1 1 ${r} 0`;
+      refX = r;
+      marker.setAttribute("refY", r);
+      break;
+    case "square":
+      pathD = `M 0 0 L ${size} 0 L ${size} ${size} L 0 ${size} z`;
+      refX = size / 2;
+      break;
+    case "bar":
+      const bw = size / 3;
+      pathD = `M 0 0 L ${bw} 0 L ${bw} ${size} L 0 ${size} z`;
+      refX = bw / 2;
+      break;
+    case "none":
+      pathD = "";
+      break;
+    default: // "arrow"
+      pathD = `M 0 0 L ${size} ${size/2} L 0 ${size} z`;
+      refX = 0;
+      marker.setAttribute("refY", size / 2);
+  }
+
+  markerPath.setAttribute("d", pathD);
+  marker.setAttribute("refX", refX);
+
+  // Show/hide marker based on head style
+  if (arrowData.head === "none") {
+    arrowData._path.removeAttribute("marker-end");
+  } else {
+    arrowData._path.setAttribute("marker-end", `url(#${arrowData._markerId})`);
   }
 }
 
@@ -1733,6 +1921,10 @@ function addNewArrow() {
     control2X: null,
     control2Y: null,
     curveMode: false,
+    // Styling
+    color: CONFIG.ARROW_DEFAULT_COLOR,
+    width: CONFIG.ARROW_DEFAULT_WIDTH,
+    head: "arrow",
     // UI state
     isActive: true, // New arrows start active
   };
@@ -1798,7 +1990,7 @@ function createArrowElement(arrowData) {
 
   const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
   arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-  arrowPath.setAttribute("fill", CONFIG.ARROW_DEFAULT_COLOR);
+  arrowPath.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
   marker.appendChild(arrowPath);
   defs.appendChild(marker);
   svg.appendChild(defs);
@@ -1815,8 +2007,8 @@ function createArrowElement(arrowData) {
 
   // Create the arrow path (supports both straight lines and Bezier curves)
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("stroke", CONFIG.ARROW_DEFAULT_COLOR);
-  path.setAttribute("stroke-width", CONFIG.ARROW_DEFAULT_WIDTH);
+  path.setAttribute("stroke", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+  path.setAttribute("stroke-width", arrowData.width || CONFIG.ARROW_DEFAULT_WIDTH);
   path.setAttribute("fill", "none");
   path.setAttribute("marker-end", `url(#${markerId})`);
   path.style.pointerEvents = "none";
@@ -1892,8 +2084,10 @@ function createArrowElement(arrowData) {
   if (!container._clickOutsideHandler) {
     container._clickOutsideHandler = true;
     document.addEventListener("click", (e) => {
-      // Check if click is outside all arrow containers
-      if (!e.target.closest(".editable-arrow-container") && activeArrow === arrowData) {
+      // Check if click is outside all arrow containers and style panel
+      if (!e.target.closest(".editable-arrow-container") &&
+          !e.target.closest(".arrow-style-panel") &&
+          activeArrow === arrowData) {
         setActiveArrow(null);
       }
     });
@@ -3264,6 +3458,19 @@ function serializeArrowToShortcode(arrow) {
     const c2x = round(arrow.control2X);
     const c2y = round(arrow.control2Y);
     shortcode += ` control2="${c2x},${c2y}"`;
+  }
+
+  // Add styling (only if non-default)
+  if (arrow.color && arrow.color !== CONFIG.ARROW_DEFAULT_COLOR && arrow.color !== "#000000" && arrow.color !== "black") {
+    shortcode += ` color="${arrow.color}"`;
+  }
+
+  if (arrow.width && arrow.width !== CONFIG.ARROW_DEFAULT_WIDTH) {
+    shortcode += ` width="${arrow.width}"`;
+  }
+
+  if (arrow.head && arrow.head !== "arrow") {
+    shortcode += ` head="${arrow.head}"`;
   }
 
   shortcode += ` position="absolute" >}}`;

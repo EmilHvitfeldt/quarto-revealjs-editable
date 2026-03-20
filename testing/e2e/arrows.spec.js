@@ -1305,4 +1305,194 @@ test.describe('Arrow Feature', () => {
 
   });
 
+  test.describe('Arrow Style Panel', () => {
+
+    test('Style panel appears when arrow is selected', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // Initially no panel
+      let panel = await page.$('#arrow-style-panel');
+      if (panel) {
+        const display = await panel.evaluate(el => getComputedStyle(el).display);
+        expect(display).toBe('none');
+      }
+
+      // Add arrow - it starts selected
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Panel should be visible
+      panel = await page.$('#arrow-style-panel');
+      expect(panel).toBeTruthy();
+      const display = await panel.evaluate(el => el.style.display);
+      expect(display).toBe('block');
+    });
+
+    test('Style panel hides when arrow is deselected', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Click outside to deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      const panel = await page.$('#arrow-style-panel');
+      const display = await panel.evaluate(el => el.style.display);
+      expect(display).toBe('none');
+    });
+
+    test('Color picker changes arrow color', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change color to red
+      await page.fill('#arrow-style-color', '#ff0000');
+      await page.waitForTimeout(50);
+
+      // Verify path stroke changed
+      const strokeColor = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke');
+      });
+      expect(strokeColor).toBe('#ff0000');
+    });
+
+    test('Width input changes arrow width', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change width to 5
+      await page.fill('#arrow-style-width', '5');
+      await page.waitForTimeout(50);
+
+      // Verify path stroke-width changed
+      const strokeWidth = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-width');
+      });
+      expect(strokeWidth).toBe('5');
+    });
+
+    test('Head style selector changes arrowhead shape', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Get initial marker path
+      const initialMarkerPath = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const marker = container.querySelector('marker path');
+        return marker.getAttribute('d');
+      });
+
+      // Change head to diamond
+      await page.selectOption('#arrow-style-head', 'diamond');
+      await page.waitForTimeout(50);
+
+      // Verify marker path changed
+      const newMarkerPath = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const marker = container.querySelector('marker path');
+        return marker.getAttribute('d');
+      });
+      expect(newMarkerPath).not.toBe(initialMarkerPath);
+    });
+
+    test('Head style "none" removes arrowhead', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change head to none
+      await page.selectOption('#arrow-style-head', 'none');
+      await page.waitForTimeout(50);
+
+      // Verify marker-end is removed
+      const hasMarker = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.hasAttribute('marker-end');
+      });
+      expect(hasMarker).toBe(false);
+    });
+
+    test('Style panel syncs values when selecting different arrows', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // Create first arrow and change its color
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+      await page.fill('#arrow-style-color', '#ff0000');
+      await page.waitForTimeout(50);
+
+      // Click outside to deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Create second arrow (default color)
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Panel should show default color for new arrow
+      const colorValue = await page.$eval('#arrow-style-color', el => el.value);
+      expect(colorValue).toBe('#000000');
+    });
+
+    test('Style changes persist after deselect and reselect', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change styles
+      await page.fill('#arrow-style-color', '#00ff00');
+      await page.fill('#arrow-style-width', '4');
+      await page.waitForTimeout(50);
+
+      // Click outside to deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Click arrow to reselect (use evaluate to dispatch click event on hit area)
+      await page.evaluate(() => {
+        const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+        hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await page.waitForTimeout(100);
+
+      // Verify panel shows saved values
+      const colorValue = await page.$eval('#arrow-style-color', el => el.value);
+      const widthValue = await page.$eval('#arrow-style-width', el => el.value);
+      expect(colorValue).toBe('#00ff00');
+      expect(widthValue).toBe('4');
+    });
+
+  });
+
 });

@@ -167,6 +167,16 @@ Dashed guide lines show the connection between endpoints and their control point
 
 Only the currently selected arrow shows its handles and controls. Click on an arrow to select it, or click elsewhere to deselect.
 
+### Arrow Styling
+
+When an arrow is selected, a style panel appears in the bottom-left corner of the screen with options to customize the arrow's appearance:
+
+- **Color**: Pick any color for the arrow line and head
+- **Width**: Choose line thickness from 1-10px
+- **Head**: Select arrowhead style (arrow, stealth, diamond, circle, square, bar, or none)
+
+Style changes are applied immediately and saved with the arrow.
+
 ### Saved Format
 
 Arrows are saved as quarto-arrows shortcodes:
@@ -179,3 +189,9 @@ Curved arrows include control points:
 
 ```markdown
 {{< arrow from="100,200" to="400,300" control1="150,100" control2="350,400" position="absolute" >}}
+```
+
+Styled arrows include additional attributes:
+
+```markdown
+{{< arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" position="absolute" >}}
