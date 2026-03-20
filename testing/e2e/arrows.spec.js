@@ -1462,6 +1462,69 @@ test.describe('Arrow Feature', () => {
       expect(colorValue).toBe('#000000');
     });
 
+    test('Dash selector changes arrow dash pattern', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change dash to dashed
+      await page.selectOption('#arrow-style-dash', 'dashed');
+      await page.waitForTimeout(50);
+
+      // Verify path has stroke-dasharray
+      const dashArray = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+      expect(dashArray).toBeTruthy();
+      expect(dashArray).not.toBe('none');
+    });
+
+    test('Opacity slider changes arrow opacity', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change opacity to 0.5
+      await page.fill('#arrow-style-opacity', '0.5');
+      await page.waitForTimeout(50);
+
+      // Verify path opacity changed
+      const opacity = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('opacity');
+      });
+      expect(opacity).toBe('0.5');
+    });
+
+    test('Line style selector creates multiple lines', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change line to double
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      // Verify extra lines were created
+      const extraLineCount = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        return container.querySelectorAll('.arrow-extra-line').length;
+      });
+      expect(extraLineCount).toBe(2);
+    });
+
     test('Style changes persist after deselect and reselect', async ({ page }) => {
       const htmlPath = path.join(TESTING_DIR, 'arrows.html');
       await page.goto(`file://${htmlPath}`);
@@ -1491,6 +1554,441 @@ test.describe('Arrow Feature', () => {
       const widthValue = await page.$eval('#arrow-style-width', el => el.value);
       expect(colorValue).toBe('#00ff00');
       expect(widthValue).toBe('4');
+    });
+
+  });
+
+  test.describe('Dash Style', () => {
+
+    test('Switching between dash styles updates stroke-dasharray', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Initially solid (no dasharray)
+      let dashArray = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+      expect(dashArray).toBeFalsy();
+
+      // Change to dashed
+      await page.selectOption('#arrow-style-dash', 'dashed');
+      await page.waitForTimeout(50);
+
+      dashArray = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+      expect(dashArray).toBeTruthy();
+
+      // Change to dotted
+      await page.selectOption('#arrow-style-dash', 'dotted');
+      await page.waitForTimeout(50);
+
+      const dottedArray = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+      expect(dottedArray).toBeTruthy();
+      expect(dottedArray).not.toBe(dashArray);
+
+      // Change back to solid
+      await page.selectOption('#arrow-style-dash', 'solid');
+      await page.waitForTimeout(50);
+
+      dashArray = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+      expect(dashArray).toBeFalsy();
+    });
+
+    test('Dash pattern scales with stroke width', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Set dashed with width 2
+      await page.selectOption('#arrow-style-dash', 'dashed');
+      await page.fill('#arrow-style-width', '2');
+      await page.waitForTimeout(50);
+
+      const dashArray2 = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+
+      // Change width to 4
+      await page.fill('#arrow-style-width', '4');
+      await page.waitForTimeout(50);
+
+      const dashArray4 = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-dasharray');
+      });
+
+      // Dash pattern should be different (scaled)
+      expect(dashArray4).not.toBe(dashArray2);
+    });
+
+    test('Dash persists after deselect and reselect', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.selectOption('#arrow-style-dash', 'dotted');
+      await page.waitForTimeout(50);
+
+      // Deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Reselect
+      await page.evaluate(() => {
+        const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+        hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await page.waitForTimeout(100);
+
+      const dashValue = await page.$eval('#arrow-style-dash', el => el.value);
+      expect(dashValue).toBe('dotted');
+    });
+
+  });
+
+  test.describe('Line Style', () => {
+
+    test('Triple line creates 2 extra paths and shows center line', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.selectOption('#arrow-style-line', 'triple');
+      await page.waitForTimeout(50);
+
+      const result = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const extraLines = container.querySelectorAll('.arrow-extra-line').length;
+        const mainPath = container.querySelector('svg path[stroke]:not([stroke="transparent"]):not(.arrow-extra-line)');
+        const mainVisible = mainPath.style.visibility !== 'hidden' && mainPath.getAttribute('stroke') !== 'transparent';
+        return { extraLines, mainVisible };
+      });
+
+      expect(result.extraLines).toBe(2);
+      expect(result.mainVisible).toBe(true);
+    });
+
+    test('Switching back to single removes extra lines', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Set to double
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      let extraCount = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        return container.querySelectorAll('.arrow-extra-line').length;
+      });
+      expect(extraCount).toBe(2);
+
+      // Switch back to single
+      await page.selectOption('#arrow-style-line', 'single');
+      await page.waitForTimeout(50);
+
+      extraCount = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        return container.querySelectorAll('.arrow-extra-line').length;
+      });
+      expect(extraCount).toBe(0);
+    });
+
+    test('Extra lines follow arrow when handles dragged', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      // Get initial extra line paths
+      const initialPaths = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const lines = container.querySelectorAll('.arrow-extra-line');
+        return Array.from(lines).map(l => l.getAttribute('d'));
+      });
+
+      // Drag end handle
+      const endHandle = await page.$('.editable-arrow-handle-end');
+      const box = await endHandle.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 50, box.y + 30);
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+
+      // Get updated extra line paths
+      const updatedPaths = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const lines = container.querySelectorAll('.arrow-extra-line');
+        return Array.from(lines).map(l => l.getAttribute('d'));
+      });
+
+      // Paths should have changed
+      expect(updatedPaths[0]).not.toBe(initialPaths[0]);
+    });
+
+    test('Extra lines have same color and dash as main', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Set color, dash, and line style
+      await page.fill('#arrow-style-color', '#ff0000');
+      await page.selectOption('#arrow-style-dash', 'dashed');
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      const extraLineStyles = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const lines = container.querySelectorAll('.arrow-extra-line');
+        return Array.from(lines).map(l => ({
+          stroke: l.getAttribute('stroke'),
+          dasharray: l.getAttribute('stroke-dasharray')
+        }));
+      });
+
+      expect(extraLineStyles.length).toBe(2);
+      extraLineStyles.forEach(style => {
+        expect(style.stroke).toBe('#ff0000');
+        expect(style.dasharray).toBeTruthy();
+      });
+    });
+
+    test('Arrowhead visible for double line', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      // Main path should have marker-end and be visible (even if stroke is transparent)
+      const hasMarker = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const mainPath = container.querySelector('svg path[marker-end]');
+        return mainPath !== null && mainPath.style.visibility !== 'hidden';
+      });
+
+      expect(hasMarker).toBe(true);
+    });
+
+    test('Curved arrows work with double lines', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Enable curve mode
+      await page.click('.editable-arrow-curve-toggle');
+      await page.waitForTimeout(100);
+
+      // Set double line
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      const result = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const extraLines = container.querySelectorAll('.arrow-extra-line');
+        const paths = Array.from(extraLines).map(l => l.getAttribute('d'));
+        // Curved paths contain 'C' for cubic bezier
+        const allCurved = paths.every(p => p && p.includes('C'));
+        return { count: extraLines.length, allCurved };
+      });
+
+      expect(result.count).toBe(2);
+      expect(result.allCurved).toBe(true);
+    });
+
+  });
+
+  test.describe('Opacity', () => {
+
+    test('Opacity 0 makes arrow nearly invisible', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.fill('#arrow-style-opacity', '0');
+      await page.waitForTimeout(50);
+
+      const opacity = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('opacity');
+      });
+
+      expect(opacity).toBe('0');
+    });
+
+    test('Opacity applies to extra lines in double/triple mode', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.fill('#arrow-style-opacity', '0.5');
+      await page.selectOption('#arrow-style-line', 'double');
+      await page.waitForTimeout(50);
+
+      const opacities = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const lines = container.querySelectorAll('.arrow-extra-line');
+        return Array.from(lines).map(l => l.getAttribute('opacity'));
+      });
+
+      expect(opacities.length).toBe(2);
+      opacities.forEach(op => {
+        expect(op).toBe('0.5');
+      });
+    });
+
+    test('Opacity persists after deselect and reselect', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      await page.fill('#arrow-style-opacity', '0.3');
+      await page.waitForTimeout(50);
+
+      // Deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Reselect
+      await page.evaluate(() => {
+        const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+        hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await page.waitForTimeout(100);
+
+      const opacityValue = await page.$eval('#arrow-style-opacity', el => el.value);
+      expect(opacityValue).toBe('0.3');
+    });
+
+  });
+
+  test.describe('Style Interactions', () => {
+
+    test('Changing multiple styles at once applies all correctly', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Change multiple styles
+      await page.fill('#arrow-style-color', '#0000ff');
+      await page.fill('#arrow-style-width', '5');
+      await page.selectOption('#arrow-style-head', 'diamond');
+      await page.selectOption('#arrow-style-dash', 'dotted');
+      await page.fill('#arrow-style-opacity', '0.7');
+      await page.waitForTimeout(50);
+
+      const styles = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return {
+          stroke: pathEl.getAttribute('stroke'),
+          strokeWidth: pathEl.getAttribute('stroke-width'),
+          dasharray: pathEl.getAttribute('stroke-dasharray'),
+          opacity: pathEl.getAttribute('opacity')
+        };
+      });
+
+      expect(styles.stroke).toBe('#0000ff');
+      expect(styles.strokeWidth).toBe('5');
+      expect(styles.dasharray).toBeTruthy();
+      expect(styles.opacity).toBe('0.7');
+    });
+
+    test('New arrow has default style values', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // Create first arrow and change styles
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+      await page.fill('#arrow-style-color', '#ff0000');
+      await page.selectOption('#arrow-style-dash', 'dashed');
+      await page.waitForTimeout(50);
+
+      // Deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Create second arrow
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Panel should show default values for new arrow
+      const values = await page.evaluate(() => {
+        return {
+          color: document.querySelector('#arrow-style-color').value,
+          dash: document.querySelector('#arrow-style-dash').value,
+          line: document.querySelector('#arrow-style-line').value,
+          opacity: document.querySelector('#arrow-style-opacity').value
+        };
+      });
+
+      expect(values.color).toBe('#000000');
+      expect(values.dash).toBe('solid');
+      expect(values.line).toBe('single');
+      expect(values.opacity).toBe('1');
     });
 
   });

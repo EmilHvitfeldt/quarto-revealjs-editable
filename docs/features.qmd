@@ -172,8 +172,11 @@ Only the currently selected arrow shows its handles and controls. Click on an ar
 When an arrow is selected, a style panel appears in the bottom-left corner of the screen with options to customize the arrow's appearance:
 
 - **Color**: Pick any color for the arrow line and head
-- **Width**: Choose line thickness from 1-10px
-- **Head**: Select arrowhead style (arrow, stealth, diamond, circle, square, bar, or none)
+- **Width**: Line thickness (1-20px)
+- **Head**: Arrowhead style (arrow, stealth, diamond, circle, square, bar, or none)
+- **Dash**: Line pattern (solid, dashed, or dotted)
+- **Line**: Line style (single, double, or triple parallel lines)
+- **Opacity**: Transparency slider (0 to 1)
 
 Style changes are applied immediately and saved with the arrow.
 
@@ -194,4 +197,4 @@ Curved arrows include control points:
 Styled arrows include additional attributes:
 
 ```markdown
-{{< arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" position="absolute" >}}
+{{< arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" dash="dashed" opacity="0.8" position="absolute" >}}

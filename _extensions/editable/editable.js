@@ -1749,6 +1749,74 @@ function createArrowStylePanel() {
   headRow.appendChild(headSelect);
   panel.appendChild(headRow);
 
+  // Dash row
+  const dashRow = document.createElement("div");
+  dashRow.className = "arrow-style-row";
+  const dashLabel = document.createElement("label");
+  dashLabel.textContent = "Dash";
+  const dashSelect = document.createElement("select");
+  dashSelect.id = "arrow-style-dash";
+  ["solid", "dashed", "dotted"].forEach(style => {
+    const opt = document.createElement("option");
+    opt.value = style;
+    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+    dashSelect.appendChild(opt);
+  });
+  dashSelect.addEventListener("change", (e) => {
+    if (activeArrow) {
+      activeArrow.dash = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  dashRow.appendChild(dashLabel);
+  dashRow.appendChild(dashSelect);
+  panel.appendChild(dashRow);
+
+  // Line row
+  const lineRow = document.createElement("div");
+  lineRow.className = "arrow-style-row";
+  const lineLabel = document.createElement("label");
+  lineLabel.textContent = "Line";
+  const lineSelect = document.createElement("select");
+  lineSelect.id = "arrow-style-line";
+  ["single", "double", "triple"].forEach(style => {
+    const opt = document.createElement("option");
+    opt.value = style;
+    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+    lineSelect.appendChild(opt);
+  });
+  lineSelect.addEventListener("change", (e) => {
+    if (activeArrow) {
+      activeArrow.line = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  lineRow.appendChild(lineLabel);
+  lineRow.appendChild(lineSelect);
+  panel.appendChild(lineRow);
+
+  // Opacity row
+  const opacityRow = document.createElement("div");
+  opacityRow.className = "arrow-style-row";
+  const opacityLabel = document.createElement("label");
+  opacityLabel.textContent = "Opacity";
+  const opacityInput = document.createElement("input");
+  opacityInput.type = "range";
+  opacityInput.id = "arrow-style-opacity";
+  opacityInput.min = "0";
+  opacityInput.max = "1";
+  opacityInput.step = "0.1";
+  opacityInput.value = "1";
+  opacityInput.addEventListener("input", (e) => {
+    if (activeArrow) {
+      activeArrow.opacity = parseFloat(e.target.value);
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  opacityRow.appendChild(opacityLabel);
+  opacityRow.appendChild(opacityInput);
+  panel.appendChild(opacityRow);
+
   document.body.appendChild(panel);
   arrowStylePanel = panel;
   return panel;
@@ -1760,17 +1828,29 @@ function updateArrowStylePanel(arrowData) {
   if (arrowData) {
     // Update panel values to match selected arrow
     const colorPicker = panel.querySelector("#arrow-style-color");
-    const widthSelect = panel.querySelector("#arrow-style-width");
+    const widthInput = panel.querySelector("#arrow-style-width");
     const headSelect = panel.querySelector("#arrow-style-head");
+    const dashSelect = panel.querySelector("#arrow-style-dash");
+    const lineSelect = panel.querySelector("#arrow-style-line");
+    const opacityInput = panel.querySelector("#arrow-style-opacity");
 
     if (colorPicker) {
       colorPicker.value = arrowData.color === "black" ? "#000000" : arrowData.color;
     }
-    if (widthSelect) {
-      widthSelect.value = arrowData.width.toString();
+    if (widthInput) {
+      widthInput.value = arrowData.width.toString();
     }
     if (headSelect) {
       headSelect.value = arrowData.head || "arrow";
+    }
+    if (dashSelect) {
+      dashSelect.value = arrowData.dash || "solid";
+    }
+    if (lineSelect) {
+      lineSelect.value = arrowData.line || "single";
+    }
+    if (opacityInput) {
+      opacityInput.value = (arrowData.opacity !== undefined ? arrowData.opacity : 1).toString();
     }
 
     panel.style.display = "block";
@@ -1786,8 +1866,100 @@ function updateArrowAppearance(arrowData) {
   arrowData._path.setAttribute("stroke", arrowData.color);
   arrowData._path.setAttribute("stroke-width", arrowData.width);
 
+  // Update dash style
+  const dashPatterns = {
+    solid: "none",
+    dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
+    dotted: `${arrowData.width},${arrowData.width * 2}`
+  };
+  const dashArray = dashPatterns[arrowData.dash] || "none";
+  if (dashArray === "none") {
+    arrowData._path.removeAttribute("stroke-dasharray");
+  } else {
+    arrowData._path.setAttribute("stroke-dasharray", dashArray);
+  }
+
+  // Update opacity
+  const opacity = arrowData.opacity !== undefined ? arrowData.opacity : 1;
+  arrowData._path.setAttribute("opacity", opacity);
+
+  // Update line style (single, double, triple)
+  updateArrowLineStyle(arrowData);
+
   // Update arrowhead marker
   updateArrowheadMarker(arrowData);
+}
+
+function updateArrowLineStyle(arrowData) {
+  if (!arrowData._svg || !arrowData._path) return;
+
+  // Remove existing extra lines
+  const existingLines = arrowData._svg.querySelectorAll(".arrow-extra-line");
+  existingLines.forEach(line => line.remove());
+
+  const lineStyle = arrowData.line || "single";
+  if (lineStyle === "single") {
+    // Restore main path stroke when switching back to single
+    arrowData._path.setAttribute("stroke", arrowData.color);
+    arrowData._path.style.visibility = "visible";
+    return;
+  }
+
+  // Get the current path data
+  const pathD = arrowData._path.getAttribute("d");
+  if (!pathD) return;
+
+  // Calculate offset based on stroke width
+  const offset = arrowData.width * 1.5;
+
+  // For double/triple, we create parallel paths with offset
+  const createOffsetPath = (offsetAmount) => {
+    const extraPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    extraPath.className.baseVal = "arrow-extra-line";
+    extraPath.setAttribute("stroke", arrowData.color);
+    extraPath.setAttribute("stroke-width", arrowData.width);
+    extraPath.setAttribute("fill", "none");
+    extraPath.style.pointerEvents = "none";
+
+    // Apply same dash pattern
+    const dashPatterns = {
+      solid: "none",
+      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
+      dotted: `${arrowData.width},${arrowData.width * 2}`
+    };
+    const dashArray = dashPatterns[arrowData.dash] || "none";
+    if (dashArray !== "none") {
+      extraPath.setAttribute("stroke-dasharray", dashArray);
+    }
+
+    // Apply opacity
+    const opacity = arrowData.opacity !== undefined ? arrowData.opacity : 1;
+    extraPath.setAttribute("opacity", opacity);
+
+    // Create offset path by transforming
+    extraPath.setAttribute("d", pathD);
+    extraPath.setAttribute("transform", `translate(0, ${offsetAmount})`);
+
+    return extraPath;
+  };
+
+  if (lineStyle === "double") {
+    const line1 = createOffsetPath(-offset);
+    const line2 = createOffsetPath(offset);
+    arrowData._svg.insertBefore(line1, arrowData._path);
+    arrowData._svg.insertBefore(line2, arrowData._path);
+    // Make main path stroke transparent but keep visible for arrowhead marker
+    arrowData._path.style.visibility = "visible";
+    arrowData._path.setAttribute("stroke", "transparent");
+  } else if (lineStyle === "triple") {
+    const line1 = createOffsetPath(-offset);
+    const line2 = createOffsetPath(offset);
+    arrowData._svg.insertBefore(line1, arrowData._path);
+    arrowData._svg.insertBefore(line2, arrowData._path);
+    // Show main path as center line
+    arrowData._path.style.visibility = "visible";
+    arrowData._path.setAttribute("stroke", arrowData.color);
+  }
 }
 
 function updateArrowheadMarker(arrowData) {
@@ -1925,6 +2097,9 @@ function addNewArrow() {
     color: CONFIG.ARROW_DEFAULT_COLOR,
     width: CONFIG.ARROW_DEFAULT_WIDTH,
     head: "arrow",
+    dash: "solid",
+    line: "single",
+    opacity: 1,
     // UI state
     isActive: true, // New arrows start active
   };
@@ -2238,6 +2413,11 @@ function updateArrowPath(arrowData) {
     } else {
       arrowData._guideLine2.style.display = "none";
     }
+  }
+
+  // Update extra lines for double/triple line styles
+  if (arrowData.line && arrowData.line !== "single") {
+    updateArrowLineStyle(arrowData);
   }
 }
 
@@ -3471,6 +3651,18 @@ function serializeArrowToShortcode(arrow) {
 
   if (arrow.head && arrow.head !== "arrow") {
     shortcode += ` head="${arrow.head}"`;
+  }
+
+  if (arrow.dash && arrow.dash !== "solid") {
+    shortcode += ` dash="${arrow.dash}"`;
+  }
+
+  if (arrow.line && arrow.line !== "single") {
+    shortcode += ` line="${arrow.line}"`;
+  }
+
+  if (arrow.opacity !== undefined && arrow.opacity !== 1) {
+    shortcode += ` opacity="${arrow.opacity}"`;
   }
 
   shortcode += ` position="absolute" >}}`;

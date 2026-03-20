@@ -975,6 +975,11 @@
   text-align: center;
 }
 
+.arrow-style-row input[type="range"] {
+  width: 80px;
+  cursor: pointer;
+}
+
 .arrow-style-row select:focus,
 .arrow-style-row input[type="color"]:focus {
   outline: none;
