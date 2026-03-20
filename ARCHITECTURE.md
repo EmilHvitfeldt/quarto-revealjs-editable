@@ -213,15 +213,17 @@ const PropertySerializers = {
 
 ### 5. New Element Registry
 
-The New Element Registry tracks elements and slides added dynamically during a session.
+The New Element Registry tracks elements, slides, and arrows added dynamically during a session.
 
 ```javascript
 const NewElementRegistry = {
   newDivs: [],      // Dynamically added text divs
   newSlides: [],    // Dynamically added slides
+  newArrows: [],    // Dynamically added arrows
 
   addDiv(div, slideIndex) { },
   addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) { },
+  addArrow(arrowData, slideIndex, newSlideRef = null) { },
   countNewSlidesBefore(index) { },
   clear() { },
   hasNewElements() { },
@@ -262,8 +264,10 @@ const ToolbarRegistry = {
 **Registered actions:**
 - `save` - Save edits to file
 - `copy` - Copy QMD to clipboard
-- `addText` - Add new editable text to current slide
-- `addSlide` - Add new slide after current
+- `add` - Submenu containing:
+  - `addText` - Add new editable text to current slide
+  - `addSlide` - Add new slide after current
+  - `addArrow` - Add new arrow to current slide (requires quarto-arrows extension)
 
 ### 7. Quill Rich Text Editor
 
@@ -403,6 +407,75 @@ State is captured at the START of actions, before changes occur:
 
 **Note:** Text editing via contentEditable uses the browser's native undo, which operates separately from this system.
 
+### 11. Arrow System
+
+The Arrow System enables adding SVG arrows to slides, integrated with the [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension.
+
+**Arrow data structure:**
+```javascript
+const arrowData = {
+  fromX: 0, fromY: 0,         // Start point coordinates
+  toX: 0, toY: 0,             // End point coordinates
+  control1X: null,            // First Bezier control point (null = straight line)
+  control1Y: null,
+  control2X: null,            // Second Bezier control point
+  control2Y: null,
+  curveMode: false,           // Whether curve editing is enabled
+  isActive: false,            // Whether arrow is currently selected
+  slideIndex: 0,              // Slide index for serialization
+  newSlideRef: null,          // Reference to new slide (if on dynamically added slide)
+  // DOM references (prefixed with _)
+  _path: null,                // SVG path element
+  _hitArea: null,             // Invisible wider path for easier clicking
+  _svg: null,                 // SVG container
+  _container: null,           // Outer div container
+  _startHandle: null,         // Draggable start point handle
+  _endHandle: null,           // Draggable end point handle
+  _control1Handle: null,      // Control point 1 handle
+  _control2Handle: null,      // Control point 2 handle
+  _curveToggle: null,         // Button to toggle curve mode
+  _guideLine1: null,          // Dashed line from start to control1
+  _guideLine2: null,          // Dashed line from end to control2
+};
+```
+
+**Key functions:**
+- `addNewArrow()` - Creates arrow on current slide, registers in NewElementRegistry
+- `createArrowElement(arrowData)` - Builds DOM structure (SVG, handles, controls)
+- `createArrowHandle(arrowData, position)` - Creates draggable handle for endpoint or control point
+- `updateArrowPath(arrowData)` - Updates SVG path (straight line or Bezier curve)
+- `updateArrowHandles(arrowData)` - Positions handles at current coordinates
+- `setActiveArrow(arrowData)` - Manages selection state (only one arrow active at a time)
+- `toggleCurveMode(arrowData)` - Switches between straight and curved arrow
+- `serializeArrowToShortcode(arrow)` - Converts to `{{< arrow ... >}}` format
+
+**Title slide handling:**
+Documents with YAML frontmatter (title, author, etc.) generate a title slide at index 0 that doesn't correspond to a `##` heading in the QMD source. Two helper functions handle this offset:
+
+```javascript
+function hasTitleSlide() {
+  // Returns true if first slide lacks an h2 (indicating it's a YAML-generated title slide)
+}
+
+function getQmdHeadingIndex(revealIndex) {
+  // Converts Reveal.js slide index to QMD ## heading index
+  // If title slide exists: revealIndex 1 → heading index 0
+}
+```
+
+**Active selection:**
+Only one arrow can be active (selected) at a time. Active arrows show:
+- Start/end point handles (blue/green circles)
+- Curve toggle button
+- Control point handles and guide lines (when in curve mode)
+
+Inactive arrows hide all controls for a cleaner UI. Selection is managed via:
+- Click on arrow's hit area → selects arrow
+- Click outside all arrows → deselects active arrow
+
+**Hit area:**
+A transparent 20px-wide stroke path sits behind the visible 2px arrow path, making selection much easier. Both paths share the same `d` attribute.
+
 ---
 
 ## Data Flow
@@ -448,9 +521,14 @@ State is captured at the START of actions, before changes occur:
    │
    ├─▶ insertNewSlides() - Add new slide headings at correct positions
    │   └─▶ Uses NewElementRegistry.newSlides
+   │   └─▶ Also inserts arrows on new slides (from newArrows with newSlideRef)
    │
    ├─▶ insertNewDivs() - Add new text elements to their slides
    │   └─▶ Uses NewElementRegistry.newDivs
+   │
+   ├─▶ insertNewArrows() - Add arrow shortcodes to original slides
+   │   └─▶ Uses NewElementRegistry.newArrows (excluding those on new slides)
+   │   └─▶ Serializes via serializeArrowToShortcode()
    │
    ├─▶ extractEditableEltDimensions() (original elements only)
    │   └─▶ For each element: editableElt.toDimensions()
@@ -465,6 +543,14 @@ State is captured at the START of actions, before changes occur:
    │
 3. Download file or copy to clipboard
 ```
+
+**Arrow serialization format:**
+```
+{{< arrow from="x,y" to="x,y" [control1="x,y"] [control2="x,y"] position="absolute" >}}
+```
+- `from` and `to` are always included
+- `control1` and `control2` only included for curved arrows
+- `position="absolute"` required for proper positioning on slides
 
 ---
 
@@ -658,6 +744,15 @@ Styles use CSS custom properties for easy theming:
   --editable-toolbar-copy-color: #6c757d;
   --editable-toolbar-add-text-color: #28a745;
   --editable-toolbar-add-slide-color: #17a2b8;
+  --editable-toolbar-add-arrow-color: #6f42c1;
+
+  /* Arrow elements */
+  --editable-arrow-start-color: #007cba;
+  --editable-arrow-end-color: #28a745;
+  --editable-arrow-control1-color: #ff6600;
+  --editable-arrow-control2-color: #9933ff;
+  --editable-arrow-handle-size: 12px;
+  --editable-arrow-control-handle-size: 10px;
 }
 ```
 
@@ -672,6 +767,12 @@ Styles use CSS custom properties for easy theming:
 - `.editable-toolbar-button` - Toolbar action buttons
 - `.editable-new` - Marker for dynamically added elements
 - `.editable-new-slide` - Marker for dynamically added slides
+- `.editable-arrow-container` - Wrapper for arrow SVG and controls
+- `.editable-arrow-container.active` - When arrow is selected
+- `.editable-arrow-container.curve-mode` - When arrow is in curve editing mode
+- `.editable-arrow-handle` - Base class for arrow endpoint handles
+- `.editable-arrow-handle-start`, `-end`, `-control1`, `-control2` - Position-specific handles
+- `.editable-arrow-curve-toggle` - Button to toggle curve mode
 
 ---
 
@@ -683,12 +784,13 @@ Styles use CSS custom properties for easy theming:
 - Test base64 encoding/decoding
 - Verify toolbar and registry functions exist
 
-### E2E Tests (Playwright) - 168 tests across 4 spec files
+### E2E Tests (Playwright) - 222 tests across 5 spec files
 
-**save-edits.spec.js** - Core save functionality (8 tests)
-**ui-controls.spec.js** - UI elements, accessibility, CSS, undo/redo, rotation (55 tests)
-**toolbar.spec.js** - Floating toolbar, new elements, save integration, edge cases (76 tests)
-**quill-formatting.spec.js** - Rich text formatting, alignment, content preservation, source integrity (29 tests)
+**save-edits.spec.js** - Core save functionality (16 tests)
+**ui-controls.spec.js** - UI elements, accessibility, CSS, undo/redo, rotation (54 tests)
+**toolbar.spec.js** - Floating toolbar, new elements, save integration, edge cases (83 tests)
+**quill-formatting.spec.js** - Rich text formatting, alignment, content preservation, source integrity (22 tests)
+**arrows.spec.js** - Arrow creation, selection, dragging, curves, serialization (47 tests)
 
 Key test areas:
 - UI controls exist and function
@@ -699,10 +801,16 @@ Key test areas:
 - Undo/redo functionality
 - Floating toolbar actions
 - New element creation and tracking
-- Save integration with correct ordering (30 tests verifying element positions in saved QMD)
+- Save integration with correct ordering
 - Quill formatting (bold, italic, underline, strikethrough, colors)
 - Brand color shortcode output
 - Full save pipeline verification
+- Arrow creation and positioning
+- Arrow handle dragging (start, end, control points)
+- Curve mode toggle and Bezier paths
+- Arrow selection and active state
+- Arrow serialization to shortcode format
+- Title slide offset handling
 
 Run tests:
 ```bash
