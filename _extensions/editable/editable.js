@@ -3063,4 +3063,6 @@ ${fence}`;
       }
     };
   };
+  window.getTransformedQmd = getTransformedQmd;
+  window.quillInstances = quillInstances;
 })();

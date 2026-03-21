@@ -8,7 +8,7 @@ import { CONFIG } from './config.js';
 import { getEditableElements, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex } from './utils.js';
 import { editableRegistry, EditableElement } from './editable-element.js';
 import { setupUndoRedoKeyboard } from './undo.js';
-import { initializeQuillForElement } from './quill.js';
+import { initializeQuillForElement, quillInstances } from './quill.js';
 import { ToolbarRegistry, NewElementRegistry } from './registries.js';
 import { Capabilities, getCapabilitiesFor } from './capabilities.js';
 import { createFloatingToolbar } from './toolbar.js';
@@ -658,3 +658,7 @@ window.Revealeditable = function () {
     },
   };
 };
+
+// Expose internals for testing
+window.getTransformedQmd = getTransformedQmd;
+window.quillInstances = quillInstances;
