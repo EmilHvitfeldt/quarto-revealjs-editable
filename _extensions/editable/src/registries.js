@@ -1,31 +1,63 @@
+/**
+ * Registry systems for UI controls, toolbar actions, and new elements.
+ * @module registries
+ */
+
 import { CONFIG } from './config.js';
 import { createButton, changeFontSize } from './utils.js';
 import { editableRegistry } from './editable-element.js';
 import { pushUndoState } from './undo.js';
 import { quillInstances } from './quill.js';
 
-// =============================================================================
-// Control Registry
-// =============================================================================
-
-// Registry for UI controls - allows easy addition of new controls
+/**
+ * Registry for element control buttons (font size, alignment, edit mode).
+ * Controls are shown when an element is selected/hovered.
+ * @example
+ * ControlRegistry.register("myControl", {
+ *   icon: "X",
+ *   ariaLabel: "My control",
+ *   title: "Tooltip text",
+ *   className: "my-control-class",
+ *   appliesTo: ["div"],
+ *   onClick: (element, btn, e) => { ... }
+ * });
+ */
 export const ControlRegistry = {
+  /** @type {Map<string, Object>} Registered controls by name */
   controls: new Map(),
 
-  // Register a new control
+  /**
+   * Register a new control.
+   * @param {string} name - Unique control name
+   * @param {Object} config - Control configuration
+   * @param {string} config.icon - Button text/icon
+   * @param {string} config.ariaLabel - Accessibility label
+   * @param {string} config.title - Tooltip text
+   * @param {string} [config.className] - Additional CSS class
+   * @param {string[]} config.appliesTo - Element types this control applies to
+   * @param {Function} config.onClick - Click handler (element, btn, event)
+   */
   register(name, config) {
-    // config: { icon, ariaLabel, title, onClick, appliesTo, className }
     this.controls.set(name, { name, ...config });
   },
 
-  // Get controls for a specific element type
+  /**
+   * Get controls applicable to an element type.
+   * @param {string} elementType - Element type ("img" or "div")
+   * @returns {Object[]} Array of control configs
+   */
   getControlsFor(elementType) {
     return [...this.controls.values()].filter(
       (c) => c.appliesTo.includes(elementType)
     );
   },
 
-  // Create a button from a control config
+  /**
+   * Create a button element from a control config.
+   * @param {Object} config - Control configuration
+   * @param {HTMLElement} element - The editable element
+   * @returns {HTMLButtonElement} The created button
+   */
   createButton(config, element) {
     const btn = createButton(config.icon, config.className || "");
     btn.setAttribute("aria-label", config.ariaLabel);
@@ -152,89 +184,133 @@ ControlRegistry.register("editMode", {
   },
 });
 
-// =============================================================================
-// New Element Registry - Tracks dynamically added elements and slides
-// =============================================================================
-
+/**
+ * Registry tracking dynamically added elements, slides, and arrows.
+ * Tracks insertions during a session for proper serialization to QMD.
+ */
 export const NewElementRegistry = {
-  // Track new text divs added during the session
+  /** @type {Array<{element: HTMLElement, slideIndex: number, content: string, newSlideRef: Object|null}>} */
   newDivs: [],
 
-  // Track new slides added during the session
+  /** @type {Array<{element: HTMLElement, afterSlideIndex: number, insertAfterNewSlide: Object|null, insertionOrder: number}>} */
   newSlides: [],
 
-  // Track new arrows added during the session
+  /** @type {Array<Object>} Arrow data objects */
   newArrows: [],
 
-  // Add a new text div
-  // newSlideRef is a reference to the new slide entry if this div is on a new slide
+  /**
+   * Add a new text div to tracking.
+   * @param {HTMLElement} div - The div element
+   * @param {number} slideIndex - Index of the slide containing the div
+   * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+   */
   addDiv(div, slideIndex, newSlideRef = null) {
     this.newDivs.push({
       element: div,
       slideIndex: slideIndex,
       content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
-      newSlideRef: newSlideRef, // Reference to NewElementRegistry.newSlides entry if on a new slide
+      newSlideRef: newSlideRef,
     });
   },
 
-  // Add a new slide
-  // insertAfterNewSlide: reference to another newSlides entry if this slide comes after a new slide
+  /**
+   * Add a new slide to tracking.
+   * @param {HTMLElement} slide - The slide section element
+   * @param {number} afterSlideIndex - Original slide index to insert after
+   * @param {Object|null} [insertAfterNewSlide=null] - Parent new slide for chained insertions
+   */
   addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
     this.newSlides.push({
       element: slide,
       afterSlideIndex: afterSlideIndex,
-      insertAfterNewSlide: insertAfterNewSlide, // Reference to parent new slide, or null
+      insertAfterNewSlide: insertAfterNewSlide,
       insertionOrder: this.newSlides.length,
     });
   },
 
-  // Add a new arrow
-  // newSlideRef is a reference to the new slide entry if this arrow is on a new slide
-  // Note: We store the reference directly (not a copy) so handle drag updates are reflected
+  /**
+   * Add a new arrow to tracking.
+   * Stores reference directly so drag updates are reflected.
+   * @param {Object} arrowData - Arrow data object
+   * @param {number} slideIndex - Index of the slide containing the arrow
+   * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+   */
   addArrow(arrowData, slideIndex, newSlideRef = null) {
     arrowData.slideIndex = slideIndex;
     arrowData.newSlideRef = newSlideRef;
     this.newArrows.push(arrowData);
   },
 
-  // Get count of new slides before a given index (for offset calculation)
+  /**
+   * Count new slides inserted before a given index (for offset calculation).
+   * @param {number} index - The slide index
+   * @returns {number} Count of new slides before this index
+   */
   countNewSlidesBefore(index) {
     return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
   },
 
-  // Clear all tracked elements (e.g., after save)
+  /**
+   * Clear all tracked elements (e.g., after save).
+   */
   clear() {
     this.newDivs = [];
     this.newSlides = [];
     this.newArrows = [];
   },
 
-  // Check if there are any new elements
+  /**
+   * Check if there are any new elements tracked.
+   * @returns {boolean} True if any new elements exist
+   */
   hasNewElements() {
     return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
   },
 };
 
-// =============================================================================
-// Toolbar Registry - Manages floating toolbar actions
-// =============================================================================
-
+/**
+ * Registry for floating toolbar actions (save, copy, add elements).
+ * @example
+ * ToolbarRegistry.register("myAction", {
+ *   icon: "X",
+ *   label: "My Action",
+ *   title: "Tooltip text",
+ *   className: "toolbar-my-action",
+ *   onClick: () => { ... }
+ * });
+ */
 export const ToolbarRegistry = {
+  /** @type {Map<string, Object>} Registered actions by name */
   actions: new Map(),
 
-  // Register a toolbar action
-  // config: { icon, label, title, onClick, className }
-  // For submenu groups: { icon, label, title, className, submenu: [...configs] }
+  /**
+   * Register a toolbar action.
+   * @param {string} name - Unique action name
+   * @param {Object} config - Action configuration
+   * @param {string} config.icon - Button icon
+   * @param {string} config.label - Button label
+   * @param {string} config.title - Tooltip text
+   * @param {string} [config.className] - Additional CSS class
+   * @param {Function} [config.onClick] - Click handler
+   * @param {Array} [config.submenu] - Submenu items for dropdown
+   */
   register(name, config) {
     this.actions.set(name, { name, ...config });
   },
 
-  // Get all registered actions
+  /**
+   * Get all registered actions.
+   * @returns {Object[]} Array of action configs
+   */
   getActions() {
     return [...this.actions.values()];
   },
 
-  // Create a button from an action config
+  /**
+   * Create a button element from an action config.
+   * @param {Object} config - Action configuration
+   * @returns {HTMLButtonElement} The created button
+   */
   createButton(config) {
     const btn = document.createElement("button");
     btn.className = "editable-toolbar-button " + (config.className || "");
@@ -249,7 +325,11 @@ export const ToolbarRegistry = {
     return btn;
   },
 
-  // Create a button with submenu
+  /**
+   * Create a button with dropdown submenu.
+   * @param {Object} config - Action configuration with submenu array
+   * @returns {HTMLDivElement} Wrapper containing button and submenu
+   */
   createSubmenuButton(config) {
     const wrapper = document.createElement("div");
     wrapper.className = "editable-toolbar-submenu-wrapper";

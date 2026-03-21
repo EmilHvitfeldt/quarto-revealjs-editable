@@ -1,3 +1,9 @@
+/**
+ * Main entry point for the editable Reveal.js plugin.
+ * Registers toolbar actions and initializes editable elements.
+ * @module main
+ */
+
 import { CONFIG } from './config.js';
 import { getEditableElements, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex } from './utils.js';
 import { editableRegistry, EditableElement } from './editable-element.js';
@@ -20,9 +26,7 @@ import {
   getFenceForContent,
 } from './serialization.js';
 
-// =============================================================================
-// Register Toolbar Actions
-// =============================================================================
+// Register toolbar actions (save, copy, add)
 
 ToolbarRegistry.register("save", {
   icon: "💾",
@@ -70,10 +74,10 @@ ToolbarRegistry.register("add", {
   ],
 });
 
-// =============================================================================
-// New Element Creation
-// =============================================================================
-
+/**
+ * Add a new editable text element to the current slide.
+ * @returns {Promise<HTMLElement|null>} The new div element or null
+ */
 async function addNewTextElement() {
   const currentSlide = getCurrentSlide();
   if (!currentSlide) {
@@ -126,6 +130,10 @@ async function addNewTextElement() {
   return newDiv;
 }
 
+/**
+ * Add a new slide after the current slide.
+ * @returns {HTMLElement|null} The new slide section element or null
+ */
 function addNewSlide() {
   const currentSlide = getCurrentSlide();
   if (!currentSlide) {
@@ -179,10 +187,10 @@ function addNewSlide() {
   return newSlide;
 }
 
-// =============================================================================
-// Save/Export Functions
-// =============================================================================
-
+/**
+ * Get the transformed QMD content with all edits applied.
+ * @returns {string} Complete QMD content
+ */
 function getTransformedQmd() {
   let content = readIndexQmd();
   if (!content) return "";
@@ -203,6 +211,9 @@ function getTransformedQmd() {
   return content;
 }
 
+/**
+ * Save edits to a file (triggers download dialog).
+ */
 function saveMovedElts() {
   try {
     const content = getTransformedQmd();
@@ -215,6 +226,9 @@ function saveMovedElts() {
   }
 }
 
+/**
+ * Copy the transformed QMD content to clipboard.
+ */
 function copyQmdToClipboard() {
   const content = getTransformedQmd();
   if (!content) return;
@@ -226,6 +240,10 @@ function copyQmdToClipboard() {
   });
 }
 
+/**
+ * Read the original QMD content from the injected global variable.
+ * @returns {string} Original QMD content or empty string
+ */
 function readIndexQmd() {
   if (!window._input_file) {
     console.error("_input_file not found. Was the editable filter applied?");
@@ -234,14 +252,19 @@ function readIndexQmd() {
   return window._input_file;
 }
 
+/**
+ * Get the filename for saving.
+ * @returns {string} Filename from injected global
+ */
 function getEditableFilename() {
   return window._input_filename.split(/[/\\]/).pop();
 }
 
-// =============================================================================
-// File Download
-// =============================================================================
-
+/**
+ * Download a string as a file. Uses File System Access API if available.
+ * @param {string} content - Content to download
+ * @param {string} [mimeType="text/plain"] - MIME type
+ */
 async function downloadString(content, mimeType = "text/plain") {
   const filename = getEditableFilename();
 
@@ -282,10 +305,9 @@ async function downloadString(content, mimeType = "text/plain") {
   URL.revokeObjectURL(url);
 }
 
-// =============================================================================
-// Menu Button Setup
-// =============================================================================
-
+/**
+ * Add save and copy buttons to the Reveal.js slide menu.
+ */
 function addSaveMenuButton() {
   const slideMenuItems = document.querySelector(
     "div.slide-menu-custom-panel ul.slide-menu-items"
@@ -351,10 +373,11 @@ function addSaveMenuButton() {
   }
 }
 
-// =============================================================================
-// Editable Element Setup
-// =============================================================================
-
+/**
+ * Set up an element with editable capabilities.
+ * Creates container, initializes state, attaches capabilities.
+ * @param {HTMLElement} elt - Element to make editable
+ */
 function setupDraggableElt(elt) {
   const editableElt = new EditableElement(elt);
   editableRegistry.set(elt, editableElt);
@@ -531,7 +554,11 @@ function setupDraggableElt(elt) {
   }
 }
 
-// Helper to set up an image once it has valid dimensions
+/**
+ * Set up an image element once it has valid dimensions.
+ * Polls for dimensions if not immediately available.
+ * @param {HTMLImageElement} img - Image element
+ */
 function setupImageWhenReady(img) {
   if (img.complete && img.naturalWidth > 0 && img.offsetWidth > 0) {
     setupDraggableElt(img);
@@ -564,7 +591,10 @@ function setupImageWhenReady(img) {
   poll();
 }
 
-// Helper to set up a div once it has valid dimensions
+/**
+ * Set up a div element once it has valid dimensions.
+ * @param {HTMLDivElement} div - Div element
+ */
 function setupDivWhenReady(div) {
   if (div.offsetWidth >= CONFIG.MIN_ELEMENT_SIZE && div.offsetHeight >= CONFIG.MIN_ELEMENT_SIZE) {
     setupDraggableElt(div);
@@ -594,10 +624,11 @@ function setupDivWhenReady(div) {
   requestAnimationFrame(checkAndSetup);
 }
 
-// =============================================================================
-// Plugin Initialization
-// =============================================================================
-
+/**
+ * Reveal.js plugin factory function.
+ * Initializes editable elements when Reveal.js is ready.
+ * @returns {Object} Reveal.js plugin object
+ */
 window.Revealeditable = function () {
   return {
     id: "Revealeditable",

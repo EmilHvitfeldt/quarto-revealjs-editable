@@ -1,15 +1,29 @@
-// =============================================================================
-// Element State Management
-// =============================================================================
+/**
+ * Element state management for editable elements.
+ * Provides centralized state tracking and DOM synchronization.
+ * @module editable-element
+ */
 
-// Registry to track all editable elements
+/**
+ * Registry mapping DOM elements to their EditableElement instances.
+ * @type {Map<HTMLElement, EditableElement>}
+ */
 export const editableRegistry = new Map();
 
-// EditableElement class - centralized state for each editable element
+/**
+ * Wraps a DOM element with editable capabilities.
+ * Manages state synchronization between internal state and DOM.
+ */
 export class EditableElement {
+  /**
+   * @param {HTMLElement} element - The DOM element to wrap
+   */
   constructor(element) {
+    /** @type {HTMLElement} The wrapped DOM element */
     this.element = element;
+    /** @type {HTMLElement|null} The wrapper container for positioning */
     this.container = null;
+    /** @type {string} Element type ("img" or "div") */
     this.type = element.tagName.toLowerCase();
 
     // Get dimensions - for images, use naturalWidth/naturalHeight if offset values are 0
@@ -20,7 +34,10 @@ export class EditableElement {
       height = element.naturalHeight || height;
     }
 
-    // Initialize state from current element
+    /**
+     * Internal state object tracking all editable properties.
+     * @type {{x: number, y: number, width: number, height: number, rotation: number, fontSize: number|null, textAlign: string|null}}
+     */
     this.state = {
       x: 0,
       y: 0,
@@ -33,12 +50,19 @@ export class EditableElement {
     };
   }
 
-  // Get a copy of current state
+  /**
+   * Get a copy of current state.
+   * @returns {Object} Copy of state object
+   */
   getState() {
     return { ...this.state };
   }
 
-  // Update state and optionally sync to DOM
+  /**
+   * Update state and optionally sync to DOM.
+   * @param {Object} updates - Properties to update
+   * @param {boolean} [syncToDOM=true] - Whether to apply changes to DOM
+   */
   setState(updates, syncToDOM = true) {
     Object.assign(this.state, updates);
 
@@ -47,7 +71,10 @@ export class EditableElement {
     }
   }
 
-  // Sync state to DOM elements
+  /**
+   * Apply internal state to DOM elements.
+   * Called after state changes to update visual representation.
+   */
   syncToDOM() {
     if (this.container) {
       this.container.style.left = this.state.x + "px";
@@ -71,7 +98,10 @@ export class EditableElement {
     }
   }
 
-  // Read current values from DOM into state
+  /**
+   * Read current values from DOM into state.
+   * Called before serialization to capture any direct DOM changes.
+   */
   syncFromDOM() {
     if (this.container) {
       this.state.x = this.container.style.left
@@ -104,7 +134,11 @@ export class EditableElement {
     }
   }
 
-  // Generate dimension object for serialization
+  /**
+   * Generate dimension object for serialization to QMD.
+   * Syncs from DOM first to capture current values.
+   * @returns {Object} Dimensions formatted for PropertySerializers
+   */
   toDimensions() {
     this.syncFromDOM();
 

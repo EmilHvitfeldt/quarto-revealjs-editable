@@ -1,12 +1,15 @@
+/**
+ * Arrow system for creating and editing SVG arrows on slides.
+ * Integrates with the quarto-arrows extension for shortcode serialization.
+ * @module arrows
+ */
+
 import { CONFIG } from './config.js';
 import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex } from './utils.js';
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 
-// =============================================================================
-// Arrow Extension Detection
-// =============================================================================
-
+/** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
 
 /**
@@ -125,16 +128,19 @@ export async function showArrowExtensionWarning() {
   return confirmed;
 }
 
-// =============================================================================
-// Arrow Creation and Management
-// =============================================================================
-
-// Track the currently active (selected) arrow
+/** @type {Object|null} Currently selected arrow data */
 let activeArrow = null;
 
-// Available arrow head styles
+/**
+ * Available arrow head styles for the quarto-arrows extension.
+ * @type {string[]}
+ */
 export const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
 
+/**
+ * Set the active (selected) arrow. Only one arrow can be active at a time.
+ * @param {Object|null} arrowData - Arrow to select, or null to deselect
+ */
 export function setActiveArrow(arrowData) {
   if (activeArrow && activeArrow !== arrowData) {
     activeArrow.isActive = false;
@@ -150,11 +156,18 @@ export function setActiveArrow(arrowData) {
   updateArrowStylePanel(arrowData);
 }
 
+/**
+ * Get the currently active arrow.
+ * @returns {Object|null} Active arrow data or null
+ */
 export function getActiveArrow() {
   return activeArrow;
 }
 
-// Clean up all event listeners for an arrow
+/**
+ * Clean up all event listeners for an arrow.
+ * @param {Object} arrowData - Arrow data object
+ */
 export function cleanupArrowListeners(arrowData) {
   if (arrowData._dragController) {
     arrowData._dragController.abort();
@@ -176,6 +189,10 @@ export function cleanupArrowListeners(arrowData) {
   }
 }
 
+/**
+ * Create arrow style controls for the toolbar (color, width, head, dash, etc.).
+ * @returns {HTMLElement} Container with all arrow style controls
+ */
 export function createArrowStyleControls() {
   const container = document.createElement("div");
   container.className = "arrow-style-controls";
@@ -334,6 +351,11 @@ export function createArrowStyleControls() {
   return container;
 }
 
+/**
+ * Update the arrow style panel to show/hide based on selection.
+ * Shows arrow controls when an arrow is selected, hides normal toolbar buttons.
+ * @param {Object|null} arrowData - Selected arrow or null
+ */
 export function updateArrowStylePanel(arrowData) {
   const toolbar = document.getElementById("editable-toolbar");
   if (!toolbar) return;
@@ -400,6 +422,10 @@ function updateCurveToggleInToolbar(arrowData) {
   }
 }
 
+/**
+ * Update arrow visual appearance based on its data (color, width, dash, etc.).
+ * @param {Object} arrowData - Arrow data object
+ */
 export function updateArrowAppearance(arrowData) {
   if (!arrowData._path) return;
 
@@ -588,6 +614,11 @@ function updateArrowheadMarker(arrowData) {
   }
 }
 
+/**
+ * Update arrow UI visibility based on active/selected state.
+ * Shows/hides handles and guide lines.
+ * @param {Object} arrowData - Arrow data object
+ */
 export function updateArrowActiveState(arrowData) {
   if (!arrowData._container) return;
 
@@ -621,6 +652,11 @@ export function updateArrowActiveState(arrowData) {
   }
 }
 
+/**
+ * Add a new arrow to the current slide.
+ * Shows extension warning if quarto-arrows isn't detected.
+ * @returns {Promise<HTMLElement|null>} Arrow container element or null
+ */
 export async function addNewArrow() {
   if (!(await showArrowExtensionWarning())) {
     return null;
@@ -681,6 +717,11 @@ export async function addNewArrow() {
   return arrowContainer;
 }
 
+/**
+ * Create the DOM elements for an arrow (SVG, handles, hit area).
+ * @param {Object} arrowData - Arrow data object
+ * @returns {HTMLElement} Arrow container element
+ */
 export function createArrowElement(arrowData) {
   const container = document.createElement("div");
   container.className = "editable-arrow-container editable-new";
@@ -863,6 +904,12 @@ export function createArrowElement(arrowData) {
   return container;
 }
 
+/**
+ * Create a draggable handle for an arrow endpoint or control point.
+ * @param {Object} arrowData - Arrow data object
+ * @param {string} position - Handle position ("start", "end", "control1", "control2")
+ * @returns {HTMLElement} Handle element
+ */
 function createArrowHandle(arrowData, position) {
   const handle = document.createElement("div");
   handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
@@ -956,6 +1003,11 @@ function createArrowHandle(arrowData, position) {
   return handle;
 }
 
+/**
+ * Update the SVG path for an arrow based on its coordinates.
+ * Handles straight lines, quadratic curves, and cubic Bezier curves.
+ * @param {Object} arrowData - Arrow data object
+ */
 export function updateArrowPath(arrowData) {
   if (!arrowData._path) return;
 
@@ -1005,6 +1057,10 @@ export function updateArrowPath(arrowData) {
   }
 }
 
+/**
+ * Update handle positions to match arrow coordinates.
+ * @param {Object} arrowData - Arrow data object
+ */
 export function updateArrowHandles(arrowData) {
   if (arrowData._startHandle) {
     arrowData._startHandle.style.left = arrowData.fromX + "px";
@@ -1024,6 +1080,11 @@ export function updateArrowHandles(arrowData) {
   }
 }
 
+/**
+ * Toggle between straight line and curve mode for an arrow.
+ * When entering curve mode, creates default control points.
+ * @param {Object} arrowData - Arrow data object
+ */
 export function toggleCurveMode(arrowData) {
   arrowData.curveMode = !arrowData.curveMode;
 

@@ -1,13 +1,22 @@
+/**
+ * Quill rich text editor integration.
+ * Handles dynamic loading, initialization, and management of Quill editors.
+ * @module quill
+ */
+
 import { CONFIG } from './config.js';
 import { getColorPalette } from './colors.js';
 
-// =============================================================================
-// Quill Editor Loader
-// =============================================================================
-
+/** @type {boolean} Whether Quill has been loaded */
 let quillLoaded = false;
+/** @type {Promise|null} Loading promise to prevent duplicate loads */
 let quillLoading = null;
 
+/**
+ * Load Quill CSS and JS from CDN.
+ * Returns immediately if already loaded, or returns existing promise if loading.
+ * @returns {Promise<void>} Resolves when Quill is ready
+ */
 export function loadQuill() {
   if (quillLoaded) {
     return Promise.resolve();
@@ -39,10 +48,18 @@ export function loadQuill() {
   return quillLoading;
 }
 
-// Store Quill instances per element
+/**
+ * Map of DOM elements to their Quill instance data.
+ * @type {Map<HTMLElement, {quill: Quill, toolbarContainer: HTMLElement, editorWrapper: HTMLElement, isEditing: boolean, originalContent: string, isDirty: boolean}>}
+ */
 export const quillInstances = new Map();
 
-// Initialize Quill for an editable div element (called at page load)
+/**
+ * Initialize Quill editor for an editable div element.
+ * Called at page load to prevent text shifting when entering edit mode.
+ * @param {HTMLElement} element - The div element to initialize
+ * @returns {Promise<Object|null>} Quill data object or null if failed
+ */
 export async function initializeQuillForElement(element) {
   // Only for div elements
   if (element.tagName.toLowerCase() !== "div") return null;

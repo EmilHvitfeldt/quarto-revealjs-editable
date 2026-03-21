@@ -1,3 +1,9 @@
+/**
+ * Serialization utilities for converting element state to QMD format.
+ * Handles property serialization, HTML-to-Quarto conversion, and QMD transformation.
+ * @module serialization
+ */
+
 import { CONFIG } from './config.js';
 import { round, getOriginalEditableElements, getOriginalEditableDivs } from './utils.js';
 import { getBrandColorOutput } from './colors.js';
@@ -5,11 +11,18 @@ import { editableRegistry } from './editable-element.js';
 import { NewElementRegistry } from './registries.js';
 import { quillInstances } from './quill.js';
 
-// =============================================================================
-// Property Serializers
-// =============================================================================
-
-// Serializers for converting state to QMD attributes
+/**
+ * Property serializers for converting state values to QMD attribute strings.
+ * Each serializer specifies its type ("attr" for attributes, "style" for CSS)
+ * and a serialize function that returns the formatted string.
+ * @type {Object<string, {type: string, serialize: Function}>}
+ * @example
+ * // Add a new serializer
+ * PropertySerializers.opacity = {
+ *   type: "style",
+ *   serialize: (v) => v !== 1 ? `opacity: ${v};` : null
+ * };
+ */
 export const PropertySerializers = {
   // Core position/size properties (go in attribute list)
   width: {
@@ -44,7 +57,11 @@ export const PropertySerializers = {
   },
 };
 
-// Serialize dimensions to QMD attribute string
+/**
+ * Serialize dimensions object to QMD attribute string.
+ * @param {Object} dimensions - Dimension values from EditableElement.toDimensions()
+ * @returns {string} Formatted attribute string (e.g., "{.absolute width=200px ...}")
+ */
 export function serializeToQmd(dimensions) {
   const attrs = [];
   const styles = [];
@@ -71,12 +88,12 @@ export function serializeToQmd(dimensions) {
   return str;
 }
 
-// =============================================================================
-// QMD Transformation
-// =============================================================================
-
-// Get the fence string needed for content (handles ::: in user content)
-// If content contains :::, use :::: (or longer if needed)
+/**
+ * Get the fence string needed for div content.
+ * If content contains :::, uses :::: (or longer) to avoid conflicts.
+ * @param {string} content - The content to be fenced
+ * @returns {string} Fence string (e.g., ":::" or "::::")
+ */
 export function getFenceForContent(content) {
   // Find the longest sequence of colons at the start of any line
   const matches = content.match(/^:+/gm) || [];
@@ -89,7 +106,12 @@ export function getFenceForContent(content) {
   return ":".repeat(maxColons);
 }
 
-// Convert element innerHTML to Quarto/Markdown text with proper formatting
+/**
+ * Convert element innerHTML to Quarto/Markdown text with proper formatting.
+ * Handles Quill editor content, HTML tags, and brand color shortcodes.
+ * @param {HTMLElement} element - The element to convert
+ * @returns {string} Quarto-formatted markdown text
+ */
 export function elementToText(element) {
   // If Quill was used, get content from .ql-editor
   const quillEditor = element.querySelector(".ql-editor");
@@ -184,7 +206,11 @@ export function elementToText(element) {
   return text.trim();
 }
 
-// Serialize an arrow to quarto-arrows shortcode format
+/**
+ * Serialize an arrow to quarto-arrows shortcode format.
+ * @param {Object} arrow - Arrow data object
+ * @returns {string} Arrow shortcode (e.g., '{{< arrow from="x,y" to="x,y" ... >}}')
+ */
 export function serializeArrowToShortcode(arrow) {
   const fromX = round(arrow.fromX);
   const fromY = round(arrow.fromY);
@@ -237,10 +263,10 @@ export function serializeArrowToShortcode(arrow) {
   return shortcode;
 }
 
-// =============================================================================
-// Dimension Extraction
-// =============================================================================
-
+/**
+ * Extract dimensions from all original editable elements.
+ * @returns {Object[]} Array of dimension objects for serialization
+ */
 export function extractEditableEltDimensions() {
   // Only process original elements, not dynamically added ones
   const editableElements = getOriginalEditableElements();
@@ -271,11 +297,12 @@ export function extractEditableEltDimensions() {
   return dimensions;
 }
 
-// =============================================================================
-// QMD Content Transformation
-// =============================================================================
-
-// Insert new slides (with their associated divs) into QMD content
+/**
+ * Insert new slides (with their associated divs and arrows) into QMD content.
+ * Handles tree-based ordering for chained slide insertions.
+ * @param {string} text - Original QMD content
+ * @returns {{text: string, slideLinePositions: Map}} Updated text and position map
+ */
 export function insertNewSlides(text) {
   if (NewElementRegistry.newSlides.length === 0) {
     return { text, slideLinePositions: new Map() };
@@ -438,7 +465,12 @@ export function insertNewSlides(text) {
   return { text: lines.join("\n"), slideLinePositions };
 }
 
-// Insert new text divs into QMD content
+/**
+ * Insert new text divs into QMD content (for divs on original slides).
+ * @param {string} text - QMD content (may already have new slides inserted)
+ * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
+ * @returns {string} Updated QMD content
+ */
 export function insertNewDivs(text, slideLinePositions = new Map()) {
   const divsOnOriginalSlides = NewElementRegistry.newDivs.filter(
     (div) => !div.newSlideRef
@@ -515,7 +547,12 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
   return lines.join("\n");
 }
 
-// Insert new arrows into QMD content
+/**
+ * Insert new arrows into QMD content (for arrows on original slides).
+ * @param {string} text - QMD content
+ * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
+ * @returns {string} Updated QMD content
+ */
 export function insertNewArrows(text, slideLinePositions = new Map()) {
   const arrowsOnOriginalSlides = NewElementRegistry.newArrows.filter(
     (arrow) => !arrow.newSlideRef
@@ -582,6 +619,11 @@ export function insertNewArrows(text, slideLinePositions = new Map()) {
   return lines.join("\n");
 }
 
+/**
+ * Update existing text div content in QMD (converts HTML to Quarto markdown).
+ * @param {string} text - QMD content
+ * @returns {string} Updated QMD content with converted div contents
+ */
 export function updateTextDivs(text) {
   const divs = getOriginalEditableDivs();
   const replacements = Array.from(divs).map(htmlToQuarto);
@@ -599,6 +641,12 @@ export function updateTextDivs(text) {
   });
 }
 
+/**
+ * Convert a div's HTML content to Quarto fenced div format.
+ * Returns null if div wasn't modified (preserves original content).
+ * @param {HTMLElement} div - The div element
+ * @returns {string|null} Quarto fenced div or null if unmodified
+ */
 function htmlToQuarto(div) {
   const quillData = quillInstances.get(div);
   if (quillData && !quillData.isDirty) {
@@ -611,6 +659,12 @@ function htmlToQuarto(div) {
   return `${fence} {.editable}\n` + text.trim() + `\n${fence}`;
 }
 
+/**
+ * Replace {.editable} attribute strings with {.absolute ...} in QMD.
+ * @param {string} text - QMD content
+ * @param {string[]} replacements - Array of replacement attribute strings
+ * @returns {string} Updated QMD content
+ */
 export function replaceEditableOccurrences(text, replacements) {
   const regex = /(?:^(:{3,}) |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
 
@@ -622,6 +676,11 @@ export function replaceEditableOccurrences(text, replacements) {
   });
 }
 
+/**
+ * Format dimension objects as QMD attribute strings.
+ * @param {Object[]} dimensions - Array of dimension objects
+ * @returns {string[]} Array of formatted attribute strings
+ */
 export function formatEditableEltStrings(dimensions) {
   return dimensions.map((dim) => serializeToQmd(dim));
 }

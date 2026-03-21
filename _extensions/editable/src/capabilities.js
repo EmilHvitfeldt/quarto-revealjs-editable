@@ -1,16 +1,32 @@
+/**
+ * Capability system for modular element behaviors.
+ * Each capability handles a specific type of interaction (move, resize, rotate, etc.).
+ * @module capabilities
+ */
+
 import { CONFIG } from './config.js';
 import { getSlideScale, getClientCoordinates } from './utils.js';
 import { pushUndoState } from './undo.js';
 import { quillInstances } from './quill.js';
 import { ControlRegistry } from './registries.js';
 
-// =============================================================================
-// Capability System
-// =============================================================================
-
-// Capability definitions - each capability handles a specific interaction type
+/**
+ * Capability definitions for editable elements.
+ * Each capability has a consistent interface with optional methods:
+ * - init(context) - Initialize capability state
+ * - createHandles(context) - Create UI handles
+ * - createControls(context) - Create UI controls
+ * - attachEvents(context) - Attach event listeners
+ * - onMove(context, event) - Handle pointer move
+ * - onStop(context) - Cleanup when interaction ends
+ * - isActive(context) - Check if currently active
+ * - handleKeyboard(context, event, editableElt) - Handle arrow keys
+ * @type {Object}
+ */
 export const Capabilities = {
-  // Move capability - handles dragging elements
+  /**
+   * Move capability - handles dragging elements to reposition them.
+   */
   move: {
     name: "move",
 
@@ -106,7 +122,10 @@ export const Capabilities = {
     },
   },
 
-  // Resize capability - handles resizing elements
+  /**
+   * Resize capability - handles resizing elements via corner handles.
+   * Supports aspect ratio preservation with Shift key.
+   */
   resize: {
     name: "resize",
 
@@ -271,8 +290,10 @@ export const Capabilities = {
     },
   },
 
-  // Font controls capability - now just creates the container for edit button
-  // All formatting (font size, alignment, colors) is handled by Quill toolbar
+  /**
+   * Font controls capability - creates container for edit button.
+   * Actual formatting (font size, alignment, colors) is handled by Quill toolbar.
+   */
   fontControls: {
     name: "fontControls",
 
@@ -295,7 +316,9 @@ export const Capabilities = {
     },
   },
 
-  // Edit text capability - contentEditable toggle (div only)
+  /**
+   * Edit text capability - toggles contentEditable mode for divs.
+   */
   editText: {
     name: "editText",
 
@@ -330,7 +353,11 @@ export const Capabilities = {
     },
   },
 
-  // Rotate capability - handles rotating elements
+  /**
+   * Rotate capability - handles rotating elements via top handle.
+   * Supports 15-degree snap with Shift key.
+   * Keyboard: Ctrl/Cmd + arrow keys for rotation.
+   */
   rotate: {
     name: "rotate",
 
@@ -456,13 +483,20 @@ export const Capabilities = {
   },
 };
 
-// Map element types to their capabilities
+/**
+ * Maps element types to their enabled capabilities.
+ * @type {Object<string, string[]>}
+ */
 export const ELEMENT_CAPABILITIES = {
   img: ["move", "resize", "rotate"],
   div: ["move", "resize", "rotate", "fontControls", "editText"],
 };
 
-// Get capabilities for an element type
+/**
+ * Get capability objects for an element type.
+ * @param {string} elementType - Element type ("img" or "div")
+ * @returns {Object[]} Array of capability objects
+ */
 export function getCapabilitiesFor(elementType) {
   const capabilityNames = ELEMENT_CAPABILITIES[elementType] || ["move", "resize"];
   return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);

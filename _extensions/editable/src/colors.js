@@ -1,11 +1,24 @@
-// Default color palette for the color pickers
+/**
+ * Color utilities for the editable extension.
+ * Handles color palettes, RGB/hex conversion, and brand color integration.
+ * @module colors
+ */
+
+/**
+ * Default color palette for color pickers when no brand colors are available.
+ * @type {string[]}
+ */
 export const DEFAULT_COLOR_PALETTE = [
   "#000000", "#434343", "#666666", "#999999", "#cccccc", "#ffffff",
   "#e60000", "#ff9900", "#ffff00", "#008a00", "#0066cc", "#9933ff",
   "#ff99cc", "#ffcc99", "#ffff99", "#99ff99", "#99ccff", "#cc99ff",
 ];
 
-// Get color palette - uses brand colors if available, otherwise defaults
+/**
+ * Get the color palette for color pickers.
+ * Uses brand colors from _brand.yml if injected by Lua filter, otherwise defaults.
+ * @returns {string[]} Array of hex color values
+ */
 export function getColorPalette() {
   // Check if brand palette colors were injected by Quarto
   if (window._quarto_brand_palette && Array.isArray(window._quarto_brand_palette) && window._quarto_brand_palette.length > 0) {
@@ -14,7 +27,11 @@ export function getColorPalette() {
   return DEFAULT_COLOR_PALETTE;
 }
 
-// Convert RGB color string to hex format
+/**
+ * Convert RGB color string to hex format.
+ * @param {string} rgb - RGB color string (e.g., "rgb(255, 107, 107)")
+ * @returns {string|null} Hex color string (e.g., "#ff6b6b") or null if invalid
+ */
 export function rgbToHex(rgb) {
   // Match rgb(r, g, b) or rgba(r, g, b, a)
   const match = rgb.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
@@ -27,8 +44,16 @@ export function rgbToHex(rgb) {
   return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
 }
 
-// Convert a color value to brand shortcode if it's a brand color, otherwise return as-is
-// Uses placeholder to avoid being stripped by HTML cleanup regex
+/**
+ * Convert a color value to brand shortcode placeholder if it matches a brand color.
+ * Uses placeholder format to avoid being stripped by HTML cleanup regex.
+ * Placeholders are later converted to {{< brand color name >}} shortcodes.
+ * @param {string} colorVal - Color value (hex or rgb format)
+ * @returns {string} Brand placeholder or original color value
+ * @example
+ * // Returns "__BRAND_SHORTCODE_primary__" if #007cba is named "primary"
+ * getBrandColorOutput("#007cba")
+ */
 export function getBrandColorOutput(colorVal) {
   if (!window._quarto_brand_color_names) {
     return colorVal;

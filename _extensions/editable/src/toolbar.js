@@ -1,9 +1,15 @@
+/**
+ * Floating toolbar for save, copy, and add actions.
+ * @module toolbar
+ */
+
 import { ToolbarRegistry } from './registries.js';
 
-// =============================================================================
-// Floating Toolbar
-// =============================================================================
-
+/**
+ * Create the floating toolbar with actions from ToolbarRegistry.
+ * Toolbar is draggable via the handle.
+ * @returns {HTMLElement} The toolbar element
+ */
 export function createFloatingToolbar() {
   // Check if toolbar already exists
   if (document.getElementById("editable-toolbar")) {
@@ -52,6 +58,11 @@ export function createFloatingToolbar() {
   return toolbar;
 }
 
+/**
+ * Make the toolbar draggable via its handle.
+ * @param {HTMLElement} toolbar - The toolbar element
+ * @param {HTMLElement} handle - The drag handle element
+ */
 function makeToolbarDraggable(toolbar, handle) {
   let isDragging = false;
   let startX, startY, initialX, initialY;

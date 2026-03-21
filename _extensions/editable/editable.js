@@ -94,6 +94,9 @@ var EditableModule = (() => {
   // src/editable-element.js
   var editableRegistry = /* @__PURE__ */ new Map();
   var EditableElement = class {
+    /**
+     * @param {HTMLElement} element - The DOM element to wrap
+     */
     constructor(element) {
       this.element = element;
       this.container = null;
@@ -115,18 +118,28 @@ var EditableModule = (() => {
         textAlign: null
       };
     }
-    // Get a copy of current state
+    /**
+     * Get a copy of current state.
+     * @returns {Object} Copy of state object
+     */
     getState() {
       return { ...this.state };
     }
-    // Update state and optionally sync to DOM
+    /**
+     * Update state and optionally sync to DOM.
+     * @param {Object} updates - Properties to update
+     * @param {boolean} [syncToDOM=true] - Whether to apply changes to DOM
+     */
     setState(updates, syncToDOM = true) {
       Object.assign(this.state, updates);
       if (syncToDOM) {
         this.syncToDOM();
       }
     }
-    // Sync state to DOM elements
+    /**
+     * Apply internal state to DOM elements.
+     * Called after state changes to update visual representation.
+     */
     syncToDOM() {
       if (this.container) {
         this.container.style.left = this.state.x + "px";
@@ -146,7 +159,10 @@ var EditableModule = (() => {
         this.element.style.textAlign = this.state.textAlign;
       }
     }
-    // Read current values from DOM into state
+    /**
+     * Read current values from DOM into state.
+     * Called before serialization to capture any direct DOM changes.
+     */
     syncFromDOM() {
       if (this.container) {
         this.state.x = this.container.style.left ? parseFloat(this.container.style.left) : this.container.offsetLeft;
@@ -166,7 +182,11 @@ var EditableModule = (() => {
         }
       }
     }
-    // Generate dimension object for serialization
+    /**
+     * Generate dimension object for serialization to QMD.
+     * Syncs from DOM first to capture current values.
+     * @returns {Object} Dimensions formatted for PropertySerializers
+     */
     toDimensions() {
       this.syncFromDOM();
       const dims = {
@@ -442,18 +462,38 @@ var EditableModule = (() => {
 
   // src/registries.js
   var ControlRegistry = {
+    /** @type {Map<string, Object>} Registered controls by name */
     controls: /* @__PURE__ */ new Map(),
-    // Register a new control
+    /**
+     * Register a new control.
+     * @param {string} name - Unique control name
+     * @param {Object} config - Control configuration
+     * @param {string} config.icon - Button text/icon
+     * @param {string} config.ariaLabel - Accessibility label
+     * @param {string} config.title - Tooltip text
+     * @param {string} [config.className] - Additional CSS class
+     * @param {string[]} config.appliesTo - Element types this control applies to
+     * @param {Function} config.onClick - Click handler (element, btn, event)
+     */
     register(name, config) {
       this.controls.set(name, { name, ...config });
     },
-    // Get controls for a specific element type
+    /**
+     * Get controls applicable to an element type.
+     * @param {string} elementType - Element type ("img" or "div")
+     * @returns {Object[]} Array of control configs
+     */
     getControlsFor(elementType) {
       return [...this.controls.values()].filter(
         (c) => c.appliesTo.includes(elementType)
       );
     },
-    // Create a button from a control config
+    /**
+     * Create a button element from a control config.
+     * @param {Object} config - Control configuration
+     * @param {HTMLElement} element - The editable element
+     * @returns {HTMLButtonElement} The created button
+     */
     createButton(config, element) {
       const btn = createButton(config.icon, config.className || "");
       btn.setAttribute("aria-label", config.ariaLabel);
@@ -564,70 +604,105 @@ var EditableModule = (() => {
     }
   });
   var NewElementRegistry = {
-    // Track new text divs added during the session
+    /** @type {Array<{element: HTMLElement, slideIndex: number, content: string, newSlideRef: Object|null}>} */
     newDivs: [],
-    // Track new slides added during the session
+    /** @type {Array<{element: HTMLElement, afterSlideIndex: number, insertAfterNewSlide: Object|null, insertionOrder: number}>} */
     newSlides: [],
-    // Track new arrows added during the session
+    /** @type {Array<Object>} Arrow data objects */
     newArrows: [],
-    // Add a new text div
-    // newSlideRef is a reference to the new slide entry if this div is on a new slide
+    /**
+     * Add a new text div to tracking.
+     * @param {HTMLElement} div - The div element
+     * @param {number} slideIndex - Index of the slide containing the div
+     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+     */
     addDiv(div, slideIndex, newSlideRef = null) {
       this.newDivs.push({
         element: div,
         slideIndex,
         content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
         newSlideRef
-        // Reference to NewElementRegistry.newSlides entry if on a new slide
       });
     },
-    // Add a new slide
-    // insertAfterNewSlide: reference to another newSlides entry if this slide comes after a new slide
+    /**
+     * Add a new slide to tracking.
+     * @param {HTMLElement} slide - The slide section element
+     * @param {number} afterSlideIndex - Original slide index to insert after
+     * @param {Object|null} [insertAfterNewSlide=null] - Parent new slide for chained insertions
+     */
     addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
       this.newSlides.push({
         element: slide,
         afterSlideIndex,
         insertAfterNewSlide,
-        // Reference to parent new slide, or null
         insertionOrder: this.newSlides.length
       });
     },
-    // Add a new arrow
-    // newSlideRef is a reference to the new slide entry if this arrow is on a new slide
-    // Note: We store the reference directly (not a copy) so handle drag updates are reflected
+    /**
+     * Add a new arrow to tracking.
+     * Stores reference directly so drag updates are reflected.
+     * @param {Object} arrowData - Arrow data object
+     * @param {number} slideIndex - Index of the slide containing the arrow
+     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+     */
     addArrow(arrowData, slideIndex, newSlideRef = null) {
       arrowData.slideIndex = slideIndex;
       arrowData.newSlideRef = newSlideRef;
       this.newArrows.push(arrowData);
     },
-    // Get count of new slides before a given index (for offset calculation)
+    /**
+     * Count new slides inserted before a given index (for offset calculation).
+     * @param {number} index - The slide index
+     * @returns {number} Count of new slides before this index
+     */
     countNewSlidesBefore(index) {
       return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
     },
-    // Clear all tracked elements (e.g., after save)
+    /**
+     * Clear all tracked elements (e.g., after save).
+     */
     clear() {
       this.newDivs = [];
       this.newSlides = [];
       this.newArrows = [];
     },
-    // Check if there are any new elements
+    /**
+     * Check if there are any new elements tracked.
+     * @returns {boolean} True if any new elements exist
+     */
     hasNewElements() {
       return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
     }
   };
   var ToolbarRegistry = {
+    /** @type {Map<string, Object>} Registered actions by name */
     actions: /* @__PURE__ */ new Map(),
-    // Register a toolbar action
-    // config: { icon, label, title, onClick, className }
-    // For submenu groups: { icon, label, title, className, submenu: [...configs] }
+    /**
+     * Register a toolbar action.
+     * @param {string} name - Unique action name
+     * @param {Object} config - Action configuration
+     * @param {string} config.icon - Button icon
+     * @param {string} config.label - Button label
+     * @param {string} config.title - Tooltip text
+     * @param {string} [config.className] - Additional CSS class
+     * @param {Function} [config.onClick] - Click handler
+     * @param {Array} [config.submenu] - Submenu items for dropdown
+     */
     register(name, config) {
       this.actions.set(name, { name, ...config });
     },
-    // Get all registered actions
+    /**
+     * Get all registered actions.
+     * @returns {Object[]} Array of action configs
+     */
     getActions() {
       return [...this.actions.values()];
     },
-    // Create a button from an action config
+    /**
+     * Create a button element from an action config.
+     * @param {Object} config - Action configuration
+     * @returns {HTMLButtonElement} The created button
+     */
     createButton(config) {
       const btn = document.createElement("button");
       btn.className = "editable-toolbar-button " + (config.className || "");
@@ -641,7 +716,11 @@ var EditableModule = (() => {
       });
       return btn;
     },
-    // Create a button with submenu
+    /**
+     * Create a button with dropdown submenu.
+     * @param {Object} config - Action configuration with submenu array
+     * @returns {HTMLDivElement} Wrapper containing button and submenu
+     */
     createSubmenuButton(config) {
       const wrapper = document.createElement("div");
       wrapper.className = "editable-toolbar-submenu-wrapper";
@@ -690,7 +769,9 @@ var EditableModule = (() => {
 
   // src/capabilities.js
   var Capabilities = {
-    // Move capability - handles dragging elements
+    /**
+     * Move capability - handles dragging elements to reposition them.
+     */
     move: {
       name: "move",
       init(context) {
@@ -769,7 +850,10 @@ var EditableModule = (() => {
         return false;
       }
     },
-    // Resize capability - handles resizing elements
+    /**
+     * Resize capability - handles resizing elements via corner handles.
+     * Supports aspect ratio preservation with Shift key.
+     */
     resize: {
       name: "resize",
       init(context) {
@@ -908,8 +992,10 @@ var EditableModule = (() => {
         return false;
       }
     },
-    // Font controls capability - now just creates the container for edit button
-    // All formatting (font size, alignment, colors) is handled by Quill toolbar
+    /**
+     * Font controls capability - creates container for edit button.
+     * Actual formatting (font size, alignment, colors) is handled by Quill toolbar.
+     */
     fontControls: {
       name: "fontControls",
       init(context) {
@@ -924,7 +1010,9 @@ var EditableModule = (() => {
       attachEvents(context) {
       }
     },
-    // Edit text capability - contentEditable toggle (div only)
+    /**
+     * Edit text capability - toggles contentEditable mode for divs.
+     */
     editText: {
       name: "editText",
       init(context) {
@@ -949,7 +1037,11 @@ var EditableModule = (() => {
       attachEvents(context) {
       }
     },
-    // Rotate capability - handles rotating elements
+    /**
+     * Rotate capability - handles rotating elements via top handle.
+     * Supports 15-degree snap with Shift key.
+     * Keyboard: Ctrl/Cmd + arrow keys for rotation.
+     */
     rotate: {
       name: "rotate",
       init(context) {

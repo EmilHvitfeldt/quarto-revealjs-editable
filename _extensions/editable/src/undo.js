@@ -1,14 +1,22 @@
+/**
+ * Undo/Redo system for tracking and reverting state changes.
+ * Captures snapshots of all editable elements before changes.
+ * @module undo
+ */
+
 import { CONFIG } from './config.js';
 import { editableRegistry } from './editable-element.js';
 
-// =============================================================================
-// Undo/Redo System
-// =============================================================================
-
+/** @type {Array<Array<Object>>} Stack of previous states for undo */
 const undoStack = [];
+/** @type {Array<Array<Object>>} Stack of undone states for redo */
 const redoStack = [];
 
-// Capture a snapshot of an element's state
+/**
+ * Capture a snapshot of a single element's state.
+ * @param {HTMLElement} element - The element to capture
+ * @returns {{element: HTMLElement, state: Object}|null} State snapshot or null
+ */
 export function captureElementState(element) {
   const editableElt = editableRegistry.get(element);
   if (!editableElt) return null;
@@ -20,7 +28,10 @@ export function captureElementState(element) {
   };
 }
 
-// Capture state of all elements
+/**
+ * Capture state of all registered editable elements.
+ * @returns {Array<{element: HTMLElement, state: Object}>} Array of state snapshots
+ */
 export function captureAllState() {
   const snapshots = [];
   for (const [element, editableElt] of editableRegistry) {
@@ -33,7 +44,10 @@ export function captureAllState() {
   return snapshots;
 }
 
-// Restore state from a snapshot
+/**
+ * Restore all elements to a previous snapshot state.
+ * @param {Array<{element: HTMLElement, state: Object}>} snapshots - States to restore
+ */
 export function restoreState(snapshots) {
   for (const snapshot of snapshots) {
     const editableElt = editableRegistry.get(snapshot.element);
@@ -43,7 +57,10 @@ export function restoreState(snapshots) {
   }
 }
 
-// Push current state to undo stack (call before making changes)
+/**
+ * Push current state to undo stack. Call before making changes.
+ * Clears redo stack since new action invalidates redo history.
+ */
 export function pushUndoState() {
   const state = captureAllState();
   undoStack.push(state);
@@ -57,7 +74,10 @@ export function pushUndoState() {
   redoStack.length = 0;
 }
 
-// Undo last action
+/**
+ * Undo the last action by restoring previous state.
+ * @returns {boolean} True if undo was performed
+ */
 export function undo() {
   if (undoStack.length === 0) return false;
 
@@ -72,7 +92,10 @@ export function undo() {
   return true;
 }
 
-// Redo last undone action
+/**
+ * Redo the last undone action.
+ * @returns {boolean} True if redo was performed
+ */
 export function redo() {
   if (redoStack.length === 0) return false;
 
@@ -87,17 +110,26 @@ export function redo() {
   return true;
 }
 
-// Check if undo is available
+/**
+ * Check if undo is available.
+ * @returns {boolean} True if undo stack has entries
+ */
 export function canUndo() {
   return undoStack.length > 0;
 }
 
-// Check if redo is available
+/**
+ * Check if redo is available.
+ * @returns {boolean} True if redo stack has entries
+ */
 export function canRedo() {
   return redoStack.length > 0;
 }
 
-// Setup global keyboard shortcuts for undo/redo
+/**
+ * Setup global keyboard shortcuts for undo/redo.
+ * Ctrl+Z / Cmd+Z for undo, Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z for redo.
+ */
 export function setupUndoRedoKeyboard() {
   document.addEventListener("keydown", (e) => {
     // Check for Ctrl+Z (undo) or Cmd+Z on Mac

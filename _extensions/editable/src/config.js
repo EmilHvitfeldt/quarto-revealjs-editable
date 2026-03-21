@@ -1,4 +1,8 @@
-// Configuration constants (only runtime values - visual styling is in editable.css)
+/**
+ * Configuration constants for the editable extension.
+ * Visual styling is defined in editable.css via CSS custom properties.
+ * @type {Object}
+ */
 export const CONFIG = {
   // Sizing constraints
   MIN_ELEMENT_SIZE: 50,
