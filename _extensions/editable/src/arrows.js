@@ -252,9 +252,11 @@ export function createArrowStyleControls() {
   widthInput.title = "Width";
   widthInput.addEventListener("input", (e) => {
     if (activeArrow) {
-      const val = parseInt(e.target.value) || 1;
-      activeArrow.width = Math.max(1, Math.min(20, val));
-      updateArrowAppearance(activeArrow);
+      const val = parseInt(e.target.value);
+      if (!isNaN(val)) {
+        activeArrow.width = Math.max(1, Math.min(20, val));
+        updateArrowAppearance(activeArrow);
+      }
     }
   });
   container.appendChild(widthInput);
@@ -984,7 +986,6 @@ function createArrowHandle(arrowData, position) {
 
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
-    updateCurveTogglePosition(arrowData);
 
     e.preventDefault();
   };
@@ -1125,6 +1126,3 @@ export function toggleCurveMode(arrowData) {
   updateArrowHandles(arrowData);
 }
 
-function updateCurveTogglePosition(arrowData) {
-  // Placeholder for potential future use
-}

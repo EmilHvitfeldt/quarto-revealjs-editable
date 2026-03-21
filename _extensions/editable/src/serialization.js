@@ -6,7 +6,7 @@
 
 import { CONFIG } from './config.js';
 import { round, getOriginalEditableElements, getOriginalEditableDivs } from './utils.js';
-import { getBrandColorOutput } from './colors.js';
+import { getBrandColorOutput, normalizeColor } from './colors.js';
 import { editableRegistry } from './editable-element.js';
 import { NewElementRegistry } from './registries.js';
 import { quillInstances } from './quill.js';
@@ -233,7 +233,8 @@ export function serializeArrowToShortcode(arrow) {
   }
 
   // Add styling (only if non-default)
-  if (arrow.color && arrow.color !== CONFIG.ARROW_DEFAULT_COLOR && arrow.color !== "#000000" && arrow.color !== "black") {
+  const normalizedArrowColor = normalizeColor(arrow.color);
+  if (arrow.color && normalizedArrowColor !== "#000000") {
     const colorOutput = getBrandColorOutput(arrow.color);
     shortcode += ` color="${colorOutput}"`;
   }

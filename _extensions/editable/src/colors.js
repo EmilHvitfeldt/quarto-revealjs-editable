@@ -45,6 +45,36 @@ export function rgbToHex(rgb) {
 }
 
 /**
+ * Normalize a color value to lowercase 6-digit hex format.
+ * Handles rgb(), named colors, and short hex (#000) formats.
+ * @param {string} color - Color value in any format
+ * @returns {string} Normalized hex color (e.g., "#000000")
+ */
+export function normalizeColor(color) {
+  if (!color) return color;
+
+  let normalized = color.trim().toLowerCase();
+
+  // Handle rgb/rgba
+  if (normalized.startsWith('rgb')) {
+    const hex = rgbToHex(normalized);
+    if (hex) return hex.toLowerCase();
+  }
+
+  // Handle named color "black"
+  if (normalized === 'black') return '#000000';
+
+  // Handle short hex (#000 -> #000000)
+  if (normalized.match(/^#[0-9a-f]{3}$/i)) {
+    return '#' + normalized[1] + normalized[1] +
+                 normalized[2] + normalized[2] +
+                 normalized[3] + normalized[3];
+  }
+
+  return normalized;
+}
+
+/**
  * Convert a color value to brand shortcode placeholder if it matches a brand color.
  * Uses placeholder format to avoid being stripped by HTML cleanup regex.
  * Placeholders are later converted to {{< brand color name >}} shortcodes.

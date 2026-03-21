@@ -323,6 +323,22 @@ var EditableModule = (() => {
     const b = parseInt(match[3], 10);
     return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
   }
+  function normalizeColor(color) {
+    if (!color)
+      return color;
+    let normalized = color.trim().toLowerCase();
+    if (normalized.startsWith("rgb")) {
+      const hex = rgbToHex(normalized);
+      if (hex)
+        return hex.toLowerCase();
+    }
+    if (normalized === "black")
+      return "#000000";
+    if (normalized.match(/^#[0-9a-f]{3}$/i)) {
+      return "#" + normalized[1] + normalized[1] + normalized[2] + normalized[2] + normalized[3] + normalized[3];
+    }
+    return normalized;
+  }
   function getBrandColorOutput(colorVal) {
     if (!window._quarto_brand_color_names) {
       return colorVal;
@@ -1396,9 +1412,11 @@ var EditableModule = (() => {
     widthInput.title = "Width";
     widthInput.addEventListener("input", (e) => {
       if (activeArrow) {
-        const val = parseInt(e.target.value) || 1;
-        activeArrow.width = Math.max(1, Math.min(20, val));
-        updateArrowAppearance(activeArrow);
+        const val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+          activeArrow.width = Math.max(1, Math.min(20, val));
+          updateArrowAppearance(activeArrow);
+        }
       }
     });
     container.appendChild(widthInput);
@@ -1996,7 +2014,6 @@ var EditableModule = (() => {
       }
       updateArrowPath(arrowData);
       updateArrowHandles(arrowData);
-      updateCurveTogglePosition(arrowData);
       e.preventDefault();
     };
     const stopDrag = () => {
@@ -2101,8 +2118,6 @@ var EditableModule = (() => {
     }
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
-  }
-  function updateCurveTogglePosition(arrowData) {
   }
 
   // src/serialization.js
@@ -2258,7 +2273,8 @@ ${innerFence}`;
       const c2y = round(arrow.control2Y);
       shortcode += ` control2="${c2x},${c2y}"`;
     }
-    if (arrow.color && arrow.color !== CONFIG.ARROW_DEFAULT_COLOR && arrow.color !== "#000000" && arrow.color !== "black") {
+    const normalizedArrowColor = normalizeColor(arrow.color);
+    if (arrow.color && normalizedArrowColor !== "#000000") {
       const colorOutput = getBrandColorOutput(arrow.color);
       shortcode += ` color="${colorOutput}"`;
     }
