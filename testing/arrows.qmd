@@ -2,7 +2,7 @@
 title: "Arrows Test"
 filters:
   - editable
-  - arrow
+  - arrows
 ---
 
 ## Slide with existing arrow

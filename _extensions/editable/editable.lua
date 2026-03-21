@@ -56,10 +56,10 @@ local function has_arrow_extension()
   if not input_dir then input_dir = "./" end
 
   local arrow_paths = {
-    input_dir .. "_extensions/arrow/_extension.yml",
-    input_dir .. "_extensions/EmilHvitfeldt/arrow/_extension.yml",
-    "./_extensions/arrow/_extension.yml",
-    "./_extensions/EmilHvitfeldt/arrow/_extension.yml"
+    input_dir .. "_extensions/arrows/_extension.yml",
+    input_dir .. "_extensions/EmilHvitfeldt/arrows/_extension.yml",
+    "./_extensions/arrows/_extension.yml",
+    "./_extensions/EmilHvitfeldt/arrows/_extension.yml"
   }
 
   for _, path in ipairs(arrow_paths) do
