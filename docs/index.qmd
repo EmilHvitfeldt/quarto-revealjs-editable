@@ -25,6 +25,7 @@ Or [open in a new tab](example.html){target="_blank"} for the full experience.
 - **Move** elements by dragging them to reposition
 - **Resize** elements using corner handles (hold Shift to preserve aspect ratio)
 - **Rotate** elements using the orange circular handle (hold Shift to snap to 15° increments)
+- **Add arrows** with straight or curved (Bezier) paths via [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) integration
 - **Rich text editing** with formatting toolbar
 - **Brand color support** via Quarto's `_brand.yml`
 - **Keyboard navigation** for accessibility

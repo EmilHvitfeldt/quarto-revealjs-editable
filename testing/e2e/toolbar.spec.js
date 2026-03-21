@@ -16,6 +16,11 @@ async function clickAddSlide(page) {
   await page.click('.editable-toolbar-submenu-item.toolbar-add-slide');
 }
 
+async function clickAddArrow(page) {
+  await page.click('.toolbar-add');
+  await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
+}
+
 test.describe('Floating Toolbar', () => {
 
   test.beforeAll(async () => {
@@ -99,9 +104,10 @@ test.describe('Floating Toolbar', () => {
       return Array.from(items).map(item => item.className);
     });
 
-    expect(submenuItems.length).toBe(2);
+    expect(submenuItems.length).toBeGreaterThanOrEqual(2);
     expect(submenuItems.some(c => c.includes('toolbar-add-text'))).toBe(true);
     expect(submenuItems.some(c => c.includes('toolbar-add-slide'))).toBe(true);
+    // Arrow option only appears when arrow filter is enabled
 
     // Click outside to close submenu
     await page.click('body', { position: { x: 10, y: 10 } });

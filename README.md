@@ -44,8 +44,9 @@ Once rendered, editable elements can be:
 
 ## Features
 
-- Floating toolbar for quick actions (save, copy, add text, add slide)
+- Floating toolbar for quick actions (save, copy, add text, add slide, add arrow)
 - Rich text editing with formatting (bold, italic, colors, alignment)
+- Arrow support with straight and curved (Bezier) arrows (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows))
 - Brand color support via `_brand.yml`
 - Keyboard navigation for accessibility
 - Undo/Redo support

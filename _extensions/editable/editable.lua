@@ -117,11 +117,9 @@ local function get_brand_palette_colors()
 end
 
 function Pandoc(doc)
-  -- No editable elements found: skip injection entirely.
-  -- This keeps the generated HTML clean after a save (when all {.editable}
-  -- have been replaced by {.absolute ...}) and avoids unnecessary base64
-  -- encoding when the filter is active but unused.
-  if not has_editable_elements(doc) then return doc end
+  -- Always inject the file content when the filter is active.
+  -- This allows adding new elements (like arrows) even when
+  -- there are no existing .editable elements in the document.
 
   -- Encode qmd source as base64 and inject into <head>
   local filename = quarto.doc.input_file

@@ -2,6 +2,26 @@
 
 All notable changes to the quarto-revealjs-editable extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Arrow support** - Add arrows to slides via the toolbar (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension)
+  - Automatic detection of arrow extension with helpful install message if missing
+  - Add Arrow button (➡️) in the Add submenu
+  - Draggable start and end point handles
+  - Curve mode toggle for Bezier curves with two control points
+  - Guide lines showing control point connections in curve mode
+  - Arrows serialized as `{{< arrow from="x,y" to="x,y" ... >}}` shortcodes
+  - 20px invisible hit area for easier arrow selection
+  - Active selection UI - only selected arrow shows handles/controls
+  - Arrow styling controls integrated into main toolbar (color, width, head style, dash, line style, opacity)
+  - Color presets using brand palette (or defaults) with custom color picker
+  - Brand colors saved as `{{< brand color name >}}` shortcodes in arrow color attribute
+  - Drag arrows by their body to move entire arrow while preserving shape
+
+---
+
 ## [6.0.0] - 2026-03-16
 
 ### Added

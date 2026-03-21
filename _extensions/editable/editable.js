@@ -21,12 +21,153 @@ const CONFIG = {
   NEW_TEXT_HEIGHT: 50,
   NEW_SLIDE_HEADING: "## New Slide",
 
+  // Arrow defaults
+  NEW_ARROW_LENGTH: 150,
+  ARROW_HANDLE_SIZE: 12,
+  ARROW_CONTROL_HANDLE_SIZE: 10,
+  ARROW_DEFAULT_COLOR: "black",
+  ARROW_DEFAULT_WIDTH: 2,
+  ARROW_CONTROL1_COLOR: "#ff6600",
+  ARROW_CONTROL2_COLOR: "#9933ff",
+
   // Quill Editor CDN
   QUILL_CSS:
     "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
   QUILL_JS:
     "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js",
 };
+
+// =============================================================================
+// Arrow Extension Detection
+// =============================================================================
+
+let arrowExtensionWarningShown = false;
+
+/**
+ * Check if the quarto-arrows extension appears to be installed.
+ * Detection methods:
+ * 1. Look for rendered arrow SVGs with marker elements (indicates extension was used)
+ * 2. Check for arrow-specific CSS or scripts
+ */
+function hasArrowExtension() {
+  // Check for any SVGs with marker definitions (arrow extension output)
+  const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
+  if (arrowSvgs.length > 0) return true;
+
+  // Check if any arrow shortcode rendered (even without markers, paths may exist)
+  // Arrow extension creates SVGs with specific structure
+  const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
+  if (arrowPaths.length > 0) return true;
+
+  return false;
+}
+
+/**
+ * Show a custom modal dialog for arrow extension warning.
+ * Returns a Promise that resolves to true (continue) or false (cancel).
+ */
+function showArrowExtensionModal() {
+  return new Promise((resolve) => {
+    // Create modal overlay
+    const overlay = document.createElement("div");
+    overlay.className = "editable-modal-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+    `;
+
+    // Create modal dialog
+    const modal = document.createElement("div");
+    modal.className = "editable-modal";
+    modal.style.cssText = `
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 450px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      font-family: system-ui, -apple-system, sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
+      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
+        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
+      </p>
+      <p style="margin: 0 0 16px 0; color: #555;">
+        Install with:<br>
+        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
+      </p>
+      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
+        Continue? (Arrows will work in the editor but won't render until the extension is installed)
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="editable-modal-cancel" style="
+          padding: 8px 16px;
+          border: 1px solid #ccc;
+          background: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Cancel</button>
+        <button class="editable-modal-confirm" style="
+          padding: 8px 16px;
+          border: none;
+          background: var(--editable-accent-color, #007cba);
+          color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Continue</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Handle button clicks
+    const cleanup = (result) => {
+      overlay.remove();
+      resolve(result);
+    };
+
+    modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
+    modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cleanup(false);
+    };
+
+    // Focus confirm button
+    modal.querySelector(".editable-modal-confirm").focus();
+  });
+}
+
+/**
+ * Show a one-time informational message about arrow extension dependency.
+ * Returns a Promise that resolves to true if user confirms, false if cancelled.
+ */
+async function showArrowExtensionWarning() {
+  if (arrowExtensionWarningShown) return true;
+
+  const detected = hasArrowExtension();
+  if (detected) {
+    arrowExtensionWarningShown = true;
+    return true;
+  }
+
+  const confirmed = await showArrowExtensionModal();
+  if (confirmed) {
+    arrowExtensionWarningShown = true;
+  }
+  return confirmed;
+}
 
 // =============================================================================
 // Quill Editor Loader
@@ -1141,6 +1282,9 @@ const NewElementRegistry = {
   // Track new slides added during the session
   newSlides: [],
 
+  // Track new arrows added during the session
+  newArrows: [],
+
   // Add a new text div
   // newSlideRef is a reference to the new slide entry if this div is on a new slide
   addDiv(div, slideIndex, newSlideRef = null) {
@@ -1163,6 +1307,15 @@ const NewElementRegistry = {
     });
   },
 
+  // Add a new arrow
+  // newSlideRef is a reference to the new slide entry if this arrow is on a new slide
+  // Note: We store the reference directly (not a copy) so handle drag updates are reflected
+  addArrow(arrowData, slideIndex, newSlideRef = null) {
+    arrowData.slideIndex = slideIndex;
+    arrowData.newSlideRef = newSlideRef;
+    this.newArrows.push(arrowData);
+  },
+
   // Get count of new slides before a given index (for offset calculation)
   countNewSlidesBefore(index) {
     return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
@@ -1172,11 +1325,12 @@ const NewElementRegistry = {
   clear() {
     this.newDivs = [];
     this.newSlides = [];
+    this.newArrows = [];
   },
 
   // Check if there are any new elements
   hasNewElements() {
-    return this.newDivs.length > 0 || this.newSlides.length > 0;
+    return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
   },
 };
 
@@ -1290,7 +1444,7 @@ ToolbarRegistry.register("copy", {
   onClick: () => copyQmdToClipboard(),
 });
 
-// Add submenu: groups "Add Text" and "Add Slide"
+// Add submenu: groups "Add Text", "Add Slide", and "Add Arrow"
 ToolbarRegistry.register("add", {
   icon: "➕",
   label: "Add",
@@ -1310,6 +1464,13 @@ ToolbarRegistry.register("add", {
       title: "Add new slide after current",
       className: "toolbar-add-slide",
       onClick: () => addNewSlide(),
+    },
+    {
+      icon: "➡️",
+      label: "Arrow",
+      title: "Add arrow to current slide",
+      className: "toolbar-add-arrow",
+      onClick: () => addNewArrow(),
     },
   ],
 });
@@ -1454,7 +1615,7 @@ function getOriginalEditableDivs() {
   return document.querySelectorAll("div.editable:not(.editable-new)");
 }
 
-// Get current slide index (accounting for title slide)
+// Get current slide index (Reveal.js index)
 function getCurrentSlideIndex() {
   const indices = Reveal.getIndices();
   return indices.h;
@@ -1464,6 +1625,25 @@ function getCurrentSlideIndex() {
 function getCurrentSlide() {
   return document.querySelector("section.present:not(.stack)") ||
          document.querySelector("section.present");
+}
+
+// Check if document has a title slide (from YAML frontmatter)
+// Title slides don't have a ## heading in the QMD source
+function hasTitleSlide() {
+  const firstSlide = Reveal.getSlide(0);
+  if (!firstSlide) return false;
+  // Title slides typically have an h1 with the title, not an h2
+  const h2 = firstSlide.querySelector("h2");
+  return !h2;
+}
+
+// Convert Reveal.js slide index to QMD heading index
+// If there's a title slide, the first ## heading is at Reveal index 1
+function getQmdHeadingIndex(revealIndex) {
+  if (hasTitleSlide()) {
+    return revealIndex - 1;
+  }
+  return revealIndex;
 }
 
 // =============================================================================
@@ -1510,9 +1690,11 @@ async function addNewTextElement() {
       NewElementRegistry.addDiv(newDiv, slideIndex, null);
     }
   } else {
+    // Convert to QMD heading index (accounts for title slide offset)
+    const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
     // Calculate original slide index (accounting for new slides before this position)
     const originalSlideIndex =
-      slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+      qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
     NewElementRegistry.addDiv(newDiv, originalSlideIndex, null);
   }
 
@@ -1539,6 +1721,7 @@ function addNewSlide() {
   }
 
   const slideIndex = getCurrentSlideIndex();
+  const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
 
   // Calculate original slide index and track parent new slide if applicable
   let originalSlideIndex;
@@ -1556,11 +1739,11 @@ function addNewSlide() {
       insertAfterNewSlide = currentNewSlideEntry;
     } else {
       originalSlideIndex =
-        slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+        qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
     }
   } else {
     originalSlideIndex =
-      slideIndex - NewElementRegistry.countNewSlidesBefore(slideIndex);
+      qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
   }
 
   // Create new slide section
@@ -1589,6 +1772,982 @@ function addNewSlide() {
     insertAfterNewSlide ? "yes" : "no"
   );
   return newSlide;
+}
+
+// =============================================================================
+// Arrow Creation and Management
+// =============================================================================
+
+// Track the currently active (selected) arrow
+let activeArrow = null;
+
+// Available arrow head styles
+const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
+
+function setActiveArrow(arrowData) {
+  // Deactivate previous arrow
+  if (activeArrow && activeArrow !== arrowData) {
+    activeArrow.isActive = false;
+    updateArrowActiveState(activeArrow);
+  }
+
+  // Activate new arrow
+  activeArrow = arrowData;
+  if (arrowData) {
+    arrowData.isActive = true;
+    updateArrowActiveState(arrowData);
+  }
+
+  // Show/hide arrow style panel
+  updateArrowStylePanel(arrowData);
+}
+
+// Clean up all event listeners for an arrow (call when removing arrow)
+function cleanupArrowListeners(arrowData) {
+  // Abort the main drag controller
+  if (arrowData._dragController) {
+    arrowData._dragController.abort();
+    arrowData._dragController = null;
+  }
+
+  // Abort handle drag controllers
+  const handles = [
+    arrowData._startHandle,
+    arrowData._endHandle,
+    arrowData._control1Handle,
+    arrowData._control2Handle
+  ];
+
+  for (const handle of handles) {
+    if (handle && handle._dragController) {
+      handle._dragController.abort();
+      handle._dragController = null;
+    }
+  }
+}
+
+function createArrowStyleControls() {
+  const container = document.createElement("div");
+  container.className = "arrow-style-controls";
+  container.style.display = "none";
+
+  // Color presets row
+  const colorPresetsRow = document.createElement("div");
+  colorPresetsRow.className = "arrow-color-presets";
+
+  // Add black as first option (default arrow color)
+  const defaultColors = ["#000000"];
+  const paletteColors = getColorPalette();
+  const allColors = [...defaultColors, ...paletteColors.filter(c => c.toLowerCase() !== "#000000")];
+
+  allColors.forEach(color => {
+    const swatch = document.createElement("button");
+    swatch.className = "arrow-color-swatch";
+    swatch.style.backgroundColor = color;
+    swatch.title = color;
+    swatch.addEventListener("click", () => {
+      if (activeArrow) {
+        activeArrow.color = color;
+        updateArrowAppearance(activeArrow);
+        // Update the color picker to match
+        const picker = container.querySelector("#arrow-style-color");
+        if (picker) picker.value = color;
+        // Update swatch selection
+        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
+        swatch.classList.add("selected");
+      }
+    });
+    colorPresetsRow.appendChild(swatch);
+  });
+  container.appendChild(colorPresetsRow);
+
+  // Color picker for custom colors
+  const colorPicker = document.createElement("input");
+  colorPicker.type = "color";
+  colorPicker.id = "arrow-style-color";
+  colorPicker.className = "arrow-toolbar-color";
+  colorPicker.value = "#000000";
+  colorPicker.title = "Custom color";
+  colorPicker.addEventListener("input", (e) => {
+    if (activeArrow) {
+      activeArrow.color = e.target.value;
+      updateArrowAppearance(activeArrow);
+      // Clear swatch selection when using custom color
+      colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
+    }
+  });
+  container.appendChild(colorPicker);
+
+  // Width input
+  const widthInput = document.createElement("input");
+  widthInput.type = "number";
+  widthInput.id = "arrow-style-width";
+  widthInput.className = "arrow-toolbar-width";
+  widthInput.min = "1";
+  widthInput.max = "20";
+  widthInput.value = "2";
+  widthInput.title = "Width";
+  widthInput.addEventListener("input", (e) => {
+    if (activeArrow) {
+      const val = parseInt(e.target.value) || 1;
+      activeArrow.width = Math.max(1, Math.min(20, val));
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  container.appendChild(widthInput);
+
+  // Head style select
+  const headSelect = document.createElement("select");
+  headSelect.id = "arrow-style-head";
+  headSelect.className = "arrow-toolbar-select";
+  headSelect.title = "Head style";
+  ARROW_HEAD_STYLES.forEach(style => {
+    const opt = document.createElement("option");
+    opt.value = style;
+    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+    headSelect.appendChild(opt);
+  });
+  headSelect.addEventListener("change", (e) => {
+    if (activeArrow) {
+      activeArrow.head = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  container.appendChild(headSelect);
+
+  // Dash select
+  const dashSelect = document.createElement("select");
+  dashSelect.id = "arrow-style-dash";
+  dashSelect.className = "arrow-toolbar-select";
+  dashSelect.title = "Dash style";
+  ["solid", "dashed", "dotted"].forEach(style => {
+    const opt = document.createElement("option");
+    opt.value = style;
+    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+    dashSelect.appendChild(opt);
+  });
+  dashSelect.addEventListener("change", (e) => {
+    if (activeArrow) {
+      activeArrow.dash = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  container.appendChild(dashSelect);
+
+  // Line select
+  const lineSelect = document.createElement("select");
+  lineSelect.id = "arrow-style-line";
+  lineSelect.className = "arrow-toolbar-select";
+  lineSelect.title = "Line style";
+  ["single", "double", "triple"].forEach(style => {
+    const opt = document.createElement("option");
+    opt.value = style;
+    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+    lineSelect.appendChild(opt);
+  });
+  lineSelect.addEventListener("change", (e) => {
+    if (activeArrow) {
+      activeArrow.line = e.target.value;
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  container.appendChild(lineSelect);
+
+  // Opacity input
+  const opacityInput = document.createElement("input");
+  opacityInput.type = "range";
+  opacityInput.id = "arrow-style-opacity";
+  opacityInput.className = "arrow-toolbar-opacity";
+  opacityInput.min = "0";
+  opacityInput.max = "1";
+  opacityInput.step = "0.1";
+  opacityInput.value = "1";
+  opacityInput.title = "Opacity";
+  opacityInput.addEventListener("input", (e) => {
+    if (activeArrow) {
+      activeArrow.opacity = parseFloat(e.target.value);
+      updateArrowAppearance(activeArrow);
+    }
+  });
+  container.appendChild(opacityInput);
+
+  // Curve mode toggle
+  const curveToggle = document.createElement("button");
+  curveToggle.id = "arrow-style-curve";
+  curveToggle.className = "arrow-toolbar-curve";
+  curveToggle.innerHTML = "⤴ Curve";
+  curveToggle.title = "Toggle curve mode";
+  curveToggle.addEventListener("click", () => {
+    if (activeArrow) {
+      toggleCurveMode(activeArrow);
+      updateCurveToggleInToolbar(activeArrow);
+    }
+  });
+  container.appendChild(curveToggle);
+
+  return container;
+}
+
+function updateArrowStylePanel(arrowData) {
+  const toolbar = document.getElementById("editable-toolbar");
+  if (!toolbar) return;
+
+  const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
+  let arrowControls = toolbar.querySelector(".arrow-style-controls");
+
+  // Create arrow controls if they don't exist
+  if (!arrowControls) {
+    arrowControls = createArrowStyleControls();
+    toolbar.appendChild(arrowControls);
+  }
+
+  if (arrowData) {
+    // Update control values to match selected arrow
+    const colorPicker = arrowControls.querySelector("#arrow-style-color");
+    const widthInput = arrowControls.querySelector("#arrow-style-width");
+    const headSelect = arrowControls.querySelector("#arrow-style-head");
+    const dashSelect = arrowControls.querySelector("#arrow-style-dash");
+    const lineSelect = arrowControls.querySelector("#arrow-style-line");
+    const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
+
+    if (colorPicker) {
+      const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
+      colorPicker.value = colorValue;
+      // Update swatch selection
+      const swatches = arrowControls.querySelectorAll(".arrow-color-swatch");
+      swatches.forEach(s => {
+        s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
+          rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+      });
+    }
+    if (widthInput) {
+      widthInput.value = arrowData.width.toString();
+    }
+    if (headSelect) {
+      headSelect.value = arrowData.head || "arrow";
+    }
+    if (dashSelect) {
+      dashSelect.value = arrowData.dash || "solid";
+    }
+    if (lineSelect) {
+      lineSelect.value = arrowData.line || "single";
+    }
+    if (opacityInput) {
+      opacityInput.value = (arrowData.opacity !== undefined ? arrowData.opacity : 1).toString();
+    }
+
+    // Update curve toggle state
+    updateCurveToggleInToolbar(arrowData);
+
+    // Show arrow controls, hide normal buttons
+    buttonsContainer.style.display = "none";
+    arrowControls.style.display = "flex";
+  } else {
+    // Show normal buttons, hide arrow controls
+    buttonsContainer.style.display = "flex";
+    arrowControls.style.display = "none";
+  }
+}
+
+function updateCurveToggleInToolbar(arrowData) {
+  const curveToggle = document.querySelector("#arrow-style-curve");
+  if (!curveToggle) return;
+
+  if (arrowData && arrowData.curveMode) {
+    curveToggle.classList.add("active");
+  } else {
+    curveToggle.classList.remove("active");
+  }
+}
+
+function updateArrowAppearance(arrowData) {
+  if (!arrowData._path) return;
+
+  // Update path stroke
+  arrowData._path.setAttribute("stroke", arrowData.color);
+  arrowData._path.setAttribute("stroke-width", arrowData.width);
+
+  // Update dash style
+  const dashPatterns = {
+    solid: "none",
+    dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
+    dotted: `${arrowData.width},${arrowData.width * 2}`
+  };
+  const dashArray = dashPatterns[arrowData.dash] || "none";
+  if (dashArray === "none") {
+    arrowData._path.removeAttribute("stroke-dasharray");
+  } else {
+    arrowData._path.setAttribute("stroke-dasharray", dashArray);
+  }
+
+  // Update opacity
+  const opacity = arrowData.opacity !== undefined ? arrowData.opacity : 1;
+  arrowData._path.setAttribute("opacity", opacity);
+
+  // Update line style (single, double, triple)
+  updateArrowLineStyle(arrowData);
+
+  // Update arrowhead marker
+  updateArrowheadMarker(arrowData);
+}
+
+function updateArrowLineStyle(arrowData) {
+  if (!arrowData._svg || !arrowData._path) return;
+
+  // Remove existing extra lines
+  const existingLines = arrowData._svg.querySelectorAll(".arrow-extra-line");
+  existingLines.forEach(line => line.remove());
+
+  const lineStyle = arrowData.line || "single";
+  if (lineStyle === "single") {
+    // Restore main path stroke when switching back to single
+    arrowData._path.setAttribute("stroke", arrowData.color);
+    arrowData._path.style.visibility = "visible";
+    return;
+  }
+
+  // Get the current path data
+  const pathD = arrowData._path.getAttribute("d");
+  if (!pathD) return;
+
+  // Calculate offset based on stroke width
+  const offset = arrowData.width * 1.5;
+
+  // For double/triple, we create parallel paths with offset
+  const createOffsetPath = (offsetAmount) => {
+    const extraPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    extraPath.className.baseVal = "arrow-extra-line";
+    extraPath.setAttribute("stroke", arrowData.color);
+    extraPath.setAttribute("stroke-width", arrowData.width);
+    extraPath.setAttribute("fill", "none");
+    extraPath.style.pointerEvents = "none";
+
+    // Apply same dash pattern
+    const dashPatterns = {
+      solid: "none",
+      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
+      dotted: `${arrowData.width},${arrowData.width * 2}`
+    };
+    const dashArray = dashPatterns[arrowData.dash] || "none";
+    if (dashArray !== "none") {
+      extraPath.setAttribute("stroke-dasharray", dashArray);
+    }
+
+    // Apply opacity
+    const opacity = arrowData.opacity !== undefined ? arrowData.opacity : 1;
+    extraPath.setAttribute("opacity", opacity);
+
+    // Create offset path by transforming
+    extraPath.setAttribute("d", pathD);
+    extraPath.setAttribute("transform", `translate(0, ${offsetAmount})`);
+
+    return extraPath;
+  };
+
+  if (lineStyle === "double") {
+    const line1 = createOffsetPath(-offset);
+    const line2 = createOffsetPath(offset);
+    arrowData._svg.insertBefore(line1, arrowData._path);
+    arrowData._svg.insertBefore(line2, arrowData._path);
+    // Make main path stroke transparent but keep visible for arrowhead marker
+    arrowData._path.style.visibility = "visible";
+    arrowData._path.setAttribute("stroke", "transparent");
+  } else if (lineStyle === "triple") {
+    const line1 = createOffsetPath(-offset);
+    const line2 = createOffsetPath(offset);
+    arrowData._svg.insertBefore(line1, arrowData._path);
+    arrowData._svg.insertBefore(line2, arrowData._path);
+    // Show main path as center line
+    arrowData._path.style.visibility = "visible";
+    arrowData._path.setAttribute("stroke", arrowData.color);
+  }
+}
+
+function updateArrowheadMarker(arrowData) {
+  if (!arrowData._svg || !arrowData._markerId) return;
+
+  const marker = arrowData._svg.querySelector(`#${arrowData._markerId}`);
+  if (!marker) return;
+
+  const markerPath = marker.querySelector("path");
+  if (!markerPath) return;
+
+  // Update marker color
+  markerPath.setAttribute("fill", arrowData.color);
+
+  // Update marker shape based on head style
+  const size = 10;
+  let pathD;
+  let refX = 0;
+
+  switch (arrowData.head) {
+    case "stealth":
+      const w = size * 1.2;
+      pathD = `M 0 0 L ${w} ${size/2} L 0 ${size} L ${w*0.3} ${size/2} z`;
+      refX = w * 0.3;
+      break;
+    case "diamond":
+      pathD = `M 0 ${size/2} L ${size/2} 0 L ${size} ${size/2} L ${size/2} ${size} z`;
+      refX = size / 2;
+      break;
+    case "circle":
+      const r = size / 2;
+      pathD = `M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${size} A ${r} ${r} 0 1 1 ${r} 0`;
+      refX = r;
+      marker.setAttribute("refY", r);
+      break;
+    case "square":
+      pathD = `M 0 0 L ${size} 0 L ${size} ${size} L 0 ${size} z`;
+      refX = size / 2;
+      break;
+    case "bar":
+      const bw = size / 3;
+      pathD = `M 0 0 L ${bw} 0 L ${bw} ${size} L 0 ${size} z`;
+      refX = bw / 2;
+      break;
+    case "none":
+      pathD = "";
+      break;
+    default: // "arrow"
+      pathD = `M 0 0 L ${size} ${size/2} L 0 ${size} z`;
+      refX = 0;
+      marker.setAttribute("refY", size / 2);
+  }
+
+  markerPath.setAttribute("d", pathD);
+  marker.setAttribute("refX", refX);
+
+  // Show/hide marker based on head style
+  if (arrowData.head === "none") {
+    arrowData._path.removeAttribute("marker-end");
+  } else {
+    arrowData._path.setAttribute("marker-end", `url(#${arrowData._markerId})`);
+  }
+}
+
+function updateArrowActiveState(arrowData) {
+  if (!arrowData._container) return;
+
+  const showControls = arrowData.isActive;
+
+  // Show/hide endpoint handles
+  if (arrowData._startHandle) {
+    arrowData._startHandle.style.display = showControls ? "" : "none";
+  }
+  if (arrowData._endHandle) {
+    arrowData._endHandle.style.display = showControls ? "" : "none";
+  }
+
+  // Show/hide control point handles (only if in curve mode)
+  if (arrowData._control1Handle) {
+    arrowData._control1Handle.style.display = (showControls && arrowData.curveMode) ? "" : "none";
+  }
+  if (arrowData._control2Handle) {
+    arrowData._control2Handle.style.display = (showControls && arrowData.curveMode) ? "" : "none";
+  }
+
+  // Show/hide guide lines
+  if (arrowData._guideLine1) {
+    arrowData._guideLine1.style.display = (showControls && arrowData.curveMode && arrowData.control1X !== null) ? "" : "none";
+  }
+  if (arrowData._guideLine2) {
+    arrowData._guideLine2.style.display = (showControls && arrowData.curveMode && arrowData.control2X !== null) ? "" : "none";
+  }
+
+  // Update container class
+  if (showControls) {
+    arrowData._container.classList.add("active");
+  } else {
+    arrowData._container.classList.remove("active");
+  }
+}
+
+async function addNewArrow() {
+  // Check for arrow extension and show warning if not detected
+  if (!(await showArrowExtensionWarning())) {
+    return null; // User cancelled
+  }
+
+  const currentSlide = getCurrentSlide();
+  if (!currentSlide) {
+    console.warn("No current slide found");
+    return null;
+  }
+
+  const slideIndex = getCurrentSlideIndex();
+  const slideWidth = currentSlide.offsetWidth || 960;
+  const slideHeight = currentSlide.offsetHeight || 700;
+
+  // Default arrow position: centered, horizontal
+  const centerX = slideWidth / 2;
+  const centerY = slideHeight / 2;
+  const halfLength = CONFIG.NEW_ARROW_LENGTH / 2;
+
+  const arrowData = {
+    fromX: centerX - halfLength,
+    fromY: centerY,
+    toX: centerX + halfLength,
+    toY: centerY,
+    // Control points (null = straight line, set values = curve)
+    control1X: null,
+    control1Y: null,
+    control2X: null,
+    control2Y: null,
+    curveMode: false,
+    // Styling
+    color: CONFIG.ARROW_DEFAULT_COLOR,
+    width: CONFIG.ARROW_DEFAULT_WIDTH,
+    head: "arrow",
+    dash: "solid",
+    line: "single",
+    opacity: 1,
+    // UI state
+    isActive: true, // New arrows start active
+  };
+
+  // Create the arrow container element
+  const arrowContainer = createArrowElement(arrowData);
+  currentSlide.appendChild(arrowContainer);
+
+  // Store reference to container in arrowData for later updates
+  arrowData.element = arrowContainer;
+
+  // Track in NewElementRegistry
+  const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
+  if (isOnNewSlide) {
+    const newSlideEntry = NewElementRegistry.newSlides.find(
+      (s) => s.element === currentSlide
+    );
+    NewElementRegistry.addArrow(arrowData, slideIndex, newSlideEntry || null);
+  } else {
+    // Convert to QMD heading index (accounts for title slide offset)
+    const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
+    const originalSlideIndex =
+      qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
+    NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
+  }
+
+  console.log("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+  return arrowContainer;
+}
+
+function createArrowElement(arrowData) {
+  const container = document.createElement("div");
+  container.className = "editable-arrow-container editable-new";
+  container.style.position = "absolute";
+  container.style.left = "0";
+  container.style.top = "0";
+  container.style.width = "100%";
+  container.style.height = "100%";
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "100";
+
+  // Create SVG for the arrow
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.style.position = "absolute";
+  svg.style.left = "0";
+  svg.style.top = "0";
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+  svg.style.overflow = "visible";
+  // Don't set pointer-events on SVG - let children handle their own
+
+  // Create arrowhead marker
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+  const markerId = "arrowhead-" + Math.random().toString(36).substr(2, 9);
+  marker.setAttribute("id", markerId);
+  marker.setAttribute("markerWidth", "10");
+  marker.setAttribute("markerHeight", "10");
+  marker.setAttribute("refX", "0");
+  marker.setAttribute("refY", "5");
+  marker.setAttribute("orient", "auto");
+  marker.setAttribute("markerUnits", "strokeWidth");
+
+  const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+  arrowPath.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+  marker.appendChild(arrowPath);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  // Create invisible hit area for easier clicking (wider stroke)
+  const hitArea = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  hitArea.setAttribute("stroke", "transparent");
+  hitArea.setAttribute("stroke-width", "20");
+  hitArea.setAttribute("stroke-linecap", "round");
+  hitArea.setAttribute("fill", "none");
+  hitArea.style.pointerEvents = "auto";
+  hitArea.style.cursor = "pointer";
+  svg.appendChild(hitArea);
+
+  // Create the arrow path (supports both straight lines and Bezier curves)
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("stroke", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+  path.setAttribute("stroke-width", arrowData.width || CONFIG.ARROW_DEFAULT_WIDTH);
+  path.setAttribute("fill", "none");
+  path.setAttribute("marker-end", `url(#${markerId})`);
+  path.style.pointerEvents = "none";
+  svg.appendChild(path);
+
+  // Create control point guide lines (shown in curve mode)
+  const guideLine1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  guideLine1.setAttribute("stroke", CONFIG.ARROW_CONTROL1_COLOR);
+  guideLine1.setAttribute("stroke-width", "1");
+  guideLine1.setAttribute("stroke-dasharray", "4,4");
+  guideLine1.setAttribute("opacity", "0.6");
+  guideLine1.style.display = "none";
+  svg.appendChild(guideLine1);
+
+  const guideLine2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  guideLine2.setAttribute("stroke", CONFIG.ARROW_CONTROL2_COLOR);
+  guideLine2.setAttribute("stroke-width", "1");
+  guideLine2.setAttribute("stroke-dasharray", "4,4");
+  guideLine2.setAttribute("opacity", "0.6");
+  guideLine2.style.display = "none";
+  svg.appendChild(guideLine2);
+
+  container.appendChild(svg);
+
+  // Store references for updates
+  arrowData._path = path;
+  arrowData._hitArea = hitArea;
+  arrowData._svg = svg;
+  arrowData._markerId = markerId;
+  arrowData._guideLine1 = guideLine1;
+  arrowData._guideLine2 = guideLine2;
+  arrowData._container = container;
+
+  // Create draggable handles for start and end points
+  const startHandle = createArrowHandle(arrowData, "start");
+  const endHandle = createArrowHandle(arrowData, "end");
+  container.appendChild(startHandle);
+  container.appendChild(endHandle);
+
+  arrowData._startHandle = startHandle;
+  arrowData._endHandle = endHandle;
+
+  // Create control point handles (hidden initially)
+  const control1Handle = createArrowHandle(arrowData, "control1");
+  const control2Handle = createArrowHandle(arrowData, "control2");
+  control1Handle.style.display = "none";
+  control2Handle.style.display = "none";
+  container.appendChild(control1Handle);
+  container.appendChild(control2Handle);
+
+  arrowData._control1Handle = control1Handle;
+  arrowData._control2Handle = control2Handle;
+
+
+  // Add click and drag handler to select and move arrow (on hit area)
+  // Use AbortController for proper cleanup of document listeners
+  const arrowDragController = new AbortController();
+  arrowData._dragController = arrowDragController;
+
+  let isDraggingArrow = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let arrowDragScale = 1;
+
+  const startArrowDrag = (e) => {
+    e.stopPropagation();
+    setActiveArrow(arrowData);
+
+    isDraggingArrow = true;
+    arrowDragScale = getSlideScale();
+
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    dragStartX = clientX;
+    dragStartY = clientY;
+
+    hitArea.style.cursor = "grabbing";
+  };
+
+  const onArrowDrag = (e) => {
+    if (!isDraggingArrow) return;
+    e.preventDefault();
+
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+    const deltaX = (clientX - dragStartX) / arrowDragScale;
+    const deltaY = (clientY - dragStartY) / arrowDragScale;
+
+    // Move all points by the delta
+    arrowData.fromX += deltaX;
+    arrowData.fromY += deltaY;
+    arrowData.toX += deltaX;
+    arrowData.toY += deltaY;
+
+    if (arrowData.control1X !== null) {
+      arrowData.control1X += deltaX;
+      arrowData.control1Y += deltaY;
+    }
+    if (arrowData.control2X !== null) {
+      arrowData.control2X += deltaX;
+      arrowData.control2Y += deltaY;
+    }
+
+    dragStartX = clientX;
+    dragStartY = clientY;
+
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+  };
+
+  const endArrowDrag = () => {
+    isDraggingArrow = false;
+    hitArea.style.cursor = "grab";
+  };
+
+  hitArea.addEventListener("mousedown", startArrowDrag);
+  document.addEventListener("mousemove", onArrowDrag, { signal: arrowDragController.signal });
+  document.addEventListener("mouseup", endArrowDrag, { signal: arrowDragController.signal });
+
+  hitArea.style.cursor = "grab";
+
+  // Update visual
+  updateArrowPath(arrowData);
+  updateArrowHandles(arrowData);
+
+  // Set as active arrow
+  setActiveArrow(arrowData);
+
+  // Add click-outside handler to deselect (only once per container)
+  if (!container._clickOutsideHandler) {
+    container._clickOutsideHandler = true;
+    document.addEventListener("click", (e) => {
+      // Check if click is outside all arrow containers and toolbar
+      if (!e.target.closest(".editable-arrow-container") &&
+          !e.target.closest(".editable-toolbar") &&
+          activeArrow === arrowData) {
+        setActiveArrow(null);
+      }
+    });
+  }
+
+  return container;
+}
+
+function createArrowHandle(arrowData, position) {
+  const handle = document.createElement("div");
+  handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
+  handle.style.position = "absolute";
+
+  // Different sizes and colors for different handle types
+  const isControlPoint = position === "control1" || position === "control2";
+  const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
+
+  let bgColor;
+  if (position === "start") bgColor = "#007cba";
+  else if (position === "end") bgColor = "#28a745";
+  else if (position === "control1") bgColor = CONFIG.ARROW_CONTROL1_COLOR;
+  else if (position === "control2") bgColor = CONFIG.ARROW_CONTROL2_COLOR;
+
+  handle.style.width = handleSize + "px";
+  handle.style.height = handleSize + "px";
+  handle.style.borderRadius = "50%";
+  handle.style.backgroundColor = bgColor;
+  handle.style.border = "2px solid white";
+  handle.style.cursor = "move";
+  handle.style.pointerEvents = "auto";
+  handle.style.transform = "translate(-50%, -50%)";
+  handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+  handle.setAttribute("role", "slider");
+  handle.setAttribute("aria-label", `Arrow ${position} point`);
+  handle.setAttribute("tabindex", "0");
+
+  // Add drag functionality
+  // Use AbortController for proper cleanup of document listeners
+  const handleDragController = new AbortController();
+  handle._dragController = handleDragController;
+
+  let isDragging = false;
+  let cachedScale = 1;
+
+  const startDrag = (e) => {
+    isDragging = true;
+    cachedScale = getSlideScale();
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onDrag = (e) => {
+    if (!isDragging) return;
+
+    const rect = arrowData.element.getBoundingClientRect();
+    const scale = cachedScale;
+
+    let clientX, clientY;
+    if (e.type.startsWith("touch")) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    // Convert to slide coordinates
+    const x = (clientX - rect.left) / scale;
+    const y = (clientY - rect.top) / scale;
+
+    // Update arrow data based on which handle
+    if (position === "start") {
+      arrowData.fromX = x;
+      arrowData.fromY = y;
+    } else if (position === "end") {
+      arrowData.toX = x;
+      arrowData.toY = y;
+    } else if (position === "control1") {
+      arrowData.control1X = x;
+      arrowData.control1Y = y;
+    } else if (position === "control2") {
+      arrowData.control2X = x;
+      arrowData.control2Y = y;
+    }
+
+    // Update visual
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+    updateCurveTogglePosition(arrowData);
+
+    e.preventDefault();
+  };
+
+  const stopDrag = () => {
+    isDragging = false;
+  };
+
+  handle.addEventListener("mousedown", startDrag);
+  handle.addEventListener("touchstart", startDrag);
+  document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
+  document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
+  document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
+  document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
+
+  return handle;
+}
+
+function updateArrowPath(arrowData) {
+  if (!arrowData._path) return;
+
+  const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+  let pathD;
+
+  if (control1X !== null && control2X !== null) {
+    // Cubic Bezier curve (two control points)
+    pathD = `M ${fromX},${fromY} C ${control1X},${control1Y} ${control2X},${control2Y} ${toX},${toY}`;
+  } else if (control1X !== null) {
+    // Quadratic Bezier curve (one control point)
+    pathD = `M ${fromX},${fromY} Q ${control1X},${control1Y} ${toX},${toY}`;
+  } else {
+    // Straight line
+    pathD = `M ${fromX},${fromY} L ${toX},${toY}`;
+  }
+
+  arrowData._path.setAttribute("d", pathD);
+
+  // Update hit area path to match
+  if (arrowData._hitArea) {
+    arrowData._hitArea.setAttribute("d", pathD);
+  }
+
+  // Update guide lines (show connections from endpoints to control points)
+  if (arrowData._guideLine1 && arrowData.curveMode) {
+    if (control1X !== null) {
+      arrowData._guideLine1.setAttribute("x1", fromX);
+      arrowData._guideLine1.setAttribute("y1", fromY);
+      arrowData._guideLine1.setAttribute("x2", control1X);
+      arrowData._guideLine1.setAttribute("y2", control1Y);
+      arrowData._guideLine1.style.display = "";
+    } else {
+      arrowData._guideLine1.style.display = "none";
+    }
+  }
+
+  if (arrowData._guideLine2 && arrowData.curveMode) {
+    if (control2X !== null) {
+      arrowData._guideLine2.setAttribute("x1", toX);
+      arrowData._guideLine2.setAttribute("y1", toY);
+      arrowData._guideLine2.setAttribute("x2", control2X);
+      arrowData._guideLine2.setAttribute("y2", control2Y);
+      arrowData._guideLine2.style.display = "";
+    } else {
+      arrowData._guideLine2.style.display = "none";
+    }
+  }
+
+  // Update extra lines for double/triple line styles
+  if (arrowData.line && arrowData.line !== "single") {
+    updateArrowLineStyle(arrowData);
+  }
+}
+
+function updateArrowHandles(arrowData) {
+  if (arrowData._startHandle) {
+    arrowData._startHandle.style.left = arrowData.fromX + "px";
+    arrowData._startHandle.style.top = arrowData.fromY + "px";
+  }
+  if (arrowData._endHandle) {
+    arrowData._endHandle.style.left = arrowData.toX + "px";
+    arrowData._endHandle.style.top = arrowData.toY + "px";
+  }
+  if (arrowData._control1Handle && arrowData.control1X !== null) {
+    arrowData._control1Handle.style.left = arrowData.control1X + "px";
+    arrowData._control1Handle.style.top = arrowData.control1Y + "px";
+  }
+  if (arrowData._control2Handle && arrowData.control2X !== null) {
+    arrowData._control2Handle.style.left = arrowData.control2X + "px";
+    arrowData._control2Handle.style.top = arrowData.control2Y + "px";
+  }
+}
+
+function toggleCurveMode(arrowData) {
+  arrowData.curveMode = !arrowData.curveMode;
+
+  if (arrowData.curveMode) {
+    // Enable curve mode - initialize control points at sensible defaults
+    const { fromX, fromY, toX, toY } = arrowData;
+
+    // Calculate perpendicular offset for control points
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const perpX = -dy / len * 50; // 50px offset perpendicular to line
+    const perpY = dx / len * 50;
+
+    // Place control points at 1/3 and 2/3 along the line, offset perpendicular
+    arrowData.control1X = fromX + dx / 3 + perpX;
+    arrowData.control1Y = fromY + dy / 3 + perpY;
+    arrowData.control2X = fromX + 2 * dx / 3 + perpX;
+    arrowData.control2Y = fromY + 2 * dy / 3 + perpY;
+
+    // Add curve-mode class to container
+    if (arrowData._container) {
+      arrowData._container.classList.add("curve-mode");
+    }
+
+  } else {
+    // Disable curve mode - reset to straight line
+    arrowData.control1X = null;
+    arrowData.control1Y = null;
+    arrowData.control2X = null;
+    arrowData.control2Y = null;
+
+    // Remove curve-mode class from container
+    if (arrowData._container) {
+      arrowData._container.classList.remove("curve-mode");
+    }
+
+    // Hide guide lines
+    if (arrowData._guideLine1) arrowData._guideLine1.style.display = "none";
+    if (arrowData._guideLine2) arrowData._guideLine2.style.display = "none";
+
+  }
+
+  updateArrowPath(arrowData);
+  updateArrowHandles(arrowData);
 }
 
 // =============================================================================
@@ -2123,6 +3282,9 @@ function getTransformedQmd() {
   // Then, insert any new text divs (pass slide positions for divs on new slides)
   content = insertNewDivs(content, slideLinePositions);
 
+  // Insert any new arrows
+  content = insertNewArrows(content, slideLinePositions);
+
   // Now process existing editable elements
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);
@@ -2133,9 +3295,14 @@ function getTransformedQmd() {
 }
 
 function saveMovedElts() {
-  const content = getTransformedQmd();
-  if (content) {
-    downloadString(content);
+  try {
+    const content = getTransformedQmd();
+    if (content) {
+      downloadString(content);
+    }
+  } catch (error) {
+    console.error("Error saving:", error);
+    alert("Error saving: " + error.message);
   }
 }
 
@@ -2339,6 +3506,17 @@ function insertNewSlides(text) {
     }
   }
 
+  // Build a map of new slides to their associated arrows
+  const arrowsByNewSlide = new Map();
+  for (const arrowInfo of NewElementRegistry.newArrows) {
+    if (arrowInfo.newSlideRef) {
+      if (!arrowsByNewSlide.has(arrowInfo.newSlideRef)) {
+        arrowsByNewSlide.set(arrowInfo.newSlideRef, []);
+      }
+      arrowsByNewSlide.get(arrowInfo.newSlideRef).push(arrowInfo);
+    }
+  }
+
   // Build tree structure for slides with same afterSlideIndex
   // Flatten each tree respecting insertion semantics:
   // - Later roots come before earlier roots (inserted at same position, pushing down)
@@ -2447,6 +3625,15 @@ function insertNewSlides(text) {
         }
       }
 
+      // Add arrows for this slide
+      const arrowsForThisSlide = arrowsByNewSlide.get(newSlide) || [];
+      for (const arrowInfo of arrowsForThisSlide) {
+        const shortcode = serializeArrowToShortcode(arrowInfo);
+        newSlideContent.push("");
+        newSlideContent.push(shortcode);
+        newSlideContent.push("");
+      }
+
       // Track line position (will be at baseInsertLineIndex since we insert there)
       slideLinePositions.set(newSlide, baseInsertLineIndex + 1);
 
@@ -2464,7 +3651,8 @@ function insertNewSlides(text) {
     // After processing this group, update slideHeadingLines for the total added content
     const totalLinesAdded = orderedSlides.reduce((sum, slide) => {
       const divs = divsByNewSlide.get(slide) || [];
-      return sum + 3 + divs.length * 4; // 3 for heading, 4 per div
+      const arrows = arrowsByNewSlide.get(slide) || [];
+      return sum + 3 + divs.length * 4 + arrows.length * 3; // 3 for heading, 4 per div, 3 per arrow
     }, 0);
 
     for (let j = 0; j < slideHeadingLines.length; j++) {
@@ -2561,6 +3749,134 @@ function insertNewDivs(text, slideLinePositions = new Map()) {
   }
 
   return lines.join("\n");
+}
+
+// Insert new arrows into QMD content
+// Only handles arrows on ORIGINAL slides - arrows on new slides are handled by insertNewSlides
+function insertNewArrows(text, slideLinePositions = new Map()) {
+  // Filter to only arrows on original slides (not on new slides)
+  const arrowsOnOriginalSlides = NewElementRegistry.newArrows.filter(
+    (arrow) => !arrow.newSlideRef
+  );
+
+  if (arrowsOnOriginalSlides.length === 0) {
+    return text;
+  }
+
+  const lines = text.split("\n");
+
+  // Find all level-2 heading positions
+  const slideHeadingLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const prevLine = i > 0 ? lines[i - 1].trim() : "";
+
+    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+      slideHeadingLines.push(i);
+    }
+  }
+
+  // Group arrows by slide index
+  const arrowsBySlide = new Map();
+  for (const arrow of arrowsOnOriginalSlides) {
+    const slideIdx = arrow.slideIndex;
+    if (!arrowsBySlide.has(slideIdx)) {
+      arrowsBySlide.set(slideIdx, []);
+    }
+    arrowsBySlide.get(slideIdx).push(arrow);
+  }
+
+  // Sort slide indices in descending order (insert from end)
+  const slideIndices = [...arrowsBySlide.keys()].sort((a, b) => b - a);
+
+  for (const slideIdx of slideIndices) {
+    const arrowsForSlide = arrowsBySlide.get(slideIdx);
+
+    // Find where to insert (before the next slide or at end)
+    let insertLineIndex;
+    if (slideIdx >= slideHeadingLines.length) {
+      insertLineIndex = lines.length;
+    } else if (slideIdx + 1 < slideHeadingLines.length) {
+      insertLineIndex = slideHeadingLines[slideIdx + 1];
+    } else {
+      insertLineIndex = lines.length;
+    }
+
+    // Create arrow shortcodes for all new arrows on this slide
+    const newContent = [];
+    for (const arrow of arrowsForSlide) {
+      const shortcode = serializeArrowToShortcode(arrow);
+      newContent.push("");
+      newContent.push(shortcode);
+      newContent.push("");
+    }
+
+    if (newContent.length > 0) {
+      lines.splice(insertLineIndex, 0, ...newContent);
+
+      // Update slideHeadingLines for subsequent insertions
+      for (let i = 0; i < slideHeadingLines.length; i++) {
+        if (slideHeadingLines[i] >= insertLineIndex) {
+          slideHeadingLines[i] += newContent.length;
+        }
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+// Serialize an arrow to quarto-arrows shortcode format
+function serializeArrowToShortcode(arrow) {
+  const fromX = round(arrow.fromX);
+  const fromY = round(arrow.fromY);
+  const toX = round(arrow.toX);
+  const toY = round(arrow.toY);
+
+  let shortcode = `{{< arrow from="${fromX},${fromY}" to="${toX},${toY}"`;
+
+  // Add control points if they exist (curved arrow)
+  if (arrow.control1X !== null && arrow.control1Y !== null) {
+    const c1x = round(arrow.control1X);
+    const c1y = round(arrow.control1Y);
+    shortcode += ` control1="${c1x},${c1y}"`;
+  }
+
+  if (arrow.control2X !== null && arrow.control2Y !== null) {
+    const c2x = round(arrow.control2X);
+    const c2y = round(arrow.control2Y);
+    shortcode += ` control2="${c2x},${c2y}"`;
+  }
+
+  // Add styling (only if non-default)
+  if (arrow.color && arrow.color !== CONFIG.ARROW_DEFAULT_COLOR && arrow.color !== "#000000" && arrow.color !== "black") {
+    const colorOutput = getBrandColorOutput(arrow.color);
+    shortcode += ` color="${colorOutput}"`;
+  }
+
+  if (arrow.width && arrow.width !== CONFIG.ARROW_DEFAULT_WIDTH) {
+    shortcode += ` width="${arrow.width}"`;
+  }
+
+  if (arrow.head && arrow.head !== "arrow") {
+    shortcode += ` head="${arrow.head}"`;
+  }
+
+  if (arrow.dash && arrow.dash !== "solid") {
+    shortcode += ` dash="${arrow.dash}"`;
+  }
+
+  if (arrow.line && arrow.line !== "single") {
+    shortcode += ` line="${arrow.line}"`;
+  }
+
+  if (arrow.opacity !== undefined && arrow.opacity !== 1) {
+    shortcode += ` opacity="${arrow.opacity}"`;
+  }
+
+  shortcode += ` position="absolute" >}}`;
+
+  return shortcode;
 }
 
 function updateTextDivs(text) {

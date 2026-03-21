@@ -311,7 +311,8 @@ check_multiple_elements() {
 
 echo "--- Basic Tests ---"
 run_render_test "Test 1: Basic rendering" "basic.qmd" "inject"
-run_render_test "Test 2: No editable elements" "no-editable.qmd" "no-inject"
+# Note: _input_file is always injected to support dynamic arrow creation
+run_render_test "Test 2: No editable elements (still injects for arrow support)" "no-editable.qmd" "inject"
 run_render_test "Test 3: Special characters" "special-chars.qmd" "inject"
 run_render_test "Test 4: Shortcodes" "shortcode.qmd" "inject"
 run_render_test "Test 5: UTF-8 content" "utf8.qmd" "inject"
@@ -448,6 +449,10 @@ check_brand_colors() {
 }
 
 check_brand_colors "Test 21: Brand color injection" "brand-colors.html"
+
+echo ""
+echo "--- Arrow Tests ---"
+run_render_test "Test 22: Arrows rendering" "arrows.qmd" "inject"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

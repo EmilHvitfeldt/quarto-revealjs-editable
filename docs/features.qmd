@@ -6,11 +6,11 @@ title: "Features"
 
 A floating toolbar appears on the right side of the slides with quick access to common actions:
 
-| Button | Action                                    |
-|--------|-------------------------------------------|
-| Save   | Save edits to file                        |
-| Copy   | Copy QMD to clipboard                     |
-| Add    | Opens submenu with Text and Slide options |
+| Button | Action                                              |
+|--------|-----------------------------------------------------|
+| Save   | Save edits to file                                  |
+| Copy   | Copy QMD to clipboard                               |
+| Add    | Opens submenu with Text, Slide, and Arrow options   |
 
 The toolbar is draggable—grab the handle at the top to reposition it.
 
@@ -22,6 +22,7 @@ Click the **Add** button to open a submenu with options:
 
 - **Text**: Creates a new editable text block on the current slide. Position and style it like any other editable element.
 - **Slide**: Inserts a new blank slide after the current one. The slide will be saved with a `## New Slide` heading.
+- **Arrow**: Adds an arrow to the current slide (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension). See [Arrow Support](#arrow-support) below.
 
 New elements are marked with a dashed border to distinguish them from original content.
 
@@ -122,3 +123,83 @@ Sometimes you might find that images don't stay the size that you dragged them t
   max-height: unset;
 }
 ```
+
+## Arrow Support
+
+The extension integrates with [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) to add arrows to your slides visually.
+
+### Setup
+
+First, install the quarto-arrows extension:
+
+```bash
+quarto add EmilHvitfeldt/quarto-arrows
+```
+
+Then add both filters to your YAML header:
+
+```yaml
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+  - arrow
+```
+
+::: {.callout-note}
+If you try to add an arrow without the quarto-arrows extension installed, you'll see a warning with install instructions. You can still add arrows in the browser—they just won't render when you next run `quarto render` until the extension is installed.
+:::
+
+### Using Arrows
+
+Click **Add → Arrow** to create an arrow on the current slide. The arrow appears centered with draggable handles:
+
+- **Blue handle**: Start point
+- **Green handle**: End point
+- **Drag body**: Click and drag anywhere on the arrow line to move the entire arrow
+
+### Curved Arrows
+
+Toggle **Curve** in the toolbar (when arrow is selected) to enable Bezier curve mode. Two additional control point handles appear:
+
+- **Orange handle**: First control point (influences curve near start)
+- **Purple handle**: Second control point (influences curve near end)
+
+Dashed guide lines show the connection between endpoints and their control points.
+
+### Selection
+
+Only the currently selected arrow shows its handles and controls. Click on an arrow to select it, or click elsewhere to deselect.
+
+### Arrow Styling
+
+When an arrow is selected, the toolbar switches to show styling controls:
+
+- **Curve**: Toggle between straight and curved arrows
+- **Color**: Color presets (including brand colors) plus custom color picker
+- **Width**: Line thickness (1-20px)
+- **Head**: Arrowhead style (arrow, stealth, diamond, circle, square, bar, or none)
+- **Dash**: Line pattern (solid, dashed, or dotted)
+- **Line**: Line style (single, double, or triple parallel lines)
+- **Opacity**: Transparency slider (0 to 1)
+
+Click anywhere outside the arrow to deselect it and return to the normal toolbar. Style changes are applied immediately and saved with the arrow.
+
+### Saved Format
+
+Arrows are saved as quarto-arrows shortcodes:
+
+```markdown
+{{< arrow from="100,200" to="400,300" position="absolute" >}}
+```
+
+Curved arrows include control points:
+
+```markdown
+{{< arrow from="100,200" to="400,300" control1="150,100" control2="350,400" position="absolute" >}}
+```
+
+Styled arrows include additional attributes:
+
+```markdown
+{{< arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" dash="dashed" opacity="0.8" position="absolute" >}}

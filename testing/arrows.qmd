@@ -1,0 +1,22 @@
+---
+title: "Arrows Test"
+filters:
+  - editable
+  - arrow
+---
+
+## Slide with existing arrow
+
+This slide has an existing arrow shortcode:
+
+{{< arrow from="100,200" to="400,200" >}}
+
+## Slide for adding arrows
+
+Add arrows here using the toolbar.
+
+Some editable text to test alongside arrows.
+
+## Another slide
+
+More content here.

@@ -784,3 +784,221 @@
 .quill-toolbar-container .ql-size .ql-picker-item[data-value="huge"]::before {
   content: 'Huge' !important;
 }
+
+/* =============================================================================
+   Arrow Elements
+   ============================================================================= */
+
+:root {
+  --editable-arrow-start-color: #007cba;
+  --editable-arrow-end-color: #28a745;
+  --editable-arrow-control1-color: #ff6600;
+  --editable-arrow-control2-color: #9933ff;
+  --editable-arrow-handle-size: 12px;
+  --editable-arrow-control-handle-size: 10px;
+  --editable-toolbar-add-arrow-color: #6f42c1;
+}
+
+/* Arrow container */
+.editable-arrow-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.editable-arrow-container.editable-new {
+  border: none !important;
+}
+
+/* Arrow handles */
+.editable-arrow-handle {
+  position: absolute;
+  width: var(--editable-arrow-handle-size);
+  height: var(--editable-arrow-handle-size);
+  border-radius: 50%;
+  border: 2px solid white;
+  cursor: move;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  z-index: 101;
+}
+
+.editable-arrow-handle:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.editable-arrow-handle:active {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.editable-arrow-handle-start {
+  background-color: var(--editable-arrow-start-color);
+}
+
+.editable-arrow-handle-end {
+  background-color: var(--editable-arrow-end-color);
+}
+
+.editable-arrow-handle-control1 {
+  background-color: var(--editable-arrow-control1-color);
+}
+
+.editable-arrow-handle-control2 {
+  background-color: var(--editable-arrow-control2-color);
+}
+
+/* Curve mode toggle button */
+.editable-arrow-curve-toggle {
+  display: none;
+}
+
+.editable-arrow-container.active .editable-arrow-curve-toggle {
+  display: flex;
+}
+
+.editable-arrow-curve-toggle:hover {
+  transform: scale(1.1);
+}
+
+/* Arrow handles - hidden by default, shown when active */
+.editable-arrow-handle {
+  display: none;
+}
+
+.editable-arrow-container.active .editable-arrow-handle {
+  display: block;
+}
+
+/* Control point handles only shown in curve mode */
+.editable-arrow-handle-control1,
+.editable-arrow-handle-control2 {
+  display: none !important;
+}
+
+.editable-arrow-container.active.curve-mode .editable-arrow-handle-control1,
+.editable-arrow-container.active.curve-mode .editable-arrow-handle-control2 {
+  display: block !important;
+}
+
+/* Arrow submenu item color */
+.editable-toolbar-submenu-item.toolbar-add-arrow {
+  background-color: var(--editable-toolbar-add-arrow-color);
+}
+
+/* =============================================================================
+   Arrow Style Controls (inline in toolbar)
+   ============================================================================= */
+
+.arrow-style-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.arrow-color-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.arrow-color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.arrow-color-swatch:hover {
+  border-color: #999;
+  transform: scale(1.1);
+}
+
+.arrow-color-swatch.selected {
+  border: 2px solid var(--editable-accent-color, #007cba);
+  box-shadow: 0 0 0 1px white inset;
+}
+
+.arrow-toolbar-color {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  box-sizing: border-box;
+}
+
+.arrow-toolbar-color::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.arrow-toolbar-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.arrow-toolbar-width {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.arrow-toolbar-select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.arrow-toolbar-opacity {
+  width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.arrow-toolbar-curve {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.arrow-toolbar-curve.active {
+  background: var(--editable-accent-color, #007cba);
+  color: white;
+  border-color: var(--editable-accent-color, #007cba);
+}
+
+.arrow-toolbar-color:focus,
+.arrow-toolbar-width:focus,
+.arrow-toolbar-select:focus,
+.arrow-toolbar-curve:focus {
+  outline: none;
+  border-color: var(--editable-accent-color, #007cba);
+  box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.2);
+}
