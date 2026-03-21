@@ -451,6 +451,10 @@ check_brand_colors() {
 check_brand_colors "Test 21: Brand color injection" "brand-colors.html"
 
 echo ""
+echo "--- Arrow Tests ---"
+run_render_test "Test 22: Arrows rendering" "arrows.qmd" "inject"
+
+echo ""
 if [ $FAILED -eq 0 ]; then
   echo "=== All tests passed! ==="
   exit 0
