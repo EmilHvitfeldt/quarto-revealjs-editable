@@ -1,6 +1,8 @@
 var EditableModule = (() => {
   // src/config.js
   var CONFIG = {
+    // Debug mode - set window.EDITABLE_DEBUG = true to enable
+    DEBUG: typeof window !== "undefined" && window.EDITABLE_DEBUG,
     // Sizing constraints
     MIN_ELEMENT_SIZE: 50,
     KEYBOARD_MOVE_STEP: 10,
@@ -25,6 +27,9 @@ var EditableModule = (() => {
     ARROW_DEFAULT_WIDTH: 2,
     ARROW_CONTROL1_COLOR: "#ff6600",
     ARROW_CONTROL2_COLOR: "#9933ff",
+    // Polling config
+    POLL_MAX_ATTEMPTS: 50,
+    POLL_INTERVAL_MS: 100,
     // Quill Editor CDN
     QUILL_CSS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
     QUILL_JS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"
@@ -33,6 +38,11 @@ var EditableModule = (() => {
   // src/utils.js
   function round(n) {
     return Math.round(n * 10) / 10;
+  }
+  function debug(...args) {
+    if (CONFIG.DEBUG) {
+      console.log("[editable]", ...args);
+    }
   }
   function getSlideScale() {
     const slidesContainerEl = document.querySelector(".slides");
@@ -271,7 +281,7 @@ var EditableModule = (() => {
           return;
         e.preventDefault();
         if (undo()) {
-          console.log("Undo performed");
+          debug("Undo performed");
         }
         return;
       }
@@ -280,7 +290,7 @@ var EditableModule = (() => {
           return;
         e.preventDefault();
         if (redo()) {
-          console.log("Redo performed");
+          debug("Redo performed");
         }
         return;
       }
@@ -322,6 +332,22 @@ var EditableModule = (() => {
     const g = parseInt(match[2], 10);
     const b = parseInt(match[3], 10);
     return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  }
+  function normalizeColor(color) {
+    if (!color)
+      return color;
+    let normalized = color.trim().toLowerCase();
+    if (normalized.startsWith("rgb")) {
+      const hex = rgbToHex(normalized);
+      if (hex)
+        return hex.toLowerCase();
+    }
+    if (normalized === "black")
+      return "#000000";
+    if (normalized.match(/^#[0-9a-f]{3}$/i)) {
+      return "#" + normalized[1] + normalized[1] + normalized[2] + normalized[2] + normalized[3] + normalized[3];
+    }
+    return normalized;
   }
   function getBrandColorOutput(colorVal) {
     if (!window._quarto_brand_color_names) {
@@ -401,7 +427,7 @@ var EditableModule = (() => {
       const colorOptions = presetColors.map((c) => `<option value="${c}"></option>`).join("");
       const colorOptionsWithExtras = `<option value="unset"></option>` + colorOptions + `<option value="custom">\u22EF</option>`;
       const toolbarContainer = document.createElement("div");
-      toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
+      toolbarContainer.id = "toolbar-" + Math.random().toString(36).substring(2, 11);
       toolbarContainer.innerHTML = `
       <button class="ql-bold">B</button>
       <button class="ql-italic">I</button>
@@ -1331,6 +1357,15 @@ var EditableModule = (() => {
     return confirmed;
   }
   var activeArrow = null;
+  var arrowControlRefs = {
+    colorPicker: null,
+    widthInput: null,
+    headSelect: null,
+    dashSelect: null,
+    lineSelect: null,
+    opacityInput: null,
+    colorPresetsRow: null
+  };
   var ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
   function setActiveArrow(arrowData) {
     if (activeArrow && activeArrow !== arrowData) {
@@ -1396,9 +1431,11 @@ var EditableModule = (() => {
     widthInput.title = "Width";
     widthInput.addEventListener("input", (e) => {
       if (activeArrow) {
-        const val = parseInt(e.target.value) || 1;
-        activeArrow.width = Math.max(1, Math.min(20, val));
-        updateArrowAppearance(activeArrow);
+        const val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+          activeArrow.width = Math.max(1, Math.min(20, val));
+          updateArrowAppearance(activeArrow);
+        }
       }
     });
     container.appendChild(widthInput);
@@ -1481,6 +1518,13 @@ var EditableModule = (() => {
       }
     });
     container.appendChild(curveToggle);
+    arrowControlRefs.colorPicker = colorPicker;
+    arrowControlRefs.widthInput = widthInput;
+    arrowControlRefs.headSelect = headSelect;
+    arrowControlRefs.dashSelect = dashSelect;
+    arrowControlRefs.lineSelect = lineSelect;
+    arrowControlRefs.opacityInput = opacityInput;
+    arrowControlRefs.colorPresetsRow = colorPresetsRow;
     return container;
   }
   function updateArrowStylePanel(arrowData) {
@@ -1494,19 +1538,15 @@ var EditableModule = (() => {
       toolbar.appendChild(arrowControls);
     }
     if (arrowData) {
-      const colorPicker = arrowControls.querySelector("#arrow-style-color");
-      const widthInput = arrowControls.querySelector("#arrow-style-width");
-      const headSelect = arrowControls.querySelector("#arrow-style-head");
-      const dashSelect = arrowControls.querySelector("#arrow-style-dash");
-      const lineSelect = arrowControls.querySelector("#arrow-style-line");
-      const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
+      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow } = arrowControlRefs;
       if (colorPicker) {
         const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
         colorPicker.value = colorValue;
-        const swatches = arrowControls.querySelectorAll(".arrow-color-swatch");
-        swatches.forEach((s) => {
-          s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
-        });
+        if (colorPresetsRow) {
+          colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => {
+            s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+          });
+        }
       }
       if (widthInput) {
         widthInput.value = arrowData.width.toString();
@@ -1779,7 +1819,7 @@ var EditableModule = (() => {
       const originalSlideIndex = qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
       NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
     }
-    console.log("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+    debug("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
     return arrowContainer;
   }
   function createArrowElement(arrowData) {
@@ -1801,7 +1841,7 @@ var EditableModule = (() => {
     svg.style.overflow = "visible";
     const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-    const markerId = "arrowhead-" + Math.random().toString(36).substr(2, 9);
+    const markerId = "arrowhead-" + Math.random().toString(36).substring(2, 11);
     marker.setAttribute("id", markerId);
     marker.setAttribute("markerWidth", "10");
     marker.setAttribute("markerHeight", "10");
@@ -1996,7 +2036,6 @@ var EditableModule = (() => {
       }
       updateArrowPath(arrowData);
       updateArrowHandles(arrowData);
-      updateCurveTogglePosition(arrowData);
       e.preventDefault();
     };
     const stopDrag = () => {
@@ -2102,10 +2141,19 @@ var EditableModule = (() => {
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
   }
-  function updateCurveTogglePosition(arrowData) {
-  }
 
   // src/serialization.js
+  function findSlideHeadingLines(lines) {
+    const headings = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const prevLine = i > 0 ? lines[i - 1].trim() : "";
+      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+        headings.push(i);
+      }
+    }
+    return headings;
+  }
   var PropertySerializers = {
     // Core position/size properties (go in attribute list)
     width: {
@@ -2258,7 +2306,8 @@ ${innerFence}`;
       const c2y = round(arrow.control2Y);
       shortcode += ` control2="${c2x},${c2y}"`;
     }
-    if (arrow.color && arrow.color !== CONFIG.ARROW_DEFAULT_COLOR && arrow.color !== "#000000" && arrow.color !== "black") {
+    const normalizedArrowColor = normalizeColor(arrow.color);
+    if (arrow.color && normalizedArrowColor !== "#000000") {
       const colorOutput = getBrandColorOutput(arrow.color);
       shortcode += ` color="${colorOutput}"`;
     }
@@ -2303,14 +2352,7 @@ ${innerFence}`;
       return { text, slideLinePositions: /* @__PURE__ */ new Map() };
     }
     const lines = text.split("\n");
-    const slideHeadingLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-        slideHeadingLines.push(i);
-      }
-    }
+    const slideHeadingLines = findSlideHeadingLines(lines);
     const divsByNewSlide = /* @__PURE__ */ new Map();
     for (const divInfo of NewElementRegistry.newDivs) {
       if (divInfo.newSlideRef) {
@@ -2434,14 +2476,7 @@ ${innerFence}`;
       return text;
     }
     const lines = text.split("\n");
-    const slideHeadingLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-        slideHeadingLines.push(i);
-      }
-    }
+    const slideHeadingLines = findSlideHeadingLines(lines);
     const divsBySlide = /* @__PURE__ */ new Map();
     for (const newDiv of divsOnOriginalSlides) {
       const slideIdx = newDiv.slideIndex;
@@ -2494,14 +2529,7 @@ ${innerFence}`;
       return text;
     }
     const lines = text.split("\n");
-    const slideHeadingLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-        slideHeadingLines.push(i);
-      }
-    }
+    const slideHeadingLines = findSlideHeadingLines(lines);
     const arrowsBySlide = /* @__PURE__ */ new Map();
     for (const arrow of arrowsOnOriginalSlides) {
       const slideIdx = arrow.slideIndex;
@@ -2662,7 +2690,7 @@ ${fence}`;
         y: (slideHeight - CONFIG.NEW_TEXT_HEIGHT) / 2
       });
     }
-    console.log("Added new text element to slide", slideIndex);
+    debug("Added new text element to slide", slideIndex);
     return newDiv;
   }
   function addNewSlide() {
@@ -2698,7 +2726,7 @@ ${fence}`;
     NewElementRegistry.addSlide(newSlide, originalSlideIndex, insertAfterNewSlide);
     Reveal.sync();
     Reveal.next();
-    console.log(
+    debug(
       "Added new slide after original index",
       originalSlideIndex,
       "insertAfterNewSlide:",
@@ -2736,7 +2764,7 @@ ${fence}`;
     if (!content)
       return;
     navigator.clipboard.writeText(content).then(function() {
-      console.log("qmd content copied to clipboard");
+      debug("qmd content copied to clipboard");
     }).catch(function(err) {
       console.error("Failed to copy to clipboard:", err);
     });
@@ -2767,10 +2795,10 @@ ${fence}`;
         const writable = await fileHandle.createWritable();
         await writable.write(content);
         await writable.close();
-        console.log("File saved successfully");
+        debug("File saved successfully");
         return;
       } catch (error) {
-        console.log("File picker cancelled or failed, using fallback method");
+        debug("File picker cancelled or failed, using fallback method");
       }
     }
     const blob = new Blob([content], { type: mimeType });
@@ -3004,15 +3032,14 @@ ${fence}`;
     };
     img.addEventListener("load", doSetup, { once: true });
     let attempts = 0;
-    const maxAttempts = 50;
     const poll = () => {
-      if (setupDone || attempts >= maxAttempts)
+      if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS)
         return;
       attempts++;
       if (img.naturalWidth > 0 && img.offsetWidth > 0) {
         doSetup();
       } else {
-        setTimeout(poll, 100);
+        setTimeout(poll, CONFIG.POLL_INTERVAL_MS);
       }
     };
     poll();
@@ -3024,9 +3051,8 @@ ${fence}`;
     }
     let setupDone = false;
     let attempts = 0;
-    const maxAttempts = 50;
     const checkAndSetup = () => {
-      if (setupDone || attempts >= maxAttempts)
+      if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS)
         return;
       attempts++;
       if (div.offsetWidth >= CONFIG.MIN_ELEMENT_SIZE && div.offsetHeight >= CONFIG.MIN_ELEMENT_SIZE) {
@@ -3036,7 +3062,7 @@ ${fence}`;
         if (attempts < 10) {
           requestAnimationFrame(checkAndSetup);
         } else {
-          setTimeout(checkAndSetup, 100);
+          setTimeout(checkAndSetup, CONFIG.POLL_INTERVAL_MS);
         }
       }
     };

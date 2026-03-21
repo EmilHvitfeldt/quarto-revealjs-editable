@@ -27,6 +27,15 @@
   --editable-toolbar-add-slide-color: #17a2b8;
   --editable-toolbar-add-color: #28a745;
   /* TODO: Add --editable-toolbar-modify-color for issue #48 */
+
+  /* Arrow theming */
+  --editable-arrow-start-color: #007cba;
+  --editable-arrow-end-color: #28a745;
+  --editable-arrow-control1-color: #ff6600;
+  --editable-arrow-control2-color: #9933ff;
+  --editable-arrow-handle-size: 12px;
+  --editable-arrow-control-handle-size: 10px;
+  --editable-toolbar-add-arrow-color: #6f42c1;
 }
 
 /* Container for editable elements */
@@ -788,16 +797,6 @@
 /* =============================================================================
    Arrow Elements
    ============================================================================= */
-
-:root {
-  --editable-arrow-start-color: #007cba;
-  --editable-arrow-end-color: #28a745;
-  --editable-arrow-control1-color: #ff6600;
-  --editable-arrow-control2-color: #9933ff;
-  --editable-arrow-handle-size: 12px;
-  --editable-arrow-control-handle-size: 10px;
-  --editable-toolbar-add-arrow-color: #6f42c1;
-}
 
 /* Arrow container */
 .editable-arrow-container {

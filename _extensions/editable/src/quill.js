@@ -85,7 +85,7 @@ export async function initializeQuillForElement(element) {
 
     // Create toolbar container
     const toolbarContainer = document.createElement("div");
-    toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
+    toolbarContainer.id = "toolbar-" + Math.random().toString(36).substring(2, 11);
     toolbarContainer.innerHTML = `
       <button class="ql-bold">B</button>
       <button class="ql-italic">I</button>

@@ -4,6 +4,9 @@
  * @type {Object}
  */
 export const CONFIG = {
+  // Debug mode - set window.EDITABLE_DEBUG = true to enable
+  DEBUG: typeof window !== 'undefined' && window.EDITABLE_DEBUG,
+
   // Sizing constraints
   MIN_ELEMENT_SIZE: 50,
   KEYBOARD_MOVE_STEP: 10,
@@ -33,6 +36,10 @@ export const CONFIG = {
   ARROW_DEFAULT_WIDTH: 2,
   ARROW_CONTROL1_COLOR: "#ff6600",
   ARROW_CONTROL2_COLOR: "#9933ff",
+
+  // Polling config
+  POLL_MAX_ATTEMPTS: 50,
+  POLL_INTERVAL_MS: 100,
 
   // Quill Editor CDN
   QUILL_CSS:

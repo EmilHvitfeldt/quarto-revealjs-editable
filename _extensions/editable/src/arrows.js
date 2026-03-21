@@ -5,7 +5,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex } from './utils.js';
+import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, debug } from './utils.js';
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 
@@ -131,6 +131,17 @@ export async function showArrowExtensionWarning() {
 /** @type {Object|null} Currently selected arrow data */
 let activeArrow = null;
 
+/** @type {Object} Cached references to arrow control DOM elements */
+const arrowControlRefs = {
+  colorPicker: null,
+  widthInput: null,
+  headSelect: null,
+  dashSelect: null,
+  lineSelect: null,
+  opacityInput: null,
+  colorPresetsRow: null,
+};
+
 /**
  * Available arrow head styles for the quarto-arrows extension.
  * @type {string[]}
@@ -252,9 +263,11 @@ export function createArrowStyleControls() {
   widthInput.title = "Width";
   widthInput.addEventListener("input", (e) => {
     if (activeArrow) {
-      const val = parseInt(e.target.value) || 1;
-      activeArrow.width = Math.max(1, Math.min(20, val));
-      updateArrowAppearance(activeArrow);
+      const val = parseInt(e.target.value);
+      if (!isNaN(val)) {
+        activeArrow.width = Math.max(1, Math.min(20, val));
+        updateArrowAppearance(activeArrow);
+      }
     }
   });
   container.appendChild(widthInput);
@@ -348,6 +361,15 @@ export function createArrowStyleControls() {
   });
   container.appendChild(curveToggle);
 
+  // Cache references for efficient updates
+  arrowControlRefs.colorPicker = colorPicker;
+  arrowControlRefs.widthInput = widthInput;
+  arrowControlRefs.headSelect = headSelect;
+  arrowControlRefs.dashSelect = dashSelect;
+  arrowControlRefs.lineSelect = lineSelect;
+  arrowControlRefs.opacityInput = opacityInput;
+  arrowControlRefs.colorPresetsRow = colorPresetsRow;
+
   return container;
 }
 
@@ -369,21 +391,17 @@ export function updateArrowStylePanel(arrowData) {
   }
 
   if (arrowData) {
-    const colorPicker = arrowControls.querySelector("#arrow-style-color");
-    const widthInput = arrowControls.querySelector("#arrow-style-width");
-    const headSelect = arrowControls.querySelector("#arrow-style-head");
-    const dashSelect = arrowControls.querySelector("#arrow-style-dash");
-    const lineSelect = arrowControls.querySelector("#arrow-style-line");
-    const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
+    const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow } = arrowControlRefs;
 
     if (colorPicker) {
       const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
       colorPicker.value = colorValue;
-      const swatches = arrowControls.querySelectorAll(".arrow-color-swatch");
-      swatches.forEach(s => {
-        s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
-          rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
-      });
+      if (colorPresetsRow) {
+        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => {
+          s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
+            rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+        });
+      }
     }
     if (widthInput) {
       widthInput.value = arrowData.width.toString();
@@ -713,7 +731,7 @@ export async function addNewArrow() {
     NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
   }
 
-  console.log("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+  debug("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
   return arrowContainer;
 }
 
@@ -743,7 +761,7 @@ export function createArrowElement(arrowData) {
 
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
   const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-  const markerId = "arrowhead-" + Math.random().toString(36).substr(2, 9);
+  const markerId = "arrowhead-" + Math.random().toString(36).substring(2, 11);
   marker.setAttribute("id", markerId);
   marker.setAttribute("markerWidth", "10");
   marker.setAttribute("markerHeight", "10");
@@ -984,7 +1002,6 @@ function createArrowHandle(arrowData, position) {
 
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
-    updateCurveTogglePosition(arrowData);
 
     e.preventDefault();
   };
@@ -1125,6 +1142,3 @@ export function toggleCurveMode(arrowData) {
   updateArrowHandles(arrowData);
 }
 
-function updateCurveTogglePosition(arrowData) {
-  // Placeholder for potential future use
-}

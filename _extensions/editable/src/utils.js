@@ -15,6 +15,16 @@ export function round(n) {
 }
 
 /**
+ * Log a debug message (only when DEBUG mode is enabled).
+ * @param {...any} args - Arguments to log
+ */
+export function debug(...args) {
+  if (CONFIG.DEBUG) {
+    console.log('[editable]', ...args);
+  }
+}
+
+/**
  * Get the current slide scale from Reveal.js CSS custom property.
  * @returns {number} The slide scale factor (default 1)
  */

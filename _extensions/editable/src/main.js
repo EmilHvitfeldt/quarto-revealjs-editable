@@ -5,7 +5,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getEditableElements, getOriginalEditableElements, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, hasTitleSlide } from './utils.js';
+import { getEditableElements, getOriginalEditableElements, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, hasTitleSlide, debug } from './utils.js';
 import { editableRegistry, EditableElement } from './editable-element.js';
 import { setupUndoRedoKeyboard, canUndo, canRedo, pushUndoState, undo, redo } from './undo.js';
 import { initializeQuillForElement, quillInstances } from './quill.js';
@@ -127,7 +127,7 @@ async function addNewTextElement() {
     });
   }
 
-  console.log("Added new text element to slide", slideIndex);
+  debug("Added new text element to slide", slideIndex);
   return newDiv;
 }
 
@@ -179,7 +179,7 @@ function addNewSlide() {
   Reveal.sync();
   Reveal.next();
 
-  console.log(
+  debug(
     "Added new slide after original index",
     originalSlideIndex,
     "insertAfterNewSlide:",
@@ -235,7 +235,7 @@ function copyQmdToClipboard() {
   if (!content) return;
 
   navigator.clipboard.writeText(content).then(function () {
-    console.log("qmd content copied to clipboard");
+    debug("qmd content copied to clipboard");
   }).catch(function (err) {
     console.error("Failed to copy to clipboard:", err);
   });
@@ -285,10 +285,10 @@ async function downloadString(content, mimeType = "text/plain") {
       await writable.write(content);
       await writable.close();
 
-      console.log("File saved successfully");
+      debug("File saved successfully");
       return;
     } catch (error) {
-      console.log("File picker cancelled or failed, using fallback method");
+      debug("File picker cancelled or failed, using fallback method");
     }
   }
 
@@ -579,14 +579,13 @@ function setupImageWhenReady(img) {
   img.addEventListener("load", doSetup, { once: true });
 
   let attempts = 0;
-  const maxAttempts = 50;
   const poll = () => {
-    if (setupDone || attempts >= maxAttempts) return;
+    if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS) return;
     attempts++;
     if (img.naturalWidth > 0 && img.offsetWidth > 0) {
       doSetup();
     } else {
-      setTimeout(poll, 100);
+      setTimeout(poll, CONFIG.POLL_INTERVAL_MS);
     }
   };
   poll();
@@ -604,10 +603,9 @@ function setupDivWhenReady(div) {
 
   let setupDone = false;
   let attempts = 0;
-  const maxAttempts = 50;
 
   const checkAndSetup = () => {
-    if (setupDone || attempts >= maxAttempts) return;
+    if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS) return;
     attempts++;
 
     if (div.offsetWidth >= CONFIG.MIN_ELEMENT_SIZE && div.offsetHeight >= CONFIG.MIN_ELEMENT_SIZE) {
@@ -617,7 +615,7 @@ function setupDivWhenReady(div) {
       if (attempts < 10) {
         requestAnimationFrame(checkAndSetup);
       } else {
-        setTimeout(checkAndSetup, 100);
+        setTimeout(checkAndSetup, CONFIG.POLL_INTERVAL_MS);
       }
     }
   };

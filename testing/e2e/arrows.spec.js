@@ -2,6 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 const { TESTING_DIR, setupPage, clickAddArrow, getArrowData, deselectArrow } = require('./test-helpers');
 
 test.describe('Arrow Feature', () => {
@@ -11,7 +12,7 @@ test.describe('Arrow Feature', () => {
     test.beforeAll(async () => {
       const htmlPath = path.join(TESTING_DIR, 'arrows.html');
       if (!fs.existsSync(htmlPath)) {
-        throw new Error('Run quarto render arrows.qmd first to generate HTML file');
+        execSync('quarto render arrows.qmd', { cwd: TESTING_DIR, stdio: 'inherit' });
       }
     });
 
