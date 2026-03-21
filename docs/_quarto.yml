@@ -28,6 +28,9 @@ website:
   page-footer:
     center: "Made with [Quarto](https://quarto.org)"
 
+filters:
+  - arrow
+
 format:
   html:
     theme: cosmo
