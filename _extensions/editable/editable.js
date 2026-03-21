@@ -1,6 +1,8 @@
 var EditableModule = (() => {
   // src/config.js
   var CONFIG = {
+    // Debug mode - set window.EDITABLE_DEBUG = true to enable
+    DEBUG: typeof window !== "undefined" && window.EDITABLE_DEBUG,
     // Sizing constraints
     MIN_ELEMENT_SIZE: 50,
     KEYBOARD_MOVE_STEP: 10,
@@ -25,6 +27,9 @@ var EditableModule = (() => {
     ARROW_DEFAULT_WIDTH: 2,
     ARROW_CONTROL1_COLOR: "#ff6600",
     ARROW_CONTROL2_COLOR: "#9933ff",
+    // Polling config
+    POLL_MAX_ATTEMPTS: 50,
+    POLL_INTERVAL_MS: 100,
     // Quill Editor CDN
     QUILL_CSS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
     QUILL_JS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"
@@ -33,6 +38,11 @@ var EditableModule = (() => {
   // src/utils.js
   function round(n) {
     return Math.round(n * 10) / 10;
+  }
+  function debug(...args) {
+    if (CONFIG.DEBUG) {
+      console.log("[editable]", ...args);
+    }
   }
   function getSlideScale() {
     const slidesContainerEl = document.querySelector(".slides");
@@ -271,7 +281,7 @@ var EditableModule = (() => {
           return;
         e.preventDefault();
         if (undo()) {
-          console.log("Undo performed");
+          debug("Undo performed");
         }
         return;
       }
@@ -280,7 +290,7 @@ var EditableModule = (() => {
           return;
         e.preventDefault();
         if (redo()) {
-          console.log("Redo performed");
+          debug("Redo performed");
         }
         return;
       }
@@ -417,7 +427,7 @@ var EditableModule = (() => {
       const colorOptions = presetColors.map((c) => `<option value="${c}"></option>`).join("");
       const colorOptionsWithExtras = `<option value="unset"></option>` + colorOptions + `<option value="custom">\u22EF</option>`;
       const toolbarContainer = document.createElement("div");
-      toolbarContainer.id = "toolbar-" + Math.random().toString(36).substr(2, 9);
+      toolbarContainer.id = "toolbar-" + Math.random().toString(36).substring(2, 11);
       toolbarContainer.innerHTML = `
       <button class="ql-bold">B</button>
       <button class="ql-italic">I</button>
@@ -1809,7 +1819,7 @@ var EditableModule = (() => {
       const originalSlideIndex = qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
       NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
     }
-    console.log("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+    debug("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
     return arrowContainer;
   }
   function createArrowElement(arrowData) {
@@ -1831,7 +1841,7 @@ var EditableModule = (() => {
     svg.style.overflow = "visible";
     const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-    const markerId = "arrowhead-" + Math.random().toString(36).substr(2, 9);
+    const markerId = "arrowhead-" + Math.random().toString(36).substring(2, 11);
     marker.setAttribute("id", markerId);
     marker.setAttribute("markerWidth", "10");
     marker.setAttribute("markerHeight", "10");
@@ -2680,7 +2690,7 @@ ${fence}`;
         y: (slideHeight - CONFIG.NEW_TEXT_HEIGHT) / 2
       });
     }
-    console.log("Added new text element to slide", slideIndex);
+    debug("Added new text element to slide", slideIndex);
     return newDiv;
   }
   function addNewSlide() {
@@ -2716,7 +2726,7 @@ ${fence}`;
     NewElementRegistry.addSlide(newSlide, originalSlideIndex, insertAfterNewSlide);
     Reveal.sync();
     Reveal.next();
-    console.log(
+    debug(
       "Added new slide after original index",
       originalSlideIndex,
       "insertAfterNewSlide:",
@@ -2754,7 +2764,7 @@ ${fence}`;
     if (!content)
       return;
     navigator.clipboard.writeText(content).then(function() {
-      console.log("qmd content copied to clipboard");
+      debug("qmd content copied to clipboard");
     }).catch(function(err) {
       console.error("Failed to copy to clipboard:", err);
     });
@@ -2785,10 +2795,10 @@ ${fence}`;
         const writable = await fileHandle.createWritable();
         await writable.write(content);
         await writable.close();
-        console.log("File saved successfully");
+        debug("File saved successfully");
         return;
       } catch (error) {
-        console.log("File picker cancelled or failed, using fallback method");
+        debug("File picker cancelled or failed, using fallback method");
       }
     }
     const blob = new Blob([content], { type: mimeType });
@@ -3022,15 +3032,14 @@ ${fence}`;
     };
     img.addEventListener("load", doSetup, { once: true });
     let attempts = 0;
-    const maxAttempts = 50;
     const poll = () => {
-      if (setupDone || attempts >= maxAttempts)
+      if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS)
         return;
       attempts++;
       if (img.naturalWidth > 0 && img.offsetWidth > 0) {
         doSetup();
       } else {
-        setTimeout(poll, 100);
+        setTimeout(poll, CONFIG.POLL_INTERVAL_MS);
       }
     };
     poll();
@@ -3042,9 +3051,8 @@ ${fence}`;
     }
     let setupDone = false;
     let attempts = 0;
-    const maxAttempts = 50;
     const checkAndSetup = () => {
-      if (setupDone || attempts >= maxAttempts)
+      if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS)
         return;
       attempts++;
       if (div.offsetWidth >= CONFIG.MIN_ELEMENT_SIZE && div.offsetHeight >= CONFIG.MIN_ELEMENT_SIZE) {
@@ -3054,7 +3062,7 @@ ${fence}`;
         if (attempts < 10) {
           requestAnimationFrame(checkAndSetup);
         } else {
-          setTimeout(checkAndSetup, 100);
+          setTimeout(checkAndSetup, CONFIG.POLL_INTERVAL_MS);
         }
       }
     };

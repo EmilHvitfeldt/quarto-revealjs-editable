@@ -5,6 +5,7 @@
  */
 
 import { CONFIG } from './config.js';
+import { debug } from './utils.js';
 import { editableRegistry } from './editable-element.js';
 
 /** @type {Array<Array<Object>>} Stack of previous states for undo */
@@ -139,7 +140,7 @@ export function setupUndoRedoKeyboard() {
 
       e.preventDefault();
       if (undo()) {
-        console.log("Undo performed");
+        debug("Undo performed");
       }
       return;
     }
@@ -151,7 +152,7 @@ export function setupUndoRedoKeyboard() {
 
       e.preventDefault();
       if (redo()) {
-        console.log("Redo performed");
+        debug("Redo performed");
       }
       return;
     }

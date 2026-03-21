@@ -5,7 +5,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex } from './utils.js';
+import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, debug } from './utils.js';
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 
@@ -731,7 +731,7 @@ export async function addNewArrow() {
     NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
   }
 
-  console.log("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+  debug("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
   return arrowContainer;
 }
 
@@ -761,7 +761,7 @@ export function createArrowElement(arrowData) {
 
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
   const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-  const markerId = "arrowhead-" + Math.random().toString(36).substr(2, 9);
+  const markerId = "arrowhead-" + Math.random().toString(36).substring(2, 11);
   marker.setAttribute("id", markerId);
   marker.setAttribute("markerWidth", "10");
   marker.setAttribute("markerHeight", "10");
