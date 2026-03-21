@@ -1648,7 +1648,6 @@ function addNewSlide() {
 
 // Track the currently active (selected) arrow
 let activeArrow = null;
-let arrowStylePanel = null;
 
 // Available arrow head styles
 const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
@@ -1695,50 +1694,35 @@ function cleanupArrowListeners(arrowData) {
   }
 }
 
-function createArrowStylePanel() {
-  if (arrowStylePanel) return arrowStylePanel;
+function createArrowStyleControls() {
+  const container = document.createElement("div");
+  container.className = "arrow-style-controls";
+  container.style.display = "none";
 
-  const panel = document.createElement("div");
-  panel.id = "arrow-style-panel";
-  panel.className = "arrow-style-panel";
-  panel.style.display = "none";
-
-  // Header
-  const header = document.createElement("div");
-  header.className = "arrow-style-panel-header";
-  header.textContent = "Arrow Style";
-  panel.appendChild(header);
-
-  // Color row
-  const colorRow = document.createElement("div");
-  colorRow.className = "arrow-style-row";
-  const colorLabel = document.createElement("label");
-  colorLabel.textContent = "Color";
+  // Color picker
   const colorPicker = document.createElement("input");
   colorPicker.type = "color";
   colorPicker.id = "arrow-style-color";
+  colorPicker.className = "arrow-toolbar-color";
   colorPicker.value = "#000000";
+  colorPicker.title = "Color";
   colorPicker.addEventListener("input", (e) => {
     if (activeArrow) {
       activeArrow.color = e.target.value;
       updateArrowAppearance(activeArrow);
     }
   });
-  colorRow.appendChild(colorLabel);
-  colorRow.appendChild(colorPicker);
-  panel.appendChild(colorRow);
+  container.appendChild(colorPicker);
 
-  // Width row
-  const widthRow = document.createElement("div");
-  widthRow.className = "arrow-style-row";
-  const widthLabel = document.createElement("label");
-  widthLabel.textContent = "Width";
+  // Width input
   const widthInput = document.createElement("input");
   widthInput.type = "number";
   widthInput.id = "arrow-style-width";
+  widthInput.className = "arrow-toolbar-width";
   widthInput.min = "1";
   widthInput.max = "20";
   widthInput.value = "2";
+  widthInput.title = "Width";
   widthInput.addEventListener("input", (e) => {
     if (activeArrow) {
       const val = parseInt(e.target.value) || 1;
@@ -1746,17 +1730,13 @@ function createArrowStylePanel() {
       updateArrowAppearance(activeArrow);
     }
   });
-  widthRow.appendChild(widthLabel);
-  widthRow.appendChild(widthInput);
-  panel.appendChild(widthRow);
+  container.appendChild(widthInput);
 
-  // Head style row
-  const headRow = document.createElement("div");
-  headRow.className = "arrow-style-row";
-  const headLabel = document.createElement("label");
-  headLabel.textContent = "Head";
+  // Head style select
   const headSelect = document.createElement("select");
   headSelect.id = "arrow-style-head";
+  headSelect.className = "arrow-toolbar-select";
+  headSelect.title = "Head style";
   ARROW_HEAD_STYLES.forEach(style => {
     const opt = document.createElement("option");
     opt.value = style;
@@ -1769,17 +1749,13 @@ function createArrowStylePanel() {
       updateArrowAppearance(activeArrow);
     }
   });
-  headRow.appendChild(headLabel);
-  headRow.appendChild(headSelect);
-  panel.appendChild(headRow);
+  container.appendChild(headSelect);
 
-  // Dash row
-  const dashRow = document.createElement("div");
-  dashRow.className = "arrow-style-row";
-  const dashLabel = document.createElement("label");
-  dashLabel.textContent = "Dash";
+  // Dash select
   const dashSelect = document.createElement("select");
   dashSelect.id = "arrow-style-dash";
+  dashSelect.className = "arrow-toolbar-select";
+  dashSelect.title = "Dash style";
   ["solid", "dashed", "dotted"].forEach(style => {
     const opt = document.createElement("option");
     opt.value = style;
@@ -1792,17 +1768,13 @@ function createArrowStylePanel() {
       updateArrowAppearance(activeArrow);
     }
   });
-  dashRow.appendChild(dashLabel);
-  dashRow.appendChild(dashSelect);
-  panel.appendChild(dashRow);
+  container.appendChild(dashSelect);
 
-  // Line row
-  const lineRow = document.createElement("div");
-  lineRow.className = "arrow-style-row";
-  const lineLabel = document.createElement("label");
-  lineLabel.textContent = "Line";
+  // Line select
   const lineSelect = document.createElement("select");
   lineSelect.id = "arrow-style-line";
+  lineSelect.className = "arrow-toolbar-select";
+  lineSelect.title = "Line style";
   ["single", "double", "triple"].forEach(style => {
     const opt = document.createElement("option");
     opt.value = style;
@@ -1815,48 +1787,64 @@ function createArrowStylePanel() {
       updateArrowAppearance(activeArrow);
     }
   });
-  lineRow.appendChild(lineLabel);
-  lineRow.appendChild(lineSelect);
-  panel.appendChild(lineRow);
+  container.appendChild(lineSelect);
 
-  // Opacity row
-  const opacityRow = document.createElement("div");
-  opacityRow.className = "arrow-style-row";
-  const opacityLabel = document.createElement("label");
-  opacityLabel.textContent = "Opacity";
+  // Opacity input
   const opacityInput = document.createElement("input");
   opacityInput.type = "range";
   opacityInput.id = "arrow-style-opacity";
+  opacityInput.className = "arrow-toolbar-opacity";
   opacityInput.min = "0";
   opacityInput.max = "1";
   opacityInput.step = "0.1";
   opacityInput.value = "1";
+  opacityInput.title = "Opacity";
   opacityInput.addEventListener("input", (e) => {
     if (activeArrow) {
       activeArrow.opacity = parseFloat(e.target.value);
       updateArrowAppearance(activeArrow);
     }
   });
-  opacityRow.appendChild(opacityLabel);
-  opacityRow.appendChild(opacityInput);
-  panel.appendChild(opacityRow);
+  container.appendChild(opacityInput);
 
-  document.body.appendChild(panel);
-  arrowStylePanel = panel;
-  return panel;
+  // Curve mode toggle
+  const curveToggle = document.createElement("button");
+  curveToggle.id = "arrow-style-curve";
+  curveToggle.className = "arrow-toolbar-curve";
+  curveToggle.innerHTML = "⤴ Curve";
+  curveToggle.title = "Toggle curve mode";
+  curveToggle.addEventListener("click", () => {
+    if (activeArrow) {
+      toggleCurveMode(activeArrow);
+      updateCurveToggleInToolbar(activeArrow);
+    }
+  });
+  container.appendChild(curveToggle);
+
+  return container;
 }
 
 function updateArrowStylePanel(arrowData) {
-  const panel = createArrowStylePanel();
+  const toolbar = document.getElementById("editable-toolbar");
+  if (!toolbar) return;
+
+  const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
+  let arrowControls = toolbar.querySelector(".arrow-style-controls");
+
+  // Create arrow controls if they don't exist
+  if (!arrowControls) {
+    arrowControls = createArrowStyleControls();
+    toolbar.appendChild(arrowControls);
+  }
 
   if (arrowData) {
-    // Update panel values to match selected arrow
-    const colorPicker = panel.querySelector("#arrow-style-color");
-    const widthInput = panel.querySelector("#arrow-style-width");
-    const headSelect = panel.querySelector("#arrow-style-head");
-    const dashSelect = panel.querySelector("#arrow-style-dash");
-    const lineSelect = panel.querySelector("#arrow-style-line");
-    const opacityInput = panel.querySelector("#arrow-style-opacity");
+    // Update control values to match selected arrow
+    const colorPicker = arrowControls.querySelector("#arrow-style-color");
+    const widthInput = arrowControls.querySelector("#arrow-style-width");
+    const headSelect = arrowControls.querySelector("#arrow-style-head");
+    const dashSelect = arrowControls.querySelector("#arrow-style-dash");
+    const lineSelect = arrowControls.querySelector("#arrow-style-line");
+    const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
 
     if (colorPicker) {
       colorPicker.value = arrowData.color === "black" ? "#000000" : arrowData.color;
@@ -1877,9 +1865,27 @@ function updateArrowStylePanel(arrowData) {
       opacityInput.value = (arrowData.opacity !== undefined ? arrowData.opacity : 1).toString();
     }
 
-    panel.style.display = "block";
+    // Update curve toggle state
+    updateCurveToggleInToolbar(arrowData);
+
+    // Show arrow controls, hide normal buttons
+    buttonsContainer.style.display = "none";
+    arrowControls.style.display = "flex";
   } else {
-    panel.style.display = "none";
+    // Show normal buttons, hide arrow controls
+    buttonsContainer.style.display = "flex";
+    arrowControls.style.display = "none";
+  }
+}
+
+function updateCurveToggleInToolbar(arrowData) {
+  const curveToggle = document.querySelector("#arrow-style-curve");
+  if (!curveToggle) return;
+
+  if (arrowData && arrowData.curveMode) {
+    curveToggle.classList.add("active");
+  } else {
+    curveToggle.classList.remove("active");
   }
 }
 
@@ -2069,11 +2075,6 @@ function updateArrowActiveState(arrowData) {
     arrowData._control2Handle.style.display = (showControls && arrowData.curveMode) ? "" : "none";
   }
 
-  // Show/hide curve toggle
-  if (arrowData._curveToggle) {
-    arrowData._curveToggle.style.display = showControls ? "" : "none";
-  }
-
   // Show/hide guide lines
   if (arrowData._guideLine1) {
     arrowData._guideLine1.style.display = (showControls && arrowData.curveMode && arrowData.control1X !== null) ? "" : "none";
@@ -2261,10 +2262,6 @@ function createArrowElement(arrowData) {
   arrowData._control1Handle = control1Handle;
   arrowData._control2Handle = control2Handle;
 
-  // Create curve mode toggle button
-  const curveToggle = createCurveModeToggle(arrowData);
-  container.appendChild(curveToggle);
-  arrowData._curveToggle = curveToggle;
 
   // Add click and drag handler to select and move arrow (on hit area)
   // Use AbortController for proper cleanup of document listeners
@@ -2345,9 +2342,9 @@ function createArrowElement(arrowData) {
   if (!container._clickOutsideHandler) {
     container._clickOutsideHandler = true;
     document.addEventListener("click", (e) => {
-      // Check if click is outside all arrow containers and style panel
+      // Check if click is outside all arrow containers and toolbar
       if (!e.target.closest(".editable-arrow-container") &&
-          !e.target.closest(".arrow-style-panel") &&
+          !e.target.closest(".editable-toolbar") &&
           activeArrow === arrowData) {
         setActiveArrow(null);
       }
@@ -2530,38 +2527,6 @@ function updateArrowHandles(arrowData) {
   }
 }
 
-function createCurveModeToggle(arrowData) {
-  const toggle = document.createElement("button");
-  toggle.className = "editable-arrow-curve-toggle";
-  toggle.innerHTML = "⤴";
-  toggle.title = "Toggle curve mode";
-  toggle.style.position = "absolute";
-  toggle.style.width = "24px";
-  toggle.style.height = "24px";
-  toggle.style.borderRadius = "4px";
-  toggle.style.border = "1px solid #ccc";
-  toggle.style.background = "white";
-  toggle.style.cursor = "pointer";
-  toggle.style.fontSize = "14px";
-  toggle.style.display = "flex";
-  toggle.style.alignItems = "center";
-  toggle.style.justifyContent = "center";
-  toggle.style.pointerEvents = "auto";
-  toggle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
-  toggle.style.zIndex = "102";
-
-  toggle.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleCurveMode(arrowData);
-  });
-
-  // Position near the midpoint of the arrow
-  updateCurveTogglePosition(arrowData, toggle);
-
-  return toggle;
-}
-
 function toggleCurveMode(arrowData) {
   arrowData.curveMode = !arrowData.curveMode;
 
@@ -2587,11 +2552,6 @@ function toggleCurveMode(arrowData) {
       arrowData._container.classList.add("curve-mode");
     }
 
-    // Update toggle appearance
-    if (arrowData._curveToggle) {
-      arrowData._curveToggle.style.background = CONFIG.ARROW_CONTROL1_COLOR;
-      arrowData._curveToggle.style.color = "white";
-    }
   } else {
     // Disable curve mode - reset to straight line
     arrowData.control1X = null;
@@ -2608,28 +2568,10 @@ function toggleCurveMode(arrowData) {
     if (arrowData._guideLine1) arrowData._guideLine1.style.display = "none";
     if (arrowData._guideLine2) arrowData._guideLine2.style.display = "none";
 
-    // Update toggle appearance
-    if (arrowData._curveToggle) {
-      arrowData._curveToggle.style.background = "white";
-      arrowData._curveToggle.style.color = "black";
-    }
   }
 
   updateArrowPath(arrowData);
   updateArrowHandles(arrowData);
-}
-
-function updateCurveTogglePosition(arrowData, toggle) {
-  if (!toggle) toggle = arrowData._curveToggle;
-  if (!toggle) return;
-
-  const { fromX, fromY, toX, toY } = arrowData;
-  const midX = (fromX + toX) / 2;
-  const midY = (fromY + toY) / 2;
-
-  // Position toggle slightly offset from midpoint
-  toggle.style.left = (midX + 15) + "px";
-  toggle.style.top = (midY - 20) + "px";
 }
 
 // =============================================================================

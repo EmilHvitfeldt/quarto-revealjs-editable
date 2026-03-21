@@ -7,6 +7,15 @@ const TESTING_DIR = path.join(__dirname, '..');
 
 // Helper to click Add Arrow in the toolbar submenu
 async function clickAddArrow(page) {
+  // First ensure normal toolbar buttons are visible by deselecting any arrow
+  const arrowControlsVisible = await page.evaluate(() => {
+    const arrowControls = document.querySelector('.arrow-style-controls');
+    return arrowControls && arrowControls.style.display !== 'none';
+  });
+  if (arrowControlsVisible) {
+    await page.click('body', { position: { x: 10, y: 10 } });
+    await page.waitForTimeout(100);
+  }
   await page.click('.toolbar-add');
   await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
 }
@@ -29,7 +38,6 @@ async function getArrowData(page) {
       hasEndHandle: !!container.querySelector('.editable-arrow-handle-end'),
       hasControl1Handle: !!container.querySelector('.editable-arrow-handle-control1'),
       hasControl2Handle: !!container.querySelector('.editable-arrow-handle-control2'),
-      hasCurveToggle: !!container.querySelector('.editable-arrow-curve-toggle'),
       hasSvg: !!container.querySelector('svg'),
       hasPath: !!container.querySelector('svg path'),
     }));
@@ -106,7 +114,6 @@ test.describe('Arrow Feature', () => {
       expect(newArrow.hasEndHandle).toBe(true);
       expect(newArrow.hasControl1Handle).toBe(true);
       expect(newArrow.hasControl2Handle).toBe(true);
-      expect(newArrow.hasCurveToggle).toBe(true);
     });
 
     test('New arrow is centered on slide', async ({ page }) => {
@@ -371,7 +378,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Click curve toggle
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       const arrows = await getArrowData(page);
@@ -384,7 +391,7 @@ test.describe('Arrow Feature', () => {
       await waitForReveal(page);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Check control handles are visible
@@ -410,7 +417,7 @@ test.describe('Arrow Feature', () => {
       expect(initialPath).toMatch(/^M.*L/);
 
       // Enable curve mode
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Check path is now a curve (M...C for cubic Bezier)
@@ -429,9 +436,9 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Enable then disable curve mode
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Check path is back to line
@@ -452,7 +459,7 @@ test.describe('Arrow Feature', () => {
       await waitForReveal(page);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Get initial curve path
@@ -483,7 +490,7 @@ test.describe('Arrow Feature', () => {
       await waitForReveal(page);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Check guide lines exist and are visible
@@ -503,6 +510,77 @@ test.describe('Arrow Feature', () => {
       // Should have 2 guide lines with coordinates set
       const visibleGuides = guideLines.filter(l => l.display !== 'none' && l.x1);
       expect(visibleGuides.length).toBe(2);
+    });
+
+    test('Curve toggle button shows active state when curve mode is on', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+
+      // Initially not active
+      let hasActiveClass = await page.evaluate(() => {
+        const toggle = document.querySelector('#arrow-style-curve');
+        return toggle.classList.contains('active');
+      });
+      expect(hasActiveClass).toBe(false);
+
+      // Enable curve mode
+      await page.click('#arrow-style-curve');
+      await page.waitForTimeout(100);
+
+      // Should have active class
+      hasActiveClass = await page.evaluate(() => {
+        const toggle = document.querySelector('#arrow-style-curve');
+        return toggle.classList.contains('active');
+      });
+      expect(hasActiveClass).toBe(true);
+
+      // Disable curve mode
+      await page.click('#arrow-style-curve');
+      await page.waitForTimeout(100);
+
+      // Should not have active class
+      hasActiveClass = await page.evaluate(() => {
+        const toggle = document.querySelector('#arrow-style-curve');
+        return toggle.classList.contains('active');
+      });
+      expect(hasActiveClass).toBe(false);
+    });
+
+    test('Curve toggle state syncs when selecting different arrows', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // Create first arrow and enable curve mode
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+      await page.click('#arrow-style-curve');
+      await page.waitForTimeout(100);
+
+      // Verify curve mode is on
+      let hasActiveClass = await page.evaluate(() => {
+        const toggle = document.querySelector('#arrow-style-curve');
+        return toggle.classList.contains('active');
+      });
+      expect(hasActiveClass).toBe(true);
+
+      // Deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Create second arrow (straight by default)
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Curve toggle should not be active for new arrow
+      hasActiveClass = await page.evaluate(() => {
+        const toggle = document.querySelector('#arrow-style-curve');
+        return toggle.classList.contains('active');
+      });
+      expect(hasActiveClass).toBe(false);
     });
 
   });
@@ -581,7 +659,7 @@ test.describe('Arrow Feature', () => {
       await page.waitForTimeout(200);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Get arrow path - should be cubic Bezier with control points
@@ -640,11 +718,9 @@ test.describe('Arrow Feature', () => {
       // Check handles are hidden
       const startHandleVisible = await page.locator('.editable-arrow-handle-start').isVisible();
       const endHandleVisible = await page.locator('.editable-arrow-handle-end').isVisible();
-      const curveToggleVisible = await page.locator('.editable-arrow-curve-toggle').isVisible();
 
       expect(startHandleVisible).toBe(false);
       expect(endHandleVisible).toBe(false);
-      expect(curveToggleVisible).toBe(false);
     });
 
     test('Handles are shown when arrow is active', async ({ page }) => {
@@ -657,11 +733,9 @@ test.describe('Arrow Feature', () => {
       // Check handles are visible
       const startHandleVisible = await page.locator('.editable-arrow-handle-start').isVisible();
       const endHandleVisible = await page.locator('.editable-arrow-handle-end').isVisible();
-      const curveToggleVisible = await page.locator('.editable-arrow-curve-toggle').isVisible();
 
       expect(startHandleVisible).toBe(true);
       expect(endHandleVisible).toBe(true);
-      expect(curveToggleVisible).toBe(true);
     });
 
   });
@@ -924,9 +998,13 @@ test.describe('Arrow Feature', () => {
       await page.mouse.move(box.x - 140, box.y, { steps: 5 }); // Move most of the way back
       await page.mouse.up();
 
-      // Curve toggle should still be positioned (even if awkwardly)
-      const toggleExists = await page.locator('.editable-arrow-curve-toggle').isVisible();
-      expect(toggleExists).toBe(true);
+      // Arrow should still exist and be functional
+      const arrowExists = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke="black"]');
+        return !!pathEl && !!pathEl.getAttribute('d');
+      });
+      expect(arrowExists).toBe(true);
     });
 
   });
@@ -1010,7 +1088,7 @@ test.describe('Arrow Feature', () => {
       await waitForReveal(page);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Get initial control point position
@@ -1054,7 +1132,7 @@ test.describe('Arrow Feature', () => {
 
       // Rapidly toggle curve mode
       for (let i = 0; i < 5; i++) {
-        await page.click('.editable-arrow-curve-toggle');
+        await page.click('#arrow-style-curve');
         await page.waitForTimeout(50);
       }
 
@@ -1080,7 +1158,7 @@ test.describe('Arrow Feature', () => {
       await waitForReveal(page);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Verify guide lines are visible when active
@@ -1255,6 +1333,10 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
+      // Deselect arrow to show normal toolbar buttons
+      await page.click('body', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
       // Click copy button
       await page.click('.toolbar-copy');
       await page.waitForTimeout(200);
@@ -1279,7 +1361,7 @@ test.describe('Arrow Feature', () => {
       await waitForReveal(page);
 
       await clickAddArrow(page);
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Both paths should be Bezier curves
@@ -1305,32 +1387,42 @@ test.describe('Arrow Feature', () => {
 
   });
 
-  test.describe('Arrow Style Panel', () => {
+  test.describe('Arrow Style Controls in Toolbar', () => {
 
-    test('Style panel appears when arrow is selected', async ({ page }) => {
+    test('Toolbar shows arrow controls when arrow is selected', async ({ page }) => {
       const htmlPath = path.join(TESTING_DIR, 'arrows.html');
       await page.goto(`file://${htmlPath}`);
       await waitForReveal(page);
 
-      // Initially no panel
-      let panel = await page.$('#arrow-style-panel');
-      if (panel) {
-        const display = await panel.evaluate(el => getComputedStyle(el).display);
-        expect(display).toBe('none');
-      }
+      // Initially toolbar shows normal buttons
+      let toolbarState = await page.evaluate(() => {
+        const buttons = document.querySelector('.editable-toolbar-buttons');
+        const arrowControls = document.querySelector('.arrow-style-controls');
+        return {
+          buttonsDisplay: buttons ? buttons.style.display : null,
+          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+        };
+      });
+      expect(toolbarState.buttonsDisplay).not.toBe('none');
 
       // Add arrow - it starts selected
       await clickAddArrow(page);
       await page.waitForTimeout(100);
 
-      // Panel should be visible
-      panel = await page.$('#arrow-style-panel');
-      expect(panel).toBeTruthy();
-      const display = await panel.evaluate(el => el.style.display);
-      expect(display).toBe('block');
+      // Arrow controls should be visible, normal buttons hidden
+      toolbarState = await page.evaluate(() => {
+        const buttons = document.querySelector('.editable-toolbar-buttons');
+        const arrowControls = document.querySelector('.arrow-style-controls');
+        return {
+          buttonsDisplay: buttons ? buttons.style.display : null,
+          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+        };
+      });
+      expect(toolbarState.buttonsDisplay).toBe('none');
+      expect(toolbarState.arrowControlsDisplay).toBe('flex');
     });
 
-    test('Style panel hides when arrow is deselected', async ({ page }) => {
+    test('Toolbar shows normal buttons when arrow is deselected', async ({ page }) => {
       const htmlPath = path.join(TESTING_DIR, 'arrows.html');
       await page.goto(`file://${htmlPath}`);
       await waitForReveal(page);
@@ -1342,9 +1434,16 @@ test.describe('Arrow Feature', () => {
       await page.click('.reveal', { position: { x: 10, y: 10 } });
       await page.waitForTimeout(100);
 
-      const panel = await page.$('#arrow-style-panel');
-      const display = await panel.evaluate(el => el.style.display);
-      expect(display).toBe('none');
+      const toolbarState = await page.evaluate(() => {
+        const buttons = document.querySelector('.editable-toolbar-buttons');
+        const arrowControls = document.querySelector('.arrow-style-controls');
+        return {
+          buttonsDisplay: buttons ? buttons.style.display : null,
+          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+        };
+      });
+      expect(toolbarState.buttonsDisplay).toBe('flex');
+      expect(toolbarState.arrowControlsDisplay).toBe('none');
     });
 
     test('Color picker changes arrow color', async ({ page }) => {
@@ -1438,7 +1537,7 @@ test.describe('Arrow Feature', () => {
       expect(hasMarker).toBe(false);
     });
 
-    test('Style panel syncs values when selecting different arrows', async ({ page }) => {
+    test('Arrow controls sync values when selecting different arrows', async ({ page }) => {
       const htmlPath = path.join(TESTING_DIR, 'arrows.html');
       await page.goto(`file://${htmlPath}`);
       await waitForReveal(page);
@@ -1457,7 +1556,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
       await page.waitForTimeout(100);
 
-      // Panel should show default color for new arrow
+      // Controls should show default color for new arrow
       const colorValue = await page.$eval('#arrow-style-color', el => el.value);
       expect(colorValue).toBe('#000000');
     });
@@ -1549,7 +1648,7 @@ test.describe('Arrow Feature', () => {
       });
       await page.waitForTimeout(100);
 
-      // Verify panel shows saved values
+      // Verify controls show saved values
       const colorValue = await page.$eval('#arrow-style-color', el => el.value);
       const widthValue = await page.$eval('#arrow-style-width', el => el.value);
       expect(colorValue).toBe('#00ff00');
@@ -1824,7 +1923,7 @@ test.describe('Arrow Feature', () => {
       await page.waitForTimeout(100);
 
       // Enable curve mode
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Set double line
@@ -2031,7 +2130,7 @@ test.describe('Arrow Feature', () => {
       await page.waitForTimeout(100);
 
       // Enable curve mode
-      await page.click('.editable-arrow-curve-toggle');
+      await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
       // Get initial control point positions
@@ -2177,7 +2276,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
       await page.waitForTimeout(100);
 
-      // Panel should show default values for new arrow
+      // Controls should show default values for new arrow
       const values = await page.evaluate(() => {
         return {
           color: document.querySelector('#arrow-style-color').value,
