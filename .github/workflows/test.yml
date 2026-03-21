@@ -63,12 +63,22 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Cache rendered HTML files
+        id: cache-html
+        uses: actions/cache@v4
+        with:
+          path: |
+            testing/*.html
+            testing/*_files
+          key: html-${{ hashFiles('_extensions/**', 'testing/*.qmd', 'testing/*.yml') }}
+
       - name: Setup symlink
         run: |
           cd testing
           ln -sf ../_extensions _extensions
 
       - name: Render test files
+        if: steps.cache-html.outputs.cache-hit != 'true'
         run: |
           cd testing
           chmod +x run-tests.sh

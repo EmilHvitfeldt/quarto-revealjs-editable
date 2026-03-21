@@ -2,9 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-
-// Path to test fixtures
-const TESTING_DIR = path.join(__dirname, '..');
+const { TESTING_DIR, setupPage } = require('./test-helpers');
 
 test.describe('Save Edits Feature', () => {
 
@@ -17,12 +15,7 @@ test.describe('Save Edits Feature', () => {
   });
 
   test('Save Edits transforms editable to absolute positioning', async ({ page }) => {
-    // Load the rendered slides
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-
-    // Wait for reveal.js to initialize
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Verify _input_file is loaded
     const inputFile = await page.evaluate(() => window._input_file);
@@ -49,13 +42,7 @@ test.describe('Save Edits Feature', () => {
   });
 
   test('Editable elements are wrapped in positioned containers', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-
-    // Wait for editable elements to be set up
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Verify the editable image is wrapped in a container with editable-container class
     const containerStyle = await page.evaluate(() => {
@@ -74,10 +61,7 @@ test.describe('Save Edits Feature', () => {
   });
 
   test('Dimensions are extracted correctly', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
     // Wait for editable elements to be set up with dimensions
     await page.waitForFunction(() => {
       const el = document.querySelector('.editable');
@@ -107,21 +91,22 @@ test.describe('Save Edits Feature', () => {
     // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Call copyQmdToClipboard
     await page.evaluate(() => {
       copyQmdToClipboard();
     });
 
-    // Wait a bit for clipboard to be written
-    await page.waitForTimeout(500);
-
-    // Read clipboard
-    const clipboardContent = await page.evaluate(() => navigator.clipboard.readText());
+    // Wait for clipboard to have content and read it
+    const clipboardContent = await page.evaluate(async () => {
+      for (let i = 0; i < 20; i++) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.length > 0) return text;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return await navigator.clipboard.readText();
+    });
 
     // Verify content was transformed
     expect(clipboardContent).toContain('{.absolute');
@@ -136,8 +121,7 @@ test.describe('Save Edits Feature', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'shortcode.html');
 
     // The original source (in _input_file) should have the shortcode preserved
     // Note: When saved, div content comes from rendered HTML where shortcodes are resolved
@@ -154,9 +138,7 @@ test.describe('Save Edits Feature', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'colons-in-content.html');
 
     // Get saved content - this tests that the regex correctly matches div content with colons
     const savedContent = await page.evaluate(() => {
@@ -184,9 +166,7 @@ test.describe('Save Edits Feature', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'bare-syntax.html');
 
     // Both syntaxes should create editable elements
     const result = await page.evaluate(() => {
@@ -226,8 +206,7 @@ test.describe('Save Edits Feature', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'latex.html');
 
     // Get saved content
     const savedContent = await page.evaluate(() => {
