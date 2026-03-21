@@ -146,18 +146,21 @@ filters:
   - arrow
 ```
 
+::: {.callout-note}
+If you try to add an arrow without the quarto-arrows extension installed, you'll see a warning with install instructions. You can still add arrows in the browser—they just won't render when you next run `quarto render` until the extension is installed.
+:::
+
 ### Using Arrows
 
 Click **Add → Arrow** to create an arrow on the current slide. The arrow appears centered with draggable handles:
 
 - **Blue handle**: Start point
 - **Green handle**: End point
-- **Curve toggle** (⤴): Switch between straight and curved arrows
 - **Drag body**: Click and drag anywhere on the arrow line to move the entire arrow
 
 ### Curved Arrows
 
-Click the curve toggle button to enable Bezier curve mode. Two additional control point handles appear:
+Toggle **Curve** in the toolbar (when arrow is selected) to enable Bezier curve mode. Two additional control point handles appear:
 
 - **Orange handle**: First control point (influences curve near start)
 - **Purple handle**: Second control point (influences curve near end)
@@ -170,16 +173,17 @@ Only the currently selected arrow shows its handles and controls. Click on an ar
 
 ### Arrow Styling
 
-When an arrow is selected, a style panel appears in the bottom-left corner of the screen with options to customize the arrow's appearance:
+When an arrow is selected, the toolbar switches to show styling controls:
 
-- **Color**: Pick any color for the arrow line and head
+- **Curve**: Toggle between straight and curved arrows
+- **Color**: Color presets (including brand colors) plus custom color picker
 - **Width**: Line thickness (1-20px)
 - **Head**: Arrowhead style (arrow, stealth, diamond, circle, square, bar, or none)
 - **Dash**: Line pattern (solid, dashed, or dotted)
 - **Line**: Line style (single, double, or triple parallel lines)
 - **Opacity**: Transparency slider (0 to 1)
 
-Style changes are applied immediately and saved with the arrow.
+Click anywhere outside the arrow to deselect it and return to the normal toolbar. Style changes are applied immediately and saved with the arrow.
 
 ### Saved Format
 

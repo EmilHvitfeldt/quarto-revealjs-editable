@@ -16,8 +16,16 @@ async function clickAddArrow(page) {
     await page.click('body', { position: { x: 10, y: 10 } });
     await page.waitForTimeout(100);
   }
+
   await page.click('.toolbar-add');
   await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
+
+  // Handle potential arrow extension warning modal (auto-accept)
+  const modal = await page.$('.editable-modal-overlay');
+  if (modal) {
+    await page.click('.editable-modal-confirm');
+    await page.waitForTimeout(100);
+  }
 }
 
 // Helper to wait for Reveal.js to be ready
@@ -71,6 +79,129 @@ test.describe('Arrow Feature', () => {
 
       expect(submenuItems.length).toBe(3); // Text, Slide, Arrow
       expect(submenuItems.some(c => c.includes('toolbar-add-arrow'))).toBe(true);
+    });
+
+  });
+
+  test.describe('Arrow Extension Detection', () => {
+
+    test('No warning shown when arrow extension is detected (existing arrows on page)', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // arrows.html has an existing arrow shortcode rendered, so extension should be detected
+      const hasArrowExtension = await page.evaluate(() => {
+        // Same detection logic as in editable.js
+        const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
+        if (arrowSvgs.length > 0) return true;
+        const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
+        return arrowPaths.length > 0;
+      });
+
+      expect(hasArrowExtension).toBe(true);
+
+      // Add an arrow
+      await clickAddArrow(page);
+      await page.waitForTimeout(200);
+
+      // No modal should have been shown (check it doesn't exist)
+      const modalExists = await page.$('.editable-modal-overlay');
+      expect(modalExists).toBeNull();
+
+      // Arrow should have been created
+      const arrows = await getArrowData(page);
+      expect(arrows.some(a => a.isNew)).toBe(true);
+    });
+
+    test('Warning modal shown when arrow extension not detected (basic.html)', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'basic.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // basic.html has no arrow shortcodes, so extension should not be detected
+      const hasArrowExtension = await page.evaluate(() => {
+        const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
+        if (arrowSvgs.length > 0) return true;
+        const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
+        return arrowPaths.length > 0;
+      });
+
+      expect(hasArrowExtension).toBe(false);
+
+      // Try to add an arrow
+      await page.click('.toolbar-add');
+      await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
+      await page.waitForTimeout(200);
+
+      // Modal should appear with install instructions
+      const modal = await page.$('.editable-modal-overlay');
+      expect(modal).not.toBeNull();
+
+      const modalText = await page.textContent('.editable-modal');
+      expect(modalText).toContain('quarto-arrows');
+      expect(modalText).toContain('quarto add');
+
+      // Click continue to dismiss
+      await page.click('.editable-modal-confirm');
+    });
+
+    test('Warning only shown once per session', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'basic.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // First arrow - should show modal
+      await page.click('.toolbar-add');
+      await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
+      await page.waitForTimeout(200);
+
+      // Modal should appear
+      let modal = await page.$('.editable-modal-overlay');
+      expect(modal).not.toBeNull();
+
+      // Click continue
+      await page.click('.editable-modal-confirm');
+      await page.waitForTimeout(200);
+
+      // Deselect arrow first
+      await page.click('body', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Second arrow - should NOT show modal again
+      await page.click('.toolbar-add');
+      await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
+      await page.waitForTimeout(200);
+
+      // No modal should appear this time
+      modal = await page.$('.editable-modal-overlay');
+      expect(modal).toBeNull();
+    });
+
+    test('Arrow not created if user cancels warning modal', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'basic.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      // Try to add an arrow
+      await page.click('.toolbar-add');
+      await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
+      await page.waitForTimeout(200);
+
+      // Modal should appear
+      const modal = await page.$('.editable-modal-overlay');
+      expect(modal).not.toBeNull();
+
+      // Click cancel
+      await page.click('.editable-modal-cancel');
+      await page.waitForTimeout(200);
+
+      // No arrow should have been created
+      const arrows = await page.evaluate(() => {
+        return document.querySelectorAll('.editable-arrow-container').length;
+      });
+
+      expect(arrows).toBe(0);
     });
 
   });

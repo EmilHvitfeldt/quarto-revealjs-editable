@@ -248,11 +248,12 @@ npm run test:e2e
 | New slide between middle slides  | Correct position in multi-slide document         |
 | Multiple text on different slides| Each text on correct corresponding slide         |
 
-**`e2e/arrows.spec.js`** - Arrow Feature (88 tests):
+**`e2e/arrows.spec.js`** - Arrow Feature (92 tests):
 
 | Category | Tests | Description |
 |----------|-------|-------------|
 | Toolbar Integration | 1 | Add submenu includes Arrow option |
+| Arrow Extension Detection | 4 | Detection with/without extension, warning once, cancel aborts |
 | Arrow Creation | 4 | Creates container, has elements, centered, starts active |
 | Arrow Selection | 3 | Click outside deselects, click hit area selects, only one active |
 | Handle Dragging | 3 | Start/end handles draggable, SVG path updates |

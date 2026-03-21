@@ -411,6 +411,9 @@ State is captured at the START of actions, before changes occur:
 
 The Arrow System enables adding SVG arrows to slides, integrated with the [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension.
 
+**Extension detection:**
+When users click "Add Arrow", the system checks if the quarto-arrows extension is installed by looking for rendered arrow SVGs on the page (specifically `<marker id="arrow-...">` elements). If not detected, a warning dialog explains the dependency and provides install instructions. The warning is only shown once per session, and users can proceed with adding arrows even without the extension (arrows will work in the browser but won't render on next Quarto render).
+
 **Arrow data structure:**
 ```javascript
 const arrowData = {

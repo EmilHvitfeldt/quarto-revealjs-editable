@@ -38,6 +38,138 @@ const CONFIG = {
 };
 
 // =============================================================================
+// Arrow Extension Detection
+// =============================================================================
+
+let arrowExtensionWarningShown = false;
+
+/**
+ * Check if the quarto-arrows extension appears to be installed.
+ * Detection methods:
+ * 1. Look for rendered arrow SVGs with marker elements (indicates extension was used)
+ * 2. Check for arrow-specific CSS or scripts
+ */
+function hasArrowExtension() {
+  // Check for any SVGs with marker definitions (arrow extension output)
+  const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
+  if (arrowSvgs.length > 0) return true;
+
+  // Check if any arrow shortcode rendered (even without markers, paths may exist)
+  // Arrow extension creates SVGs with specific structure
+  const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
+  if (arrowPaths.length > 0) return true;
+
+  return false;
+}
+
+/**
+ * Show a custom modal dialog for arrow extension warning.
+ * Returns a Promise that resolves to true (continue) or false (cancel).
+ */
+function showArrowExtensionModal() {
+  return new Promise((resolve) => {
+    // Create modal overlay
+    const overlay = document.createElement("div");
+    overlay.className = "editable-modal-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+    `;
+
+    // Create modal dialog
+    const modal = document.createElement("div");
+    modal.className = "editable-modal";
+    modal.style.cssText = `
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 450px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      font-family: system-ui, -apple-system, sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
+      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
+        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
+      </p>
+      <p style="margin: 0 0 16px 0; color: #555;">
+        Install with:<br>
+        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
+      </p>
+      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
+        Continue? (Arrows will work in the editor but won't render until the extension is installed)
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="editable-modal-cancel" style="
+          padding: 8px 16px;
+          border: 1px solid #ccc;
+          background: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Cancel</button>
+        <button class="editable-modal-confirm" style="
+          padding: 8px 16px;
+          border: none;
+          background: var(--editable-accent-color, #007cba);
+          color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Continue</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Handle button clicks
+    const cleanup = (result) => {
+      overlay.remove();
+      resolve(result);
+    };
+
+    modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
+    modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cleanup(false);
+    };
+
+    // Focus confirm button
+    modal.querySelector(".editable-modal-confirm").focus();
+  });
+}
+
+/**
+ * Show a one-time informational message about arrow extension dependency.
+ * Returns a Promise that resolves to true if user confirms, false if cancelled.
+ */
+async function showArrowExtensionWarning() {
+  if (arrowExtensionWarningShown) return true;
+
+  const detected = hasArrowExtension();
+  if (detected) {
+    arrowExtensionWarningShown = true;
+    return true;
+  }
+
+  const confirmed = await showArrowExtensionModal();
+  if (confirmed) {
+    arrowExtensionWarningShown = true;
+  }
+  return confirmed;
+}
+
+// =============================================================================
 // Quill Editor Loader
 // =============================================================================
 
@@ -2130,7 +2262,12 @@ function updateArrowActiveState(arrowData) {
   }
 }
 
-function addNewArrow() {
+async function addNewArrow() {
+  // Check for arrow extension and show warning if not detected
+  if (!(await showArrowExtensionWarning())) {
+    return null; // User cancelled
+  }
+
   const currentSlide = getCurrentSlide();
   if (!currentSlide) {
     console.warn("No current slide found");
