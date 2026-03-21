@@ -2,16 +2,12 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-
-const TESTING_DIR = path.join(__dirname, '..');
+const { TESTING_DIR, setupPage } = require('./test-helpers');
 
 test.describe('UI Controls', () => {
 
   test('Edit button exists for div elements', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Check that edit button is created for div.editable
     // Note: Font size and alignment controls are now in Quill toolbar (appears on edit)
@@ -32,9 +28,7 @@ test.describe('UI Controls', () => {
   });
 
   test('changeFontSize function works', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Test the changeFontSize function directly
     const result = await page.evaluate(() => {
@@ -53,9 +47,7 @@ test.describe('UI Controls', () => {
   });
 
   test('Text alignment can be set', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Test alignment by setting style directly
     const result = await page.evaluate(() => {
@@ -68,9 +60,7 @@ test.describe('UI Controls', () => {
   });
 
   test('Edit mode can be enabled', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Test contentEditable
     const result = await page.evaluate(() => {
@@ -83,10 +73,7 @@ test.describe('UI Controls', () => {
   });
 
   test('Resize handles are created', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Check resize handles exist
     const handles = await page.evaluate(() => {
@@ -110,10 +97,7 @@ test.describe('UI Controls', () => {
 test.describe('Menu Integration', () => {
 
   test('Save and Copy buttons are added to menu', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Check menu items exist in DOM (even if not visible)
     const menuItems = await page.evaluate(() => {
@@ -133,10 +117,7 @@ test.describe('Menu Integration', () => {
 test.describe('Drag and Resize', () => {
 
   test('Dragging element changes its position', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Simulate drag using dispatchEvent to bypass reveal.js overlays
     const result = await page.evaluate(() => {
@@ -191,10 +172,7 @@ test.describe('Drag and Resize', () => {
   });
 
   test('Resizing element changes its dimensions', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Simulate resize using dispatchEvent
     const result = await page.evaluate(() => {
@@ -252,10 +230,7 @@ test.describe('Drag and Resize', () => {
   });
 
   test('Dragging div element changes its position', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Simulate drag on div element
     const result = await page.evaluate(() => {
@@ -310,10 +285,7 @@ test.describe('Drag and Resize', () => {
   });
 
   test('Resize preserves aspect ratio with shift key', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Wait for image to have valid dimensions
     await page.waitForFunction(() => {
@@ -385,10 +357,7 @@ test.describe('Drag and Resize', () => {
 test.describe('Resize Edge Cases', () => {
 
   test('Resize from NW corner adjusts position', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Resizing from NW should change both position and size
     const result = await page.evaluate(() => {
@@ -447,10 +416,7 @@ test.describe('Resize Edge Cases', () => {
   });
 
   test('Resize enforces minimum size of 50px', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Try to resize to very small size
     const result = await page.evaluate(() => {
@@ -494,10 +460,7 @@ test.describe('Resize Edge Cases', () => {
 test.describe('Font Size Controls', () => {
 
   test('Font size decrease has minimum of 8px', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Click decrease button many times to hit minimum
     const result = await page.evaluate(() => {
@@ -523,10 +486,7 @@ test.describe('Font Size Controls', () => {
   });
 
   test('Quill toolbar appears when entering edit mode', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Click edit button
     await page.evaluate(() => {
@@ -560,10 +520,7 @@ test.describe('Font Size Controls', () => {
   });
 
   test('Quill toolbar has formatting buttons', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Click edit button and wait for Quill
     await page.evaluate(() => {
@@ -602,10 +559,7 @@ test.describe('Font Size Controls', () => {
   });
 
   test('Edit mode button toggles contentEditable', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get initial state - Quill editor should be disabled initially
     const initialEditable = await page.evaluate(() => {
@@ -670,9 +624,7 @@ test.describe('Multiple Elements', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'multiple-elements.html');
 
     const result = await page.evaluate(() => {
       return new Promise(resolve => {
@@ -741,9 +693,7 @@ test.describe('Multiple Elements', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'multiple-elements.html');
 
     const result = await page.evaluate(() => {
       const editables = document.querySelectorAll('.editable');
@@ -766,9 +716,7 @@ test.describe('Multiple Elements', () => {
 test.describe('Code Quality', () => {
 
   test('Graceful handling when _input_file is missing', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Capture console errors
     const consoleErrors = [];
@@ -803,10 +751,7 @@ test.describe('Code Quality', () => {
   });
 
   test('Dimension values are rounded to 1 decimal place', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       // Create dimensions with many decimal places
@@ -832,10 +777,7 @@ test.describe('Code Quality', () => {
   });
 
   test('No global variable pollution', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Call save functions and verify no globals are leaked
     const globalsCheck = await page.evaluate(() => {
@@ -872,9 +814,7 @@ test.describe('Code Quality', () => {
 test.describe('htmlToQuarto Conversion', () => {
 
   test('Basic HTML tags convert to markdown', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     // Test htmlToQuarto with mock HTML
     const result = await page.evaluate(() => {
@@ -891,9 +831,7 @@ test.describe('htmlToQuarto Conversion', () => {
   });
 
   test('Strikethrough converts to markdown', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const mockDiv = document.createElement('div');
@@ -908,10 +846,7 @@ test.describe('htmlToQuarto Conversion', () => {
 test.describe('Accessibility', () => {
 
   test('Containers are focusable with proper ARIA attributes', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const container = document.querySelector('.editable').parentNode;
@@ -930,10 +865,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Resize handles have ARIA labels', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const handles = await page.evaluate(() => {
       const container = document.querySelector('.editable').parentNode;
@@ -953,14 +885,11 @@ test.describe('Accessibility', () => {
   });
 
   test('Edit button has ARIA label', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Navigate to slide with div.editable
     await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => document.querySelector('div.editable'));
 
     const buttons = await page.evaluate(() => {
       const container = document.querySelector('div.editable').parentNode;
@@ -982,10 +911,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Focus shows controls like hover does', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const container = document.querySelector('.editable').parentNode;
@@ -1012,10 +938,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Arrow keys move element', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get initial position and focus container
     const initial = await page.evaluate(() => {
@@ -1045,10 +968,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Shift+Arrow keys resize element', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get initial size and focus container
     const initial = await page.evaluate(() => {
@@ -1079,10 +999,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Keyboard resize respects minimum size', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Set element to minimum size and try to shrink further
     await page.evaluate(() => {
@@ -1113,10 +1030,7 @@ test.describe('Accessibility', () => {
   });
 
   test('Shift+Tab blurs container to return to slide navigation', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Focus the container
     const focused = await page.evaluate(() => {
@@ -1144,10 +1058,7 @@ test.describe('Accessibility', () => {
 test.describe('CSS Customization', () => {
 
   test('Container has editable-container class', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const container = document.querySelector('.editable').parentNode;
@@ -1162,10 +1073,7 @@ test.describe('CSS Customization', () => {
   });
 
   test('Resize handles have position-specific classes', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const handles = await page.evaluate(() => {
       const container = document.querySelector('.editable').parentNode;
@@ -1185,10 +1093,7 @@ test.describe('CSS Customization', () => {
   });
 
   test('Font controls have editable-font-controls class', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const divEditable = document.querySelector('div.editable');
@@ -1206,10 +1111,7 @@ test.describe('CSS Customization', () => {
   });
 
   test('Edit button has editable-button class', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const buttons = await page.evaluate(() => {
       const divEditable = document.querySelector('div.editable');
@@ -1229,10 +1131,7 @@ test.describe('CSS Customization', () => {
   });
 
   test('CSS custom properties are applied from stylesheet', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const root = document.documentElement;
@@ -1251,10 +1150,7 @@ test.describe('CSS Customization', () => {
   });
 
   test('CSS custom properties can be overridden', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Override the CSS custom property and verify it takes effect
     const result = await page.evaluate(() => {
@@ -1289,10 +1185,7 @@ test.describe('CSS Customization', () => {
   });
 
   test('Active class controls visibility of handles', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Test that CSS class toggles work (actual opacity depends on CSS loading)
     const result = await page.evaluate(() => {
@@ -1332,8 +1225,7 @@ test.describe('CSS Customization', () => {
 // Undo/Redo Tests
 test.describe('Undo/Redo', () => {
   test('Undo stack functions exist', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       return {
@@ -1353,8 +1245,7 @@ test.describe('Undo/Redo', () => {
   });
 
   test('Undo reverts drag position', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(async () => {
       const container = document.querySelector('.editable-container');
@@ -1402,8 +1293,7 @@ test.describe('Undo/Redo', () => {
   });
 
   test('Redo restores undone action', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(async () => {
       const container = document.querySelector('.editable-container');
@@ -1448,8 +1338,7 @@ test.describe('Undo/Redo', () => {
   });
 
   test('canUndo returns false when stack is empty', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       // Clear stacks by reloading page, so they should be empty
@@ -1465,8 +1354,7 @@ test.describe('Undo/Redo', () => {
   });
 
   test('canUndo returns true after action', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const canUndoBefore = canUndo();
@@ -1487,8 +1375,7 @@ test.describe('Undo/Redo', () => {
   });
 
   test('Undo clears redo stack on new action', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       // Make a change
@@ -1513,8 +1400,7 @@ test.describe('Undo/Redo', () => {
   });
 
   test('Ctrl+Z triggers undo', async ({ page }) => {
-    await page.goto(`file://${process.cwd()}/basic.html`);
-    await page.waitForSelector('.editable-container');
+    await setupPage(page, 'basic.html');
 
     // Setup: make a change
     await page.evaluate(() => {
@@ -1531,8 +1417,12 @@ test.describe('Undo/Redo', () => {
     // Press Ctrl+Z
     await page.keyboard.press('Control+z');
 
-    // Wait for undo to apply
-    await page.waitForTimeout(100);
+    // Wait for undo to apply - position should revert from 200
+    await page.waitForFunction(() => {
+      const container = document.querySelector('.editable-container');
+      const left = container.style.left ? parseFloat(container.style.left) : container.offsetLeft;
+      return left !== 200;
+    }, { timeout: 2000 });
 
     const result = await page.evaluate(() => {
       const container = document.querySelector('.editable-container');
@@ -1549,10 +1439,7 @@ test.describe('Undo/Redo', () => {
 // Rotation Tests
 test.describe('Rotation', () => {
   test('Rotate handle is created for elements', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const img = document.querySelector('img.editable');
@@ -1573,14 +1460,11 @@ test.describe('Rotation', () => {
   });
 
   test('Rotate handle exists for div elements too', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Navigate to slide with div.editable
     await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => document.querySelector('div.editable'));
 
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -1595,10 +1479,7 @@ test.describe('Rotation', () => {
   });
 
   test('Rotation state is included in EditableElement', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const img = document.querySelector('img.editable');
@@ -1614,10 +1495,7 @@ test.describe('Rotation', () => {
   });
 
   test('Rotation can be set via setState', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const img = document.querySelector('img.editable');
@@ -1638,10 +1516,7 @@ test.describe('Rotation', () => {
   });
 
   test('Rotation is serialized to QMD style attribute', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const dimensions = {
@@ -1659,10 +1534,7 @@ test.describe('Rotation', () => {
   });
 
   test('Rotation is not serialized when 0', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const dimensions = {
@@ -1680,10 +1552,7 @@ test.describe('Rotation', () => {
   });
 
   test('Ctrl+Arrow rotates element via keyboard', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Focus container
     await page.evaluate(() => {
@@ -1707,10 +1576,7 @@ test.describe('Rotation', () => {
   });
 
   test('Ctrl+Shift+Arrow rotates by larger step', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Focus container
     await page.evaluate(() => {
@@ -1734,10 +1600,7 @@ test.describe('Rotation', () => {
   });
 
   test('Rotation is included in undo/redo', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(async () => {
       const img = document.querySelector('img.editable');
@@ -1769,10 +1632,7 @@ test.describe('Rotation', () => {
   });
 
   test('CSS custom property for rotate color exists', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const result = await page.evaluate(() => {
       const root = document.documentElement;

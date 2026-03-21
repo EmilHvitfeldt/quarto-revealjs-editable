@@ -2,24 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-
-const TESTING_DIR = path.join(__dirname, '..');
-
-// Helper functions to interact with the Add submenu
-async function clickAddText(page) {
-  await page.click('.toolbar-add');
-  await page.click('.editable-toolbar-submenu-item.toolbar-add-text');
-}
-
-async function clickAddSlide(page) {
-  await page.click('.toolbar-add');
-  await page.click('.editable-toolbar-submenu-item.toolbar-add-slide');
-}
-
-async function clickAddArrow(page) {
-  await page.click('.toolbar-add');
-  await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
-}
+const { TESTING_DIR, setupPage, clickAddText, clickAddSlide, clickAddArrow, addSlidesWithMarkers, addTextWithMarker, addSlideViaJS } = require('./test-helpers');
 
 test.describe('Floating Toolbar', () => {
 
@@ -31,10 +14,7 @@ test.describe('Floating Toolbar', () => {
   });
 
   test('Toolbar is created and visible', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Check toolbar exists
     const toolbar = await page.locator('#editable-toolbar');
@@ -60,10 +40,7 @@ test.describe('Floating Toolbar', () => {
   });
 
   test('Toolbar has all expected buttons', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const buttons = await page.evaluate(() => {
       const toolbar = document.getElementById('editable-toolbar');
@@ -85,10 +62,7 @@ test.describe('Floating Toolbar', () => {
   });
 
   test('Add button has submenu with Text and Slide options', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Check submenu exists but is hidden
     const submenu = await page.locator('.editable-toolbar-submenu');
@@ -115,10 +89,7 @@ test.describe('Floating Toolbar', () => {
   });
 
   test('Toolbar is draggable', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get initial position
     const initialPos = await page.evaluate(() => {
@@ -145,10 +116,7 @@ test.describe('Floating Toolbar', () => {
   });
 
   test('Toolbar buttons have hover labels', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Check that buttons have icon and label spans
     const buttonStructure = await page.evaluate(() => {
@@ -170,10 +138,7 @@ test.describe('Floating Toolbar', () => {
 test.describe('Add Text Element', () => {
 
   test('addNewTextElement creates a new editable div', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Count initial editable elements
     const initialCount = await page.evaluate(() => {
@@ -212,14 +177,10 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element has resize handles', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Check it has handles
     const result = await page.evaluate(() => {
@@ -240,16 +201,11 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element is tracked in NewElementRegistry', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add two text elements
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await clickAddText(page);
-    await page.waitForTimeout(200);
 
     // Check registry
     const registryState = await page.evaluate(() => {
@@ -264,10 +220,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element edit mode works', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element and wait for Quill
     await clickAddText(page);
@@ -313,10 +266,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element can be edited when in edit mode', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element and wait for Quill
     await clickAddText(page);
@@ -364,14 +314,10 @@ test.describe('Add Text Element', () => {
   });
 
   test('Arrow keys do not move element when in edit mode', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Get initial position
     const initialPos = await page.evaluate(() => {
@@ -414,14 +360,10 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element is positioned in center of slide', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Check position is roughly centered
     const position = await page.evaluate(() => {
@@ -448,10 +390,7 @@ test.describe('Add Text Element', () => {
 
   // Tests for issue #44: New text elements should preserve formatting when saved
   test('New text element preserves bold formatting when saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element and wait for Quill
     await clickAddText(page);
@@ -478,10 +417,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element preserves italic formatting when saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddText(page);
     await page.waitForFunction(() => {
@@ -507,10 +443,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element preserves underline formatting when saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddText(page);
     await page.waitForFunction(() => {
@@ -535,10 +468,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element preserves strikethrough formatting when saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddText(page);
     await page.waitForFunction(() => {
@@ -563,10 +493,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element preserves text color when saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddText(page);
     await page.waitForFunction(() => {
@@ -591,10 +518,7 @@ test.describe('Add Text Element', () => {
   });
 
   test('New text element preserves combined formatting when saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddText(page);
     await page.waitForFunction(() => {
@@ -632,10 +556,7 @@ test.describe('Add Text Element', () => {
 test.describe('Add Slide', () => {
 
   test('addNewSlide creates a new slide section', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Count initial slides
     const initialSlides = await page.evaluate(() => {
@@ -644,7 +565,6 @@ test.describe('Add Slide', () => {
 
     // Click add slide button
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Verify new slide was created
     const result = await page.evaluate(() => {
@@ -663,14 +583,10 @@ test.describe('Add Slide', () => {
   });
 
   test('New slide is tracked in NewElementRegistry', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Check registry
     const registryState = await page.evaluate(() => {
@@ -685,17 +601,13 @@ test.describe('Add Slide', () => {
   });
 
   test('Reveal.js navigates to new slide', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get initial slide index
     const initialIndex = await page.evaluate(() => Reveal.getIndices().h);
 
     // Add a slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Check we navigated to the new slide
     const newIndex = await page.evaluate(() => Reveal.getIndices().h);
@@ -737,14 +649,10 @@ test.describe('New Elements in Save Flow', () => {
   }
 
   test('New text elements are excluded from original element processing', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Check that getOriginalEditableElements excludes new elements
     const counts = await page.evaluate(() => {
@@ -760,14 +668,10 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('getTransformedQmd includes new divs', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element and modify its content
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Modify the new element's text
     await page.evaluate(() => {
@@ -784,14 +688,10 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('getTransformedQmd includes new slides', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Get transformed QMD
     const transformed = await page.evaluate(() => getTransformedQmd());
@@ -801,18 +701,12 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Multiple new elements are saved correctly', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add multiple elements
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
 
     // Get transformed QMD
     const transformed = await page.evaluate(() => getTransformedQmd());
@@ -826,14 +720,10 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Save action includes new text element in downloaded file', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new text element and modify its content
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Modify the new element's text to something unique
     await page.evaluate(() => {
@@ -864,14 +754,10 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Save action includes new slide in downloaded file', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Set up download listener before clicking save
     const downloadPromise = page.waitForEvent('download');
@@ -895,10 +781,7 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('New slide is inserted at correct position in document', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get the heading of the current slide (slide 0)
     const currentSlideHeading = await page.evaluate(() => {
@@ -909,7 +792,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Navigate to slide 1
     await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 1);
 
     // Get heading of slide 1
     const slide1Heading = await page.evaluate(() => {
@@ -920,7 +803,6 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add a new slide after slide 1
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Set up download listener and save
     const downloadPromise = page.waitForEvent('download');
@@ -945,17 +827,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Add new slide then add text to it', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Get initial slide index
     const initialSlideIndex = await page.evaluate(() => Reveal.getIndices().h);
 
     // Add a new slide (this navigates to the new slide)
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Verify we're on the new slide
     const newSlideIndex = await page.evaluate(() => Reveal.getIndices().h);
@@ -963,7 +841,6 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add a text element to the new slide
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Modify the text content
     await page.evaluate(() => {
@@ -1014,20 +891,15 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Slides inserted at various positions maintain correct order', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Start on slide 0 (original)
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
 
     // Insert slide 1 after original
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SLIDE_1';
@@ -1035,33 +907,29 @@ test.describe('New Elements in Save Flow', () => {
 
     // Insert slide 2 after slide 1 (we're now on slide 1)
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SLIDE_2';
     });
 
     // Go back one slide (to slide 1), insert slide 3
+    const prevIdx = await page.evaluate(() => Reveal.getIndices().h);
     await page.evaluate(() => Reveal.prev());
-    await page.waitForTimeout(300);
+    await page.waitForFunction((expected) => Reveal.getIndices().h === expected, prevIdx - 1);
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SLIDE_3';
     });
 
     // Go back two slides (to original), insert slide 4
+    const prevIdx2 = await page.evaluate(() => Reveal.getIndices().h);
     await page.evaluate(() => { Reveal.prev(); Reveal.prev(); });
-    await page.waitForTimeout(300);
+    await page.waitForFunction((expected) => Reveal.getIndices().h === expected, prevIdx2 - 2);
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SLIDE_4';
@@ -1098,18 +966,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Add 3 slides with text on 2nd slide maintains correct order', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add first new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text marker to first new slide
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const newEl = document.querySelector('.editable-new');
       newEl.textContent = 'MARKER_SLIDE_1';
@@ -1117,11 +980,9 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add second new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text marker to second new slide
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       // Find the most recently added text element (on current slide)
       const currentSlide = document.querySelector('section.present');
@@ -1131,11 +992,9 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add third new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text marker to third new slide
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const currentSlide = document.querySelector('section.present');
       const newEl = currentSlide.querySelector('.editable-new');
@@ -1196,22 +1055,17 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Text on original slide after adding new slides', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Start on slide 0, add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Go back to original slide 0
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
 
     // Add text to original slide 0
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'TEXT_ON_ORIGINAL';
@@ -1239,19 +1093,14 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Multiple text elements on same new slide', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add 3 text elements to the new slide
     for (let i = 1; i <= 3; i++) {
       await clickAddText(page);
-      await page.waitForTimeout(300);
       await page.evaluate((idx) => {
         const currentSlide = document.querySelector('section.present');
         const newEls = currentSlide.querySelectorAll('.editable-new');
@@ -1293,18 +1142,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('New slides at different original positions', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add slide after original slide 0
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'AFTER_SLIDE_0';
@@ -1312,13 +1156,11 @@ test.describe('New Elements in Save Flow', () => {
 
     // Navigate to original slide 1 (now at index 2 due to new slide)
     await page.evaluate(() => Reveal.slide(2));
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => Reveal.getIndices().h === 2);
 
     // Add slide after original slide 1
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'AFTER_SLIDE_1';
@@ -1348,18 +1190,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Text positioning is preserved on new slides', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text and move it to specific position
     await clickAddText(page);
-    await page.waitForTimeout(300);
 
     // Set specific position via setState
     await page.evaluate(() => {
@@ -1402,18 +1239,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Empty text element content', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text and clear its content
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = '';
@@ -1450,18 +1282,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Special characters in new element text', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text with special characters
     await clickAddText(page);
-    await page.waitForTimeout(300);
     const specialText = 'Text with: colons, {braces}, **markdown**, and ::: fences';
     await page.evaluate((text) => {
       const el = document.querySelector('section.present .editable-new');
@@ -1493,16 +1320,11 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Deep nesting of new slides', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add slide A
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DEPTH_1';
@@ -1510,9 +1332,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add slide B after A
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DEPTH_2';
@@ -1520,9 +1340,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add slide C after B
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DEPTH_3';
@@ -1530,9 +1348,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add slide D after C
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DEPTH_4';
@@ -1567,18 +1383,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Mixed: new slides at multiple positions with text on each', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add slide with text after original slide 0
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'GROUP_A_TEXT';
@@ -1586,13 +1397,11 @@ test.describe('New Elements in Save Flow', () => {
 
     // Navigate to original slide 1 (now index 2)
     await page.evaluate(() => Reveal.slide(2));
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => Reveal.getIndices().h === 2);
 
     // Add slide with text after original slide 1
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'GROUP_B_TEXT';
@@ -1622,24 +1431,17 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Adding text to the last new slide in a chain', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add 3 slides in sequence, only add text to the last one
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text only to the third (last) new slide
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'LAST_IN_CHAIN';
@@ -1676,10 +1478,7 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Original element modifications alongside new elements', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Move an existing editable element
     await page.evaluate(() => {
@@ -1694,9 +1493,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add a new slide with text
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'NEW_ALONGSIDE_MODIFIED';
@@ -1738,20 +1535,15 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('New slide after the last original slide', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Navigate to the last slide (Slide 2, index 1)
     await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 1);
 
     // Add a new slide after the last slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'AFTER_LAST_SLIDE';
@@ -1779,18 +1571,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Font styling on new elements is saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text and change font size
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -1827,18 +1614,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Rotation on new elements is saved', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text and rotate it
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -1876,19 +1658,14 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Copy to clipboard includes new elements', async ({ page, context }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Add a new slide with text
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'CLIPBOARD_TEST';
@@ -1896,10 +1673,15 @@ test.describe('New Elements in Save Flow', () => {
 
     // Click copy button
     await page.click('.toolbar-copy');
-    await page.waitForTimeout(500);
 
-    // Read clipboard
+    // Wait for clipboard to have content and read it
     const clipboardContent = await page.evaluate(async () => {
+      // Poll clipboard until it has content (max 2 seconds)
+      for (let i = 0; i < 20; i++) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.length > 0) return text;
+        await new Promise(r => setTimeout(r, 100));
+      }
       return await navigator.clipboard.readText();
     });
 
@@ -1917,14 +1699,10 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('New slide with no content saves correctly', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide but don't add any text
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Save without adding text
     const downloadPromise = page.waitForEvent('download');
@@ -1951,16 +1729,11 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Interleaved operations save correctly', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // 1. Add slide A
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SLIDE_A_TEXT';
@@ -1968,9 +1741,8 @@ test.describe('New Elements in Save Flow', () => {
 
     // 2. Go back to original slide 0, add text there
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'ORIGINAL_SLIDE_TEXT';
@@ -1978,9 +1750,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // 3. Add another slide B (after original slide 0)
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SLIDE_B_TEXT';
@@ -1989,9 +1759,8 @@ test.describe('New Elements in Save Flow', () => {
     // 4. Go back to slide A, add more text
     // Slide A should now be at index 2 (original 0, B at 1, A at 2)
     await page.evaluate(() => Reveal.slide(2));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 2);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const currentSlide = document.querySelector('section.present');
       const newEls = currentSlide.querySelectorAll('.editable-new');
@@ -2029,18 +1798,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Unicode and emoji in new element text', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text with unicode and emoji
     await clickAddText(page);
-    await page.waitForTimeout(300);
     const unicodeText = '中文 日本語 émojis 🎉🚀 Ñoño';
     await page.evaluate((text) => {
       const el = document.querySelector('section.present .editable-new');
@@ -2072,18 +1836,13 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Multi-line text content in new elements', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text with multiple lines
     await clickAddText(page);
-    await page.waitForTimeout(300);
     const multilineText = 'Line one\nLine two\nLine three';
     await page.evaluate((text) => {
       const el = document.querySelector('section.present .editable-new');
@@ -2118,20 +1877,15 @@ test.describe('New Elements in Save Flow', () => {
 
   test('New slide between middle original slides', async ({ page }) => {
     // This test uses multiple-elements.qmd which has more slides
-    const htmlPath = path.join(TESTING_DIR, 'multiple-elements.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'multiple-elements.html');
 
     // Navigate to slide 1 (second slide, "Slide 2")
     await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 1);
 
     // Add a new slide after it
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'MIDDLE_INSERT';
@@ -2164,16 +1918,11 @@ test.describe('New Elements in Save Flow', () => {
   });
 
   test('Multiple text elements on different new slides', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add slide A with text
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DIFF_SLIDE_A';
@@ -2181,9 +1930,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add slide B with different text
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DIFF_SLIDE_B';
@@ -2191,9 +1938,7 @@ test.describe('New Elements in Save Flow', () => {
 
     // Add slide C with different text
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'DIFF_SLIDE_C';
@@ -2390,18 +2135,13 @@ test.describe('NewElementRegistry', () => {
 test.describe('Edge Cases - Content that could break parsing', () => {
 
   test('Text containing "## " at line start (fake heading)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     // Add text that looks like a heading
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.innerHTML = '## Fake Heading\nThis is not a real slide';
@@ -2437,16 +2177,11 @@ test.describe('Edge Cases - Content that could break parsing', () => {
   });
 
   test('Text containing standalone ":::" line', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.innerHTML = 'Before fence<br>:::<br>After fence';
@@ -2509,16 +2244,11 @@ test.describe('Edge Cases - Content that could break parsing', () => {
   });
 
   test('Text containing "{.absolute" (output format)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'Use {.absolute width=100px} for positioning';
@@ -2545,16 +2275,11 @@ test.describe('Edge Cases - Content that could break parsing', () => {
   });
 
   test('Text containing "::: {.editable" (input format)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'Example: ::: {.editable} content :::';
@@ -2581,16 +2306,11 @@ test.describe('Edge Cases - Content that could break parsing', () => {
   });
 
   test('Text with markdown code blocks (```)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     const codeContent = '```javascript\nconst x = 1;\n```';
     await page.evaluate((text) => {
       const el = document.querySelector('section.present .editable-new');
@@ -2619,16 +2339,11 @@ test.describe('Edge Cases - Content that could break parsing', () => {
   });
 
   test('Text starting with markdown list markers', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.innerHTML = '- Item 1<br>* Item 2<br>1. Item 3<br>> Quote';
@@ -2662,17 +2377,12 @@ test.describe('Edge Cases - Content that could break parsing', () => {
 test.describe('Edge Cases - Document structure', () => {
 
   test('Document with no ## headings (title slide only)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'title-only.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'title-only.html');
 
     // Add a new slide
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'TEXT_ON_NEW_SLIDE';
@@ -2704,16 +2414,11 @@ test.describe('Edge Cases - Document structure', () => {
 test.describe('Edge Cases - Numeric/positioning', () => {
 
   test('Negative rotation (-45deg)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -2746,16 +2451,11 @@ test.describe('Edge Cases - Numeric/positioning', () => {
   });
 
   test('Rotation exactly 360 degrees', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -2788,16 +2488,11 @@ test.describe('Edge Cases - Numeric/positioning', () => {
   });
 
   test('Rotation > 360 degrees (400deg)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -2826,16 +2521,11 @@ test.describe('Edge Cases - Numeric/positioning', () => {
   });
 
   test('Position at (0, 0)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -2864,16 +2554,11 @@ test.describe('Edge Cases - Numeric/positioning', () => {
   });
 
   test('New element at minimum size (50x50)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -2902,16 +2587,11 @@ test.describe('Edge Cases - Numeric/positioning', () => {
   });
 
   test('Decimal position/size values round correctly', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) {
@@ -2947,22 +2627,12 @@ test.describe('Edge Cases - Numeric/positioning', () => {
 test.describe('Edge Cases - Insertion order', () => {
 
   test('Add 5+ slides after same original, NO navigation between', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Stay on slide 0 and add 5 slides in sequence (no going back)
-    for (let i = 1; i <= 5; i++) {
-      await clickAddSlide(page);
-      await page.waitForTimeout(400);
-      await clickAddText(page);
-      await page.waitForTimeout(200);
-      await page.evaluate((num) => {
-        const el = document.querySelector('section.present .editable-new');
-        if (el) el.textContent = `CHAIN_${num}`;
-      }, i);
-    }
+    // Use fast JS-based helper
+    const markers = ['CHAIN_1', 'CHAIN_2', 'CHAIN_3', 'CHAIN_4', 'CHAIN_5'];
+    await addSlidesWithMarkers(page, markers);
 
     const downloadPromise = page.waitForEvent('download');
     await page.click('.toolbar-save');
@@ -2994,16 +2664,11 @@ test.describe('Edge Cases - Insertion order', () => {
   });
 
   test('Wide tree: 5 slides via repeated back-and-add (all roots)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add slide 1 from original
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'WIDE_1';
@@ -3011,11 +2676,9 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Go back to original, add slide 2
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'WIDE_2';
@@ -3023,11 +2686,9 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Go back to original, add slide 3
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'WIDE_3';
@@ -3035,11 +2696,9 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Go back to original, add slide 4
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'WIDE_4';
@@ -3047,11 +2706,9 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Go back to original, add slide 5
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'WIDE_5';
@@ -3088,23 +2745,12 @@ test.describe('Edge Cases - Insertion order', () => {
   });
 
   test('Deeper nesting (6+ levels)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add 6 slides in a chain: A -> B -> C -> D -> E -> F
+    // Use fast JS-based helper instead of clicking UI for each
     const markers = ['DEEP_A', 'DEEP_B', 'DEEP_C', 'DEEP_D', 'DEEP_E', 'DEEP_F'];
-    for (const marker of markers) {
-      await clickAddSlide(page);
-      await page.waitForTimeout(400);
-      await clickAddText(page);
-      await page.waitForTimeout(200);
-      await page.evaluate((m) => {
-        const el = document.querySelector('section.present .editable-new');
-        if (el) el.textContent = m;
-      }, marker);
-    }
+    await addSlidesWithMarkers(page, markers);
 
     const downloadPromise = page.waitForEvent('download');
     await page.click('.toolbar-save');
@@ -3132,18 +2778,13 @@ test.describe('Edge Cases - Insertion order', () => {
   });
 
   test('Alternating: add slide -> add text -> add slide -> add text pattern', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Pattern: slide1 -> text on original -> slide2 -> text on slide1 -> slide3
 
     // Add slide 1
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'TEXT_ON_SLIDE_1';
@@ -3151,9 +2792,8 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Go back to original, add text
     await page.evaluate(() => Reveal.slide(0));
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 0);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'TEXT_ON_ORIGINAL';
@@ -3161,9 +2801,7 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Add slide 2 (from original)
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'TEXT_ON_SLIDE_2';
@@ -3171,9 +2809,8 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Go to slide 1, add text
     await page.evaluate(() => Reveal.slide(2)); // slide 1 is now at index 2
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => Reveal.getIndices().h === 2);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const currentSlide = document.querySelector('section.present');
       const newEls = currentSlide.querySelectorAll('.editable-new');
@@ -3183,9 +2820,7 @@ test.describe('Edge Cases - Insertion order', () => {
 
     // Add slide 3 (from slide 1)
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'TEXT_ON_SLIDE_3';
@@ -3229,10 +2864,7 @@ test.describe('Edge Cases - Insertion order', () => {
 test.describe('Edge Cases - State management', () => {
 
   test('Save with NO new elements (only moved existing)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Just move an existing element, don't add any new ones
     await page.evaluate(() => {
@@ -3266,16 +2898,11 @@ test.describe('Edge Cases - State management', () => {
   });
 
   test('Multiple saves in same session', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // First save: add a slide
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'FIRST_SAVE_TEXT';
@@ -3297,9 +2924,7 @@ test.describe('Edge Cases - State management', () => {
 
     // Second save: add another slide
     await clickAddSlide(page);
-    await page.waitForTimeout(400);
     await clickAddText(page);
-    await page.waitForTimeout(200);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'SECOND_SAVE_TEXT';
@@ -3326,10 +2951,7 @@ test.describe('Edge Cases - State management', () => {
   });
 
   test('Registry state after clear and new additions', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     // Add element, clear, add again
     const result = await page.evaluate(() => {
@@ -3360,16 +2982,11 @@ test.describe('Edge Cases - State management', () => {
 test.describe('Edge Cases - Text content', () => {
 
   test('Text with only whitespace', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = '   \t\n   ';
@@ -3397,16 +3014,11 @@ test.describe('Edge Cases - Text content', () => {
   });
 
   test('Text with consecutive paragraph breaks (\\n\\n)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.innerHTML = 'Paragraph 1<br><br>Paragraph 2<br><br>Paragraph 3';
@@ -3437,16 +3049,11 @@ test.describe('Edge Cases - Text content', () => {
   });
 
   test('Very long text (1000+ chars)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     const longText = 'LONG_START_' + 'x'.repeat(1000) + '_LONG_END';
     await page.evaluate((text) => {
       const el = document.querySelector('section.present .editable-new');
@@ -3471,16 +3078,11 @@ test.describe('Edge Cases - Text content', () => {
   });
 
   test('Text with HTML tags (<div>, <script>)', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     // Set as text content to preserve literal angle brackets
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
@@ -3508,16 +3110,11 @@ test.describe('Edge Cases - Text content', () => {
 test.describe('Edge Cases - Output format', () => {
 
   test('Verify ::: block properly closed with closing :::', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'VERIFY_CLOSURE';
@@ -3559,16 +3156,11 @@ test.describe('Edge Cases - Output format', () => {
   });
 
   test('Verify proper blank lines around inserted content', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     await clickAddSlide(page);
-    await page.waitForTimeout(500);
 
     await clickAddText(page);
-    await page.waitForTimeout(300);
     await page.evaluate(() => {
       const el = document.querySelector('section.present .editable-new');
       if (el) el.textContent = 'BLANK_LINES_TEST';

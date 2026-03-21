@@ -2,55 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-
-const TESTING_DIR = path.join(__dirname, '..');
-
-// Helper to click Add Arrow in the toolbar submenu
-async function clickAddArrow(page) {
-  // First ensure normal toolbar buttons are visible by deselecting any arrow
-  const arrowControlsVisible = await page.evaluate(() => {
-    const arrowControls = document.querySelector('.arrow-style-controls');
-    return arrowControls && arrowControls.style.display !== 'none';
-  });
-  if (arrowControlsVisible) {
-    await page.click('body', { position: { x: 10, y: 10 } });
-    await page.waitForTimeout(100);
-  }
-
-  await page.click('.toolbar-add');
-  await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
-
-  // Handle potential arrow extension warning modal (auto-accept)
-  const modal = await page.$('.editable-modal-overlay');
-  if (modal) {
-    await page.click('.editable-modal-confirm');
-    await page.waitForTimeout(100);
-  }
-}
-
-// Helper to wait for Reveal.js to be ready
-async function waitForReveal(page) {
-  await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-  await page.waitForTimeout(500);
-}
-
-// Helper to get arrow data from the page
-async function getArrowData(page) {
-  return page.evaluate(() => {
-    const containers = document.querySelectorAll('.editable-arrow-container');
-    return Array.from(containers).map(container => ({
-      isNew: container.classList.contains('editable-new'),
-      isActive: container.classList.contains('active'),
-      hasCurveMode: container.classList.contains('curve-mode'),
-      hasStartHandle: !!container.querySelector('.editable-arrow-handle-start'),
-      hasEndHandle: !!container.querySelector('.editable-arrow-handle-end'),
-      hasControl1Handle: !!container.querySelector('.editable-arrow-handle-control1'),
-      hasControl2Handle: !!container.querySelector('.editable-arrow-handle-control2'),
-      hasSvg: !!container.querySelector('svg'),
-      hasPath: !!container.querySelector('svg path'),
-    }));
-  });
-}
+const { TESTING_DIR, setupPage, clickAddArrow, getArrowData, deselectArrow } = require('./test-helpers');
 
 test.describe('Arrow Feature', () => {
 
@@ -64,9 +16,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Add submenu includes Arrow option', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Click add button to open submenu
       await page.click('.toolbar-add');
@@ -86,9 +36,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Arrow Extension Detection', () => {
 
     test('No warning shown when arrow extension is detected (existing arrows on page)', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // arrows.html has an existing arrow shortcode rendered, so extension should be detected
       const hasArrowExtension = await page.evaluate(() => {
@@ -103,7 +51,6 @@ test.describe('Arrow Feature', () => {
 
       // Add an arrow
       await clickAddArrow(page);
-      await page.waitForTimeout(200);
 
       // No modal should have been shown (check it doesn't exist)
       const modalExists = await page.$('.editable-modal-overlay');
@@ -115,9 +62,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Warning modal shown when arrow extension not detected (basic.html)', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'basic.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'basic.html');
 
       // Simulate "extension not installed" by clearing the flag
       // (The Lua filter sets this flag when extension is installed in project)
@@ -128,9 +73,9 @@ test.describe('Arrow Feature', () => {
       // Try to add an arrow
       await page.click('.toolbar-add');
       await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
-      await page.waitForTimeout(200);
 
       // Modal should appear with install instructions
+      await page.waitForSelector('.editable-modal-overlay', { timeout: 2000 });
       const modal = await page.$('.editable-modal-overlay');
       expect(modal).not.toBeNull();
 
@@ -143,9 +88,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Warning only shown once per session', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'basic.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'basic.html');
 
       // Simulate "extension not installed" by clearing the flag
       await page.evaluate(() => {
@@ -155,7 +98,7 @@ test.describe('Arrow Feature', () => {
       // First arrow - should show modal
       await page.click('.toolbar-add');
       await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
-      await page.waitForTimeout(200);
+      await page.waitForSelector('.editable-modal-overlay', { timeout: 2000 });
 
       // Modal should appear
       let modal = await page.$('.editable-modal-overlay');
@@ -163,16 +106,16 @@ test.describe('Arrow Feature', () => {
 
       // Click continue
       await page.click('.editable-modal-confirm');
-      await page.waitForTimeout(200);
+      await page.waitForSelector('.editable-modal-overlay', { state: 'hidden', timeout: 2000 }).catch(() => {});
 
       // Deselect arrow first
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Second arrow - should NOT show modal again
       await page.click('.toolbar-add');
       await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
-      await page.waitForTimeout(200);
+      // Wait a moment for potential modal
+      await page.waitForTimeout(100);
 
       // No modal should appear this time
       modal = await page.$('.editable-modal-overlay');
@@ -180,9 +123,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrow not created if user cancels warning modal', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'basic.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'basic.html');
 
       // Simulate "extension not installed" by clearing the flag
       await page.evaluate(() => {
@@ -192,7 +133,7 @@ test.describe('Arrow Feature', () => {
       // Try to add an arrow
       await page.click('.toolbar-add');
       await page.click('.editable-toolbar-submenu-item.toolbar-add-arrow');
-      await page.waitForTimeout(200);
+      await page.waitForSelector('.editable-modal-overlay', { timeout: 2000 });
 
       // Modal should appear
       const modal = await page.$('.editable-modal-overlay');
@@ -200,7 +141,7 @@ test.describe('Arrow Feature', () => {
 
       // Click cancel
       await page.click('.editable-modal-cancel');
-      await page.waitForTimeout(200);
+      await page.waitForSelector('.editable-modal-overlay', { state: 'hidden', timeout: 2000 }).catch(() => {});
 
       // No arrow should have been created
       const arrows = await page.evaluate(() => {
@@ -215,9 +156,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Arrow Creation', () => {
 
     test('Adding arrow creates arrow container on current slide', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Count existing arrows
       const initialCount = await page.evaluate(() =>
@@ -235,9 +174,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('New arrow has all required elements', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -254,9 +191,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('New arrow is centered on slide', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -295,9 +230,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('New arrow starts as active (selected)', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -312,9 +245,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Arrow Selection', () => {
 
     test('Clicking outside arrow deselects it', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -323,8 +254,7 @@ test.describe('Arrow Feature', () => {
       expect(arrows.find(a => a.isNew).isActive).toBe(true);
 
       // Click outside
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Should be deselected
       arrows = await getArrowData(page);
@@ -332,15 +262,12 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Clicking arrow hit area selects it', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
       // Deselect by clicking outside
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Get arrow path position and click on it
       const pathCenter = await page.evaluate(() => {
@@ -379,15 +306,11 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Only one arrow can be active at a time', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Add two arrows
       await clickAddArrow(page);
-      await page.waitForTimeout(200);
       await clickAddArrow(page);
-      await page.waitForTimeout(200);
 
       // Count active arrows
       const activeCount = await page.evaluate(() =>
@@ -402,9 +325,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Handle Dragging', () => {
 
     test('Dragging start handle updates arrow position', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -437,9 +358,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dragging end handle updates arrow position', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -474,9 +393,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('SVG path updates when handles are dragged', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -508,9 +425,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Curve Mode', () => {
 
     test('Toggle button switches to curve mode', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -523,9 +438,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Control point handles appear in curve mode', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
@@ -540,9 +453,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Path becomes Bezier curve in curve mode', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -566,9 +477,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Toggling curve mode off resets to straight line', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -591,9 +500,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dragging control points changes curve shape', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
@@ -622,9 +529,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Guide lines connect endpoints to control points', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
@@ -650,9 +555,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Curve toggle button shows active state when curve mode is on', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -687,13 +590,10 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Curve toggle state syncs when selecting different arrows', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Create first arrow and enable curve mode
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await page.click('#arrow-style-curve');
       await page.waitForTimeout(100);
 
@@ -710,7 +610,6 @@ test.describe('Arrow Feature', () => {
 
       // Create second arrow (straight by default)
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Curve toggle should not be active for new arrow
       hasActiveClass = await page.evaluate(() => {
@@ -725,9 +624,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Title Slide Handling', () => {
 
     test('hasTitleSlide detects YAML title slide', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       const hasTitle = await page.evaluate(() => {
         // Reproduce the hasTitleSlide logic
@@ -742,9 +639,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrow added to content slide appears on that slide', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Navigate to slide 1 (first content slide after title)
       await page.evaluate(() => Reveal.slide(1));
@@ -767,9 +662,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Serialization', () => {
 
     test('Arrow has valid coordinates for serialization', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Navigate to a content slide
       await page.evaluate(() => Reveal.slide(1));
@@ -788,9 +681,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Curved arrow has Bezier path with control points', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await page.evaluate(() => Reveal.slide(1));
       await page.waitForTimeout(200);
@@ -815,9 +706,7 @@ test.describe('Arrow Feature', () => {
 
     test('Save button works when document has only arrows', async ({ page }) => {
       // Use a test file that has no .editable elements
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Add an arrow
       await page.evaluate(() => Reveal.slide(1));
@@ -842,15 +731,12 @@ test.describe('Arrow Feature', () => {
   test.describe('Active State UI', () => {
 
     test('Handles are hidden when arrow is not active', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
       // Deselect
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Check handles are hidden
       const startHandleVisible = await page.locator('.editable-arrow-handle-start').isVisible();
@@ -861,9 +747,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Handles are shown when arrow is active', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -880,9 +764,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Hit Area', () => {
 
     test('Hit area has wider stroke than visible path', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -906,9 +788,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Hit area path matches visible path', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -938,20 +818,15 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Multiple Arrows', () => {
 
     test('Multiple arrows on same slide are all created', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await page.evaluate(() => Reveal.slide(1));
       await page.waitForTimeout(200);
 
       // Add 3 arrows to the same slide
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       const arrowCount = await page.evaluate(() => {
         const currentSlide = document.querySelector('section.present');
@@ -962,14 +837,10 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Multiple arrows have unique marker IDs', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       const markerIds = await page.evaluate(() => {
         const markers = document.querySelectorAll('.editable-arrow-container.editable-new marker');
@@ -982,14 +853,10 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Selecting one arrow deselects others', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Click on the first arrow's path
       const firstArrowBox = await page.locator('.editable-arrow-container.editable-new').first().boundingBox();
@@ -1008,9 +875,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Title Slide', () => {
 
     test('Arrow can be added to title slide', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Make sure we're on title slide (index 0)
       await page.evaluate(() => Reveal.slide(0));
@@ -1031,9 +896,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Existing Arrows from Shortcodes', () => {
 
     test('Existing arrow from shortcode is rendered', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Go to slide with existing arrow (slide 1 in arrows.qmd)
       await page.evaluate(() => Reveal.slide(1));
@@ -1055,9 +918,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Coordinate Boundaries', () => {
 
     test('Arrow handle can be dragged to slide edge', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1085,9 +946,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrow with handles at same position (zero length)', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1120,9 +979,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrow handles very short distance between points', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1149,9 +1006,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Slide Navigation', () => {
 
     test('Arrow state preserved when navigating away and back', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await page.evaluate(() => Reveal.slide(1));
       await page.waitForTimeout(200);
@@ -1190,9 +1045,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Creating arrow then immediately switching slides', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await page.evaluate(() => Reveal.slide(1));
       await page.waitForTimeout(200);
@@ -1220,9 +1073,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Curve Mode Interactions', () => {
 
     test('Control points adjust when endpoints are moved in curve mode', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
@@ -1261,9 +1112,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Rapidly toggling curve mode does not break arrow', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1290,9 +1139,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Guide lines hidden after deselection in curve mode', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
@@ -1306,8 +1153,7 @@ test.describe('Arrow Feature', () => {
       expect(guideLinesVisible).toBe(true);
 
       // Deselect
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Guide lines should be hidden
       guideLinesVisible = await page.evaluate(() => {
@@ -1322,9 +1168,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Accessibility', () => {
 
     test('Arrow handles have correct ARIA attributes', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1346,9 +1190,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Handles are focusable via keyboard', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1368,9 +1210,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Z-Index and Overlapping', () => {
 
     test('Arrow container has correct z-index', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1383,9 +1223,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrow handles have higher z-index than container', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -1406,9 +1244,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Performance', () => {
 
     test('Creating many arrows does not crash', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Create 10 arrows
       for (let i = 0; i < 10; i++) {
@@ -1424,9 +1260,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Page remains responsive after many arrows', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Create several arrows
       for (let i = 0; i < 5; i++) {
@@ -1458,9 +1292,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Copy Functionality', () => {
 
     test('Copy to clipboard includes new arrows', async ({ page, context }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Grant clipboard permissions
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -1471,8 +1303,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Deselect arrow to show normal toolbar buttons
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Click copy button
       await page.click('.toolbar-copy');
@@ -1493,9 +1324,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Edge Cases - Hit Area on Curves', () => {
 
     test('Hit area follows curved path', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
@@ -1527,9 +1356,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Arrow Style Controls in Toolbar', () => {
 
     test('Toolbar shows arrow controls when arrow is selected', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Initially toolbar shows normal buttons
       let toolbarState = await page.evaluate(() => {
@@ -1544,7 +1371,6 @@ test.describe('Arrow Feature', () => {
 
       // Add arrow - it starts selected
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Arrow controls should be visible, normal buttons hidden
       toolbarState = await page.evaluate(() => {
@@ -1560,12 +1386,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Toolbar shows normal buttons when arrow is deselected', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Click outside to deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
@@ -1584,12 +1407,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Color picker changes arrow color', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change color to red
       await page.fill('#arrow-style-color', '#ff0000');
@@ -1605,12 +1425,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Width input changes arrow width', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change width to 5
       await page.fill('#arrow-style-width', '5');
@@ -1626,12 +1443,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Head style selector changes arrowhead shape', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Get initial marker path
       const initialMarkerPath = await page.evaluate(() => {
@@ -1654,12 +1468,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Head style "none" removes arrowhead', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change head to none
       await page.selectOption('#arrow-style-head', 'none');
@@ -1675,13 +1486,10 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrow controls sync values when selecting different arrows', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Create first arrow and change its color
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await page.fill('#arrow-style-color', '#ff0000');
       await page.waitForTimeout(50);
 
@@ -1691,7 +1499,6 @@ test.describe('Arrow Feature', () => {
 
       // Create second arrow (default color)
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Controls should show default color for new arrow
       const colorValue = await page.$eval('#arrow-style-color', el => el.value);
@@ -1699,12 +1506,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dash selector changes arrow dash pattern', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change dash to dashed
       await page.selectOption('#arrow-style-dash', 'dashed');
@@ -1721,12 +1525,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Opacity slider changes arrow opacity', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change opacity to 0.5
       await page.fill('#arrow-style-opacity', '0.5');
@@ -1742,12 +1543,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Line style selector creates multiple lines', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change line to double
       await page.selectOption('#arrow-style-line', 'double');
@@ -1762,12 +1560,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Style changes persist after deselect and reselect', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change styles
       await page.fill('#arrow-style-color', '#00ff00');
@@ -1797,12 +1592,9 @@ test.describe('Arrow Feature', () => {
   test.describe('Color Presets', () => {
 
     test('Color presets row exists with swatches', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       const presetsInfo = await page.evaluate(() => {
         const presetsRow = document.querySelector('.arrow-color-presets');
@@ -1818,12 +1610,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Black is the first color swatch', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       const firstSwatchColor = await page.evaluate(() => {
         const firstSwatch = document.querySelector('.arrow-color-swatch');
@@ -1845,12 +1634,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Clicking a swatch changes arrow color', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Get second swatch (first non-black color)
       const secondSwatchColor = await page.evaluate(() => {
@@ -1888,12 +1674,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Clicked swatch shows selected state', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Initially first swatch (black) should be selected since arrow is black by default
       let selectedCount = await page.evaluate(() => {
@@ -1922,12 +1705,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Using custom color picker clears swatch selection', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Initially a swatch should be selected
       let selectedCount = await page.evaluate(() => {
@@ -1947,20 +1727,16 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Selecting arrow highlights matching swatch', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Click second swatch to set a non-black color
       await page.click('.arrow-color-swatch:nth-child(2)');
       await page.waitForTimeout(50);
 
       // Deselect arrow
-      await page.click('body', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
+      await deselectArrow(page);
 
       // Reselect arrow by clicking on it
       await page.evaluate(() => {
@@ -1983,12 +1759,9 @@ test.describe('Arrow Feature', () => {
   test.describe('Dash Style', () => {
 
     test('Switching between dash styles updates stroke-dasharray', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Initially solid (no dasharray)
       let dashArray = await page.evaluate(() => {
@@ -2034,12 +1807,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dash pattern scales with stroke width', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Set dashed with width 2
       await page.selectOption('#arrow-style-dash', 'dashed');
@@ -2067,12 +1837,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dash persists after deselect and reselect', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.selectOption('#arrow-style-dash', 'dotted');
       await page.waitForTimeout(50);
@@ -2097,12 +1864,9 @@ test.describe('Arrow Feature', () => {
   test.describe('Line Style', () => {
 
     test('Triple line creates 2 extra paths and shows center line', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.selectOption('#arrow-style-line', 'triple');
       await page.waitForTimeout(50);
@@ -2120,12 +1884,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Switching back to single removes extra lines', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Set to double
       await page.selectOption('#arrow-style-line', 'double');
@@ -2149,12 +1910,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Extra lines follow arrow when handles dragged', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.selectOption('#arrow-style-line', 'double');
       await page.waitForTimeout(50);
@@ -2187,12 +1945,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Extra lines have same color and dash as main', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Set color, dash, and line style
       await page.fill('#arrow-style-color', '#ff0000');
@@ -2217,12 +1972,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Arrowhead visible for double line', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.selectOption('#arrow-style-line', 'double');
       await page.waitForTimeout(50);
@@ -2238,12 +1990,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Curved arrows work with double lines', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Enable curve mode
       await page.click('#arrow-style-curve');
@@ -2271,12 +2020,9 @@ test.describe('Arrow Feature', () => {
   test.describe('Opacity', () => {
 
     test('Opacity 0 makes arrow nearly invisible', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.fill('#arrow-style-opacity', '0');
       await page.waitForTimeout(50);
@@ -2291,12 +2037,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Opacity applies to extra lines in double/triple mode', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.fill('#arrow-style-opacity', '0.5');
       await page.selectOption('#arrow-style-line', 'double');
@@ -2315,12 +2058,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Opacity persists after deselect and reselect', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       await page.fill('#arrow-style-opacity', '0.3');
       await page.waitForTimeout(50);
@@ -2345,12 +2085,9 @@ test.describe('Arrow Feature', () => {
   test.describe('Drag Arrow by Body', () => {
 
     test('Arrow can be dragged by its body', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Get initial positions
       const initialPos = await page.evaluate(() => {
@@ -2386,12 +2123,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dragging arrow body moves all points together', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Get initial start and end positions
       const initialPositions = await page.evaluate(() => {
@@ -2445,12 +2179,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dragging curved arrow body moves control points too', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Enable curve mode
       await page.click('#arrow-style-curve');
@@ -2527,12 +2258,9 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Hit area has grab cursor', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       const cursor = await page.evaluate(() => {
         const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
@@ -2547,12 +2275,9 @@ test.describe('Arrow Feature', () => {
   test.describe('Style Interactions', () => {
 
     test('Changing multiple styles at once applies all correctly', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Change multiple styles
       await page.fill('#arrow-style-color', '#0000ff');
@@ -2580,13 +2305,10 @@ test.describe('Arrow Feature', () => {
     });
 
     test('New arrow has default style values', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Create first arrow and change styles
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await page.fill('#arrow-style-color', '#ff0000');
       await page.selectOption('#arrow-style-dash', 'dashed');
       await page.waitForTimeout(50);
@@ -2597,7 +2319,6 @@ test.describe('Arrow Feature', () => {
 
       // Create second arrow
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       // Controls should show default values for new arrow
       const values = await page.evaluate(() => {
@@ -2620,9 +2341,7 @@ test.describe('Arrow Feature', () => {
   test.describe('Event Listener Cleanup', () => {
 
     test('Arrow handles have AbortControllers attached to DOM elements', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -2653,9 +2372,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('AbortController signals are not aborted initially', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 
@@ -2679,15 +2396,11 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Multiple arrows have separate AbortControllers', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       // Create two arrows
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
       await clickAddArrow(page);
-      await page.waitForTimeout(100);
 
       const controllersUnique = await page.evaluate(() => {
         const containers = document.querySelectorAll('.editable-arrow-container.editable-new');
@@ -2706,9 +2419,7 @@ test.describe('Arrow Feature', () => {
     });
 
     test('Dragging still works with AbortController setup', async ({ page }) => {
-      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
-      await page.goto(`file://${htmlPath}`);
-      await waitForReveal(page);
+      await setupPage(page, 'arrows.html');
 
       await clickAddArrow(page);
 

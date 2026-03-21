@@ -2,9 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-
-// Path to test fixtures
-const TESTING_DIR = path.join(__dirname, '..');
+const { TESTING_DIR, setupPage } = require('./test-helpers');
 
 test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
 
@@ -17,10 +15,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Bold formatting saves as **text** in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     // Apply bold formatting and get full saved output
     const savedContent = await page.evaluate(() => {
@@ -44,10 +39,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Italic formatting saves as *text* in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -69,10 +61,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Underline formatting saves as [text]{.underline} in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -92,10 +81,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Strikethrough formatting saves as ~~text~~ in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -115,10 +101,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Text color saves with style attribute in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -139,10 +122,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Background color saves with style attribute in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -170,9 +150,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'brand-colors.html');
 
     const savedContent = await page.evaluate(() => {
       // Verify brand colors are loaded
@@ -207,9 +185,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'brand-colors.html');
 
     const savedContent = await page.evaluate(() => {
       if (!window._quarto_brand_color_names) {
@@ -243,9 +219,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
       return;
     }
 
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'brand-colors.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -269,10 +243,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Center alignment saves as fenced div in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -294,10 +265,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Right alignment saves as fenced div in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -319,10 +287,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
   });
 
   test('Multiple formats on same text in full pipeline', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -348,10 +313,7 @@ test.describe('Quill Editor Formatting - Full Save Pipeline', () => {
 test.describe('Content Preservation and Alignment Regression Tests', () => {
 
   test('Unedited div preserves original content but gets absolute positioning', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     // Don't edit anything - just save
     const savedContent = await page.evaluate(() => {
@@ -368,10 +330,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Alignment creates nested fences with outer absolute positioning', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -396,10 +355,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Mixed edited and unedited divs both get absolute positioning', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       // Get all editable divs
@@ -431,10 +387,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Nested fences use correct colon count when alignment creates inner fences', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -456,10 +409,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Multiple paragraphs with different alignments each get own fenced div', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -489,10 +439,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Alignment combined with bold formatting', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -520,10 +467,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Color combined with alignment', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -551,10 +495,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Code formatting preserved as backticks', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -576,10 +517,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Links converted to markdown syntax', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -600,10 +538,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Line breaks preserved as newlines', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -624,10 +559,7 @@ test.describe('Content Preservation and Alignment Regression Tests', () => {
   });
 
   test('Deeply nested formatting preserved correctly', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -662,10 +594,7 @@ test.describe('Source Preservation - No Unnecessary Modifications', () => {
 
   test('Unedited div content is preserved exactly (not normalized)', async ({ page }) => {
     // This test verifies we don't modify content that wasn't edited
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const result = await page.evaluate(() => {
       // Get original source content for first div
@@ -694,10 +623,7 @@ test.describe('Source Preservation - No Unnecessary Modifications', () => {
   });
 
   test('Content containing literal {.absolute should not confuse replacement', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -718,10 +644,7 @@ test.describe('Source Preservation - No Unnecessary Modifications', () => {
   });
 
   test('Content containing literal ::: should not break fencing', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'basic.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'basic.html');
 
     const savedContent = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -743,10 +666,7 @@ test.describe('Source Preservation - No Unnecessary Modifications', () => {
   });
 
   test('Only edited divs have content changed, others stay exactly as source', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const result = await page.evaluate(() => {
       const divs = document.querySelectorAll('div.editable');
@@ -786,10 +706,7 @@ test.describe('Source Preservation - No Unnecessary Modifications', () => {
   });
 
   test('Clicking in editor without typing does not mark as dirty', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -816,10 +733,7 @@ test.describe('Source Preservation - No Unnecessary Modifications', () => {
   });
 
   test('Formatting without selection does not create spurious changes', async ({ page }) => {
-    const htmlPath = path.join(TESTING_DIR, 'quill-editor.html');
-    await page.goto(`file://${htmlPath}`);
-    await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
-    await page.waitForTimeout(500);
+    await setupPage(page, 'quill-editor.html');
 
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
