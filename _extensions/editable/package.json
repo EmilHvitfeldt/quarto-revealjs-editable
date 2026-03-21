@@ -7,9 +7,12 @@
   "scripts": {
     "build": "esbuild src/main.js --bundle --outfile=editable.js --format=iife --global-name=EditableModule",
     "build:minify": "esbuild src/main.js --bundle --outfile=editable.js --format=iife --global-name=EditableModule --minify",
-    "watch": "esbuild src/main.js --bundle --outfile=editable.js --format=iife --global-name=EditableModule --watch"
+    "watch": "esbuild src/main.js --bundle --outfile=editable.js --format=iife --global-name=EditableModule --watch",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "devDependencies": {
-    "esbuild": "^0.20.0"
+    "esbuild": "^0.20.0",
+    "vitest": "^1.0.0"
   }
 }
