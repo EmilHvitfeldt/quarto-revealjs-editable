@@ -9,11 +9,34 @@ This document provides checklists and guidelines for contributing to the quarto-
 git clone https://github.com/EmilHvitfeldt/quarto-revealjs-editable.git
 cd quarto-revealjs-editable
 
+# Install extension build dependencies
+cd _extensions/editable
+npm install
+
 # Install test dependencies
-cd testing
+cd ../../testing
 npm install
 npx playwright install chromium
 ```
+
+## Building the JavaScript
+
+The JavaScript source code is in `_extensions/editable/src/` and is bundled into `editable.js` using esbuild.
+
+```bash
+cd _extensions/editable
+
+# Build once
+npm run build
+
+# Build and watch for changes (development)
+npm run watch
+
+# Build minified (production)
+npm run build:minify
+```
+
+**Important:** After making JavaScript changes in `src/`, you must run `npm run build` before testing.
 
 ## Running Tests
 
@@ -26,10 +49,15 @@ cd testing
 npm run test:e2e
 ```
 
-**Important:** After making JavaScript changes, rebuild the test HTML before running E2E tests:
+**Important:** After making JavaScript changes:
 
 ```bash
-cd testing
+# 1. Rebuild the bundled JS
+cd _extensions/editable
+npm run build
+
+# 2. Rebuild the test HTML
+cd ../../testing
 quarto render basic.qmd
 ```
 
@@ -37,7 +65,7 @@ quarto render basic.qmd
 
 ## Adding a New Feature Checklist
 
-### 1. JavaScript Implementation (`_extensions/editable/editable.js`)
+### 1. JavaScript Implementation (`_extensions/editable/src/`)
 
 - [ ] **State management** - If the feature needs persistent state:
   - [ ] Add property to `EditableElement.state` (with default value)

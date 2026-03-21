@@ -10,3 +10,6 @@ docs/_site/
 docs/_extensions
 docs/image.png
 docs/demo-text.mp4
+
+# Extension build artifacts
+_extensions/editable/node_modules/
