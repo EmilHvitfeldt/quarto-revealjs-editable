@@ -49,6 +49,30 @@ local function has_editable_elements(doc)
   return found
 end
 
+-- Check if quarto-arrows extension is installed
+local function has_arrow_extension()
+  local input_file = quarto.doc.input_file
+  local input_dir = input_file:match("(.*/)")
+  if not input_dir then input_dir = "./" end
+
+  local arrow_paths = {
+    input_dir .. "_extensions/arrow/_extension.yml",
+    input_dir .. "_extensions/EmilHvitfeldt/arrow/_extension.yml",
+    "./_extensions/arrow/_extension.yml",
+    "./_extensions/EmilHvitfeldt/arrow/_extension.yml"
+  }
+
+  for _, path in ipairs(arrow_paths) do
+    local f = io.open(path, "r")
+    if f then
+      f:close()
+      return true
+    end
+  end
+
+  return false
+end
+
 -- Extract brand palette colors by reading _brand.yml directly
 -- Returns two values: array of hex colors, and table mapping hex -> name
 local function get_brand_palette_colors()
@@ -158,6 +182,11 @@ function Pandoc(doc)
       script = script .. "'" .. hex .. "':'" .. name .. "'"
     end
     script = script .. "};\n"
+  end
+
+  -- Inject arrow extension detection flag
+  if has_arrow_extension() then
+    script = script .. "window._quarto_arrow_extension = true;\n"
   end
 
   script = script .. "</script>"

@@ -50,7 +50,10 @@ let arrowExtensionWarningShown = false;
  * 2. Check for arrow-specific CSS or scripts
  */
 function hasArrowExtension() {
-  // Check for any SVGs with marker definitions (arrow extension output)
+  // Check for flag injected by Lua filter (detects extension installation)
+  if (window._quarto_arrow_extension) return true;
+
+  // Fallback: Check for any SVGs with marker definitions (arrow extension output)
   const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
   if (arrowSvgs.length > 0) return true;
 
