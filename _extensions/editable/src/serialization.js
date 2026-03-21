@@ -12,6 +12,23 @@ import { NewElementRegistry } from './registries.js';
 import { quillInstances } from './quill.js';
 
 /**
+ * Find all level-2 heading line indices (slide boundaries) in QMD lines.
+ * @param {string[]} lines - Array of QMD lines
+ * @returns {number[]} Array of line indices where slide headings start
+ */
+function findSlideHeadingLines(lines) {
+  const headings = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const prevLine = i > 0 ? lines[i - 1].trim() : "";
+    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+      headings.push(i);
+    }
+  }
+  return headings;
+}
+
+/**
  * Property serializers for converting state values to QMD attribute strings.
  * Each serializer specifies its type ("attr" for attributes, "style" for CSS)
  * and a serialize function that returns the formatted string.
@@ -310,17 +327,7 @@ export function insertNewSlides(text) {
   }
 
   const lines = text.split("\n");
-
-  // Find all level-2 heading positions (slide boundaries)
-  const slideHeadingLines = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    const prevLine = i > 0 ? lines[i - 1].trim() : "";
-
-    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-      slideHeadingLines.push(i);
-    }
-  }
+  const slideHeadingLines = findSlideHeadingLines(lines);
 
   // Build a map of new slides to their associated divs
   const divsByNewSlide = new Map();
@@ -482,16 +489,7 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
   }
 
   const lines = text.split("\n");
-
-  const slideHeadingLines = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    const prevLine = i > 0 ? lines[i - 1].trim() : "";
-
-    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-      slideHeadingLines.push(i);
-    }
-  }
+  const slideHeadingLines = findSlideHeadingLines(lines);
 
   const divsBySlide = new Map();
   for (const newDiv of divsOnOriginalSlides) {
@@ -564,16 +562,7 @@ export function insertNewArrows(text, slideLinePositions = new Map()) {
   }
 
   const lines = text.split("\n");
-
-  const slideHeadingLines = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    const prevLine = i > 0 ? lines[i - 1].trim() : "";
-
-    if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-      slideHeadingLines.push(i);
-    }
-  }
+  const slideHeadingLines = findSlideHeadingLines(lines);
 
   const arrowsBySlide = new Map();
   for (const arrow of arrowsOnOriginalSlides) {

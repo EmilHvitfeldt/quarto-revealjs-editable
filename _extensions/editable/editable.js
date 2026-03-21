@@ -1347,6 +1347,15 @@ var EditableModule = (() => {
     return confirmed;
   }
   var activeArrow = null;
+  var arrowControlRefs = {
+    colorPicker: null,
+    widthInput: null,
+    headSelect: null,
+    dashSelect: null,
+    lineSelect: null,
+    opacityInput: null,
+    colorPresetsRow: null
+  };
   var ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
   function setActiveArrow(arrowData) {
     if (activeArrow && activeArrow !== arrowData) {
@@ -1499,6 +1508,13 @@ var EditableModule = (() => {
       }
     });
     container.appendChild(curveToggle);
+    arrowControlRefs.colorPicker = colorPicker;
+    arrowControlRefs.widthInput = widthInput;
+    arrowControlRefs.headSelect = headSelect;
+    arrowControlRefs.dashSelect = dashSelect;
+    arrowControlRefs.lineSelect = lineSelect;
+    arrowControlRefs.opacityInput = opacityInput;
+    arrowControlRefs.colorPresetsRow = colorPresetsRow;
     return container;
   }
   function updateArrowStylePanel(arrowData) {
@@ -1512,19 +1528,15 @@ var EditableModule = (() => {
       toolbar.appendChild(arrowControls);
     }
     if (arrowData) {
-      const colorPicker = arrowControls.querySelector("#arrow-style-color");
-      const widthInput = arrowControls.querySelector("#arrow-style-width");
-      const headSelect = arrowControls.querySelector("#arrow-style-head");
-      const dashSelect = arrowControls.querySelector("#arrow-style-dash");
-      const lineSelect = arrowControls.querySelector("#arrow-style-line");
-      const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
+      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow } = arrowControlRefs;
       if (colorPicker) {
         const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
         colorPicker.value = colorValue;
-        const swatches = arrowControls.querySelectorAll(".arrow-color-swatch");
-        swatches.forEach((s) => {
-          s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
-        });
+        if (colorPresetsRow) {
+          colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => {
+            s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+          });
+        }
       }
       if (widthInput) {
         widthInput.value = arrowData.width.toString();
@@ -2121,6 +2133,17 @@ var EditableModule = (() => {
   }
 
   // src/serialization.js
+  function findSlideHeadingLines(lines) {
+    const headings = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const prevLine = i > 0 ? lines[i - 1].trim() : "";
+      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
+        headings.push(i);
+      }
+    }
+    return headings;
+  }
   var PropertySerializers = {
     // Core position/size properties (go in attribute list)
     width: {
@@ -2319,14 +2342,7 @@ ${innerFence}`;
       return { text, slideLinePositions: /* @__PURE__ */ new Map() };
     }
     const lines = text.split("\n");
-    const slideHeadingLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-        slideHeadingLines.push(i);
-      }
-    }
+    const slideHeadingLines = findSlideHeadingLines(lines);
     const divsByNewSlide = /* @__PURE__ */ new Map();
     for (const divInfo of NewElementRegistry.newDivs) {
       if (divInfo.newSlideRef) {
@@ -2450,14 +2466,7 @@ ${innerFence}`;
       return text;
     }
     const lines = text.split("\n");
-    const slideHeadingLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-        slideHeadingLines.push(i);
-      }
-    }
+    const slideHeadingLines = findSlideHeadingLines(lines);
     const divsBySlide = /* @__PURE__ */ new Map();
     for (const newDiv of divsOnOriginalSlides) {
       const slideIdx = newDiv.slideIndex;
@@ -2510,14 +2519,7 @@ ${innerFence}`;
       return text;
     }
     const lines = text.split("\n");
-    const slideHeadingLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      if (line.startsWith("## ") && (i === 0 || prevLine === "")) {
-        slideHeadingLines.push(i);
-      }
-    }
+    const slideHeadingLines = findSlideHeadingLines(lines);
     const arrowsBySlide = /* @__PURE__ */ new Map();
     for (const arrow of arrowsOnOriginalSlides) {
       const slideIdx = arrow.slideIndex;

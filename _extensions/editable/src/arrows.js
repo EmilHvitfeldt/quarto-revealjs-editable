@@ -131,6 +131,17 @@ export async function showArrowExtensionWarning() {
 /** @type {Object|null} Currently selected arrow data */
 let activeArrow = null;
 
+/** @type {Object} Cached references to arrow control DOM elements */
+const arrowControlRefs = {
+  colorPicker: null,
+  widthInput: null,
+  headSelect: null,
+  dashSelect: null,
+  lineSelect: null,
+  opacityInput: null,
+  colorPresetsRow: null,
+};
+
 /**
  * Available arrow head styles for the quarto-arrows extension.
  * @type {string[]}
@@ -350,6 +361,15 @@ export function createArrowStyleControls() {
   });
   container.appendChild(curveToggle);
 
+  // Cache references for efficient updates
+  arrowControlRefs.colorPicker = colorPicker;
+  arrowControlRefs.widthInput = widthInput;
+  arrowControlRefs.headSelect = headSelect;
+  arrowControlRefs.dashSelect = dashSelect;
+  arrowControlRefs.lineSelect = lineSelect;
+  arrowControlRefs.opacityInput = opacityInput;
+  arrowControlRefs.colorPresetsRow = colorPresetsRow;
+
   return container;
 }
 
@@ -371,21 +391,17 @@ export function updateArrowStylePanel(arrowData) {
   }
 
   if (arrowData) {
-    const colorPicker = arrowControls.querySelector("#arrow-style-color");
-    const widthInput = arrowControls.querySelector("#arrow-style-width");
-    const headSelect = arrowControls.querySelector("#arrow-style-head");
-    const dashSelect = arrowControls.querySelector("#arrow-style-dash");
-    const lineSelect = arrowControls.querySelector("#arrow-style-line");
-    const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
+    const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow } = arrowControlRefs;
 
     if (colorPicker) {
       const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
       colorPicker.value = colorValue;
-      const swatches = arrowControls.querySelectorAll(".arrow-color-swatch");
-      swatches.forEach(s => {
-        s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
-          rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
-      });
+      if (colorPresetsRow) {
+        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => {
+          s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
+            rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+        });
+      }
     }
     if (widthInput) {
       widthInput.value = arrowData.width.toString();
