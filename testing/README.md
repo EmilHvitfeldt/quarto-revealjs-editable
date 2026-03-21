@@ -73,7 +73,7 @@ npm run test:e2e
 
 ### E2E Test Files
 
-**Total: 139 E2E tests across 3 spec files**
+**Total: 227 E2E tests across 5 spec files**
 
 **`e2e/save-edits.spec.js`** - Core save functionality (8 tests):
 
@@ -247,6 +247,40 @@ npm run test:e2e
 | Multi-line text preserved        | Newlines in content preserved                    |
 | New slide between middle slides  | Correct position in multi-slide document         |
 | Multiple text on different slides| Each text on correct corresponding slide         |
+
+**`e2e/arrows.spec.js`** - Arrow Feature (88 tests):
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| Toolbar Integration | 1 | Add submenu includes Arrow option |
+| Arrow Creation | 4 | Creates container, has elements, centered, starts active |
+| Arrow Selection | 3 | Click outside deselects, click hit area selects, only one active |
+| Handle Dragging | 3 | Start/end handles draggable, SVG path updates |
+| Curve Mode | 8 | Toggle works, control handles appear, Bezier path, guide lines, active state |
+| Title Slide Handling | 2 | Title slide detection, arrows on content slides |
+| Serialization | 2 | Valid coordinates, Bezier path format |
+| Save Without Editable | 1 | Save works with only arrows |
+| Active State UI | 2 | Handles hidden/shown based on selection |
+| Hit Area | 2 | Wider stroke for easy selection, matches visible path |
+| Edge Cases - Multiple Arrows | 4 | Multiple arrows, unique IDs, selection |
+| Edge Cases - Title Slide | 1 | Arrow on title slide |
+| Edge Cases - Existing Arrows | 1 | Shortcode arrows rendered |
+| Edge Cases - Coordinate Boundaries | 3 | Edge positions, zero length, short distance |
+| Edge Cases - Slide Navigation | 2 | State preserved, immediate navigation |
+| Edge Cases - Curve Mode | 3 | Control points adjust, rapid toggle, guide lines hidden |
+| Edge Cases - Accessibility | 2 | ARIA attributes, keyboard focus |
+| Edge Cases - Z-Index | 2 | Container and handle z-index |
+| Edge Cases - Performance | 2 | Many arrows, responsiveness |
+| Edge Cases - Copy | 1 | Clipboard includes arrows |
+| Edge Cases - Hit Area Curves | 1 | Hit area follows curved path |
+| Arrow Style Controls | 8 | Toolbar mode switching, color/width/head/dash/opacity/line controls |
+| Color Presets | 6 | Presets exist, black first, swatch click, selection state, custom clears |
+| Dash Style | 3 | Stroke-dasharray updates, scales with width, persists |
+| Line Style | 5 | Double/triple lines, extra paths follow arrow, color/dash match |
+| Opacity | 3 | Opacity 0, applies to extra lines, persists |
+| Drag Arrow by Body | 4 | Body drag moves all points, curved arrows, grab cursor |
+| Style Interactions | 2 | Multiple styles at once, default values for new arrows |
+| Event Listener Cleanup | 4 | AbortControllers attached, not aborted, separate per arrow, drag works |
 
 ---
 

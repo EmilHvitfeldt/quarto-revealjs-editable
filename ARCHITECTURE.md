@@ -466,12 +466,17 @@ function getQmdHeadingIndex(revealIndex) {
 **Active selection:**
 Only one arrow can be active (selected) at a time. Active arrows show:
 - Start/end point handles (blue/green circles)
-- Curve toggle button
 - Control point handles and guide lines (when in curve mode)
+- Arrow styling controls in the main toolbar (replaces normal toolbar buttons)
+
+The toolbar shows arrow-specific controls when an arrow is selected:
+- Color presets (brand palette or defaults) + custom color picker
+- Width, head style, dash style, line style, opacity
+- Curve mode toggle button
 
 Inactive arrows hide all controls for a cleaner UI. Selection is managed via:
 - Click on arrow's hit area → selects arrow
-- Click outside all arrows → deselects active arrow
+- Click outside all arrows and toolbar → deselects active arrow
 
 **Hit area:**
 A transparent 20px-wide stroke path sits behind the visible 2px arrow path, making selection much easier. Both paths share the same `d` attribute.

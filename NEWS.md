@@ -14,6 +14,10 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - Arrows serialized as `{{< arrow from="x,y" to="x,y" ... >}}` shortcodes
   - 20px invisible hit area for easier arrow selection
   - Active selection UI - only selected arrow shows handles/controls
+  - Arrow styling controls integrated into main toolbar (color, width, head style, dash, line style, opacity)
+  - Color presets using brand palette (or defaults) with custom color picker
+  - Brand colors saved as `{{< brand color name >}}` shortcodes in arrow color attribute
+  - Drag arrows by their body to move entire arrow while preserving shape
 
 ---
 
