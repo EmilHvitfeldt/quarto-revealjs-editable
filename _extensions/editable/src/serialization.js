@@ -647,7 +647,7 @@ export function updateTextDivs(text) {
  * @param {HTMLElement} div - The div element
  * @returns {string|null} Quarto fenced div or null if unmodified
  */
-function htmlToQuarto(div) {
+export function htmlToQuarto(div) {
   const quillData = quillInstances.get(div);
   if (quillData && !quillData.isDirty) {
     return null;

@@ -258,6 +258,12 @@ var EditableModule = (() => {
     restoreState(redoState);
     return true;
   }
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+  function canRedo() {
+    return redoStack.length > 0;
+  }
   function setupUndoRedoKeyboard() {
     document.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
@@ -3065,4 +3071,25 @@ ${fence}`;
   };
   window.getTransformedQmd = getTransformedQmd;
   window.quillInstances = quillInstances;
+  window.editableRegistry = editableRegistry;
+  window.ToolbarRegistry = ToolbarRegistry;
+  window.NewElementRegistry = NewElementRegistry;
+  window.extractEditableEltDimensions = extractEditableEltDimensions;
+  window.formatEditableEltStrings = formatEditableEltStrings;
+  window.replaceEditableOccurrences = replaceEditableOccurrences;
+  window.updateTextDivs = updateTextDivs;
+  window.serializeToQmd = serializeToQmd;
+  window.copyQmdToClipboard = copyQmdToClipboard;
+  window.canUndo = canUndo;
+  window.canRedo = canRedo;
+  window.pushUndoState = pushUndoState;
+  window.undo = undo;
+  window.redo = redo;
+  window.getEditableElements = getEditableElements;
+  window.getOriginalEditableElements = getOriginalEditableElements;
+  window.hasTitleSlide = hasTitleSlide;
+  window.htmlToQuarto = htmlToQuarto;
+  window.readIndexQmd = readIndexQmd;
+  window.addNewSlide = addNewSlide;
+  window.addNewTextElement = addNewTextElement;
 })();

@@ -5,9 +5,9 @@
  */
 
 import { CONFIG } from './config.js';
-import { getEditableElements, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex } from './utils.js';
+import { getEditableElements, getOriginalEditableElements, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, hasTitleSlide } from './utils.js';
 import { editableRegistry, EditableElement } from './editable-element.js';
-import { setupUndoRedoKeyboard } from './undo.js';
+import { setupUndoRedoKeyboard, canUndo, canRedo, pushUndoState, undo, redo } from './undo.js';
 import { initializeQuillForElement, quillInstances } from './quill.js';
 import { ToolbarRegistry, NewElementRegistry } from './registries.js';
 import { Capabilities, getCapabilitiesFor } from './capabilities.js';
@@ -24,6 +24,7 @@ import {
   serializeToQmd,
   elementToText,
   getFenceForContent,
+  htmlToQuarto,
 } from './serialization.js';
 
 // Register toolbar actions (save, copy, add)
@@ -662,3 +663,24 @@ window.Revealeditable = function () {
 // Expose internals for testing
 window.getTransformedQmd = getTransformedQmd;
 window.quillInstances = quillInstances;
+window.editableRegistry = editableRegistry;
+window.ToolbarRegistry = ToolbarRegistry;
+window.NewElementRegistry = NewElementRegistry;
+window.extractEditableEltDimensions = extractEditableEltDimensions;
+window.formatEditableEltStrings = formatEditableEltStrings;
+window.replaceEditableOccurrences = replaceEditableOccurrences;
+window.updateTextDivs = updateTextDivs;
+window.serializeToQmd = serializeToQmd;
+window.copyQmdToClipboard = copyQmdToClipboard;
+window.canUndo = canUndo;
+window.canRedo = canRedo;
+window.pushUndoState = pushUndoState;
+window.undo = undo;
+window.redo = redo;
+window.getEditableElements = getEditableElements;
+window.getOriginalEditableElements = getOriginalEditableElements;
+window.hasTitleSlide = hasTitleSlide;
+window.htmlToQuarto = htmlToQuarto;
+window.readIndexQmd = readIndexQmd;
+window.addNewSlide = addNewSlide;
+window.addNewTextElement = addNewTextElement;
