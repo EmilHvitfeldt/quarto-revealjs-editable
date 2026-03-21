@@ -5,6 +5,7 @@ revealjs-plugins:
   - editable
 filters:
   - editable
+  - arrow
 ---
 
 ## Try Moving This Image
