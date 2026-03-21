@@ -190,16 +190,17 @@ Click anywhere outside the arrow to deselect it and return to the normal toolbar
 Arrows are saved as quarto-arrows shortcodes:
 
 ```markdown
-{{< arrow from="100,200" to="400,300" position="absolute" >}}
+{{</* arrow from="100,200" to="400,300" position="absolute" */>}}
 ```
 
 Curved arrows include control points:
 
 ```markdown
-{{< arrow from="100,200" to="400,300" control1="150,100" control2="350,400" position="absolute" >}}
+{{</* arrow from="100,200" to="400,300" control1="150,100" control2="350,400" position="absolute" */>}}
 ```
 
 Styled arrows include additional attributes:
 
 ```markdown
-{{< arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" dash="dashed" opacity="0.8" position="absolute" >}}
+{{</* arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" dash="dashed" opacity="0.8" position="absolute" */>}}
+```
