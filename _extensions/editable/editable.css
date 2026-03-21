@@ -904,6 +904,32 @@
   padding: 4px 0;
 }
 
+.arrow-color-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.arrow-color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.arrow-color-swatch:hover {
+  border-color: #999;
+  transform: scale(1.1);
+}
+
+.arrow-color-swatch.selected {
+  border: 2px solid var(--editable-accent-color, #007cba);
+  box-shadow: 0 0 0 1px white inset;
+}
+
 .arrow-toolbar-color {
   width: 100%;
   height: 28px;

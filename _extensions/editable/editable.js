@@ -1699,17 +1699,49 @@ function createArrowStyleControls() {
   container.className = "arrow-style-controls";
   container.style.display = "none";
 
-  // Color picker
+  // Color presets row
+  const colorPresetsRow = document.createElement("div");
+  colorPresetsRow.className = "arrow-color-presets";
+
+  // Add black as first option (default arrow color)
+  const defaultColors = ["#000000"];
+  const paletteColors = getColorPalette();
+  const allColors = [...defaultColors, ...paletteColors.filter(c => c.toLowerCase() !== "#000000")];
+
+  allColors.forEach(color => {
+    const swatch = document.createElement("button");
+    swatch.className = "arrow-color-swatch";
+    swatch.style.backgroundColor = color;
+    swatch.title = color;
+    swatch.addEventListener("click", () => {
+      if (activeArrow) {
+        activeArrow.color = color;
+        updateArrowAppearance(activeArrow);
+        // Update the color picker to match
+        const picker = container.querySelector("#arrow-style-color");
+        if (picker) picker.value = color;
+        // Update swatch selection
+        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
+        swatch.classList.add("selected");
+      }
+    });
+    colorPresetsRow.appendChild(swatch);
+  });
+  container.appendChild(colorPresetsRow);
+
+  // Color picker for custom colors
   const colorPicker = document.createElement("input");
   colorPicker.type = "color";
   colorPicker.id = "arrow-style-color";
   colorPicker.className = "arrow-toolbar-color";
   colorPicker.value = "#000000";
-  colorPicker.title = "Color";
+  colorPicker.title = "Custom color";
   colorPicker.addEventListener("input", (e) => {
     if (activeArrow) {
       activeArrow.color = e.target.value;
       updateArrowAppearance(activeArrow);
+      // Clear swatch selection when using custom color
+      colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
     }
   });
   container.appendChild(colorPicker);
@@ -1847,7 +1879,14 @@ function updateArrowStylePanel(arrowData) {
     const opacityInput = arrowControls.querySelector("#arrow-style-opacity");
 
     if (colorPicker) {
-      colorPicker.value = arrowData.color === "black" ? "#000000" : arrowData.color;
+      const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
+      colorPicker.value = colorValue;
+      // Update swatch selection
+      const swatches = arrowControls.querySelectorAll(".arrow-color-swatch");
+      swatches.forEach(s => {
+        s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
+          rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+      });
     }
     if (widthInput) {
       widthInput.value = arrowData.width.toString();
@@ -3674,7 +3713,8 @@ function serializeArrowToShortcode(arrow) {
 
   // Add styling (only if non-default)
   if (arrow.color && arrow.color !== CONFIG.ARROW_DEFAULT_COLOR && arrow.color !== "#000000" && arrow.color !== "black") {
-    shortcode += ` color="${arrow.color}"`;
+    const colorOutput = getBrandColorOutput(arrow.color);
+    shortcode += ` color="${colorOutput}"`;
   }
 
   if (arrow.width && arrow.width !== CONFIG.ARROW_DEFAULT_WIDTH) {

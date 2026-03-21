@@ -1657,6 +1657,192 @@ test.describe('Arrow Feature', () => {
 
   });
 
+  test.describe('Color Presets', () => {
+
+    test('Color presets row exists with swatches', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      const presetsInfo = await page.evaluate(() => {
+        const presetsRow = document.querySelector('.arrow-color-presets');
+        const swatches = document.querySelectorAll('.arrow-color-swatch');
+        return {
+          hasPresetsRow: !!presetsRow,
+          swatchCount: swatches.length
+        };
+      });
+
+      expect(presetsInfo.hasPresetsRow).toBe(true);
+      expect(presetsInfo.swatchCount).toBeGreaterThan(0);
+    });
+
+    test('Black is the first color swatch', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      const firstSwatchColor = await page.evaluate(() => {
+        const firstSwatch = document.querySelector('.arrow-color-swatch');
+        const bgColor = firstSwatch.style.backgroundColor;
+        // Convert rgb to hex if needed
+        if (bgColor.startsWith('rgb')) {
+          const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+          if (match) {
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`;
+          }
+        }
+        return bgColor;
+      });
+
+      expect(firstSwatchColor).toBe('#000000');
+    });
+
+    test('Clicking a swatch changes arrow color', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Get second swatch (first non-black color)
+      const secondSwatchColor = await page.evaluate(() => {
+        const swatches = document.querySelectorAll('.arrow-color-swatch');
+        if (swatches.length < 2) return null;
+        return swatches[1].style.backgroundColor;
+      });
+
+      // Click the second swatch
+      await page.click('.arrow-color-swatch:nth-child(2)');
+      await page.waitForTimeout(50);
+
+      // Verify arrow color changed
+      const arrowColor = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke');
+      });
+
+      // Convert rgb to comparable format if needed
+      const normalizedSwatchColor = await page.evaluate((color) => {
+        if (color.startsWith('rgb')) {
+          const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+          if (match) {
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`;
+          }
+        }
+        return color;
+      }, secondSwatchColor);
+
+      expect(arrowColor.toLowerCase()).toBe(normalizedSwatchColor.toLowerCase());
+    });
+
+    test('Clicked swatch shows selected state', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Initially first swatch (black) should be selected since arrow is black by default
+      let selectedCount = await page.evaluate(() => {
+        return document.querySelectorAll('.arrow-color-swatch.selected').length;
+      });
+      expect(selectedCount).toBe(1);
+
+      // Click second swatch
+      await page.click('.arrow-color-swatch:nth-child(2)');
+      await page.waitForTimeout(50);
+
+      // Verify second swatch is now selected and only one is selected
+      const selectionState = await page.evaluate(() => {
+        const swatches = document.querySelectorAll('.arrow-color-swatch');
+        const selectedSwatches = document.querySelectorAll('.arrow-color-swatch.selected');
+        return {
+          totalSelected: selectedSwatches.length,
+          secondIsSelected: swatches[1].classList.contains('selected'),
+          firstIsSelected: swatches[0].classList.contains('selected')
+        };
+      });
+
+      expect(selectionState.totalSelected).toBe(1);
+      expect(selectionState.secondIsSelected).toBe(true);
+      expect(selectionState.firstIsSelected).toBe(false);
+    });
+
+    test('Using custom color picker clears swatch selection', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Initially a swatch should be selected
+      let selectedCount = await page.evaluate(() => {
+        return document.querySelectorAll('.arrow-color-swatch.selected').length;
+      });
+      expect(selectedCount).toBe(1);
+
+      // Use the custom color picker
+      await page.fill('#arrow-style-color', '#123456');
+      await page.waitForTimeout(50);
+
+      // Verify no swatches are selected
+      selectedCount = await page.evaluate(() => {
+        return document.querySelectorAll('.arrow-color-swatch.selected').length;
+      });
+      expect(selectedCount).toBe(0);
+    });
+
+    test('Selecting arrow highlights matching swatch', async ({ page }) => {
+      const htmlPath = path.join(TESTING_DIR, 'arrows.html');
+      await page.goto(`file://${htmlPath}`);
+      await waitForReveal(page);
+
+      await clickAddArrow(page);
+      await page.waitForTimeout(100);
+
+      // Click second swatch to set a non-black color
+      await page.click('.arrow-color-swatch:nth-child(2)');
+      await page.waitForTimeout(50);
+
+      // Deselect arrow
+      await page.click('body', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Reselect arrow by clicking on it
+      await page.evaluate(() => {
+        const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+        hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await page.waitForTimeout(100);
+
+      // Verify second swatch is selected
+      const secondIsSelected = await page.evaluate(() => {
+        const swatches = document.querySelectorAll('.arrow-color-swatch');
+        return swatches[1].classList.contains('selected');
+      });
+
+      expect(secondIsSelected).toBe(true);
+    });
+
+  });
+
   test.describe('Dash Style', () => {
 
     test('Switching between dash styles updates stroke-dasharray', async ({ page }) => {
