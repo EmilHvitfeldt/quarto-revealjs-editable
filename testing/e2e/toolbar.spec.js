@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-const { TESTING_DIR, setupPage, clickAddText, clickAddSlide, clickAddArrow } = require('./test-helpers');
+const { TESTING_DIR, setupPage, clickAddText, clickAddSlide, clickAddArrow, addSlidesWithMarkers, addTextWithMarker, addSlideViaJS } = require('./test-helpers');
 
 test.describe('Floating Toolbar', () => {
 
@@ -2630,14 +2630,9 @@ test.describe('Edge Cases - Insertion order', () => {
     await setupPage(page, 'basic.html');
 
     // Stay on slide 0 and add 5 slides in sequence (no going back)
-    for (let i = 1; i <= 5; i++) {
-      await clickAddSlide(page);
-      await clickAddText(page);
-      await page.evaluate((num) => {
-        const el = document.querySelector('section.present .editable-new');
-        if (el) el.textContent = `CHAIN_${num}`;
-      }, i);
-    }
+    // Use fast JS-based helper
+    const markers = ['CHAIN_1', 'CHAIN_2', 'CHAIN_3', 'CHAIN_4', 'CHAIN_5'];
+    await addSlidesWithMarkers(page, markers);
 
     const downloadPromise = page.waitForEvent('download');
     await page.click('.toolbar-save');
@@ -2753,15 +2748,9 @@ test.describe('Edge Cases - Insertion order', () => {
     await setupPage(page, 'basic.html');
 
     // Add 6 slides in a chain: A -> B -> C -> D -> E -> F
+    // Use fast JS-based helper instead of clicking UI for each
     const markers = ['DEEP_A', 'DEEP_B', 'DEEP_C', 'DEEP_D', 'DEEP_E', 'DEEP_F'];
-    for (const marker of markers) {
-      await clickAddSlide(page);
-      await clickAddText(page);
-      await page.evaluate((m) => {
-        const el = document.querySelector('section.present .editable-new');
-        if (el) el.textContent = m;
-      }, marker);
-    }
+    await addSlidesWithMarkers(page, markers);
 
     const downloadPromise = page.waitForEvent('download');
     await page.click('.toolbar-save');

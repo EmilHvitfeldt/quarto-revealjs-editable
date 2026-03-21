@@ -154,6 +154,74 @@ async function deselectArrow(page) {
   }, { timeout: 1000 }).catch(() => {});
 }
 
+/**
+ * Add multiple slides with text markers efficiently using direct JS calls.
+ * Much faster than clicking UI for each slide in a loop.
+ * @param {import('@playwright/test').Page} page
+ * @param {string[]} markers - Array of text markers for each slide
+ */
+async function addSlidesWithMarkers(page, markers) {
+  await page.evaluate(async (markers) => {
+    for (const marker of markers) {
+      // Call internal functions directly
+      addNewSlide();
+      const div = await addNewTextElement();
+      if (div) {
+        const editor = div.querySelector('.ql-editor');
+        if (editor) {
+          editor.textContent = marker;
+        } else {
+          div.textContent = marker;
+        }
+        // Mark as dirty so it gets saved
+        const quillData = quillInstances?.get(div);
+        if (quillData) quillData.isDirty = true;
+      }
+    }
+  }, markers);
+  // Wait for all elements to be created
+  await page.waitForFunction(
+    (count) => document.querySelectorAll('.editable-new-slide').length >= count,
+    markers.length,
+    { timeout: 5000 }
+  );
+}
+
+/**
+ * Add text element with marker on current slide using direct JS call.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} marker - Text content for the element
+ */
+async function addTextWithMarker(page, marker) {
+  await page.evaluate(async (marker) => {
+    const div = await addNewTextElement();
+    if (div) {
+      const editor = div.querySelector('.ql-editor');
+      if (editor) {
+        editor.textContent = marker;
+      } else {
+        div.textContent = marker;
+      }
+      const quillData = quillInstances?.get(div);
+      if (quillData) quillData.isDirty = true;
+    }
+  }, marker);
+}
+
+/**
+ * Add a new slide using direct JS call (faster than UI click).
+ * @param {import('@playwright/test').Page} page
+ */
+async function addSlideViaJS(page) {
+  const initialCount = await page.evaluate(() => document.querySelectorAll('.editable-new-slide').length);
+  await page.evaluate(() => addNewSlide());
+  await page.waitForFunction(
+    (count) => document.querySelectorAll('.editable-new-slide').length > count,
+    initialCount,
+    { timeout: 5000 }
+  );
+}
+
 module.exports = {
   TESTING_DIR,
   setupPage,
@@ -165,4 +233,7 @@ module.exports = {
   clickAddArrow,
   getArrowData,
   deselectArrow,
+  addSlidesWithMarkers,
+  addTextWithMarker,
+  addSlideViaJS,
 };
