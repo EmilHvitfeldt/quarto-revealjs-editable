@@ -119,15 +119,11 @@ test.describe('Arrow Feature', () => {
       await page.goto(`file://${htmlPath}`);
       await waitForReveal(page);
 
-      // basic.html has no arrow shortcodes, so extension should not be detected
-      const hasArrowExtension = await page.evaluate(() => {
-        const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
-        if (arrowSvgs.length > 0) return true;
-        const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
-        return arrowPaths.length > 0;
+      // Simulate "extension not installed" by clearing the flag
+      // (The Lua filter sets this flag when extension is installed in project)
+      await page.evaluate(() => {
+        window._quarto_arrow_extension = false;
       });
-
-      expect(hasArrowExtension).toBe(false);
 
       // Try to add an arrow
       await page.click('.toolbar-add');
@@ -150,6 +146,11 @@ test.describe('Arrow Feature', () => {
       const htmlPath = path.join(TESTING_DIR, 'basic.html');
       await page.goto(`file://${htmlPath}`);
       await waitForReveal(page);
+
+      // Simulate "extension not installed" by clearing the flag
+      await page.evaluate(() => {
+        window._quarto_arrow_extension = false;
+      });
 
       // First arrow - should show modal
       await page.click('.toolbar-add');
@@ -182,6 +183,11 @@ test.describe('Arrow Feature', () => {
       const htmlPath = path.join(TESTING_DIR, 'basic.html');
       await page.goto(`file://${htmlPath}`);
       await waitForReveal(page);
+
+      // Simulate "extension not installed" by clearing the flag
+      await page.evaluate(() => {
+        window._quarto_arrow_extension = false;
+      });
 
       // Try to add an arrow
       await page.click('.toolbar-add');

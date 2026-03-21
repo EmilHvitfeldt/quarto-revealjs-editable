@@ -2094,6 +2094,65 @@ function updateArrowAppearance(arrowData) {
   updateArrowheadMarker(arrowData);
 }
 
+// Calculate perpendicular offset for a point given a tangent direction
+function offsetPointPerpendicular(x, y, tangentX, tangentY, offsetAmount) {
+  const len = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
+  if (len === 0) return { x, y };
+  // Normal is perpendicular to tangent (rotate 90 degrees)
+  const normalX = -tangentY / len;
+  const normalY = tangentX / len;
+  return {
+    x: x + normalX * offsetAmount,
+    y: y + normalY * offsetAmount
+  };
+}
+
+// Create an offset path for parallel lines (handles curves properly)
+function createOffsetPathD(arrowData, offsetAmount) {
+  const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+
+  if (control1X !== null && control2X !== null) {
+    // Cubic Bezier: M from C c1 c2 to
+    // Tangent at start: from -> c1
+    // Tangent at c1: from -> c2 (average direction)
+    // Tangent at c2: c1 -> to (average direction)
+    // Tangent at end: c2 -> to
+    const startTangent = { x: control1X - fromX, y: control1Y - fromY };
+    const endTangent = { x: toX - control2X, y: toY - control2Y };
+    // For control points, use the chord direction for smoother offsets
+    const c1Tangent = { x: control2X - fromX, y: control2Y - fromY };
+    const c2Tangent = { x: toX - control1X, y: toY - control1Y };
+
+    const newFrom = offsetPointPerpendicular(fromX, fromY, startTangent.x, startTangent.y, offsetAmount);
+    const newC1 = offsetPointPerpendicular(control1X, control1Y, c1Tangent.x, c1Tangent.y, offsetAmount);
+    const newC2 = offsetPointPerpendicular(control2X, control2Y, c2Tangent.x, c2Tangent.y, offsetAmount);
+    const newTo = offsetPointPerpendicular(toX, toY, endTangent.x, endTangent.y, offsetAmount);
+
+    return `M ${newFrom.x},${newFrom.y} C ${newC1.x},${newC1.y} ${newC2.x},${newC2.y} ${newTo.x},${newTo.y}`;
+  } else if (control1X !== null) {
+    // Quadratic Bezier: M from Q c1 to
+    // Tangent at start: from -> c1
+    // Tangent at control: from -> to (chord direction)
+    // Tangent at end: c1 -> to
+    const startTangent = { x: control1X - fromX, y: control1Y - fromY };
+    const controlTangent = { x: toX - fromX, y: toY - fromY };
+    const endTangent = { x: toX - control1X, y: toY - control1Y };
+
+    const newFrom = offsetPointPerpendicular(fromX, fromY, startTangent.x, startTangent.y, offsetAmount);
+    const newC1 = offsetPointPerpendicular(control1X, control1Y, controlTangent.x, controlTangent.y, offsetAmount);
+    const newTo = offsetPointPerpendicular(toX, toY, endTangent.x, endTangent.y, offsetAmount);
+
+    return `M ${newFrom.x},${newFrom.y} Q ${newC1.x},${newC1.y} ${newTo.x},${newTo.y}`;
+  } else {
+    // Straight line: M from L to
+    const tangent = { x: toX - fromX, y: toY - fromY };
+    const newFrom = offsetPointPerpendicular(fromX, fromY, tangent.x, tangent.y, offsetAmount);
+    const newTo = offsetPointPerpendicular(toX, toY, tangent.x, tangent.y, offsetAmount);
+
+    return `M ${newFrom.x},${newFrom.y} L ${newTo.x},${newTo.y}`;
+  }
+}
+
 function updateArrowLineStyle(arrowData) {
   if (!arrowData._svg || !arrowData._path) return;
 
@@ -2109,14 +2168,10 @@ function updateArrowLineStyle(arrowData) {
     return;
   }
 
-  // Get the current path data
-  const pathD = arrowData._path.getAttribute("d");
-  if (!pathD) return;
-
   // Calculate offset based on stroke width
   const offset = arrowData.width * 1.5;
 
-  // For double/triple, we create parallel paths with offset
+  // For double/triple, we create parallel paths with perpendicular offset
   const createOffsetPath = (offsetAmount) => {
     const extraPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
     extraPath.className.baseVal = "arrow-extra-line";
@@ -2140,9 +2195,9 @@ function updateArrowLineStyle(arrowData) {
     const opacity = arrowData.opacity !== undefined ? arrowData.opacity : 1;
     extraPath.setAttribute("opacity", opacity);
 
-    // Create offset path by transforming
-    extraPath.setAttribute("d", pathD);
-    extraPath.setAttribute("transform", `translate(0, ${offsetAmount})`);
+    // Create geometrically correct offset path
+    const offsetPathD = createOffsetPathD(arrowData, offsetAmount);
+    extraPath.setAttribute("d", offsetPathD);
 
     return extraPath;
   };
