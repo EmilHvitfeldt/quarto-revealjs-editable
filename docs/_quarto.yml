@@ -29,7 +29,7 @@ website:
     center: "Made with [Quarto](https://quarto.org)"
 
 filters:
-  - arrow
+  - arrows
 
 format:
   html:

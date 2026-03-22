@@ -28,6 +28,9 @@ jobs:
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
+      - name: Install arrows extension
+        run: quarto add emilhvitfeldt/quarto-arrows --no-prompt
+
       - name: Copy extension to docs
         run: |
           cp -r _extensions docs/
