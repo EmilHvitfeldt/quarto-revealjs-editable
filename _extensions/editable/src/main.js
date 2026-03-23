@@ -258,6 +258,7 @@ function readIndexQmd() {
  * @returns {string} Filename from injected global
  */
 function getEditableFilename() {
+  if (!window._input_filename) return 'untitled.qmd';
   return window._input_filename.split(/[/\\]/).pop();
 }
 

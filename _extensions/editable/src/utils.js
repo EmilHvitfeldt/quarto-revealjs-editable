@@ -120,6 +120,7 @@ export function getOriginalEditableDivs() {
  * @returns {number} Horizontal slide index
  */
 export function getCurrentSlideIndex() {
+  if (typeof Reveal === 'undefined') return 0;
   const indices = Reveal.getIndices();
   return indices.h;
 }
@@ -139,6 +140,7 @@ export function getCurrentSlide() {
  * @returns {boolean} True if first slide lacks an h2 heading
  */
 export function hasTitleSlide() {
+  if (typeof Reveal === 'undefined') return false;
   const firstSlide = Reveal.getSlide(0);
   if (!firstSlide) return false;
   // Title slides typically have an h1 with the title, not an h2
