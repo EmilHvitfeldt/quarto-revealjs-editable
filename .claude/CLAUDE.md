@@ -122,7 +122,7 @@ PropertySerializers.propName = {
 ## Documentation Updates
 
 When adding features, follow the checklist in `CONTRIBUTING.md`. Key files to update:
-- `NEWS.md` - Changelog entry under `[Unreleased]`
+- `NEWS.md` - Changelog entry under `[Unreleased]` (but fixes to features added in the same unreleased version don't need separate entries)
 - `ARCHITECTURE.md` - Technical details (state, capabilities, serializers)
 - `testing/README.md` - Test documentation
 - `README.md` - User-facing docs (if applicable)
