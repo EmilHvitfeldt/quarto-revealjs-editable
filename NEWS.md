@@ -20,6 +20,11 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - Brand colors saved as `{{< brand color name >}}` shortcodes in arrow color attribute
   - Drag arrows by their body to move entire arrow while preserving shape
 
+### Fixed
+
+- **Race condition in Quill initialization** - Added guards to prevent duplicate initialization when `initializeQuillForElement` is called multiple times for the same element before first call completes (#85)
+- **Arrow click-outside handler performance** - Changed from per-arrow click handlers to a single global handler, eliminating redundant event listeners (#60)
+
 ---
 
 ## [6.0.0] - 2026-03-16

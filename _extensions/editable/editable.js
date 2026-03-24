@@ -396,11 +396,25 @@ var EditableModule = (() => {
     return quillLoading;
   }
   var quillInstances = /* @__PURE__ */ new Map();
+  var initializingElements = /* @__PURE__ */ new Set();
   async function initializeQuillForElement(element) {
     if (element.tagName.toLowerCase() !== "div")
       return null;
     if (quillInstances.has(element))
       return quillInstances.get(element);
+    if (initializingElements.has(element)) {
+      await new Promise((resolve) => {
+        const check = () => {
+          if (quillInstances.has(element))
+            resolve();
+          else
+            setTimeout(check, 10);
+        };
+        check();
+      });
+      return quillInstances.get(element);
+    }
+    initializingElements.add(element);
     try {
       let createColorHandler = function(picker, formatName) {
         return function(value) {
@@ -485,9 +499,11 @@ var EditableModule = (() => {
         quillData.isDirty = true;
       });
       quillInstances.set(element, quillData);
+      initializingElements.delete(element);
       return quillData;
     } catch (err) {
       console.error("Failed to initialize Quill for element:", err);
+      initializingElements.delete(element);
       return null;
     }
   }
@@ -1357,6 +1373,7 @@ var EditableModule = (() => {
     return confirmed;
   }
   var activeArrow = null;
+  var globalClickOutsideHandlerRegistered = false;
   var arrowControlRefs = {
     colorPicker: null,
     widthInput: null,
@@ -1959,10 +1976,10 @@ var EditableModule = (() => {
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
     setActiveArrow(arrowData);
-    if (!container._clickOutsideHandler) {
-      container._clickOutsideHandler = true;
+    if (!globalClickOutsideHandlerRegistered) {
+      globalClickOutsideHandlerRegistered = true;
       document.addEventListener("click", (e) => {
-        if (!e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar") && activeArrow === arrowData) {
+        if (activeArrow && !e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar")) {
           setActiveArrow(null);
         }
       });

@@ -54,6 +54,9 @@ export function loadQuill() {
  */
 export const quillInstances = new Map();
 
+/** @type {Set<HTMLElement>} Elements currently being initialized (race condition guard) */
+const initializingElements = new Set();
+
 /**
  * Initialize Quill editor for an editable div element.
  * Called at page load to prevent text shifting when entering edit mode.
@@ -66,6 +69,20 @@ export async function initializeQuillForElement(element) {
 
   // Skip if already initialized
   if (quillInstances.has(element)) return quillInstances.get(element);
+
+  // Guard against race conditions - wait for existing initialization
+  if (initializingElements.has(element)) {
+    await new Promise(resolve => {
+      const check = () => {
+        if (quillInstances.has(element)) resolve();
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    return quillInstances.get(element);
+  }
+
+  initializingElements.add(element);
 
   try {
     await loadQuill();
@@ -182,10 +199,12 @@ export async function initializeQuillForElement(element) {
     });
 
     quillInstances.set(element, quillData);
+    initializingElements.delete(element);
 
     return quillData;
   } catch (err) {
     console.error("Failed to initialize Quill for element:", err);
+    initializingElements.delete(element);
     return null;
   }
 }
