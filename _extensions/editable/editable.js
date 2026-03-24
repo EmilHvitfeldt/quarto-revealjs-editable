@@ -1,41 +1,56 @@
 var EditableModule = (() => {
-  // src/config.js
-  var CONFIG = {
-    // Debug mode - set window.EDITABLE_DEBUG = true to enable
-    DEBUG: typeof window !== "undefined" && window.EDITABLE_DEBUG,
-    // Sizing constraints
-    MIN_ELEMENT_SIZE: 50,
-    KEYBOARD_MOVE_STEP: 10,
-    // Font constraints
-    MIN_FONT_SIZE: 8,
-    DEFAULT_FONT_SIZE: 16,
-    FONT_SIZE_STEP: 2,
-    // Timing
-    HOVER_TIMEOUT: 500,
-    // Undo/Redo
-    MAX_UNDO_STACK_SIZE: 50,
-    // New element defaults
-    NEW_TEXT_CONTENT: "New text",
-    NEW_TEXT_WIDTH: 200,
-    NEW_TEXT_HEIGHT: 50,
-    NEW_SLIDE_HEADING: "## New Slide",
-    // Arrow defaults
-    NEW_ARROW_LENGTH: 150,
-    ARROW_HANDLE_SIZE: 12,
-    ARROW_CONTROL_HANDLE_SIZE: 10,
-    ARROW_DEFAULT_COLOR: "black",
-    ARROW_DEFAULT_WIDTH: 2,
-    ARROW_CONTROL1_COLOR: "#ff6600",
-    ARROW_CONTROL2_COLOR: "#9933ff",
-    ARROW_DEFAULT_LABEL_POSITION: "middle",
-    ARROW_DEFAULT_LABEL_OFFSET: 10,
-    // Polling config
-    POLL_MAX_ATTEMPTS: 50,
-    POLL_INTERVAL_MS: 100,
-    // Quill Editor CDN
-    QUILL_CSS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
-    QUILL_JS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"
+  var __defProp = Object.defineProperty;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __esm = (fn, res) => function __init() {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   };
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+
+  // src/config.js
+  var CONFIG;
+  var init_config = __esm({
+    "src/config.js"() {
+      CONFIG = {
+        // Debug mode - set window.EDITABLE_DEBUG = true to enable
+        DEBUG: typeof window !== "undefined" && window.EDITABLE_DEBUG,
+        // Sizing constraints
+        MIN_ELEMENT_SIZE: 50,
+        KEYBOARD_MOVE_STEP: 10,
+        // Font constraints
+        MIN_FONT_SIZE: 8,
+        DEFAULT_FONT_SIZE: 16,
+        FONT_SIZE_STEP: 2,
+        // Timing
+        HOVER_TIMEOUT: 500,
+        // Undo/Redo
+        MAX_UNDO_STACK_SIZE: 50,
+        // New element defaults
+        NEW_TEXT_CONTENT: "New text",
+        NEW_TEXT_WIDTH: 200,
+        NEW_TEXT_HEIGHT: 50,
+        NEW_SLIDE_HEADING: "## New Slide",
+        // Arrow defaults
+        NEW_ARROW_LENGTH: 150,
+        ARROW_HANDLE_SIZE: 12,
+        ARROW_CONTROL_HANDLE_SIZE: 10,
+        ARROW_DEFAULT_COLOR: "black",
+        ARROW_DEFAULT_WIDTH: 2,
+        ARROW_CONTROL1_COLOR: "#ff6600",
+        ARROW_CONTROL2_COLOR: "#9933ff",
+        ARROW_DEFAULT_LABEL_POSITION: "middle",
+        ARROW_DEFAULT_LABEL_OFFSET: 10,
+        // Polling config
+        POLL_MAX_ATTEMPTS: 50,
+        POLL_INTERVAL_MS: 100,
+        // Quill Editor CDN
+        QUILL_CSS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
+        QUILL_JS: "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"
+      };
+    }
+  });
 
   // src/utils.js
   function round(n) {
@@ -106,224 +121,137 @@ var EditableModule = (() => {
     }
     return revealIndex;
   }
+  var init_utils = __esm({
+    "src/utils.js"() {
+      init_config();
+    }
+  });
 
   // src/editable-element.js
-  var editableRegistry = /* @__PURE__ */ new Map();
-  var EditableElement = class {
-    /**
-     * @param {HTMLElement} element - The DOM element to wrap
-     */
-    constructor(element) {
-      this.element = element;
-      this.container = null;
-      this.type = element.tagName.toLowerCase();
-      let width = element.offsetWidth;
-      let height = element.offsetHeight;
-      if (this.type === "img" && (width === 0 || height === 0)) {
-        width = element.naturalWidth || width;
-        height = element.naturalHeight || height;
-      }
-      this.state = {
-        x: 0,
-        y: 0,
-        width,
-        height,
-        rotation: 0,
-        // Div-specific properties
-        fontSize: null,
-        textAlign: null
+  var editableRegistry, EditableElement;
+  var init_editable_element = __esm({
+    "src/editable-element.js"() {
+      editableRegistry = /* @__PURE__ */ new Map();
+      EditableElement = class {
+        /**
+         * @param {HTMLElement} element - The DOM element to wrap
+         */
+        constructor(element) {
+          this.element = element;
+          this.container = null;
+          this.type = element.tagName.toLowerCase();
+          let width = element.offsetWidth;
+          let height = element.offsetHeight;
+          if (this.type === "img" && (width === 0 || height === 0)) {
+            width = element.naturalWidth || width;
+            height = element.naturalHeight || height;
+          }
+          this.state = {
+            x: 0,
+            y: 0,
+            width,
+            height,
+            rotation: 0,
+            // Div-specific properties
+            fontSize: null,
+            textAlign: null
+          };
+        }
+        /**
+         * Get a copy of current state.
+         * @returns {Object} Copy of state object
+         */
+        getState() {
+          return { ...this.state };
+        }
+        /**
+         * Update state and optionally sync to DOM.
+         * @param {Object} updates - Properties to update
+         * @param {boolean} [syncToDOM=true] - Whether to apply changes to DOM
+         */
+        setState(updates, syncToDOM = true) {
+          Object.assign(this.state, updates);
+          if (syncToDOM) {
+            this.syncToDOM();
+          }
+        }
+        /**
+         * Apply internal state to DOM elements.
+         * Called after state changes to update visual representation.
+         */
+        syncToDOM() {
+          if (this.container) {
+            this.container.style.left = this.state.x + "px";
+            this.container.style.top = this.state.y + "px";
+            if (this.state.rotation !== 0) {
+              this.container.style.transform = `rotate(${this.state.rotation}deg)`;
+            } else {
+              this.container.style.transform = "";
+            }
+          }
+          this.element.style.width = this.state.width + "px";
+          this.element.style.height = this.state.height + "px";
+          if (this.state.fontSize !== null) {
+            this.element.style.fontSize = this.state.fontSize + "px";
+          }
+          if (this.state.textAlign !== null) {
+            this.element.style.textAlign = this.state.textAlign;
+          }
+        }
+        /**
+         * Read current values from DOM into state.
+         * Called before serialization to capture any direct DOM changes.
+         */
+        syncFromDOM() {
+          if (this.container) {
+            this.state.x = this.container.style.left ? parseFloat(this.container.style.left) : this.container.offsetLeft;
+            this.state.y = this.container.style.top ? parseFloat(this.container.style.top) : this.container.offsetTop;
+            const transform = this.container.style.transform || "";
+            const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
+            this.state.rotation = rotateMatch ? parseFloat(rotateMatch[1]) : 0;
+          }
+          this.state.width = this.element.style.width ? parseFloat(this.element.style.width) : this.element.offsetWidth;
+          this.state.height = this.element.style.height ? parseFloat(this.element.style.height) : this.element.offsetHeight;
+          if (this.type === "div") {
+            if (this.element.style.fontSize) {
+              this.state.fontSize = parseFloat(this.element.style.fontSize);
+            }
+            if (this.element.style.textAlign) {
+              this.state.textAlign = this.element.style.textAlign;
+            }
+          }
+        }
+        /**
+         * Generate dimension object for serialization to QMD.
+         * Syncs from DOM first to capture current values.
+         * @returns {Object} Dimensions formatted for PropertySerializers
+         */
+        toDimensions() {
+          this.syncFromDOM();
+          const dims = {
+            width: this.state.width,
+            height: this.state.height,
+            left: this.state.x,
+            top: this.state.y
+          };
+          if (this.state.rotation !== 0) {
+            dims.rotation = this.state.rotation;
+          }
+          if (this.type === "div") {
+            if (this.state.fontSize !== null) {
+              dims.fontSize = this.state.fontSize;
+            }
+            if (this.state.textAlign !== null) {
+              dims.textAlign = this.state.textAlign;
+            }
+          }
+          return dims;
+        }
       };
     }
-    /**
-     * Get a copy of current state.
-     * @returns {Object} Copy of state object
-     */
-    getState() {
-      return { ...this.state };
-    }
-    /**
-     * Update state and optionally sync to DOM.
-     * @param {Object} updates - Properties to update
-     * @param {boolean} [syncToDOM=true] - Whether to apply changes to DOM
-     */
-    setState(updates, syncToDOM = true) {
-      Object.assign(this.state, updates);
-      if (syncToDOM) {
-        this.syncToDOM();
-      }
-    }
-    /**
-     * Apply internal state to DOM elements.
-     * Called after state changes to update visual representation.
-     */
-    syncToDOM() {
-      if (this.container) {
-        this.container.style.left = this.state.x + "px";
-        this.container.style.top = this.state.y + "px";
-        if (this.state.rotation !== 0) {
-          this.container.style.transform = `rotate(${this.state.rotation}deg)`;
-        } else {
-          this.container.style.transform = "";
-        }
-      }
-      this.element.style.width = this.state.width + "px";
-      this.element.style.height = this.state.height + "px";
-      if (this.state.fontSize !== null) {
-        this.element.style.fontSize = this.state.fontSize + "px";
-      }
-      if (this.state.textAlign !== null) {
-        this.element.style.textAlign = this.state.textAlign;
-      }
-    }
-    /**
-     * Read current values from DOM into state.
-     * Called before serialization to capture any direct DOM changes.
-     */
-    syncFromDOM() {
-      if (this.container) {
-        this.state.x = this.container.style.left ? parseFloat(this.container.style.left) : this.container.offsetLeft;
-        this.state.y = this.container.style.top ? parseFloat(this.container.style.top) : this.container.offsetTop;
-        const transform = this.container.style.transform || "";
-        const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
-        this.state.rotation = rotateMatch ? parseFloat(rotateMatch[1]) : 0;
-      }
-      this.state.width = this.element.style.width ? parseFloat(this.element.style.width) : this.element.offsetWidth;
-      this.state.height = this.element.style.height ? parseFloat(this.element.style.height) : this.element.offsetHeight;
-      if (this.type === "div") {
-        if (this.element.style.fontSize) {
-          this.state.fontSize = parseFloat(this.element.style.fontSize);
-        }
-        if (this.element.style.textAlign) {
-          this.state.textAlign = this.element.style.textAlign;
-        }
-      }
-    }
-    /**
-     * Generate dimension object for serialization to QMD.
-     * Syncs from DOM first to capture current values.
-     * @returns {Object} Dimensions formatted for PropertySerializers
-     */
-    toDimensions() {
-      this.syncFromDOM();
-      const dims = {
-        width: this.state.width,
-        height: this.state.height,
-        left: this.state.x,
-        top: this.state.y
-      };
-      if (this.state.rotation !== 0) {
-        dims.rotation = this.state.rotation;
-      }
-      if (this.type === "div") {
-        if (this.state.fontSize !== null) {
-          dims.fontSize = this.state.fontSize;
-        }
-        if (this.state.textAlign !== null) {
-          dims.textAlign = this.state.textAlign;
-        }
-      }
-      return dims;
-    }
-  };
-
-  // src/undo.js
-  var undoStack = [];
-  var redoStack = [];
-  function captureAllState() {
-    const snapshots = [];
-    for (const [element, editableElt] of editableRegistry) {
-      editableElt.syncFromDOM();
-      snapshots.push({
-        element,
-        state: { ...editableElt.state }
-      });
-    }
-    return snapshots;
-  }
-  function restoreState(snapshots) {
-    for (const snapshot of snapshots) {
-      const editableElt = editableRegistry.get(snapshot.element);
-      if (editableElt) {
-        editableElt.setState(snapshot.state);
-      }
-    }
-  }
-  function pushUndoState() {
-    const state = captureAllState();
-    undoStack.push(state);
-    if (undoStack.length > CONFIG.MAX_UNDO_STACK_SIZE) {
-      undoStack.shift();
-    }
-    redoStack.length = 0;
-  }
-  function undo() {
-    if (undoStack.length === 0)
-      return false;
-    const currentState = captureAllState();
-    redoStack.push(currentState);
-    const previousState = undoStack.pop();
-    restoreState(previousState);
-    return true;
-  }
-  function redo() {
-    if (redoStack.length === 0)
-      return false;
-    const currentState = captureAllState();
-    undoStack.push(currentState);
-    const redoState = redoStack.pop();
-    restoreState(redoState);
-    return true;
-  }
-  function canUndo() {
-    return undoStack.length > 0;
-  }
-  function canRedo() {
-    return redoStack.length > 0;
-  }
-  function setupUndoRedoKeyboard() {
-    document.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        if (document.activeElement.contentEditable === "true")
-          return;
-        e.preventDefault();
-        if (undo()) {
-          debug("Undo performed");
-        }
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "z" && e.shiftKey)) {
-        if (document.activeElement.contentEditable === "true")
-          return;
-        e.preventDefault();
-        if (redo()) {
-          debug("Redo performed");
-        }
-        return;
-      }
-    });
-  }
+  });
 
   // src/colors.js
-  var DEFAULT_COLOR_PALETTE = [
-    "#000000",
-    "#434343",
-    "#666666",
-    "#999999",
-    "#cccccc",
-    "#ffffff",
-    "#e60000",
-    "#ff9900",
-    "#ffff00",
-    "#008a00",
-    "#0066cc",
-    "#9933ff",
-    "#ff99cc",
-    "#ffcc99",
-    "#ffff99",
-    "#99ff99",
-    "#99ccff",
-    "#cc99ff"
-  ];
   function getColorPalette() {
     if (window._quarto_brand_palette && Array.isArray(window._quarto_brand_palette) && window._quarto_brand_palette.length > 0) {
       return window._quarto_brand_palette;
@@ -372,10 +300,33 @@ var EditableModule = (() => {
     }
     return colorVal;
   }
+  var DEFAULT_COLOR_PALETTE;
+  var init_colors = __esm({
+    "src/colors.js"() {
+      DEFAULT_COLOR_PALETTE = [
+        "#000000",
+        "#434343",
+        "#666666",
+        "#999999",
+        "#cccccc",
+        "#ffffff",
+        "#e60000",
+        "#ff9900",
+        "#ffff00",
+        "#008a00",
+        "#0066cc",
+        "#9933ff",
+        "#ff99cc",
+        "#ffcc99",
+        "#ffff99",
+        "#99ff99",
+        "#99ccff",
+        "#cc99ff"
+      ];
+    }
+  });
 
   // src/quill.js
-  var quillLoaded = false;
-  var quillLoading = null;
   function loadQuill() {
     if (quillLoaded) {
       return Promise.resolve();
@@ -401,8 +352,6 @@ var EditableModule = (() => {
     });
     return quillLoading;
   }
-  var quillInstances = /* @__PURE__ */ new Map();
-  var initializingElements = /* @__PURE__ */ new Set();
   async function initializeQuillForElement(element) {
     if (element.tagName.toLowerCase() !== "div")
       return null;
@@ -513,315 +462,1603 @@ var EditableModule = (() => {
       return null;
     }
   }
+  var quillLoaded, quillLoading, quillInstances, initializingElements;
+  var init_quill = __esm({
+    "src/quill.js"() {
+      init_config();
+      init_colors();
+      quillLoaded = false;
+      quillLoading = null;
+      quillInstances = /* @__PURE__ */ new Map();
+      initializingElements = /* @__PURE__ */ new Set();
+    }
+  });
 
   // src/registries.js
-  var ControlRegistry = {
-    /** @type {Map<string, Object>} Registered controls by name */
-    controls: /* @__PURE__ */ new Map(),
-    /**
-     * Register a new control.
-     * @param {string} name - Unique control name
-     * @param {Object} config - Control configuration
-     * @param {string} config.icon - Button text/icon
-     * @param {string} config.ariaLabel - Accessibility label
-     * @param {string} config.title - Tooltip text
-     * @param {string} [config.className] - Additional CSS class
-     * @param {string[]} config.appliesTo - Element types this control applies to
-     * @param {Function} config.onClick - Click handler (element, btn, event)
-     */
-    register(name, config) {
-      this.controls.set(name, { name, ...config });
-    },
-    /**
-     * Get controls applicable to an element type.
-     * @param {string} elementType - Element type ("img" or "div")
-     * @returns {Object[]} Array of control configs
-     */
-    getControlsFor(elementType) {
-      return [...this.controls.values()].filter(
-        (c) => c.appliesTo.includes(elementType)
-      );
-    },
-    /**
-     * Create a button element from a control config.
-     * @param {Object} config - Control configuration
-     * @param {HTMLElement} element - The editable element
-     * @returns {HTMLButtonElement} The created button
-     */
-    createButton(config, element) {
-      const btn = createButton(config.icon, config.className || "");
-      btn.setAttribute("aria-label", config.ariaLabel);
-      btn.title = config.title;
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        config.onClick(element, btn, e);
+  var ControlRegistry, NewElementRegistry, ToolbarRegistry;
+  var init_registries = __esm({
+    "src/registries.js"() {
+      init_config();
+      init_utils();
+      init_editable_element();
+      init_undo();
+      init_quill();
+      ControlRegistry = {
+        /** @type {Map<string, Object>} Registered controls by name */
+        controls: /* @__PURE__ */ new Map(),
+        /**
+         * Register a new control.
+         * @param {string} name - Unique control name
+         * @param {Object} config - Control configuration
+         * @param {string} config.icon - Button text/icon
+         * @param {string} config.ariaLabel - Accessibility label
+         * @param {string} config.title - Tooltip text
+         * @param {string} [config.className] - Additional CSS class
+         * @param {string[]} config.appliesTo - Element types this control applies to
+         * @param {Function} config.onClick - Click handler (element, btn, event)
+         */
+        register(name, config) {
+          this.controls.set(name, { name, ...config });
+        },
+        /**
+         * Get controls applicable to an element type.
+         * @param {string} elementType - Element type ("img" or "div")
+         * @returns {Object[]} Array of control configs
+         */
+        getControlsFor(elementType) {
+          return [...this.controls.values()].filter(
+            (c) => c.appliesTo.includes(elementType)
+          );
+        },
+        /**
+         * Create a button element from a control config.
+         * @param {Object} config - Control configuration
+         * @param {HTMLElement} element - The editable element
+         * @returns {HTMLButtonElement} The created button
+         */
+        createButton(config, element) {
+          const btn = createButton(config.icon, config.className || "");
+          btn.setAttribute("aria-label", config.ariaLabel);
+          btn.title = config.title;
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            config.onClick(element, btn, e);
+          });
+          return btn;
+        }
+      };
+      ControlRegistry.register("decreaseFont", {
+        icon: "A-",
+        ariaLabel: "Decrease font size",
+        title: "Decrease font size",
+        className: "editable-button-font editable-button-decrease",
+        appliesTo: ["div"],
+        onClick: (element) => {
+          pushUndoState();
+          changeFontSize(element, -CONFIG.FONT_SIZE_STEP, editableRegistry);
+        }
       });
-      return btn;
-    }
-  };
-  ControlRegistry.register("decreaseFont", {
-    icon: "A-",
-    ariaLabel: "Decrease font size",
-    title: "Decrease font size",
-    className: "editable-button-font editable-button-decrease",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      changeFontSize(element, -CONFIG.FONT_SIZE_STEP, editableRegistry);
-    }
-  });
-  ControlRegistry.register("increaseFont", {
-    icon: "A+",
-    ariaLabel: "Increase font size",
-    title: "Increase font size",
-    className: "editable-button-font editable-button-increase",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
-    }
-  });
-  ControlRegistry.register("alignLeft", {
-    icon: "\u21E4",
-    ariaLabel: "Align text left",
-    title: "Align Left",
-    className: "editable-button-align",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      element.style.textAlign = "left";
-      const editableElt = editableRegistry.get(element);
-      if (editableElt)
-        editableElt.state.textAlign = "left";
-    }
-  });
-  ControlRegistry.register("alignCenter", {
-    icon: "\u21D4",
-    ariaLabel: "Align text center",
-    title: "Align Center",
-    className: "editable-button-align",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      element.style.textAlign = "center";
-      const editableElt = editableRegistry.get(element);
-      if (editableElt)
-        editableElt.state.textAlign = "center";
-    }
-  });
-  ControlRegistry.register("alignRight", {
-    icon: "\u21E5",
-    ariaLabel: "Align text right",
-    title: "Align Right",
-    className: "editable-button-align",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      element.style.textAlign = "right";
-      const editableElt = editableRegistry.get(element);
-      if (editableElt)
-        editableElt.state.textAlign = "right";
-    }
-  });
-  ControlRegistry.register("editMode", {
-    icon: "\u270E",
-    ariaLabel: "Toggle edit mode",
-    title: "Edit Text",
-    className: "editable-button-edit",
-    appliesTo: ["div"],
-    onClick: (element, btn) => {
-      const isEditing = btn.classList.contains("active");
-      const quillData = quillInstances.get(element);
-      if (!isEditing) {
-        if (quillData) {
-          if (quillData.toolbarContainer) {
-            quillData.toolbarContainer.classList.add("editing");
-          }
-          quillData.isEditing = true;
-          quillData.quill.enable(true);
-          quillData.quill.focus();
+      ControlRegistry.register("increaseFont", {
+        icon: "A+",
+        ariaLabel: "Increase font size",
+        title: "Increase font size",
+        className: "editable-button-font editable-button-increase",
+        appliesTo: ["div"],
+        onClick: (element) => {
+          pushUndoState();
+          changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
         }
-        btn.classList.add("active");
-        btn.title = "Exit Edit Mode";
-      } else {
-        if (quillData) {
-          if (quillData.toolbarContainer) {
-            quillData.toolbarContainer.classList.remove("editing");
-          }
-          quillData.isEditing = false;
-          quillData.quill.enable(false);
+      });
+      ControlRegistry.register("alignLeft", {
+        icon: "\u21E4",
+        ariaLabel: "Align text left",
+        title: "Align Left",
+        className: "editable-button-align",
+        appliesTo: ["div"],
+        onClick: (element) => {
+          pushUndoState();
+          element.style.textAlign = "left";
+          const editableElt = editableRegistry.get(element);
+          if (editableElt)
+            editableElt.state.textAlign = "left";
         }
-        btn.classList.remove("active");
-        btn.title = "Edit Text";
-        window.getSelection().removeAllRanges();
+      });
+      ControlRegistry.register("alignCenter", {
+        icon: "\u21D4",
+        ariaLabel: "Align text center",
+        title: "Align Center",
+        className: "editable-button-align",
+        appliesTo: ["div"],
+        onClick: (element) => {
+          pushUndoState();
+          element.style.textAlign = "center";
+          const editableElt = editableRegistry.get(element);
+          if (editableElt)
+            editableElt.state.textAlign = "center";
+        }
+      });
+      ControlRegistry.register("alignRight", {
+        icon: "\u21E5",
+        ariaLabel: "Align text right",
+        title: "Align Right",
+        className: "editable-button-align",
+        appliesTo: ["div"],
+        onClick: (element) => {
+          pushUndoState();
+          element.style.textAlign = "right";
+          const editableElt = editableRegistry.get(element);
+          if (editableElt)
+            editableElt.state.textAlign = "right";
+        }
+      });
+      ControlRegistry.register("editMode", {
+        icon: "\u270E",
+        ariaLabel: "Toggle edit mode",
+        title: "Edit Text",
+        className: "editable-button-edit",
+        appliesTo: ["div"],
+        onClick: (element, btn) => {
+          const isEditing = btn.classList.contains("active");
+          const quillData = quillInstances.get(element);
+          if (!isEditing) {
+            if (quillData) {
+              if (quillData.toolbarContainer) {
+                quillData.toolbarContainer.classList.add("editing");
+              }
+              quillData.isEditing = true;
+              quillData.quill.enable(true);
+              quillData.quill.focus();
+            }
+            btn.classList.add("active");
+            btn.title = "Exit Edit Mode";
+          } else {
+            if (quillData) {
+              if (quillData.toolbarContainer) {
+                quillData.toolbarContainer.classList.remove("editing");
+              }
+              quillData.isEditing = false;
+              quillData.quill.enable(false);
+            }
+            btn.classList.remove("active");
+            btn.title = "Edit Text";
+            window.getSelection().removeAllRanges();
+          }
+        }
+      });
+      NewElementRegistry = {
+        /** @type {Array<{element: HTMLElement, slideIndex: number, content: string, newSlideRef: Object|null}>} */
+        newDivs: [],
+        /** @type {Array<{element: HTMLElement, afterSlideIndex: number, insertAfterNewSlide: Object|null, insertionOrder: number}>} */
+        newSlides: [],
+        /** @type {Array<Object>} Arrow data objects */
+        newArrows: [],
+        /**
+         * Add a new text div to tracking.
+         * @param {HTMLElement} div - The div element
+         * @param {number} slideIndex - Index of the slide containing the div
+         * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+         */
+        addDiv(div, slideIndex, newSlideRef = null) {
+          this.newDivs.push({
+            element: div,
+            slideIndex,
+            content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
+            newSlideRef
+          });
+        },
+        /**
+         * Add a new slide to tracking.
+         * @param {HTMLElement} slide - The slide section element
+         * @param {number} afterSlideIndex - Original slide index to insert after
+         * @param {Object|null} [insertAfterNewSlide=null] - Parent new slide for chained insertions
+         */
+        addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
+          this.newSlides.push({
+            element: slide,
+            afterSlideIndex,
+            insertAfterNewSlide,
+            insertionOrder: this.newSlides.length
+          });
+        },
+        /**
+         * Add a new arrow to tracking.
+         * Stores reference directly so drag updates are reflected.
+         * @param {Object} arrowData - Arrow data object
+         * @param {number} slideIndex - Index of the slide containing the arrow
+         * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+         */
+        addArrow(arrowData, slideIndex, newSlideRef = null) {
+          arrowData.slideIndex = slideIndex;
+          arrowData.newSlideRef = newSlideRef;
+          this.newArrows.push(arrowData);
+        },
+        /**
+         * Count new slides inserted before a given index (for offset calculation).
+         * @param {number} index - The slide index
+         * @returns {number} Count of new slides before this index
+         */
+        countNewSlidesBefore(index) {
+          return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
+        },
+        /**
+         * Clear all tracked elements (e.g., after save).
+         */
+        clear() {
+          this.newDivs = [];
+          this.newSlides = [];
+          this.newArrows = [];
+        },
+        /**
+         * Check if there are any new elements tracked.
+         * @returns {boolean} True if any new elements exist
+         */
+        hasNewElements() {
+          return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
+        }
+      };
+      ToolbarRegistry = {
+        /** @type {Map<string, Object>} Registered actions by name */
+        actions: /* @__PURE__ */ new Map(),
+        /**
+         * Register a toolbar action.
+         * @param {string} name - Unique action name
+         * @param {Object} config - Action configuration
+         * @param {string} config.icon - Button icon
+         * @param {string} config.label - Button label
+         * @param {string} config.title - Tooltip text
+         * @param {string} [config.className] - Additional CSS class
+         * @param {Function} [config.onClick] - Click handler
+         * @param {Array} [config.submenu] - Submenu items for dropdown
+         */
+        register(name, config) {
+          this.actions.set(name, { name, ...config });
+        },
+        /**
+         * Get all registered actions.
+         * @returns {Object[]} Array of action configs
+         */
+        getActions() {
+          return [...this.actions.values()];
+        },
+        /**
+         * Create a button element from an action config.
+         * @param {Object} config - Action configuration
+         * @returns {HTMLButtonElement} The created button
+         */
+        createButton(config) {
+          const btn = document.createElement("button");
+          btn.className = "editable-toolbar-button " + (config.className || "");
+          btn.setAttribute("aria-label", config.label);
+          btn.title = config.title;
+          btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            config.onClick(e);
+          });
+          return btn;
+        },
+        /**
+         * Create a button with dropdown submenu.
+         * @param {Object} config - Action configuration with submenu array
+         * @returns {HTMLDivElement} Wrapper containing button and submenu
+         */
+        createSubmenuButton(config) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "editable-toolbar-submenu-wrapper";
+          const btn = document.createElement("button");
+          btn.className = "editable-toolbar-button " + (config.className || "");
+          btn.setAttribute("aria-label", config.label);
+          btn.setAttribute("aria-haspopup", "true");
+          btn.setAttribute("aria-expanded", "false");
+          btn.title = config.title;
+          btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+          const submenu = document.createElement("div");
+          submenu.className = "editable-toolbar-submenu";
+          submenu.setAttribute("role", "menu");
+          config.submenu.forEach((itemConfig) => {
+            const item = document.createElement("button");
+            item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
+            item.setAttribute("role", "menuitem");
+            item.title = itemConfig.title;
+            item.innerHTML = `<span class="toolbar-icon">${itemConfig.icon}</span><span class="toolbar-label">${itemConfig.label}</span>`;
+            item.addEventListener("click", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              itemConfig.onClick(e);
+              submenu.classList.remove("open");
+              btn.setAttribute("aria-expanded", "false");
+            });
+            submenu.appendChild(item);
+          });
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpen = submenu.classList.toggle("open");
+            btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+          });
+          document.addEventListener("click", (e) => {
+            if (!wrapper.contains(e.target)) {
+              submenu.classList.remove("open");
+              btn.setAttribute("aria-expanded", "false");
+            }
+          });
+          wrapper.appendChild(btn);
+          wrapper.appendChild(submenu);
+          return wrapper;
+        }
+      };
+    }
+  });
+
+  // src/arrows.js
+  var arrows_exports = {};
+  __export(arrows_exports, {
+    ARROW_HEAD_STYLES: () => ARROW_HEAD_STYLES,
+    addNewArrow: () => addNewArrow,
+    cleanupArrowListeners: () => cleanupArrowListeners,
+    createArrowElement: () => createArrowElement,
+    createArrowStyleControls: () => createArrowStyleControls,
+    getActiveArrow: () => getActiveArrow,
+    hasArrowExtension: () => hasArrowExtension,
+    setActiveArrow: () => setActiveArrow,
+    showArrowExtensionWarning: () => showArrowExtensionWarning,
+    toggleCurveMode: () => toggleCurveMode,
+    updateArrowActiveState: () => updateArrowActiveState,
+    updateArrowAppearance: () => updateArrowAppearance,
+    updateArrowHandles: () => updateArrowHandles,
+    updateArrowLabel: () => updateArrowLabel,
+    updateArrowPath: () => updateArrowPath,
+    updateArrowStylePanel: () => updateArrowStylePanel
+  });
+  function hasArrowExtension() {
+    if (window._quarto_arrow_extension)
+      return true;
+    const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
+    if (arrowSvgs.length > 0)
+      return true;
+    const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
+    if (arrowPaths.length > 0)
+      return true;
+    return false;
+  }
+  function showArrowExtensionModal() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "editable-modal-overlay";
+      overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+    `;
+      const modal = document.createElement("div");
+      modal.className = "editable-modal";
+      modal.style.cssText = `
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 450px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      font-family: system-ui, -apple-system, sans-serif;
+    `;
+      modal.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
+      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
+        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
+      </p>
+      <p style="margin: 0 0 16px 0; color: #555;">
+        Install with:<br>
+        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
+      </p>
+      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
+        Continue? (Arrows will work in the editor but won't render until the extension is installed)
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="editable-modal-cancel" style="
+          padding: 8px 16px;
+          border: 1px solid #ccc;
+          background: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Cancel</button>
+        <button class="editable-modal-confirm" style="
+          padding: 8px 16px;
+          border: none;
+          background: var(--editable-accent-color, #007cba);
+          color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Continue</button>
+      </div>
+    `;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      const cleanup = (result) => {
+        overlay.remove();
+        resolve(result);
+      };
+      modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
+      modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
+      overlay.onclick = (e) => {
+        if (e.target === overlay)
+          cleanup(false);
+      };
+      modal.querySelector(".editable-modal-confirm").focus();
+    });
+  }
+  async function showArrowExtensionWarning() {
+    if (arrowExtensionWarningShown)
+      return true;
+    const detected = hasArrowExtension();
+    if (detected) {
+      arrowExtensionWarningShown = true;
+      return true;
+    }
+    const confirmed = await showArrowExtensionModal();
+    if (confirmed) {
+      arrowExtensionWarningShown = true;
+    }
+    return confirmed;
+  }
+  function setActiveArrow(arrowData) {
+    if (activeArrow && activeArrow !== arrowData) {
+      activeArrow.isActive = false;
+      updateArrowActiveState(activeArrow);
+    }
+    activeArrow = arrowData;
+    if (arrowData) {
+      arrowData.isActive = true;
+      updateArrowActiveState(arrowData);
+    }
+    updateArrowStylePanel(arrowData);
+  }
+  function getActiveArrow() {
+    return activeArrow;
+  }
+  function cleanupArrowListeners(arrowData) {
+    if (arrowData._dragController) {
+      arrowData._dragController.abort();
+      arrowData._dragController = null;
+    }
+    const handles = [
+      arrowData._startHandle,
+      arrowData._endHandle,
+      arrowData._control1Handle,
+      arrowData._control2Handle
+    ];
+    for (const handle of handles) {
+      if (handle && handle._dragController) {
+        handle._dragController.abort();
+        handle._dragController = null;
       }
     }
-  });
-  var NewElementRegistry = {
-    /** @type {Array<{element: HTMLElement, slideIndex: number, content: string, newSlideRef: Object|null}>} */
-    newDivs: [],
-    /** @type {Array<{element: HTMLElement, afterSlideIndex: number, insertAfterNewSlide: Object|null, insertionOrder: number}>} */
-    newSlides: [],
-    /** @type {Array<Object>} Arrow data objects */
-    newArrows: [],
-    /**
-     * Add a new text div to tracking.
-     * @param {HTMLElement} div - The div element
-     * @param {number} slideIndex - Index of the slide containing the div
-     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
-     */
-    addDiv(div, slideIndex, newSlideRef = null) {
-      this.newDivs.push({
-        element: div,
-        slideIndex,
-        content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
-        newSlideRef
-      });
-    },
-    /**
-     * Add a new slide to tracking.
-     * @param {HTMLElement} slide - The slide section element
-     * @param {number} afterSlideIndex - Original slide index to insert after
-     * @param {Object|null} [insertAfterNewSlide=null] - Parent new slide for chained insertions
-     */
-    addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
-      this.newSlides.push({
-        element: slide,
-        afterSlideIndex,
-        insertAfterNewSlide,
-        insertionOrder: this.newSlides.length
-      });
-    },
-    /**
-     * Add a new arrow to tracking.
-     * Stores reference directly so drag updates are reflected.
-     * @param {Object} arrowData - Arrow data object
-     * @param {number} slideIndex - Index of the slide containing the arrow
-     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
-     */
-    addArrow(arrowData, slideIndex, newSlideRef = null) {
-      arrowData.slideIndex = slideIndex;
-      arrowData.newSlideRef = newSlideRef;
-      this.newArrows.push(arrowData);
-    },
-    /**
-     * Count new slides inserted before a given index (for offset calculation).
-     * @param {number} index - The slide index
-     * @returns {number} Count of new slides before this index
-     */
-    countNewSlidesBefore(index) {
-      return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
-    },
-    /**
-     * Clear all tracked elements (e.g., after save).
-     */
-    clear() {
-      this.newDivs = [];
-      this.newSlides = [];
-      this.newArrows = [];
-    },
-    /**
-     * Check if there are any new elements tracked.
-     * @returns {boolean} True if any new elements exist
-     */
-    hasNewElements() {
-      return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
-    }
-  };
-  var ToolbarRegistry = {
-    /** @type {Map<string, Object>} Registered actions by name */
-    actions: /* @__PURE__ */ new Map(),
-    /**
-     * Register a toolbar action.
-     * @param {string} name - Unique action name
-     * @param {Object} config - Action configuration
-     * @param {string} config.icon - Button icon
-     * @param {string} config.label - Button label
-     * @param {string} config.title - Tooltip text
-     * @param {string} [config.className] - Additional CSS class
-     * @param {Function} [config.onClick] - Click handler
-     * @param {Array} [config.submenu] - Submenu items for dropdown
-     */
-    register(name, config) {
-      this.actions.set(name, { name, ...config });
-    },
-    /**
-     * Get all registered actions.
-     * @returns {Object[]} Array of action configs
-     */
-    getActions() {
-      return [...this.actions.values()];
-    },
-    /**
-     * Create a button element from an action config.
-     * @param {Object} config - Action configuration
-     * @returns {HTMLButtonElement} The created button
-     */
-    createButton(config) {
-      const btn = document.createElement("button");
-      btn.className = "editable-toolbar-button " + (config.className || "");
-      btn.setAttribute("aria-label", config.label);
-      btn.title = config.title;
-      btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        config.onClick(e);
-      });
-      return btn;
-    },
-    /**
-     * Create a button with dropdown submenu.
-     * @param {Object} config - Action configuration with submenu array
-     * @returns {HTMLDivElement} Wrapper containing button and submenu
-     */
-    createSubmenuButton(config) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "editable-toolbar-submenu-wrapper";
-      const btn = document.createElement("button");
-      btn.className = "editable-toolbar-button " + (config.className || "");
-      btn.setAttribute("aria-label", config.label);
-      btn.setAttribute("aria-haspopup", "true");
-      btn.setAttribute("aria-expanded", "false");
-      btn.title = config.title;
-      btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
-      const submenu = document.createElement("div");
-      submenu.className = "editable-toolbar-submenu";
-      submenu.setAttribute("role", "menu");
-      config.submenu.forEach((itemConfig) => {
-        const item = document.createElement("button");
-        item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
-        item.setAttribute("role", "menuitem");
-        item.title = itemConfig.title;
-        item.innerHTML = `<span class="toolbar-icon">${itemConfig.icon}</span><span class="toolbar-label">${itemConfig.label}</span>`;
-        item.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          itemConfig.onClick(e);
-          submenu.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
-        });
-        submenu.appendChild(item);
-      });
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const isOpen = submenu.classList.toggle("open");
-        btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      });
-      document.addEventListener("click", (e) => {
-        if (!wrapper.contains(e.target)) {
-          submenu.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
+  }
+  function createArrowStyleControls() {
+    const container = document.createElement("div");
+    container.className = "arrow-style-controls";
+    container.style.display = "none";
+    const colorPresetsRow = document.createElement("div");
+    colorPresetsRow.className = "arrow-color-presets";
+    const defaultColors = ["#000000"];
+    const paletteColors = getColorPalette();
+    const allColors = [...defaultColors, ...paletteColors.filter((c) => c.toLowerCase() !== "#000000")];
+    allColors.forEach((color) => {
+      const swatch = document.createElement("button");
+      swatch.className = "arrow-color-swatch";
+      swatch.style.backgroundColor = color;
+      swatch.title = color;
+      swatch.addEventListener("click", () => {
+        if (activeArrow) {
+          pushUndoState();
+          activeArrow.color = color;
+          updateArrowAppearance(activeArrow);
+          const picker = container.querySelector("#arrow-style-color");
+          if (picker)
+            picker.value = color;
+          colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
+          swatch.classList.add("selected");
         }
       });
-      wrapper.appendChild(btn);
-      wrapper.appendChild(submenu);
-      return wrapper;
+      colorPresetsRow.appendChild(swatch);
+    });
+    container.appendChild(colorPresetsRow);
+    const colorPicker = document.createElement("input");
+    colorPicker.type = "color";
+    colorPicker.id = "arrow-style-color";
+    colorPicker.className = "arrow-toolbar-color";
+    colorPicker.value = "#000000";
+    colorPicker.title = "Custom color";
+    colorPicker.addEventListener("focus", () => {
+      if (activeArrow)
+        pushUndoState();
+    });
+    colorPicker.addEventListener("input", (e) => {
+      if (activeArrow) {
+        activeArrow.color = e.target.value;
+        updateArrowAppearance(activeArrow);
+        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
+      }
+    });
+    container.appendChild(colorPicker);
+    const widthInput = document.createElement("input");
+    widthInput.type = "number";
+    widthInput.id = "arrow-style-width";
+    widthInput.className = "arrow-toolbar-width";
+    widthInput.min = "1";
+    widthInput.max = "20";
+    widthInput.value = "2";
+    widthInput.title = "Width";
+    widthInput.addEventListener("focus", () => {
+      if (activeArrow)
+        pushUndoState();
+    });
+    widthInput.addEventListener("input", (e) => {
+      if (activeArrow) {
+        const val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+          activeArrow.width = Math.max(1, Math.min(20, val));
+          updateArrowAppearance(activeArrow);
+        }
+      }
+    });
+    container.appendChild(widthInput);
+    const headSelect = document.createElement("select");
+    headSelect.id = "arrow-style-head";
+    headSelect.className = "arrow-toolbar-select";
+    headSelect.title = "Head style";
+    ARROW_HEAD_STYLES.forEach((style) => {
+      const opt = document.createElement("option");
+      opt.value = style;
+      opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+      headSelect.appendChild(opt);
+    });
+    headSelect.addEventListener("change", (e) => {
+      if (activeArrow) {
+        pushUndoState();
+        activeArrow.head = e.target.value;
+        updateArrowAppearance(activeArrow);
+      }
+    });
+    container.appendChild(headSelect);
+    const dashSelect = document.createElement("select");
+    dashSelect.id = "arrow-style-dash";
+    dashSelect.className = "arrow-toolbar-select";
+    dashSelect.title = "Dash style";
+    ["solid", "dashed", "dotted"].forEach((style) => {
+      const opt = document.createElement("option");
+      opt.value = style;
+      opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+      dashSelect.appendChild(opt);
+    });
+    dashSelect.addEventListener("change", (e) => {
+      if (activeArrow) {
+        pushUndoState();
+        activeArrow.dash = e.target.value;
+        updateArrowAppearance(activeArrow);
+      }
+    });
+    container.appendChild(dashSelect);
+    const lineSelect = document.createElement("select");
+    lineSelect.id = "arrow-style-line";
+    lineSelect.className = "arrow-toolbar-select";
+    lineSelect.title = "Line style";
+    ["single", "double", "triple"].forEach((style) => {
+      const opt = document.createElement("option");
+      opt.value = style;
+      opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
+      lineSelect.appendChild(opt);
+    });
+    lineSelect.addEventListener("change", (e) => {
+      if (activeArrow) {
+        pushUndoState();
+        activeArrow.line = e.target.value;
+        updateArrowAppearance(activeArrow);
+      }
+    });
+    container.appendChild(lineSelect);
+    const opacityInput = document.createElement("input");
+    opacityInput.type = "range";
+    opacityInput.id = "arrow-style-opacity";
+    opacityInput.className = "arrow-toolbar-opacity";
+    opacityInput.min = "0";
+    opacityInput.max = "1";
+    opacityInput.step = "0.1";
+    opacityInput.value = "1";
+    opacityInput.title = "Opacity";
+    opacityInput.addEventListener("mousedown", () => {
+      if (activeArrow)
+        pushUndoState();
+    });
+    opacityInput.addEventListener("input", (e) => {
+      if (activeArrow) {
+        activeArrow.opacity = parseFloat(e.target.value);
+        updateArrowAppearance(activeArrow);
+      }
+    });
+    container.appendChild(opacityInput);
+    const curveToggle = document.createElement("button");
+    curveToggle.id = "arrow-style-curve";
+    curveToggle.className = "arrow-toolbar-curve";
+    curveToggle.innerHTML = "\u2934 Curve";
+    curveToggle.title = "Toggle curve mode";
+    curveToggle.addEventListener("click", () => {
+      if (activeArrow) {
+        pushUndoState();
+        toggleCurveMode(activeArrow);
+        updateCurveToggleInToolbar(activeArrow);
+      }
+    });
+    container.appendChild(curveToggle);
+    const labelSeparator = document.createElement("div");
+    labelSeparator.className = "arrow-toolbar-separator";
+    labelSeparator.textContent = "Label";
+    container.appendChild(labelSeparator);
+    const labelInput = document.createElement("input");
+    labelInput.type = "text";
+    labelInput.id = "arrow-style-label";
+    labelInput.className = "arrow-toolbar-label";
+    labelInput.placeholder = "Label text...";
+    labelInput.title = "Label text";
+    labelInput.addEventListener("input", (e) => {
+      if (activeArrow) {
+        activeArrow.label = e.target.value;
+        updateArrowLabel(activeArrow);
+      }
+    });
+    container.appendChild(labelInput);
+    const labelPositionSelect = document.createElement("select");
+    labelPositionSelect.id = "arrow-style-label-position";
+    labelPositionSelect.className = "arrow-toolbar-select";
+    labelPositionSelect.title = "Label position";
+    ["start", "middle", "end"].forEach((pos) => {
+      const opt = document.createElement("option");
+      opt.value = pos;
+      opt.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
+      labelPositionSelect.appendChild(opt);
+    });
+    labelPositionSelect.value = CONFIG.ARROW_DEFAULT_LABEL_POSITION;
+    labelPositionSelect.addEventListener("change", (e) => {
+      if (activeArrow) {
+        activeArrow.labelPosition = e.target.value;
+        updateArrowLabel(activeArrow);
+      }
+    });
+    container.appendChild(labelPositionSelect);
+    const labelOffsetInput = document.createElement("input");
+    labelOffsetInput.type = "number";
+    labelOffsetInput.id = "arrow-style-label-offset";
+    labelOffsetInput.className = "arrow-toolbar-width";
+    labelOffsetInput.value = CONFIG.ARROW_DEFAULT_LABEL_OFFSET.toString();
+    labelOffsetInput.title = "Label offset (positive = above, negative = below)";
+    labelOffsetInput.addEventListener("input", (e) => {
+      if (activeArrow) {
+        const val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+          activeArrow.labelOffset = val;
+          updateArrowLabel(activeArrow);
+        }
+      }
+    });
+    container.appendChild(labelOffsetInput);
+    arrowControlRefs.colorPicker = colorPicker;
+    arrowControlRefs.widthInput = widthInput;
+    arrowControlRefs.headSelect = headSelect;
+    arrowControlRefs.dashSelect = dashSelect;
+    arrowControlRefs.lineSelect = lineSelect;
+    arrowControlRefs.opacityInput = opacityInput;
+    arrowControlRefs.colorPresetsRow = colorPresetsRow;
+    arrowControlRefs.labelInput = labelInput;
+    arrowControlRefs.labelPositionSelect = labelPositionSelect;
+    arrowControlRefs.labelOffsetInput = labelOffsetInput;
+    return container;
+  }
+  function updateArrowStylePanel(arrowData) {
+    const toolbar = document.getElementById("editable-toolbar");
+    if (!toolbar)
+      return;
+    const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
+    let arrowControls = toolbar.querySelector(".arrow-style-controls");
+    if (!arrowControls) {
+      arrowControls = createArrowStyleControls();
+      toolbar.appendChild(arrowControls);
     }
-  };
+    if (arrowData) {
+      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
+      if (colorPicker) {
+        const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
+        colorPicker.value = colorValue;
+        if (colorPresetsRow) {
+          colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => {
+            s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
+          });
+        }
+      }
+      if (widthInput) {
+        widthInput.value = arrowData.width.toString();
+      }
+      if (headSelect) {
+        headSelect.value = arrowData.head || "arrow";
+      }
+      if (dashSelect) {
+        dashSelect.value = arrowData.dash || "solid";
+      }
+      if (lineSelect) {
+        lineSelect.value = arrowData.line || "single";
+      }
+      if (opacityInput) {
+        opacityInput.value = (arrowData.opacity !== void 0 ? arrowData.opacity : 1).toString();
+      }
+      if (labelInput) {
+        labelInput.value = arrowData.label || "";
+      }
+      if (labelPositionSelect) {
+        labelPositionSelect.value = arrowData.labelPosition || CONFIG.ARROW_DEFAULT_LABEL_POSITION;
+      }
+      if (labelOffsetInput) {
+        labelOffsetInput.value = (arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET).toString();
+      }
+      updateCurveToggleInToolbar(arrowData);
+      buttonsContainer.style.display = "none";
+      arrowControls.style.display = "flex";
+    } else {
+      buttonsContainer.style.display = "flex";
+      arrowControls.style.display = "none";
+    }
+  }
+  function updateCurveToggleInToolbar(arrowData) {
+    const curveToggle = document.querySelector("#arrow-style-curve");
+    if (!curveToggle)
+      return;
+    if (arrowData && arrowData.curveMode) {
+      curveToggle.classList.add("active");
+    } else {
+      curveToggle.classList.remove("active");
+    }
+  }
+  function updateArrowAppearance(arrowData) {
+    if (!arrowData._path)
+      return;
+    arrowData._path.setAttribute("stroke", arrowData.color);
+    arrowData._path.setAttribute("stroke-width", arrowData.width);
+    if (arrowData._labelText) {
+      arrowData._labelText.setAttribute("fill", arrowData.color);
+    }
+    const dashPatterns = {
+      solid: "none",
+      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
+      dotted: `${arrowData.width},${arrowData.width * 2}`
+    };
+    const dashArray = dashPatterns[arrowData.dash] || "none";
+    if (dashArray === "none") {
+      arrowData._path.removeAttribute("stroke-dasharray");
+    } else {
+      arrowData._path.setAttribute("stroke-dasharray", dashArray);
+    }
+    const opacity = arrowData.opacity !== void 0 ? arrowData.opacity : 1;
+    arrowData._path.setAttribute("opacity", opacity);
+    updateArrowLineStyle(arrowData);
+    updateArrowheadMarker(arrowData);
+  }
+  function offsetPointPerpendicular(x, y, tangentX, tangentY, offsetAmount) {
+    const len = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
+    if (len === 0)
+      return { x, y };
+    const normalX = -tangentY / len;
+    const normalY = tangentX / len;
+    return {
+      x: x + normalX * offsetAmount,
+      y: y + normalY * offsetAmount
+    };
+  }
+  function createOffsetPathD(arrowData, offsetAmount) {
+    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+    if (control1X !== null && control2X !== null) {
+      const startTangent = { x: control1X - fromX, y: control1Y - fromY };
+      const endTangent = { x: toX - control2X, y: toY - control2Y };
+      const c1Tangent = { x: control2X - fromX, y: control2Y - fromY };
+      const c2Tangent = { x: toX - control1X, y: toY - control1Y };
+      const newFrom = offsetPointPerpendicular(fromX, fromY, startTangent.x, startTangent.y, offsetAmount);
+      const newC1 = offsetPointPerpendicular(control1X, control1Y, c1Tangent.x, c1Tangent.y, offsetAmount);
+      const newC2 = offsetPointPerpendicular(control2X, control2Y, c2Tangent.x, c2Tangent.y, offsetAmount);
+      const newTo = offsetPointPerpendicular(toX, toY, endTangent.x, endTangent.y, offsetAmount);
+      return `M ${newFrom.x},${newFrom.y} C ${newC1.x},${newC1.y} ${newC2.x},${newC2.y} ${newTo.x},${newTo.y}`;
+    } else if (control1X !== null) {
+      const startTangent = { x: control1X - fromX, y: control1Y - fromY };
+      const controlTangent = { x: toX - fromX, y: toY - fromY };
+      const endTangent = { x: toX - control1X, y: toY - control1Y };
+      const newFrom = offsetPointPerpendicular(fromX, fromY, startTangent.x, startTangent.y, offsetAmount);
+      const newC1 = offsetPointPerpendicular(control1X, control1Y, controlTangent.x, controlTangent.y, offsetAmount);
+      const newTo = offsetPointPerpendicular(toX, toY, endTangent.x, endTangent.y, offsetAmount);
+      return `M ${newFrom.x},${newFrom.y} Q ${newC1.x},${newC1.y} ${newTo.x},${newTo.y}`;
+    } else {
+      const tangent = { x: toX - fromX, y: toY - fromY };
+      const newFrom = offsetPointPerpendicular(fromX, fromY, tangent.x, tangent.y, offsetAmount);
+      const newTo = offsetPointPerpendicular(toX, toY, tangent.x, tangent.y, offsetAmount);
+      return `M ${newFrom.x},${newFrom.y} L ${newTo.x},${newTo.y}`;
+    }
+  }
+  function updateArrowLineStyle(arrowData) {
+    if (!arrowData._svg || !arrowData._path)
+      return;
+    const existingLines = arrowData._svg.querySelectorAll(".arrow-extra-line");
+    existingLines.forEach((line) => line.remove());
+    const lineStyle = arrowData.line || "single";
+    if (lineStyle === "single") {
+      arrowData._path.setAttribute("stroke", arrowData.color);
+      arrowData._path.style.visibility = "visible";
+      return;
+    }
+    const offset = arrowData.width * 1.5;
+    const createOffsetPath = (offsetAmount) => {
+      const extraPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      extraPath.className.baseVal = "arrow-extra-line";
+      extraPath.setAttribute("stroke", arrowData.color);
+      extraPath.setAttribute("stroke-width", arrowData.width);
+      extraPath.setAttribute("fill", "none");
+      extraPath.style.pointerEvents = "none";
+      const dashPatterns = {
+        solid: "none",
+        dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
+        dotted: `${arrowData.width},${arrowData.width * 2}`
+      };
+      const dashArray = dashPatterns[arrowData.dash] || "none";
+      if (dashArray !== "none") {
+        extraPath.setAttribute("stroke-dasharray", dashArray);
+      }
+      const opacity = arrowData.opacity !== void 0 ? arrowData.opacity : 1;
+      extraPath.setAttribute("opacity", opacity);
+      const offsetPathD = createOffsetPathD(arrowData, offsetAmount);
+      extraPath.setAttribute("d", offsetPathD);
+      return extraPath;
+    };
+    if (lineStyle === "double") {
+      const line1 = createOffsetPath(-offset);
+      const line2 = createOffsetPath(offset);
+      arrowData._svg.insertBefore(line1, arrowData._path);
+      arrowData._svg.insertBefore(line2, arrowData._path);
+      arrowData._path.style.visibility = "visible";
+      arrowData._path.setAttribute("stroke", "transparent");
+    } else if (lineStyle === "triple") {
+      const line1 = createOffsetPath(-offset);
+      const line2 = createOffsetPath(offset);
+      arrowData._svg.insertBefore(line1, arrowData._path);
+      arrowData._svg.insertBefore(line2, arrowData._path);
+      arrowData._path.style.visibility = "visible";
+      arrowData._path.setAttribute("stroke", arrowData.color);
+    }
+  }
+  function updateArrowheadMarker(arrowData) {
+    if (!arrowData._svg || !arrowData._markerId)
+      return;
+    const marker = arrowData._svg.querySelector(`#${arrowData._markerId}`);
+    if (!marker)
+      return;
+    const markerPath = marker.querySelector("path");
+    if (!markerPath)
+      return;
+    markerPath.setAttribute("fill", arrowData.color);
+    const size = 10;
+    let pathD;
+    let refX = 0;
+    switch (arrowData.head) {
+      case "stealth":
+        const w = size * 1.2;
+        pathD = `M 0 0 L ${w} ${size / 2} L 0 ${size} L ${w * 0.3} ${size / 2} z`;
+        refX = w * 0.3;
+        break;
+      case "diamond":
+        pathD = `M 0 ${size / 2} L ${size / 2} 0 L ${size} ${size / 2} L ${size / 2} ${size} z`;
+        refX = size / 2;
+        break;
+      case "circle":
+        const r = size / 2;
+        pathD = `M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${size} A ${r} ${r} 0 1 1 ${r} 0`;
+        refX = r;
+        marker.setAttribute("refY", r);
+        break;
+      case "square":
+        pathD = `M 0 0 L ${size} 0 L ${size} ${size} L 0 ${size} z`;
+        refX = size / 2;
+        break;
+      case "bar":
+        const bw = size / 3;
+        pathD = `M 0 0 L ${bw} 0 L ${bw} ${size} L 0 ${size} z`;
+        refX = bw / 2;
+        break;
+      case "none":
+        pathD = "";
+        break;
+      default:
+        pathD = `M 0 0 L ${size} ${size / 2} L 0 ${size} z`;
+        refX = 0;
+        marker.setAttribute("refY", size / 2);
+    }
+    markerPath.setAttribute("d", pathD);
+    marker.setAttribute("refX", refX);
+    if (arrowData.head === "none") {
+      arrowData._path.removeAttribute("marker-end");
+    } else {
+      arrowData._path.setAttribute("marker-end", `url(#${arrowData._markerId})`);
+    }
+  }
+  function updateArrowActiveState(arrowData) {
+    if (!arrowData._container)
+      return;
+    const showControls = arrowData.isActive;
+    if (arrowData._startHandle) {
+      arrowData._startHandle.style.display = showControls ? "" : "none";
+    }
+    if (arrowData._endHandle) {
+      arrowData._endHandle.style.display = showControls ? "" : "none";
+    }
+    if (arrowData._control1Handle) {
+      arrowData._control1Handle.style.display = showControls && arrowData.curveMode ? "" : "none";
+    }
+    if (arrowData._control2Handle) {
+      arrowData._control2Handle.style.display = showControls && arrowData.curveMode ? "" : "none";
+    }
+    if (arrowData._guideLine1) {
+      arrowData._guideLine1.style.display = showControls && arrowData.curveMode && arrowData.control1X !== null ? "" : "none";
+    }
+    if (arrowData._guideLine2) {
+      arrowData._guideLine2.style.display = showControls && arrowData.curveMode && arrowData.control2X !== null ? "" : "none";
+    }
+    if (showControls) {
+      arrowData._container.classList.add("active");
+    } else {
+      arrowData._container.classList.remove("active");
+    }
+  }
+  async function addNewArrow() {
+    if (!await showArrowExtensionWarning()) {
+      return null;
+    }
+    const currentSlide = getCurrentSlide();
+    if (!currentSlide) {
+      console.warn("No current slide found");
+      return null;
+    }
+    pushUndoState();
+    const slideIndex = getCurrentSlideIndex();
+    const slideWidth = currentSlide.offsetWidth || 960;
+    const slideHeight = currentSlide.offsetHeight || 700;
+    const centerX = slideWidth / 2;
+    const centerY = slideHeight / 2;
+    const halfLength = CONFIG.NEW_ARROW_LENGTH / 2;
+    const arrowData = {
+      fromX: centerX - halfLength,
+      fromY: centerY,
+      toX: centerX + halfLength,
+      toY: centerY,
+      control1X: null,
+      control1Y: null,
+      control2X: null,
+      control2Y: null,
+      curveMode: false,
+      color: CONFIG.ARROW_DEFAULT_COLOR,
+      width: CONFIG.ARROW_DEFAULT_WIDTH,
+      head: "arrow",
+      dash: "solid",
+      line: "single",
+      opacity: 1,
+      label: "",
+      labelPosition: CONFIG.ARROW_DEFAULT_LABEL_POSITION,
+      labelOffset: CONFIG.ARROW_DEFAULT_LABEL_OFFSET,
+      isActive: true
+    };
+    const arrowContainer = createArrowElement(arrowData);
+    currentSlide.appendChild(arrowContainer);
+    arrowData.element = arrowContainer;
+    const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
+    if (isOnNewSlide) {
+      const newSlideEntry = NewElementRegistry.newSlides.find(
+        (s) => s.element === currentSlide
+      );
+      NewElementRegistry.addArrow(arrowData, slideIndex, newSlideEntry || null);
+    } else {
+      const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
+      const originalSlideIndex = qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
+      NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
+    }
+    debug("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
+    return arrowContainer;
+  }
+  function createArrowElement(arrowData) {
+    const container = document.createElement("div");
+    container.className = "editable-arrow-container editable-new";
+    container.style.position = "absolute";
+    container.style.left = "0";
+    container.style.top = "0";
+    container.style.width = "100%";
+    container.style.height = "100%";
+    container.style.pointerEvents = "none";
+    container.style.zIndex = "100";
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.style.position = "absolute";
+    svg.style.left = "0";
+    svg.style.top = "0";
+    svg.style.width = "100%";
+    svg.style.height = "100%";
+    svg.style.overflow = "visible";
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    const markerId = "arrowhead-" + Math.random().toString(36).substring(2, 11);
+    marker.setAttribute("id", markerId);
+    marker.setAttribute("markerWidth", "10");
+    marker.setAttribute("markerHeight", "10");
+    marker.setAttribute("refX", "0");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("orient", "auto");
+    marker.setAttribute("markerUnits", "strokeWidth");
+    const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrowPath.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+    const hitArea = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    hitArea.setAttribute("stroke", "transparent");
+    hitArea.setAttribute("stroke-width", "20");
+    hitArea.setAttribute("stroke-linecap", "round");
+    hitArea.setAttribute("fill", "none");
+    hitArea.style.pointerEvents = "auto";
+    hitArea.style.cursor = "pointer";
+    svg.appendChild(hitArea);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("stroke", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+    path.setAttribute("stroke-width", arrowData.width || CONFIG.ARROW_DEFAULT_WIDTH);
+    path.setAttribute("fill", "none");
+    path.setAttribute("marker-end", `url(#${markerId})`);
+    path.style.pointerEvents = "none";
+    svg.appendChild(path);
+    const labelText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    labelText.className.baseVal = "editable-arrow-label";
+    labelText.setAttribute("text-anchor", "middle");
+    labelText.setAttribute("dominant-baseline", "middle");
+    labelText.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+    labelText.style.pointerEvents = "none";
+    labelText.style.userSelect = "none";
+    labelText.style.fontSize = "14px";
+    labelText.style.fontFamily = "system-ui, -apple-system, sans-serif";
+    svg.appendChild(labelText);
+    const guideLine1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    guideLine1.setAttribute("stroke", CONFIG.ARROW_CONTROL1_COLOR);
+    guideLine1.setAttribute("stroke-width", "1");
+    guideLine1.setAttribute("stroke-dasharray", "4,4");
+    guideLine1.setAttribute("opacity", "0.6");
+    guideLine1.style.display = "none";
+    svg.appendChild(guideLine1);
+    const guideLine2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    guideLine2.setAttribute("stroke", CONFIG.ARROW_CONTROL2_COLOR);
+    guideLine2.setAttribute("stroke-width", "1");
+    guideLine2.setAttribute("stroke-dasharray", "4,4");
+    guideLine2.setAttribute("opacity", "0.6");
+    guideLine2.style.display = "none";
+    svg.appendChild(guideLine2);
+    container.appendChild(svg);
+    arrowData._path = path;
+    arrowData._hitArea = hitArea;
+    arrowData._svg = svg;
+    arrowData._markerId = markerId;
+    arrowData._guideLine1 = guideLine1;
+    arrowData._guideLine2 = guideLine2;
+    arrowData._labelText = labelText;
+    arrowData._container = container;
+    const startHandle = createArrowHandle(arrowData, "start");
+    const endHandle = createArrowHandle(arrowData, "end");
+    container.appendChild(startHandle);
+    container.appendChild(endHandle);
+    arrowData._startHandle = startHandle;
+    arrowData._endHandle = endHandle;
+    const control1Handle = createArrowHandle(arrowData, "control1");
+    const control2Handle = createArrowHandle(arrowData, "control2");
+    control1Handle.style.display = "none";
+    control2Handle.style.display = "none";
+    container.appendChild(control1Handle);
+    container.appendChild(control2Handle);
+    arrowData._control1Handle = control1Handle;
+    arrowData._control2Handle = control2Handle;
+    const arrowDragController = new AbortController();
+    arrowData._dragController = arrowDragController;
+    let isDraggingArrow = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let arrowDragScale = 1;
+    const startArrowDrag = (e) => {
+      e.stopPropagation();
+      setActiveArrow(arrowData);
+      pushUndoState();
+      isDraggingArrow = true;
+      arrowDragScale = getSlideScale();
+      const clientX = e.clientX || e.touches && e.touches[0].clientX;
+      const clientY = e.clientY || e.touches && e.touches[0].clientY;
+      dragStartX = clientX;
+      dragStartY = clientY;
+      hitArea.style.cursor = "grabbing";
+    };
+    const onArrowDrag = (e) => {
+      if (!isDraggingArrow)
+        return;
+      e.preventDefault();
+      const clientX = e.clientX || e.touches && e.touches[0].clientX;
+      const clientY = e.clientY || e.touches && e.touches[0].clientY;
+      const deltaX = (clientX - dragStartX) / arrowDragScale;
+      const deltaY = (clientY - dragStartY) / arrowDragScale;
+      arrowData.fromX += deltaX;
+      arrowData.fromY += deltaY;
+      arrowData.toX += deltaX;
+      arrowData.toY += deltaY;
+      if (arrowData.control1X !== null) {
+        arrowData.control1X += deltaX;
+        arrowData.control1Y += deltaY;
+      }
+      if (arrowData.control2X !== null) {
+        arrowData.control2X += deltaX;
+        arrowData.control2Y += deltaY;
+      }
+      dragStartX = clientX;
+      dragStartY = clientY;
+      updateArrowPath(arrowData);
+      updateArrowHandles(arrowData);
+    };
+    const endArrowDrag = () => {
+      isDraggingArrow = false;
+      hitArea.style.cursor = "grab";
+    };
+    hitArea.addEventListener("mousedown", startArrowDrag);
+    document.addEventListener("mousemove", onArrowDrag, { signal: arrowDragController.signal });
+    document.addEventListener("mouseup", endArrowDrag, { signal: arrowDragController.signal });
+    hitArea.style.cursor = "grab";
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+    updateArrowLabel(arrowData);
+    setActiveArrow(arrowData);
+    if (!globalClickOutsideHandlerRegistered) {
+      globalClickOutsideHandlerRegistered = true;
+      document.addEventListener("click", (e) => {
+        if (activeArrow && !e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar")) {
+          setActiveArrow(null);
+        }
+      });
+    }
+    return container;
+  }
+  function createArrowHandle(arrowData, position) {
+    const handle = document.createElement("div");
+    handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
+    handle.style.position = "absolute";
+    const isControlPoint = position === "control1" || position === "control2";
+    const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
+    let bgColor;
+    if (position === "start")
+      bgColor = "#007cba";
+    else if (position === "end")
+      bgColor = "#28a745";
+    else if (position === "control1")
+      bgColor = CONFIG.ARROW_CONTROL1_COLOR;
+    else if (position === "control2")
+      bgColor = CONFIG.ARROW_CONTROL2_COLOR;
+    handle.style.width = handleSize + "px";
+    handle.style.height = handleSize + "px";
+    handle.style.borderRadius = "50%";
+    handle.style.backgroundColor = bgColor;
+    handle.style.border = "2px solid white";
+    handle.style.cursor = "move";
+    handle.style.pointerEvents = "auto";
+    handle.style.transform = "translate(-50%, -50%)";
+    handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+    handle.setAttribute("role", "slider");
+    handle.setAttribute("aria-label", `Arrow ${position} point`);
+    handle.setAttribute("tabindex", "0");
+    const handleDragController = new AbortController();
+    handle._dragController = handleDragController;
+    let isDragging = false;
+    let cachedScale = 1;
+    const startDrag = (e) => {
+      pushUndoState();
+      isDragging = true;
+      cachedScale = getSlideScale();
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onDrag = (e) => {
+      if (!isDragging)
+        return;
+      if (!arrowData.element)
+        return;
+      const rect = arrowData.element.getBoundingClientRect();
+      const scale = cachedScale;
+      let clientX, clientY;
+      if (e.type.startsWith("touch")) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      const x = (clientX - rect.left) / scale;
+      const y = (clientY - rect.top) / scale;
+      if (position === "start") {
+        arrowData.fromX = x;
+        arrowData.fromY = y;
+      } else if (position === "end") {
+        arrowData.toX = x;
+        arrowData.toY = y;
+      } else if (position === "control1") {
+        arrowData.control1X = x;
+        arrowData.control1Y = y;
+      } else if (position === "control2") {
+        arrowData.control2X = x;
+        arrowData.control2Y = y;
+      }
+      updateArrowPath(arrowData);
+      updateArrowHandles(arrowData);
+      e.preventDefault();
+    };
+    const stopDrag = () => {
+      isDragging = false;
+    };
+    handle.addEventListener("mousedown", startDrag);
+    handle.addEventListener("touchstart", startDrag);
+    document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
+    document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
+    document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
+    document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
+    return handle;
+  }
+  function updateArrowPath(arrowData) {
+    if (!arrowData._path)
+      return;
+    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+    let pathD;
+    if (control1X !== null && control2X !== null) {
+      pathD = `M ${fromX},${fromY} C ${control1X},${control1Y} ${control2X},${control2Y} ${toX},${toY}`;
+    } else if (control1X !== null) {
+      pathD = `M ${fromX},${fromY} Q ${control1X},${control1Y} ${toX},${toY}`;
+    } else {
+      pathD = `M ${fromX},${fromY} L ${toX},${toY}`;
+    }
+    arrowData._path.setAttribute("d", pathD);
+    if (arrowData._hitArea) {
+      arrowData._hitArea.setAttribute("d", pathD);
+    }
+    if (arrowData._guideLine1 && arrowData.curveMode) {
+      if (control1X !== null) {
+        arrowData._guideLine1.setAttribute("x1", fromX);
+        arrowData._guideLine1.setAttribute("y1", fromY);
+        arrowData._guideLine1.setAttribute("x2", control1X);
+        arrowData._guideLine1.setAttribute("y2", control1Y);
+        arrowData._guideLine1.style.display = "";
+      } else {
+        arrowData._guideLine1.style.display = "none";
+      }
+    }
+    if (arrowData._guideLine2 && arrowData.curveMode) {
+      if (control2X !== null) {
+        arrowData._guideLine2.setAttribute("x1", toX);
+        arrowData._guideLine2.setAttribute("y1", toY);
+        arrowData._guideLine2.setAttribute("x2", control2X);
+        arrowData._guideLine2.setAttribute("y2", control2Y);
+        arrowData._guideLine2.style.display = "";
+      } else {
+        arrowData._guideLine2.style.display = "none";
+      }
+    }
+    if (arrowData.line && arrowData.line !== "single") {
+      updateArrowLineStyle(arrowData);
+    }
+    updateArrowLabel(arrowData);
+  }
+  function updateArrowHandles(arrowData) {
+    if (arrowData._startHandle) {
+      arrowData._startHandle.style.left = arrowData.fromX + "px";
+      arrowData._startHandle.style.top = arrowData.fromY + "px";
+    }
+    if (arrowData._endHandle) {
+      arrowData._endHandle.style.left = arrowData.toX + "px";
+      arrowData._endHandle.style.top = arrowData.toY + "px";
+    }
+    if (arrowData._control1Handle && arrowData.control1X !== null) {
+      arrowData._control1Handle.style.left = arrowData.control1X + "px";
+      arrowData._control1Handle.style.top = arrowData.control1Y + "px";
+    }
+    if (arrowData._control2Handle && arrowData.control2X !== null) {
+      arrowData._control2Handle.style.left = arrowData.control2X + "px";
+      arrowData._control2Handle.style.top = arrowData.control2Y + "px";
+    }
+  }
+  function getPointOnArrow(t, arrowData) {
+    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+    let x, y, dx, dy;
+    if (control1X !== null && control2X !== null) {
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const mt3 = mt2 * mt;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      x = mt3 * fromX + 3 * mt2 * t * control1X + 3 * mt * t2 * control2X + t3 * toX;
+      y = mt3 * fromY + 3 * mt2 * t * control1Y + 3 * mt * t2 * control2Y + t3 * toY;
+      dx = 3 * mt2 * (control1X - fromX) + 6 * mt * t * (control2X - control1X) + 3 * t2 * (toX - control2X);
+      dy = 3 * mt2 * (control1Y - fromY) + 6 * mt * t * (control2Y - control1Y) + 3 * t2 * (toY - control2Y);
+    } else if (control1X !== null) {
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const t2 = t * t;
+      x = mt2 * fromX + 2 * mt * t * control1X + t2 * toX;
+      y = mt2 * fromY + 2 * mt * t * control1Y + t2 * toY;
+      dx = 2 * mt * (control1X - fromX) + 2 * t * (toX - control1X);
+      dy = 2 * mt * (control1Y - fromY) + 2 * t * (toY - control1Y);
+    } else {
+      x = fromX + t * (toX - fromX);
+      y = fromY + t * (toY - fromY);
+      dx = toX - fromX;
+      dy = toY - fromY;
+    }
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    return { x, y, angle };
+  }
+  function updateArrowLabel(arrowData) {
+    if (!arrowData._labelText)
+      return;
+    const label = arrowData.label || "";
+    arrowData._labelText.textContent = label;
+    if (!label) {
+      arrowData._labelText.style.display = "none";
+      return;
+    }
+    arrowData._labelText.style.display = "";
+    let t;
+    switch (arrowData.labelPosition) {
+      case "start":
+        t = 0.15;
+        break;
+      case "end":
+        t = 0.85;
+        break;
+      case "middle":
+      default:
+        t = 0.5;
+    }
+    const point = getPointOnArrow(t, arrowData);
+    const offset = arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET;
+    const angleRad = point.angle * (Math.PI / 180);
+    const offsetX = -Math.sin(angleRad) * offset;
+    const offsetY = Math.cos(angleRad) * offset;
+    const labelX = point.x + offsetX;
+    const labelY = point.y + offsetY;
+    arrowData._labelText.setAttribute("x", labelX);
+    arrowData._labelText.setAttribute("y", labelY);
+    let rotationAngle = point.angle;
+    if (rotationAngle > 90 || rotationAngle < -90) {
+      rotationAngle += 180;
+    }
+    arrowData._labelText.setAttribute("transform", `rotate(${rotationAngle}, ${labelX}, ${labelY})`);
+    arrowData._labelText.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+  }
+  function toggleCurveMode(arrowData) {
+    arrowData.curveMode = !arrowData.curveMode;
+    if (arrowData.curveMode) {
+      const { fromX, fromY, toX, toY } = arrowData;
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const perpX = -dy / len * 50;
+      const perpY = dx / len * 50;
+      arrowData.control1X = fromX + dx / 3 + perpX;
+      arrowData.control1Y = fromY + dy / 3 + perpY;
+      arrowData.control2X = fromX + 2 * dx / 3 + perpX;
+      arrowData.control2Y = fromY + 2 * dy / 3 + perpY;
+      if (arrowData._container) {
+        arrowData._container.classList.add("curve-mode");
+      }
+    } else {
+      arrowData.control1X = null;
+      arrowData.control1Y = null;
+      arrowData.control2X = null;
+      arrowData.control2Y = null;
+      if (arrowData._container) {
+        arrowData._container.classList.remove("curve-mode");
+      }
+      if (arrowData._guideLine1)
+        arrowData._guideLine1.style.display = "none";
+      if (arrowData._guideLine2)
+        arrowData._guideLine2.style.display = "none";
+    }
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+  }
+  var arrowExtensionWarningShown, activeArrow, globalClickOutsideHandlerRegistered, arrowControlRefs, ARROW_HEAD_STYLES;
+  var init_arrows = __esm({
+    "src/arrows.js"() {
+      init_config();
+      init_utils();
+      init_colors();
+      init_registries();
+      init_undo();
+      arrowExtensionWarningShown = false;
+      activeArrow = null;
+      globalClickOutsideHandlerRegistered = false;
+      arrowControlRefs = {
+        colorPicker: null,
+        widthInput: null,
+        headSelect: null,
+        dashSelect: null,
+        lineSelect: null,
+        opacityInput: null,
+        colorPresetsRow: null,
+        labelInput: null,
+        labelPositionSelect: null,
+        labelOffsetInput: null
+      };
+      ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
+    }
+  });
+
+  // src/undo.js
+  function captureAllState() {
+    const snapshots = [];
+    for (const [element, editableElt] of editableRegistry) {
+      editableElt.syncFromDOM();
+      snapshots.push({
+        element,
+        state: { ...editableElt.state }
+      });
+    }
+    return snapshots;
+  }
+  function captureArrowState() {
+    const snapshots = [];
+    for (const arrowData of NewElementRegistry.newArrows) {
+      const state = {};
+      for (const key of ARROW_STATE_KEYS) {
+        state[key] = arrowData[key];
+      }
+      snapshots.push({
+        arrowData,
+        state
+      });
+    }
+    return snapshots;
+  }
+  function restoreArrowState(snapshots) {
+    Promise.resolve().then(() => (init_arrows(), arrows_exports)).then(({ updateArrowPath: updateArrowPath2, updateArrowHandles: updateArrowHandles2, updateArrowAppearance: updateArrowAppearance2, updateArrowActiveState: updateArrowActiveState2 }) => {
+      for (const snapshot of snapshots) {
+        const arrowData = snapshot.arrowData;
+        for (const key of ARROW_STATE_KEYS) {
+          arrowData[key] = snapshot.state[key];
+        }
+        updateArrowPath2(arrowData);
+        updateArrowHandles2(arrowData);
+        updateArrowAppearance2(arrowData);
+        updateArrowActiveState2(arrowData);
+      }
+    });
+  }
+  function restoreState(snapshots) {
+    for (const snapshot of snapshots) {
+      const editableElt = editableRegistry.get(snapshot.element);
+      if (editableElt) {
+        editableElt.setState(snapshot.state);
+      }
+    }
+  }
+  function pushUndoState() {
+    const state = {
+      elements: captureAllState(),
+      arrows: captureArrowState()
+    };
+    undoStack.push(state);
+    if (undoStack.length > CONFIG.MAX_UNDO_STACK_SIZE) {
+      undoStack.shift();
+    }
+    redoStack.length = 0;
+  }
+  function undo() {
+    if (undoStack.length === 0)
+      return false;
+    const currentState = {
+      elements: captureAllState(),
+      arrows: captureArrowState()
+    };
+    redoStack.push(currentState);
+    const previousState = undoStack.pop();
+    restoreState(previousState.elements);
+    restoreArrowState(previousState.arrows);
+    return true;
+  }
+  function redo() {
+    if (redoStack.length === 0)
+      return false;
+    const currentState = {
+      elements: captureAllState(),
+      arrows: captureArrowState()
+    };
+    undoStack.push(currentState);
+    const redoState = redoStack.pop();
+    restoreState(redoState.elements);
+    restoreArrowState(redoState.arrows);
+    return true;
+  }
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+  function canRedo() {
+    return redoStack.length > 0;
+  }
+  function setupUndoRedoKeyboard() {
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        if (document.activeElement.contentEditable === "true")
+          return;
+        e.preventDefault();
+        if (undo()) {
+          debug("Undo performed");
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "z" && e.shiftKey)) {
+        if (document.activeElement.contentEditable === "true")
+          return;
+        e.preventDefault();
+        if (redo()) {
+          debug("Redo performed");
+        }
+        return;
+      }
+    });
+  }
+  var undoStack, redoStack, ARROW_STATE_KEYS;
+  var init_undo = __esm({
+    "src/undo.js"() {
+      init_config();
+      init_utils();
+      init_editable_element();
+      init_registries();
+      undoStack = [];
+      redoStack = [];
+      ARROW_STATE_KEYS = [
+        "fromX",
+        "fromY",
+        "toX",
+        "toY",
+        "control1X",
+        "control1Y",
+        "control2X",
+        "control2Y",
+        "curveMode",
+        "color",
+        "width",
+        "head",
+        "dash",
+        "line",
+        "opacity"
+      ];
+    }
+  });
+
+  // src/main.js
+  init_config();
+  init_utils();
+  init_editable_element();
+  init_undo();
+  init_quill();
+  init_registries();
 
   // src/capabilities.js
+  init_config();
+  init_utils();
+  init_undo();
+  init_quill();
+  init_registries();
   var Capabilities = {
     /**
      * Move capability - handles dragging elements to reposition them.
@@ -1194,6 +2431,7 @@ var EditableModule = (() => {
   }
 
   // src/toolbar.js
+  init_registries();
   function createFloatingToolbar() {
     if (document.getElementById("editable-toolbar")) {
       return document.getElementById("editable-toolbar");
@@ -1278,1049 +2516,16 @@ var EditableModule = (() => {
     document.addEventListener("touchend", stopDrag);
   }
 
-  // src/arrows.js
-  var arrowExtensionWarningShown = false;
-  function hasArrowExtension() {
-    if (window._quarto_arrow_extension)
-      return true;
-    const arrowSvgs = document.querySelectorAll('svg defs marker[id^="arrow-"]');
-    if (arrowSvgs.length > 0)
-      return true;
-    const arrowPaths = document.querySelectorAll('svg path[marker-end^="url(#arrow-"]');
-    if (arrowPaths.length > 0)
-      return true;
-    return false;
-  }
-  function showArrowExtensionModal() {
-    return new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.className = "editable-modal-overlay";
-      overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100000;
-    `;
-      const modal = document.createElement("div");
-      modal.className = "editable-modal";
-      modal.style.cssText = `
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 450px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      font-family: system-ui, -apple-system, sans-serif;
-    `;
-      modal.innerHTML = `
-      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
-      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
-        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
-      </p>
-      <p style="margin: 0 0 16px 0; color: #555;">
-        Install with:<br>
-        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
-      </p>
-      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
-        Continue? (Arrows will work in the editor but won't render until the extension is installed)
-      </p>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="editable-modal-cancel" style="
-          padding: 8px 16px;
-          border: 1px solid #ccc;
-          background: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Cancel</button>
-        <button class="editable-modal-confirm" style="
-          padding: 8px 16px;
-          border: none;
-          background: var(--editable-accent-color, #007cba);
-          color: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Continue</button>
-      </div>
-    `;
-      overlay.appendChild(modal);
-      document.body.appendChild(overlay);
-      const cleanup = (result) => {
-        overlay.remove();
-        resolve(result);
-      };
-      modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
-      modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
-      overlay.onclick = (e) => {
-        if (e.target === overlay)
-          cleanup(false);
-      };
-      modal.querySelector(".editable-modal-confirm").focus();
-    });
-  }
-  async function showArrowExtensionWarning() {
-    if (arrowExtensionWarningShown)
-      return true;
-    const detected = hasArrowExtension();
-    if (detected) {
-      arrowExtensionWarningShown = true;
-      return true;
-    }
-    const confirmed = await showArrowExtensionModal();
-    if (confirmed) {
-      arrowExtensionWarningShown = true;
-    }
-    return confirmed;
-  }
-  var activeArrow = null;
-  var globalClickOutsideHandlerRegistered = false;
-  var arrowControlRefs = {
-    colorPicker: null,
-    widthInput: null,
-    headSelect: null,
-    dashSelect: null,
-    lineSelect: null,
-    opacityInput: null,
-    colorPresetsRow: null,
-    labelInput: null,
-    labelPositionSelect: null,
-    labelOffsetInput: null
-  };
-  var ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
-  function setActiveArrow(arrowData) {
-    if (activeArrow && activeArrow !== arrowData) {
-      activeArrow.isActive = false;
-      updateArrowActiveState(activeArrow);
-    }
-    activeArrow = arrowData;
-    if (arrowData) {
-      arrowData.isActive = true;
-      updateArrowActiveState(arrowData);
-    }
-    updateArrowStylePanel(arrowData);
-  }
-  function createArrowStyleControls() {
-    const container = document.createElement("div");
-    container.className = "arrow-style-controls";
-    container.style.display = "none";
-    const colorPresetsRow = document.createElement("div");
-    colorPresetsRow.className = "arrow-color-presets";
-    const defaultColors = ["#000000"];
-    const paletteColors = getColorPalette();
-    const allColors = [...defaultColors, ...paletteColors.filter((c) => c.toLowerCase() !== "#000000")];
-    allColors.forEach((color) => {
-      const swatch = document.createElement("button");
-      swatch.className = "arrow-color-swatch";
-      swatch.style.backgroundColor = color;
-      swatch.title = color;
-      swatch.addEventListener("click", () => {
-        if (activeArrow) {
-          activeArrow.color = color;
-          updateArrowAppearance(activeArrow);
-          const picker = container.querySelector("#arrow-style-color");
-          if (picker)
-            picker.value = color;
-          colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
-          swatch.classList.add("selected");
-        }
-      });
-      colorPresetsRow.appendChild(swatch);
-    });
-    container.appendChild(colorPresetsRow);
-    const colorPicker = document.createElement("input");
-    colorPicker.type = "color";
-    colorPicker.id = "arrow-style-color";
-    colorPicker.className = "arrow-toolbar-color";
-    colorPicker.value = "#000000";
-    colorPicker.title = "Custom color";
-    colorPicker.addEventListener("input", (e) => {
-      if (activeArrow) {
-        activeArrow.color = e.target.value;
-        updateArrowAppearance(activeArrow);
-        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
-      }
-    });
-    container.appendChild(colorPicker);
-    const widthInput = document.createElement("input");
-    widthInput.type = "number";
-    widthInput.id = "arrow-style-width";
-    widthInput.className = "arrow-toolbar-width";
-    widthInput.min = "1";
-    widthInput.max = "20";
-    widthInput.value = "2";
-    widthInput.title = "Width";
-    widthInput.addEventListener("input", (e) => {
-      if (activeArrow) {
-        const val = parseInt(e.target.value);
-        if (!isNaN(val)) {
-          activeArrow.width = Math.max(1, Math.min(20, val));
-          updateArrowAppearance(activeArrow);
-        }
-      }
-    });
-    container.appendChild(widthInput);
-    const headSelect = document.createElement("select");
-    headSelect.id = "arrow-style-head";
-    headSelect.className = "arrow-toolbar-select";
-    headSelect.title = "Head style";
-    ARROW_HEAD_STYLES.forEach((style) => {
-      const opt = document.createElement("option");
-      opt.value = style;
-      opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
-      headSelect.appendChild(opt);
-    });
-    headSelect.addEventListener("change", (e) => {
-      if (activeArrow) {
-        activeArrow.head = e.target.value;
-        updateArrowAppearance(activeArrow);
-      }
-    });
-    container.appendChild(headSelect);
-    const dashSelect = document.createElement("select");
-    dashSelect.id = "arrow-style-dash";
-    dashSelect.className = "arrow-toolbar-select";
-    dashSelect.title = "Dash style";
-    ["solid", "dashed", "dotted"].forEach((style) => {
-      const opt = document.createElement("option");
-      opt.value = style;
-      opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
-      dashSelect.appendChild(opt);
-    });
-    dashSelect.addEventListener("change", (e) => {
-      if (activeArrow) {
-        activeArrow.dash = e.target.value;
-        updateArrowAppearance(activeArrow);
-      }
-    });
-    container.appendChild(dashSelect);
-    const lineSelect = document.createElement("select");
-    lineSelect.id = "arrow-style-line";
-    lineSelect.className = "arrow-toolbar-select";
-    lineSelect.title = "Line style";
-    ["single", "double", "triple"].forEach((style) => {
-      const opt = document.createElement("option");
-      opt.value = style;
-      opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
-      lineSelect.appendChild(opt);
-    });
-    lineSelect.addEventListener("change", (e) => {
-      if (activeArrow) {
-        activeArrow.line = e.target.value;
-        updateArrowAppearance(activeArrow);
-      }
-    });
-    container.appendChild(lineSelect);
-    const opacityInput = document.createElement("input");
-    opacityInput.type = "range";
-    opacityInput.id = "arrow-style-opacity";
-    opacityInput.className = "arrow-toolbar-opacity";
-    opacityInput.min = "0";
-    opacityInput.max = "1";
-    opacityInput.step = "0.1";
-    opacityInput.value = "1";
-    opacityInput.title = "Opacity";
-    opacityInput.addEventListener("input", (e) => {
-      if (activeArrow) {
-        activeArrow.opacity = parseFloat(e.target.value);
-        updateArrowAppearance(activeArrow);
-      }
-    });
-    container.appendChild(opacityInput);
-    const curveToggle = document.createElement("button");
-    curveToggle.id = "arrow-style-curve";
-    curveToggle.className = "arrow-toolbar-curve";
-    curveToggle.innerHTML = "\u2934 Curve";
-    curveToggle.title = "Toggle curve mode";
-    curveToggle.addEventListener("click", () => {
-      if (activeArrow) {
-        toggleCurveMode(activeArrow);
-        updateCurveToggleInToolbar(activeArrow);
-      }
-    });
-    container.appendChild(curveToggle);
-    const labelSeparator = document.createElement("div");
-    labelSeparator.className = "arrow-toolbar-separator";
-    labelSeparator.textContent = "Label";
-    container.appendChild(labelSeparator);
-    const labelInput = document.createElement("input");
-    labelInput.type = "text";
-    labelInput.id = "arrow-style-label";
-    labelInput.className = "arrow-toolbar-label";
-    labelInput.placeholder = "Label text...";
-    labelInput.title = "Label text";
-    labelInput.addEventListener("input", (e) => {
-      if (activeArrow) {
-        activeArrow.label = e.target.value;
-        updateArrowLabel(activeArrow);
-      }
-    });
-    container.appendChild(labelInput);
-    const labelPositionSelect = document.createElement("select");
-    labelPositionSelect.id = "arrow-style-label-position";
-    labelPositionSelect.className = "arrow-toolbar-select";
-    labelPositionSelect.title = "Label position";
-    ["start", "middle", "end"].forEach((pos) => {
-      const opt = document.createElement("option");
-      opt.value = pos;
-      opt.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
-      labelPositionSelect.appendChild(opt);
-    });
-    labelPositionSelect.value = CONFIG.ARROW_DEFAULT_LABEL_POSITION;
-    labelPositionSelect.addEventListener("change", (e) => {
-      if (activeArrow) {
-        activeArrow.labelPosition = e.target.value;
-        updateArrowLabel(activeArrow);
-      }
-    });
-    container.appendChild(labelPositionSelect);
-    const labelOffsetInput = document.createElement("input");
-    labelOffsetInput.type = "number";
-    labelOffsetInput.id = "arrow-style-label-offset";
-    labelOffsetInput.className = "arrow-toolbar-width";
-    labelOffsetInput.value = CONFIG.ARROW_DEFAULT_LABEL_OFFSET.toString();
-    labelOffsetInput.title = "Label offset (positive = above, negative = below)";
-    labelOffsetInput.addEventListener("input", (e) => {
-      if (activeArrow) {
-        const val = parseInt(e.target.value);
-        if (!isNaN(val)) {
-          activeArrow.labelOffset = val;
-          updateArrowLabel(activeArrow);
-        }
-      }
-    });
-    container.appendChild(labelOffsetInput);
-    arrowControlRefs.colorPicker = colorPicker;
-    arrowControlRefs.widthInput = widthInput;
-    arrowControlRefs.headSelect = headSelect;
-    arrowControlRefs.dashSelect = dashSelect;
-    arrowControlRefs.lineSelect = lineSelect;
-    arrowControlRefs.opacityInput = opacityInput;
-    arrowControlRefs.colorPresetsRow = colorPresetsRow;
-    arrowControlRefs.labelInput = labelInput;
-    arrowControlRefs.labelPositionSelect = labelPositionSelect;
-    arrowControlRefs.labelOffsetInput = labelOffsetInput;
-    return container;
-  }
-  function updateArrowStylePanel(arrowData) {
-    const toolbar = document.getElementById("editable-toolbar");
-    if (!toolbar)
-      return;
-    const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
-    let arrowControls = toolbar.querySelector(".arrow-style-controls");
-    if (!arrowControls) {
-      arrowControls = createArrowStyleControls();
-      toolbar.appendChild(arrowControls);
-    }
-    if (arrowData) {
-      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
-      if (colorPicker) {
-        const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
-        colorPicker.value = colorValue;
-        if (colorPresetsRow) {
-          colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => {
-            s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
-          });
-        }
-      }
-      if (widthInput) {
-        widthInput.value = arrowData.width.toString();
-      }
-      if (headSelect) {
-        headSelect.value = arrowData.head || "arrow";
-      }
-      if (dashSelect) {
-        dashSelect.value = arrowData.dash || "solid";
-      }
-      if (lineSelect) {
-        lineSelect.value = arrowData.line || "single";
-      }
-      if (opacityInput) {
-        opacityInput.value = (arrowData.opacity !== void 0 ? arrowData.opacity : 1).toString();
-      }
-      if (labelInput) {
-        labelInput.value = arrowData.label || "";
-      }
-      if (labelPositionSelect) {
-        labelPositionSelect.value = arrowData.labelPosition || CONFIG.ARROW_DEFAULT_LABEL_POSITION;
-      }
-      if (labelOffsetInput) {
-        labelOffsetInput.value = (arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET).toString();
-      }
-      updateCurveToggleInToolbar(arrowData);
-      buttonsContainer.style.display = "none";
-      arrowControls.style.display = "flex";
-    } else {
-      buttonsContainer.style.display = "flex";
-      arrowControls.style.display = "none";
-    }
-  }
-  function updateCurveToggleInToolbar(arrowData) {
-    const curveToggle = document.querySelector("#arrow-style-curve");
-    if (!curveToggle)
-      return;
-    if (arrowData && arrowData.curveMode) {
-      curveToggle.classList.add("active");
-    } else {
-      curveToggle.classList.remove("active");
-    }
-  }
-  function updateArrowAppearance(arrowData) {
-    if (!arrowData._path)
-      return;
-    arrowData._path.setAttribute("stroke", arrowData.color);
-    arrowData._path.setAttribute("stroke-width", arrowData.width);
-    if (arrowData._labelText) {
-      arrowData._labelText.setAttribute("fill", arrowData.color);
-    }
-    const dashPatterns = {
-      solid: "none",
-      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-      dotted: `${arrowData.width},${arrowData.width * 2}`
-    };
-    const dashArray = dashPatterns[arrowData.dash] || "none";
-    if (dashArray === "none") {
-      arrowData._path.removeAttribute("stroke-dasharray");
-    } else {
-      arrowData._path.setAttribute("stroke-dasharray", dashArray);
-    }
-    const opacity = arrowData.opacity !== void 0 ? arrowData.opacity : 1;
-    arrowData._path.setAttribute("opacity", opacity);
-    updateArrowLineStyle(arrowData);
-    updateArrowheadMarker(arrowData);
-  }
-  function offsetPointPerpendicular(x, y, tangentX, tangentY, offsetAmount) {
-    const len = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
-    if (len === 0)
-      return { x, y };
-    const normalX = -tangentY / len;
-    const normalY = tangentX / len;
-    return {
-      x: x + normalX * offsetAmount,
-      y: y + normalY * offsetAmount
-    };
-  }
-  function createOffsetPathD(arrowData, offsetAmount) {
-    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
-    if (control1X !== null && control2X !== null) {
-      const startTangent = { x: control1X - fromX, y: control1Y - fromY };
-      const endTangent = { x: toX - control2X, y: toY - control2Y };
-      const c1Tangent = { x: control2X - fromX, y: control2Y - fromY };
-      const c2Tangent = { x: toX - control1X, y: toY - control1Y };
-      const newFrom = offsetPointPerpendicular(fromX, fromY, startTangent.x, startTangent.y, offsetAmount);
-      const newC1 = offsetPointPerpendicular(control1X, control1Y, c1Tangent.x, c1Tangent.y, offsetAmount);
-      const newC2 = offsetPointPerpendicular(control2X, control2Y, c2Tangent.x, c2Tangent.y, offsetAmount);
-      const newTo = offsetPointPerpendicular(toX, toY, endTangent.x, endTangent.y, offsetAmount);
-      return `M ${newFrom.x},${newFrom.y} C ${newC1.x},${newC1.y} ${newC2.x},${newC2.y} ${newTo.x},${newTo.y}`;
-    } else if (control1X !== null) {
-      const startTangent = { x: control1X - fromX, y: control1Y - fromY };
-      const controlTangent = { x: toX - fromX, y: toY - fromY };
-      const endTangent = { x: toX - control1X, y: toY - control1Y };
-      const newFrom = offsetPointPerpendicular(fromX, fromY, startTangent.x, startTangent.y, offsetAmount);
-      const newC1 = offsetPointPerpendicular(control1X, control1Y, controlTangent.x, controlTangent.y, offsetAmount);
-      const newTo = offsetPointPerpendicular(toX, toY, endTangent.x, endTangent.y, offsetAmount);
-      return `M ${newFrom.x},${newFrom.y} Q ${newC1.x},${newC1.y} ${newTo.x},${newTo.y}`;
-    } else {
-      const tangent = { x: toX - fromX, y: toY - fromY };
-      const newFrom = offsetPointPerpendicular(fromX, fromY, tangent.x, tangent.y, offsetAmount);
-      const newTo = offsetPointPerpendicular(toX, toY, tangent.x, tangent.y, offsetAmount);
-      return `M ${newFrom.x},${newFrom.y} L ${newTo.x},${newTo.y}`;
-    }
-  }
-  function updateArrowLineStyle(arrowData) {
-    if (!arrowData._svg || !arrowData._path)
-      return;
-    const existingLines = arrowData._svg.querySelectorAll(".arrow-extra-line");
-    existingLines.forEach((line) => line.remove());
-    const lineStyle = arrowData.line || "single";
-    if (lineStyle === "single") {
-      arrowData._path.setAttribute("stroke", arrowData.color);
-      arrowData._path.style.visibility = "visible";
-      return;
-    }
-    const offset = arrowData.width * 1.5;
-    const createOffsetPath = (offsetAmount) => {
-      const extraPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      extraPath.className.baseVal = "arrow-extra-line";
-      extraPath.setAttribute("stroke", arrowData.color);
-      extraPath.setAttribute("stroke-width", arrowData.width);
-      extraPath.setAttribute("fill", "none");
-      extraPath.style.pointerEvents = "none";
-      const dashPatterns = {
-        solid: "none",
-        dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-        dotted: `${arrowData.width},${arrowData.width * 2}`
-      };
-      const dashArray = dashPatterns[arrowData.dash] || "none";
-      if (dashArray !== "none") {
-        extraPath.setAttribute("stroke-dasharray", dashArray);
-      }
-      const opacity = arrowData.opacity !== void 0 ? arrowData.opacity : 1;
-      extraPath.setAttribute("opacity", opacity);
-      const offsetPathD = createOffsetPathD(arrowData, offsetAmount);
-      extraPath.setAttribute("d", offsetPathD);
-      return extraPath;
-    };
-    if (lineStyle === "double") {
-      const line1 = createOffsetPath(-offset);
-      const line2 = createOffsetPath(offset);
-      arrowData._svg.insertBefore(line1, arrowData._path);
-      arrowData._svg.insertBefore(line2, arrowData._path);
-      arrowData._path.style.visibility = "visible";
-      arrowData._path.setAttribute("stroke", "transparent");
-    } else if (lineStyle === "triple") {
-      const line1 = createOffsetPath(-offset);
-      const line2 = createOffsetPath(offset);
-      arrowData._svg.insertBefore(line1, arrowData._path);
-      arrowData._svg.insertBefore(line2, arrowData._path);
-      arrowData._path.style.visibility = "visible";
-      arrowData._path.setAttribute("stroke", arrowData.color);
-    }
-  }
-  function updateArrowheadMarker(arrowData) {
-    if (!arrowData._svg || !arrowData._markerId)
-      return;
-    const marker = arrowData._svg.querySelector(`#${arrowData._markerId}`);
-    if (!marker)
-      return;
-    const markerPath = marker.querySelector("path");
-    if (!markerPath)
-      return;
-    markerPath.setAttribute("fill", arrowData.color);
-    const size = 10;
-    let pathD;
-    let refX = 0;
-    switch (arrowData.head) {
-      case "stealth":
-        const w = size * 1.2;
-        pathD = `M 0 0 L ${w} ${size / 2} L 0 ${size} L ${w * 0.3} ${size / 2} z`;
-        refX = w * 0.3;
-        break;
-      case "diamond":
-        pathD = `M 0 ${size / 2} L ${size / 2} 0 L ${size} ${size / 2} L ${size / 2} ${size} z`;
-        refX = size / 2;
-        break;
-      case "circle":
-        const r = size / 2;
-        pathD = `M ${r} 0 A ${r} ${r} 0 1 1 ${r} ${size} A ${r} ${r} 0 1 1 ${r} 0`;
-        refX = r;
-        marker.setAttribute("refY", r);
-        break;
-      case "square":
-        pathD = `M 0 0 L ${size} 0 L ${size} ${size} L 0 ${size} z`;
-        refX = size / 2;
-        break;
-      case "bar":
-        const bw = size / 3;
-        pathD = `M 0 0 L ${bw} 0 L ${bw} ${size} L 0 ${size} z`;
-        refX = bw / 2;
-        break;
-      case "none":
-        pathD = "";
-        break;
-      default:
-        pathD = `M 0 0 L ${size} ${size / 2} L 0 ${size} z`;
-        refX = 0;
-        marker.setAttribute("refY", size / 2);
-    }
-    markerPath.setAttribute("d", pathD);
-    marker.setAttribute("refX", refX);
-    if (arrowData.head === "none") {
-      arrowData._path.removeAttribute("marker-end");
-    } else {
-      arrowData._path.setAttribute("marker-end", `url(#${arrowData._markerId})`);
-    }
-  }
-  function updateArrowActiveState(arrowData) {
-    if (!arrowData._container)
-      return;
-    const showControls = arrowData.isActive;
-    if (arrowData._startHandle) {
-      arrowData._startHandle.style.display = showControls ? "" : "none";
-    }
-    if (arrowData._endHandle) {
-      arrowData._endHandle.style.display = showControls ? "" : "none";
-    }
-    if (arrowData._control1Handle) {
-      arrowData._control1Handle.style.display = showControls && arrowData.curveMode ? "" : "none";
-    }
-    if (arrowData._control2Handle) {
-      arrowData._control2Handle.style.display = showControls && arrowData.curveMode ? "" : "none";
-    }
-    if (arrowData._guideLine1) {
-      arrowData._guideLine1.style.display = showControls && arrowData.curveMode && arrowData.control1X !== null ? "" : "none";
-    }
-    if (arrowData._guideLine2) {
-      arrowData._guideLine2.style.display = showControls && arrowData.curveMode && arrowData.control2X !== null ? "" : "none";
-    }
-    if (showControls) {
-      arrowData._container.classList.add("active");
-    } else {
-      arrowData._container.classList.remove("active");
-    }
-  }
-  async function addNewArrow() {
-    if (!await showArrowExtensionWarning()) {
-      return null;
-    }
-    const currentSlide = getCurrentSlide();
-    if (!currentSlide) {
-      console.warn("No current slide found");
-      return null;
-    }
-    const slideIndex = getCurrentSlideIndex();
-    const slideWidth = currentSlide.offsetWidth || 960;
-    const slideHeight = currentSlide.offsetHeight || 700;
-    const centerX = slideWidth / 2;
-    const centerY = slideHeight / 2;
-    const halfLength = CONFIG.NEW_ARROW_LENGTH / 2;
-    const arrowData = {
-      fromX: centerX - halfLength,
-      fromY: centerY,
-      toX: centerX + halfLength,
-      toY: centerY,
-      control1X: null,
-      control1Y: null,
-      control2X: null,
-      control2Y: null,
-      curveMode: false,
-      color: CONFIG.ARROW_DEFAULT_COLOR,
-      width: CONFIG.ARROW_DEFAULT_WIDTH,
-      head: "arrow",
-      dash: "solid",
-      line: "single",
-      opacity: 1,
-      label: "",
-      labelPosition: CONFIG.ARROW_DEFAULT_LABEL_POSITION,
-      labelOffset: CONFIG.ARROW_DEFAULT_LABEL_OFFSET,
-      isActive: true
-    };
-    const arrowContainer = createArrowElement(arrowData);
-    currentSlide.appendChild(arrowContainer);
-    arrowData.element = arrowContainer;
-    const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
-    if (isOnNewSlide) {
-      const newSlideEntry = NewElementRegistry.newSlides.find(
-        (s) => s.element === currentSlide
-      );
-      NewElementRegistry.addArrow(arrowData, slideIndex, newSlideEntry || null);
-    } else {
-      const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
-      const originalSlideIndex = qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
-      NewElementRegistry.addArrow(arrowData, originalSlideIndex, null);
-    }
-    debug("Added new arrow to slide", slideIndex, "-> QMD heading index", getQmdHeadingIndex(slideIndex));
-    return arrowContainer;
-  }
-  function createArrowElement(arrowData) {
-    const container = document.createElement("div");
-    container.className = "editable-arrow-container editable-new";
-    container.style.position = "absolute";
-    container.style.left = "0";
-    container.style.top = "0";
-    container.style.width = "100%";
-    container.style.height = "100%";
-    container.style.pointerEvents = "none";
-    container.style.zIndex = "100";
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.style.position = "absolute";
-    svg.style.left = "0";
-    svg.style.top = "0";
-    svg.style.width = "100%";
-    svg.style.height = "100%";
-    svg.style.overflow = "visible";
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-    const markerId = "arrowhead-" + Math.random().toString(36).substring(2, 11);
-    marker.setAttribute("id", markerId);
-    marker.setAttribute("markerWidth", "10");
-    marker.setAttribute("markerHeight", "10");
-    marker.setAttribute("refX", "0");
-    marker.setAttribute("refY", "5");
-    marker.setAttribute("orient", "auto");
-    marker.setAttribute("markerUnits", "strokeWidth");
-    const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-    arrowPath.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
-    marker.appendChild(arrowPath);
-    defs.appendChild(marker);
-    svg.appendChild(defs);
-    const hitArea = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    hitArea.setAttribute("stroke", "transparent");
-    hitArea.setAttribute("stroke-width", "20");
-    hitArea.setAttribute("stroke-linecap", "round");
-    hitArea.setAttribute("fill", "none");
-    hitArea.style.pointerEvents = "auto";
-    hitArea.style.cursor = "pointer";
-    svg.appendChild(hitArea);
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("stroke", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
-    path.setAttribute("stroke-width", arrowData.width || CONFIG.ARROW_DEFAULT_WIDTH);
-    path.setAttribute("fill", "none");
-    path.setAttribute("marker-end", `url(#${markerId})`);
-    path.style.pointerEvents = "none";
-    svg.appendChild(path);
-    const labelText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    labelText.className.baseVal = "editable-arrow-label";
-    labelText.setAttribute("text-anchor", "middle");
-    labelText.setAttribute("dominant-baseline", "middle");
-    labelText.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
-    labelText.style.pointerEvents = "none";
-    labelText.style.userSelect = "none";
-    labelText.style.fontSize = "14px";
-    labelText.style.fontFamily = "system-ui, -apple-system, sans-serif";
-    svg.appendChild(labelText);
-    const guideLine1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    guideLine1.setAttribute("stroke", CONFIG.ARROW_CONTROL1_COLOR);
-    guideLine1.setAttribute("stroke-width", "1");
-    guideLine1.setAttribute("stroke-dasharray", "4,4");
-    guideLine1.setAttribute("opacity", "0.6");
-    guideLine1.style.display = "none";
-    svg.appendChild(guideLine1);
-    const guideLine2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    guideLine2.setAttribute("stroke", CONFIG.ARROW_CONTROL2_COLOR);
-    guideLine2.setAttribute("stroke-width", "1");
-    guideLine2.setAttribute("stroke-dasharray", "4,4");
-    guideLine2.setAttribute("opacity", "0.6");
-    guideLine2.style.display = "none";
-    svg.appendChild(guideLine2);
-    container.appendChild(svg);
-    arrowData._path = path;
-    arrowData._hitArea = hitArea;
-    arrowData._svg = svg;
-    arrowData._markerId = markerId;
-    arrowData._guideLine1 = guideLine1;
-    arrowData._guideLine2 = guideLine2;
-    arrowData._labelText = labelText;
-    arrowData._container = container;
-    const startHandle = createArrowHandle(arrowData, "start");
-    const endHandle = createArrowHandle(arrowData, "end");
-    container.appendChild(startHandle);
-    container.appendChild(endHandle);
-    arrowData._startHandle = startHandle;
-    arrowData._endHandle = endHandle;
-    const control1Handle = createArrowHandle(arrowData, "control1");
-    const control2Handle = createArrowHandle(arrowData, "control2");
-    control1Handle.style.display = "none";
-    control2Handle.style.display = "none";
-    container.appendChild(control1Handle);
-    container.appendChild(control2Handle);
-    arrowData._control1Handle = control1Handle;
-    arrowData._control2Handle = control2Handle;
-    const arrowDragController = new AbortController();
-    arrowData._dragController = arrowDragController;
-    let isDraggingArrow = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let arrowDragScale = 1;
-    const startArrowDrag = (e) => {
-      e.stopPropagation();
-      setActiveArrow(arrowData);
-      isDraggingArrow = true;
-      arrowDragScale = getSlideScale();
-      const clientX = e.clientX || e.touches && e.touches[0].clientX;
-      const clientY = e.clientY || e.touches && e.touches[0].clientY;
-      dragStartX = clientX;
-      dragStartY = clientY;
-      hitArea.style.cursor = "grabbing";
-    };
-    const onArrowDrag = (e) => {
-      if (!isDraggingArrow)
-        return;
-      e.preventDefault();
-      const clientX = e.clientX || e.touches && e.touches[0].clientX;
-      const clientY = e.clientY || e.touches && e.touches[0].clientY;
-      const deltaX = (clientX - dragStartX) / arrowDragScale;
-      const deltaY = (clientY - dragStartY) / arrowDragScale;
-      arrowData.fromX += deltaX;
-      arrowData.fromY += deltaY;
-      arrowData.toX += deltaX;
-      arrowData.toY += deltaY;
-      if (arrowData.control1X !== null) {
-        arrowData.control1X += deltaX;
-        arrowData.control1Y += deltaY;
-      }
-      if (arrowData.control2X !== null) {
-        arrowData.control2X += deltaX;
-        arrowData.control2Y += deltaY;
-      }
-      dragStartX = clientX;
-      dragStartY = clientY;
-      updateArrowPath(arrowData);
-      updateArrowHandles(arrowData);
-    };
-    const endArrowDrag = () => {
-      isDraggingArrow = false;
-      hitArea.style.cursor = "grab";
-    };
-    hitArea.addEventListener("mousedown", startArrowDrag);
-    document.addEventListener("mousemove", onArrowDrag, { signal: arrowDragController.signal });
-    document.addEventListener("mouseup", endArrowDrag, { signal: arrowDragController.signal });
-    hitArea.style.cursor = "grab";
-    updateArrowPath(arrowData);
-    updateArrowHandles(arrowData);
-    updateArrowLabel(arrowData);
-    setActiveArrow(arrowData);
-    if (!globalClickOutsideHandlerRegistered) {
-      globalClickOutsideHandlerRegistered = true;
-      document.addEventListener("click", (e) => {
-        if (activeArrow && !e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar")) {
-          setActiveArrow(null);
-        }
-      });
-    }
-    return container;
-  }
-  function createArrowHandle(arrowData, position) {
-    const handle = document.createElement("div");
-    handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
-    handle.style.position = "absolute";
-    const isControlPoint = position === "control1" || position === "control2";
-    const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
-    let bgColor;
-    if (position === "start")
-      bgColor = "#007cba";
-    else if (position === "end")
-      bgColor = "#28a745";
-    else if (position === "control1")
-      bgColor = CONFIG.ARROW_CONTROL1_COLOR;
-    else if (position === "control2")
-      bgColor = CONFIG.ARROW_CONTROL2_COLOR;
-    handle.style.width = handleSize + "px";
-    handle.style.height = handleSize + "px";
-    handle.style.borderRadius = "50%";
-    handle.style.backgroundColor = bgColor;
-    handle.style.border = "2px solid white";
-    handle.style.cursor = "move";
-    handle.style.pointerEvents = "auto";
-    handle.style.transform = "translate(-50%, -50%)";
-    handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
-    handle.setAttribute("role", "slider");
-    handle.setAttribute("aria-label", `Arrow ${position} point`);
-    handle.setAttribute("tabindex", "0");
-    const handleDragController = new AbortController();
-    handle._dragController = handleDragController;
-    let isDragging = false;
-    let cachedScale = 1;
-    const startDrag = (e) => {
-      isDragging = true;
-      cachedScale = getSlideScale();
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    const onDrag = (e) => {
-      if (!isDragging)
-        return;
-      if (!arrowData.element)
-        return;
-      const rect = arrowData.element.getBoundingClientRect();
-      const scale = cachedScale;
-      let clientX, clientY;
-      if (e.type.startsWith("touch")) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-      }
-      const x = (clientX - rect.left) / scale;
-      const y = (clientY - rect.top) / scale;
-      if (position === "start") {
-        arrowData.fromX = x;
-        arrowData.fromY = y;
-      } else if (position === "end") {
-        arrowData.toX = x;
-        arrowData.toY = y;
-      } else if (position === "control1") {
-        arrowData.control1X = x;
-        arrowData.control1Y = y;
-      } else if (position === "control2") {
-        arrowData.control2X = x;
-        arrowData.control2Y = y;
-      }
-      updateArrowPath(arrowData);
-      updateArrowHandles(arrowData);
-      e.preventDefault();
-    };
-    const stopDrag = () => {
-      isDragging = false;
-    };
-    handle.addEventListener("mousedown", startDrag);
-    handle.addEventListener("touchstart", startDrag);
-    document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
-    document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
-    document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
-    document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
-    return handle;
-  }
-  function updateArrowPath(arrowData) {
-    if (!arrowData._path)
-      return;
-    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
-    let pathD;
-    if (control1X !== null && control2X !== null) {
-      pathD = `M ${fromX},${fromY} C ${control1X},${control1Y} ${control2X},${control2Y} ${toX},${toY}`;
-    } else if (control1X !== null) {
-      pathD = `M ${fromX},${fromY} Q ${control1X},${control1Y} ${toX},${toY}`;
-    } else {
-      pathD = `M ${fromX},${fromY} L ${toX},${toY}`;
-    }
-    arrowData._path.setAttribute("d", pathD);
-    if (arrowData._hitArea) {
-      arrowData._hitArea.setAttribute("d", pathD);
-    }
-    if (arrowData._guideLine1 && arrowData.curveMode) {
-      if (control1X !== null) {
-        arrowData._guideLine1.setAttribute("x1", fromX);
-        arrowData._guideLine1.setAttribute("y1", fromY);
-        arrowData._guideLine1.setAttribute("x2", control1X);
-        arrowData._guideLine1.setAttribute("y2", control1Y);
-        arrowData._guideLine1.style.display = "";
-      } else {
-        arrowData._guideLine1.style.display = "none";
-      }
-    }
-    if (arrowData._guideLine2 && arrowData.curveMode) {
-      if (control2X !== null) {
-        arrowData._guideLine2.setAttribute("x1", toX);
-        arrowData._guideLine2.setAttribute("y1", toY);
-        arrowData._guideLine2.setAttribute("x2", control2X);
-        arrowData._guideLine2.setAttribute("y2", control2Y);
-        arrowData._guideLine2.style.display = "";
-      } else {
-        arrowData._guideLine2.style.display = "none";
-      }
-    }
-    if (arrowData.line && arrowData.line !== "single") {
-      updateArrowLineStyle(arrowData);
-    }
-    updateArrowLabel(arrowData);
-  }
-  function updateArrowHandles(arrowData) {
-    if (arrowData._startHandle) {
-      arrowData._startHandle.style.left = arrowData.fromX + "px";
-      arrowData._startHandle.style.top = arrowData.fromY + "px";
-    }
-    if (arrowData._endHandle) {
-      arrowData._endHandle.style.left = arrowData.toX + "px";
-      arrowData._endHandle.style.top = arrowData.toY + "px";
-    }
-    if (arrowData._control1Handle && arrowData.control1X !== null) {
-      arrowData._control1Handle.style.left = arrowData.control1X + "px";
-      arrowData._control1Handle.style.top = arrowData.control1Y + "px";
-    }
-    if (arrowData._control2Handle && arrowData.control2X !== null) {
-      arrowData._control2Handle.style.left = arrowData.control2X + "px";
-      arrowData._control2Handle.style.top = arrowData.control2Y + "px";
-    }
-  }
-  function getPointOnArrow(t, arrowData) {
-    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
-    let x, y, dx, dy;
-    if (control1X !== null && control2X !== null) {
-      const mt = 1 - t;
-      const mt2 = mt * mt;
-      const mt3 = mt2 * mt;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      x = mt3 * fromX + 3 * mt2 * t * control1X + 3 * mt * t2 * control2X + t3 * toX;
-      y = mt3 * fromY + 3 * mt2 * t * control1Y + 3 * mt * t2 * control2Y + t3 * toY;
-      dx = 3 * mt2 * (control1X - fromX) + 6 * mt * t * (control2X - control1X) + 3 * t2 * (toX - control2X);
-      dy = 3 * mt2 * (control1Y - fromY) + 6 * mt * t * (control2Y - control1Y) + 3 * t2 * (toY - control2Y);
-    } else if (control1X !== null) {
-      const mt = 1 - t;
-      const mt2 = mt * mt;
-      const t2 = t * t;
-      x = mt2 * fromX + 2 * mt * t * control1X + t2 * toX;
-      y = mt2 * fromY + 2 * mt * t * control1Y + t2 * toY;
-      dx = 2 * mt * (control1X - fromX) + 2 * t * (toX - control1X);
-      dy = 2 * mt * (control1Y - fromY) + 2 * t * (toY - control1Y);
-    } else {
-      x = fromX + t * (toX - fromX);
-      y = fromY + t * (toY - fromY);
-      dx = toX - fromX;
-      dy = toY - fromY;
-    }
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    return { x, y, angle };
-  }
-  function updateArrowLabel(arrowData) {
-    if (!arrowData._labelText)
-      return;
-    const label = arrowData.label || "";
-    arrowData._labelText.textContent = label;
-    if (!label) {
-      arrowData._labelText.style.display = "none";
-      return;
-    }
-    arrowData._labelText.style.display = "";
-    let t;
-    switch (arrowData.labelPosition) {
-      case "start":
-        t = 0.15;
-        break;
-      case "end":
-        t = 0.85;
-        break;
-      case "middle":
-      default:
-        t = 0.5;
-    }
-    const point = getPointOnArrow(t, arrowData);
-    const offset = arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET;
-    const angleRad = point.angle * (Math.PI / 180);
-    const offsetX = -Math.sin(angleRad) * offset;
-    const offsetY = Math.cos(angleRad) * offset;
-    const labelX = point.x + offsetX;
-    const labelY = point.y + offsetY;
-    arrowData._labelText.setAttribute("x", labelX);
-    arrowData._labelText.setAttribute("y", labelY);
-    let rotationAngle = point.angle;
-    if (rotationAngle > 90 || rotationAngle < -90) {
-      rotationAngle += 180;
-    }
-    arrowData._labelText.setAttribute("transform", `rotate(${rotationAngle}, ${labelX}, ${labelY})`);
-    arrowData._labelText.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
-  }
-  function toggleCurveMode(arrowData) {
-    arrowData.curveMode = !arrowData.curveMode;
-    if (arrowData.curveMode) {
-      const { fromX, fromY, toX, toY } = arrowData;
-      const dx = toX - fromX;
-      const dy = toY - fromY;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const perpX = -dy / len * 50;
-      const perpY = dx / len * 50;
-      arrowData.control1X = fromX + dx / 3 + perpX;
-      arrowData.control1Y = fromY + dy / 3 + perpY;
-      arrowData.control2X = fromX + 2 * dx / 3 + perpX;
-      arrowData.control2Y = fromY + 2 * dy / 3 + perpY;
-      if (arrowData._container) {
-        arrowData._container.classList.add("curve-mode");
-      }
-    } else {
-      arrowData.control1X = null;
-      arrowData.control1Y = null;
-      arrowData.control2X = null;
-      arrowData.control2Y = null;
-      if (arrowData._container) {
-        arrowData._container.classList.remove("curve-mode");
-      }
-      if (arrowData._guideLine1)
-        arrowData._guideLine1.style.display = "none";
-      if (arrowData._guideLine2)
-        arrowData._guideLine2.style.display = "none";
-    }
-    updateArrowPath(arrowData);
-    updateArrowHandles(arrowData);
-  }
+  // src/main.js
+  init_arrows();
 
   // src/serialization.js
+  init_config();
+  init_utils();
+  init_colors();
+  init_editable_element();
+  init_registries();
+  init_quill();
   function findSlideHeadingLines(lines) {
     const headings = [];
     for (let i = 0; i < lines.length; i++) {

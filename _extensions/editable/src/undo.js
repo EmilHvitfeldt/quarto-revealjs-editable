@@ -7,6 +7,7 @@
 import { CONFIG } from './config.js';
 import { debug } from './utils.js';
 import { editableRegistry } from './editable-element.js';
+import { NewElementRegistry } from './registries.js';
 
 /** @type {Array<Array<Object>>} Stack of previous states for undo */
 const undoStack = [];
@@ -45,6 +46,54 @@ export function captureAllState() {
   return snapshots;
 }
 
+/** Arrow properties to capture for undo/redo */
+const ARROW_STATE_KEYS = [
+  'fromX', 'fromY', 'toX', 'toY',
+  'control1X', 'control1Y', 'control2X', 'control2Y',
+  'curveMode', 'color', 'width', 'head', 'dash', 'line', 'opacity'
+];
+
+/**
+ * Capture state of all arrows.
+ * @returns {Array<{arrowData: Object, state: Object}>} Array of arrow state snapshots
+ */
+export function captureArrowState() {
+  const snapshots = [];
+  for (const arrowData of NewElementRegistry.newArrows) {
+    const state = {};
+    for (const key of ARROW_STATE_KEYS) {
+      state[key] = arrowData[key];
+    }
+    snapshots.push({
+      arrowData: arrowData,
+      state: state,
+    });
+  }
+  return snapshots;
+}
+
+/**
+ * Restore all arrows to a previous snapshot state.
+ * @param {Array<{arrowData: Object, state: Object}>} snapshots - States to restore
+ */
+export function restoreArrowState(snapshots) {
+  // Dynamically import arrow update functions to avoid circular dependency
+  import('./arrows.js').then(({ updateArrowPath, updateArrowHandles, updateArrowAppearance, updateArrowActiveState }) => {
+    for (const snapshot of snapshots) {
+      const arrowData = snapshot.arrowData;
+      // Restore state properties
+      for (const key of ARROW_STATE_KEYS) {
+        arrowData[key] = snapshot.state[key];
+      }
+      // Update DOM to reflect restored state
+      updateArrowPath(arrowData);
+      updateArrowHandles(arrowData);
+      updateArrowAppearance(arrowData);
+      updateArrowActiveState(arrowData);
+    }
+  });
+}
+
 /**
  * Restore all elements to a previous snapshot state.
  * @param {Array<{element: HTMLElement, state: Object}>} snapshots - States to restore
@@ -63,7 +112,10 @@ export function restoreState(snapshots) {
  * Clears redo stack since new action invalidates redo history.
  */
 export function pushUndoState() {
-  const state = captureAllState();
+  const state = {
+    elements: captureAllState(),
+    arrows: captureArrowState(),
+  };
   undoStack.push(state);
 
   // Limit stack size
@@ -83,12 +135,16 @@ export function undo() {
   if (undoStack.length === 0) return false;
 
   // Save current state to redo stack
-  const currentState = captureAllState();
+  const currentState = {
+    elements: captureAllState(),
+    arrows: captureArrowState(),
+  };
   redoStack.push(currentState);
 
   // Restore previous state
   const previousState = undoStack.pop();
-  restoreState(previousState);
+  restoreState(previousState.elements);
+  restoreArrowState(previousState.arrows);
 
   return true;
 }
@@ -101,12 +157,16 @@ export function redo() {
   if (redoStack.length === 0) return false;
 
   // Save current state to undo stack
-  const currentState = captureAllState();
+  const currentState = {
+    elements: captureAllState(),
+    arrows: captureArrowState(),
+  };
   undoStack.push(currentState);
 
   // Restore redo state
   const redoState = redoStack.pop();
-  restoreState(redoState);
+  restoreState(redoState.elements);
+  restoreArrowState(redoState.arrows);
 
   return true;
 }

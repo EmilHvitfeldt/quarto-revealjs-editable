@@ -25,6 +25,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
     - Label offset for perpendicular distance from arrow line
     - Labels automatically rotate to follow arrow direction
     - Labels follow arrow when dragged and update color to match arrow
+  - **Undo/redo support** - Arrow operations (creation, movement, styling, curve mode) integrated with Ctrl+Z/Ctrl+Y (#65)
 
 ### Fixed
 

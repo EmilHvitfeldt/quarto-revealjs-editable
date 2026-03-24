@@ -42,7 +42,7 @@ _extensions/editable/
     ├── utils.js        # Utility functions
     ├── colors.js       # Color palette and brand color handling
     ├── editable-element.js  # EditableElement class and registry
-    ├── undo.js         # Undo/redo system
+    ├── undo.js         # Undo/redo system (elements and arrows)
     ├── registries.js   # ControlRegistry, ToolbarRegistry, NewElementRegistry
     ├── capabilities.js # Capability system (move, resize, rotate, etc.)
     ├── serialization.js # QMD transformation and property serializers
