@@ -970,6 +970,7 @@ function createArrowHandle(arrowData, position) {
 
   const onDrag = (e) => {
     if (!isDragging) return;
+    if (!arrowData.element) return;
 
     const rect = arrowData.element.getBoundingClientRect();
     const scale = cachedScale;
