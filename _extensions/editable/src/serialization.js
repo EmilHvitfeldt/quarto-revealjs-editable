@@ -276,6 +276,19 @@ export function serializeArrowToShortcode(arrow) {
     shortcode += ` opacity="${arrow.opacity}"`;
   }
 
+  // Label attributes
+  if (arrow.label) {
+    shortcode += ` label="${arrow.label}"`;
+  }
+
+  if (arrow.label && arrow.labelPosition && arrow.labelPosition !== "middle") {
+    shortcode += ` label-position="${arrow.labelPosition}"`;
+  }
+
+  if (arrow.label && arrow.labelOffset !== undefined && arrow.labelOffset !== CONFIG.ARROW_DEFAULT_LABEL_OFFSET) {
+    shortcode += ` label-offset="${arrow.labelOffset}"`;
+  }
+
   shortcode += ` position="absolute" >}}`;
 
   return shortcode;

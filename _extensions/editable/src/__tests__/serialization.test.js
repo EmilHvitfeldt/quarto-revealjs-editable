@@ -5,6 +5,7 @@ vi.mock('../config.js', () => ({
   CONFIG: {
     ARROW_DEFAULT_COLOR: 'black',
     ARROW_DEFAULT_WIDTH: 2,
+    ARROW_DEFAULT_LABEL_OFFSET: 10,
   }
 }));
 
@@ -219,5 +220,93 @@ describe('serializeArrowToShortcode', () => {
     };
     const result = serializeArrowToShortcode(arrow);
     expect(result).toContain('opacity="0.5"');
+  });
+
+  it('includes label when present', () => {
+    const arrow = {
+      fromX: 100, fromY: 200,
+      toX: 300, toY: 400,
+      control1X: null, control1Y: null,
+      control2X: null, control2Y: null,
+      color: 'black',
+      width: 2,
+      label: 'Step 1',
+    };
+    const result = serializeArrowToShortcode(arrow);
+    expect(result).toContain('label="Step 1"');
+  });
+
+  it('omits label when empty', () => {
+    const arrow = {
+      fromX: 100, fromY: 200,
+      toX: 300, toY: 400,
+      control1X: null, control1Y: null,
+      control2X: null, control2Y: null,
+      color: 'black',
+      width: 2,
+      label: '',
+    };
+    const result = serializeArrowToShortcode(arrow);
+    expect(result).not.toContain('label=');
+  });
+
+  it('includes label-position when label present and not middle', () => {
+    const arrow = {
+      fromX: 100, fromY: 200,
+      toX: 300, toY: 400,
+      control1X: null, control1Y: null,
+      control2X: null, control2Y: null,
+      color: 'black',
+      width: 2,
+      label: 'Start',
+      labelPosition: 'start',
+    };
+    const result = serializeArrowToShortcode(arrow);
+    expect(result).toContain('label-position="start"');
+  });
+
+  it('omits label-position when middle (default)', () => {
+    const arrow = {
+      fromX: 100, fromY: 200,
+      toX: 300, toY: 400,
+      control1X: null, control1Y: null,
+      control2X: null, control2Y: null,
+      color: 'black',
+      width: 2,
+      label: 'Middle',
+      labelPosition: 'middle',
+    };
+    const result = serializeArrowToShortcode(arrow);
+    expect(result).not.toContain('label-position=');
+  });
+
+  it('includes label-offset when label present and not default', () => {
+    const arrow = {
+      fromX: 100, fromY: 200,
+      toX: 300, toY: 400,
+      control1X: null, control1Y: null,
+      control2X: null, control2Y: null,
+      color: 'black',
+      width: 2,
+      label: 'Offset',
+      labelOffset: 20,
+    };
+    const result = serializeArrowToShortcode(arrow);
+    expect(result).toContain('label-offset="20"');
+  });
+
+  it('omits label-offset when default (10)', () => {
+    const arrow = {
+      fromX: 100, fromY: 200,
+      toX: 300, toY: 400,
+      control1X: null, control1Y: null,
+      control2X: null, control2Y: null,
+      color: 'black',
+      width: 2,
+      label: 'Default offset',
+      labelOffset: 10,
+    };
+    const result = serializeArrowToShortcode(arrow);
+    expect(result).not.toContain('label-offset=');
   });
 });

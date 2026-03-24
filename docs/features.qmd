@@ -183,6 +183,14 @@ When an arrow is selected, the toolbar switches to show styling controls:
 - **Line**: Line style (single, double, or triple parallel lines)
 - **Opacity**: Transparency slider (0 to 1)
 
+**Label options:**
+
+- **Label text**: Add a text label to the arrow
+- **Label position**: Choose where the label appears (start, middle, or end of the arrow)
+- **Label offset**: Distance from the arrow line (positive values place label above/left, negative below/right)
+
+Labels automatically rotate to follow the arrow direction and update color to match the arrow.
+
 Click anywhere outside the arrow to deselect it and return to the normal toolbar. Style changes are applied immediately and saved with the arrow.
 
 ### Saved Format
@@ -203,4 +211,10 @@ Styled arrows include additional attributes:
 
 ```markdown
 {{</* arrow from="100,200" to="400,300" color="#ff0000" width="4" head="stealth" dash="dashed" opacity="0.8" position="absolute" */>}}
+```
+
+Arrows with labels:
+
+```markdown
+{{</* arrow from="100,200" to="400,300" label="Step 1" label-position="middle" label-offset="10" position="absolute" */>}}
 ```

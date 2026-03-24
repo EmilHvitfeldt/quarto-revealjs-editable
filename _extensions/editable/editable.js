@@ -40,6 +40,8 @@ var EditableModule = (() => {
         ARROW_DEFAULT_WIDTH: 2,
         ARROW_CONTROL1_COLOR: "#ff6600",
         ARROW_CONTROL2_COLOR: "#9933ff",
+        ARROW_DEFAULT_LABEL_POSITION: "middle",
+        ARROW_DEFAULT_LABEL_OFFSET: 10,
         // Polling config
         POLL_MAX_ATTEMPTS: 50,
         POLL_INTERVAL_MS: 100,
@@ -805,6 +807,7 @@ var EditableModule = (() => {
     updateArrowActiveState: () => updateArrowActiveState,
     updateArrowAppearance: () => updateArrowAppearance,
     updateArrowHandles: () => updateArrowHandles,
+    updateArrowLabel: () => updateArrowLabel,
     updateArrowPath: () => updateArrowPath,
     updateArrowStylePanel: () => updateArrowStylePanel
   });
@@ -1095,6 +1098,57 @@ var EditableModule = (() => {
       }
     });
     container.appendChild(curveToggle);
+    const labelSeparator = document.createElement("div");
+    labelSeparator.className = "arrow-toolbar-separator";
+    labelSeparator.textContent = "Label";
+    container.appendChild(labelSeparator);
+    const labelInput = document.createElement("input");
+    labelInput.type = "text";
+    labelInput.id = "arrow-style-label";
+    labelInput.className = "arrow-toolbar-label";
+    labelInput.placeholder = "Label text...";
+    labelInput.title = "Label text";
+    labelInput.addEventListener("input", (e) => {
+      if (activeArrow) {
+        activeArrow.label = e.target.value;
+        updateArrowLabel(activeArrow);
+      }
+    });
+    container.appendChild(labelInput);
+    const labelPositionSelect = document.createElement("select");
+    labelPositionSelect.id = "arrow-style-label-position";
+    labelPositionSelect.className = "arrow-toolbar-select";
+    labelPositionSelect.title = "Label position";
+    ["start", "middle", "end"].forEach((pos) => {
+      const opt = document.createElement("option");
+      opt.value = pos;
+      opt.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
+      labelPositionSelect.appendChild(opt);
+    });
+    labelPositionSelect.value = CONFIG.ARROW_DEFAULT_LABEL_POSITION;
+    labelPositionSelect.addEventListener("change", (e) => {
+      if (activeArrow) {
+        activeArrow.labelPosition = e.target.value;
+        updateArrowLabel(activeArrow);
+      }
+    });
+    container.appendChild(labelPositionSelect);
+    const labelOffsetInput = document.createElement("input");
+    labelOffsetInput.type = "number";
+    labelOffsetInput.id = "arrow-style-label-offset";
+    labelOffsetInput.className = "arrow-toolbar-width";
+    labelOffsetInput.value = CONFIG.ARROW_DEFAULT_LABEL_OFFSET.toString();
+    labelOffsetInput.title = "Label offset (positive = above, negative = below)";
+    labelOffsetInput.addEventListener("input", (e) => {
+      if (activeArrow) {
+        const val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+          activeArrow.labelOffset = val;
+          updateArrowLabel(activeArrow);
+        }
+      }
+    });
+    container.appendChild(labelOffsetInput);
     arrowControlRefs.colorPicker = colorPicker;
     arrowControlRefs.widthInput = widthInput;
     arrowControlRefs.headSelect = headSelect;
@@ -1102,6 +1156,9 @@ var EditableModule = (() => {
     arrowControlRefs.lineSelect = lineSelect;
     arrowControlRefs.opacityInput = opacityInput;
     arrowControlRefs.colorPresetsRow = colorPresetsRow;
+    arrowControlRefs.labelInput = labelInput;
+    arrowControlRefs.labelPositionSelect = labelPositionSelect;
+    arrowControlRefs.labelOffsetInput = labelOffsetInput;
     return container;
   }
   function updateArrowStylePanel(arrowData) {
@@ -1115,7 +1172,7 @@ var EditableModule = (() => {
       toolbar.appendChild(arrowControls);
     }
     if (arrowData) {
-      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow } = arrowControlRefs;
+      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
       if (colorPicker) {
         const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
         colorPicker.value = colorValue;
@@ -1140,6 +1197,15 @@ var EditableModule = (() => {
       if (opacityInput) {
         opacityInput.value = (arrowData.opacity !== void 0 ? arrowData.opacity : 1).toString();
       }
+      if (labelInput) {
+        labelInput.value = arrowData.label || "";
+      }
+      if (labelPositionSelect) {
+        labelPositionSelect.value = arrowData.labelPosition || CONFIG.ARROW_DEFAULT_LABEL_POSITION;
+      }
+      if (labelOffsetInput) {
+        labelOffsetInput.value = (arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET).toString();
+      }
       updateCurveToggleInToolbar(arrowData);
       buttonsContainer.style.display = "none";
       arrowControls.style.display = "flex";
@@ -1163,6 +1229,9 @@ var EditableModule = (() => {
       return;
     arrowData._path.setAttribute("stroke", arrowData.color);
     arrowData._path.setAttribute("stroke-width", arrowData.width);
+    if (arrowData._labelText) {
+      arrowData._labelText.setAttribute("fill", arrowData.color);
+    }
     const dashPatterns = {
       solid: "none",
       dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
@@ -1381,6 +1450,9 @@ var EditableModule = (() => {
       dash: "solid",
       line: "single",
       opacity: 1,
+      label: "",
+      labelPosition: CONFIG.ARROW_DEFAULT_LABEL_POSITION,
+      labelOffset: CONFIG.ARROW_DEFAULT_LABEL_OFFSET,
       isActive: true
     };
     const arrowContainer = createArrowElement(arrowData);
@@ -1448,6 +1520,16 @@ var EditableModule = (() => {
     path.setAttribute("marker-end", `url(#${markerId})`);
     path.style.pointerEvents = "none";
     svg.appendChild(path);
+    const labelText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    labelText.className.baseVal = "editable-arrow-label";
+    labelText.setAttribute("text-anchor", "middle");
+    labelText.setAttribute("dominant-baseline", "middle");
+    labelText.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
+    labelText.style.pointerEvents = "none";
+    labelText.style.userSelect = "none";
+    labelText.style.fontSize = "14px";
+    labelText.style.fontFamily = "system-ui, -apple-system, sans-serif";
+    svg.appendChild(labelText);
     const guideLine1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
     guideLine1.setAttribute("stroke", CONFIG.ARROW_CONTROL1_COLOR);
     guideLine1.setAttribute("stroke-width", "1");
@@ -1469,6 +1551,7 @@ var EditableModule = (() => {
     arrowData._markerId = markerId;
     arrowData._guideLine1 = guideLine1;
     arrowData._guideLine2 = guideLine2;
+    arrowData._labelText = labelText;
     arrowData._container = container;
     const startHandle = createArrowHandle(arrowData, "start");
     const endHandle = createArrowHandle(arrowData, "end");
@@ -1537,6 +1620,7 @@ var EditableModule = (() => {
     hitArea.style.cursor = "grab";
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
+    updateArrowLabel(arrowData);
     setActiveArrow(arrowData);
     if (!globalClickOutsideHandlerRegistered) {
       globalClickOutsideHandlerRegistered = true;
@@ -1672,6 +1756,7 @@ var EditableModule = (() => {
     if (arrowData.line && arrowData.line !== "single") {
       updateArrowLineStyle(arrowData);
     }
+    updateArrowLabel(arrowData);
   }
   function updateArrowHandles(arrowData) {
     if (arrowData._startHandle) {
@@ -1690,6 +1775,74 @@ var EditableModule = (() => {
       arrowData._control2Handle.style.left = arrowData.control2X + "px";
       arrowData._control2Handle.style.top = arrowData.control2Y + "px";
     }
+  }
+  function getPointOnArrow(t, arrowData) {
+    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+    let x, y, dx, dy;
+    if (control1X !== null && control2X !== null) {
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const mt3 = mt2 * mt;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      x = mt3 * fromX + 3 * mt2 * t * control1X + 3 * mt * t2 * control2X + t3 * toX;
+      y = mt3 * fromY + 3 * mt2 * t * control1Y + 3 * mt * t2 * control2Y + t3 * toY;
+      dx = 3 * mt2 * (control1X - fromX) + 6 * mt * t * (control2X - control1X) + 3 * t2 * (toX - control2X);
+      dy = 3 * mt2 * (control1Y - fromY) + 6 * mt * t * (control2Y - control1Y) + 3 * t2 * (toY - control2Y);
+    } else if (control1X !== null) {
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      const t2 = t * t;
+      x = mt2 * fromX + 2 * mt * t * control1X + t2 * toX;
+      y = mt2 * fromY + 2 * mt * t * control1Y + t2 * toY;
+      dx = 2 * mt * (control1X - fromX) + 2 * t * (toX - control1X);
+      dy = 2 * mt * (control1Y - fromY) + 2 * t * (toY - control1Y);
+    } else {
+      x = fromX + t * (toX - fromX);
+      y = fromY + t * (toY - fromY);
+      dx = toX - fromX;
+      dy = toY - fromY;
+    }
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    return { x, y, angle };
+  }
+  function updateArrowLabel(arrowData) {
+    if (!arrowData._labelText)
+      return;
+    const label = arrowData.label || "";
+    arrowData._labelText.textContent = label;
+    if (!label) {
+      arrowData._labelText.style.display = "none";
+      return;
+    }
+    arrowData._labelText.style.display = "";
+    let t;
+    switch (arrowData.labelPosition) {
+      case "start":
+        t = 0.15;
+        break;
+      case "end":
+        t = 0.85;
+        break;
+      case "middle":
+      default:
+        t = 0.5;
+    }
+    const point = getPointOnArrow(t, arrowData);
+    const offset = arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET;
+    const angleRad = point.angle * (Math.PI / 180);
+    const offsetX = -Math.sin(angleRad) * offset;
+    const offsetY = Math.cos(angleRad) * offset;
+    const labelX = point.x + offsetX;
+    const labelY = point.y + offsetY;
+    arrowData._labelText.setAttribute("x", labelX);
+    arrowData._labelText.setAttribute("y", labelY);
+    let rotationAngle = point.angle;
+    if (rotationAngle > 90 || rotationAngle < -90) {
+      rotationAngle += 180;
+    }
+    arrowData._labelText.setAttribute("transform", `rotate(${rotationAngle}, ${labelX}, ${labelY})`);
+    arrowData._labelText.setAttribute("fill", arrowData.color || CONFIG.ARROW_DEFAULT_COLOR);
   }
   function toggleCurveMode(arrowData) {
     arrowData.curveMode = !arrowData.curveMode;
@@ -1741,7 +1894,10 @@ var EditableModule = (() => {
         dashSelect: null,
         lineSelect: null,
         opacityInput: null,
-        colorPresetsRow: null
+        colorPresetsRow: null,
+        labelInput: null,
+        labelPositionSelect: null,
+        labelOffsetInput: null
       };
       ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
     }
@@ -2552,6 +2708,15 @@ ${innerFence}`;
     }
     if (arrow.opacity !== void 0 && arrow.opacity !== 1) {
       shortcode += ` opacity="${arrow.opacity}"`;
+    }
+    if (arrow.label) {
+      shortcode += ` label="${arrow.label}"`;
+    }
+    if (arrow.label && arrow.labelPosition && arrow.labelPosition !== "middle") {
+      shortcode += ` label-position="${arrow.labelPosition}"`;
+    }
+    if (arrow.label && arrow.labelOffset !== void 0 && arrow.labelOffset !== CONFIG.ARROW_DEFAULT_LABEL_OFFSET) {
+      shortcode += ` label-offset="${arrow.labelOffset}"`;
     }
     shortcode += ` position="absolute" >}}`;
     return shortcode;

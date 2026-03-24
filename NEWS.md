@@ -19,6 +19,12 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - Color presets using brand palette (or defaults) with custom color picker
   - Brand colors saved as `{{< brand color name >}}` shortcodes in arrow color attribute
   - Drag arrows by their body to move entire arrow while preserving shape
+  - **Label support** - Add text labels to arrows (#58)
+    - Label text input in style controls
+    - Label position selector (start, middle, end)
+    - Label offset for perpendicular distance from arrow line
+    - Labels automatically rotate to follow arrow direction
+    - Labels follow arrow when dragged and update color to match arrow
   - **Undo/redo support** - Arrow operations (creation, movement, styling, curve mode) integrated with Ctrl+Z/Ctrl+Y (#65)
 
 ### Fixed
