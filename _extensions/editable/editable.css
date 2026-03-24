@@ -996,8 +996,30 @@
 .arrow-toolbar-color:focus,
 .arrow-toolbar-width:focus,
 .arrow-toolbar-select:focus,
-.arrow-toolbar-curve:focus {
+.arrow-toolbar-curve:focus,
+.arrow-toolbar-label:focus {
   outline: none;
   border-color: var(--editable-accent-color, #007cba);
   box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.2);
+}
+
+/* Arrow label controls */
+.arrow-toolbar-separator {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #eee;
+}
+
+.arrow-toolbar-label {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
 }

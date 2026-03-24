@@ -2454,4 +2454,247 @@ test.describe('Arrow Feature', () => {
 
   });
 
+  test.describe('Arrow Labels', () => {
+
+    test('Label input exists in style controls', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      const labelInput = await page.$('#arrow-style-label');
+      expect(labelInput).not.toBeNull();
+    });
+
+    test('Label position selector exists with start/middle/end options', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      const options = await page.evaluate(() => {
+        const select = document.getElementById('arrow-style-label-position');
+        if (!select) return [];
+        return Array.from(select.options).map(o => o.value);
+      });
+
+      expect(options).toContain('start');
+      expect(options).toContain('middle');
+      expect(options).toContain('end');
+    });
+
+    test('Label offset input exists', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      const offsetInput = await page.$('#arrow-style-label-offset');
+      expect(offsetInput).not.toBeNull();
+    });
+
+    test('Typing in label input shows label on arrow', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Type in the label input
+      await page.fill('#arrow-style-label', 'Test Label');
+
+      // Check that label text element exists and has the text
+      const labelText = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? label.textContent : null;
+      });
+
+      expect(labelText).toBe('Test Label');
+    });
+
+    test('Label is hidden when text is empty', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Label should be hidden initially (empty)
+      const isHidden = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? label.style.display === 'none' : true;
+      });
+
+      expect(isHidden).toBe(true);
+    });
+
+    test('Changing label position moves label along arrow', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Add a label first
+      await page.fill('#arrow-style-label', 'Test');
+
+      // Get position at middle (default)
+      const middleX = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? parseFloat(label.getAttribute('x')) : null;
+      });
+
+      // Change to start position
+      await page.selectOption('#arrow-style-label-position', 'start');
+
+      const startX = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? parseFloat(label.getAttribute('x')) : null;
+      });
+
+      // Start position should be different from middle
+      expect(startX).not.toBe(middleX);
+      expect(startX).toBeLessThan(middleX);
+    });
+
+    test('Changing label offset moves label perpendicular to arrow', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Add a label first
+      await page.fill('#arrow-style-label', 'Test');
+
+      // Get initial Y position
+      const initialY = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? parseFloat(label.getAttribute('y')) : null;
+      });
+
+      // Change offset to negative (below line)
+      await page.fill('#arrow-style-label-offset', '-20');
+
+      const newY = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? parseFloat(label.getAttribute('y')) : null;
+      });
+
+      // Y position should have changed
+      expect(newY).not.toBe(initialY);
+    });
+
+    test('Label follows arrow when dragged', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Add a label
+      await page.fill('#arrow-style-label', 'Moving');
+
+      // Get initial label position
+      const initialLabelX = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? parseFloat(label.getAttribute('x')) : null;
+      });
+
+      // Drag the arrow body
+      const hitArea = await page.$('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
+      const box = await hitArea.boundingBox();
+
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2);
+      await page.mouse.up();
+
+      // Label should have moved
+      const newLabelX = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? parseFloat(label.getAttribute('x')) : null;
+      });
+
+      expect(newLabelX).toBeGreaterThan(initialLabelX);
+    });
+
+    test('Label color matches arrow color', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Add a label
+      await page.fill('#arrow-style-label', 'Colored');
+
+      // Change arrow color
+      await page.evaluate(() => {
+        document.getElementById('arrow-style-color').value = '#ff0000';
+        document.getElementById('arrow-style-color').dispatchEvent(new Event('input'));
+      });
+
+      // Check label color
+      const labelColor = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? label.getAttribute('fill') : null;
+      });
+
+      expect(labelColor).toBe('#ff0000');
+    });
+
+    test('Label rotates to follow arrow direction', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Add a label
+      await page.fill('#arrow-style-label', 'Rotated');
+
+      // Get initial transform
+      const initialTransform = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? label.getAttribute('transform') : null;
+      });
+
+      // Drag end handle to create angled arrow
+      const endHandle = await page.$('.editable-arrow-handle-end');
+      const box = await endHandle.boundingBox();
+
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 50, box.y - 100);
+      await page.mouse.up();
+
+      // Label transform should have changed
+      const newTransform = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label ? label.getAttribute('transform') : null;
+      });
+
+      expect(newTransform).not.toBe(initialTransform);
+    });
+
+    test('Label values sync when selecting different arrows', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      // Create two arrows
+      await clickAddArrow(page);
+
+      // Set label on first arrow
+      await page.fill('#arrow-style-label', 'Arrow 1');
+      await page.selectOption('#arrow-style-label-position', 'start');
+
+      // Click outside to deselect
+      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.waitForTimeout(100);
+
+      // Create second arrow
+      await clickAddArrow(page);
+
+      // Second arrow should have empty label
+      const labelValue = await page.evaluate(() => {
+        return document.getElementById('arrow-style-label').value;
+      });
+
+      expect(labelValue).toBe('');
+    });
+
+    test('Label works on curved arrows', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+      await clickAddArrow(page);
+
+      // Enable curve mode
+      await page.click('#arrow-style-curve');
+
+      // Add label
+      await page.fill('#arrow-style-label', 'Curved');
+
+      // Label should be visible
+      const labelVisible = await page.evaluate(() => {
+        const label = document.querySelector('.editable-arrow-label');
+        return label && label.style.display !== 'none' && label.textContent === 'Curved';
+      });
+
+      expect(labelVisible).toBe(true);
+    });
+
+  });
+
 });
