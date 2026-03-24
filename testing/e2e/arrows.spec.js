@@ -2339,6 +2339,356 @@ test.describe('Arrow Feature', () => {
 
   });
 
+  test.describe('Arrow Undo/Redo', () => {
+
+    test('Undo reverts arrow position after drag', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Get initial position
+      const initialPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+
+      // Drag the end handle
+      const endHandle = page.locator('.editable-arrow-handle-end');
+      const box = await endHandle.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 100, box.y + 100, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+
+      // Get position after drag
+      const afterDragPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+
+      // Position should have changed
+      expect(afterDragPos.left).not.toBe(initialPos.left);
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Get position after undo
+      const afterUndoPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+
+      // Position should be reverted to initial
+      expect(Math.abs(afterUndoPos.left - initialPos.left)).toBeLessThan(1);
+      expect(Math.abs(afterUndoPos.top - initialPos.top)).toBeLessThan(1);
+    });
+
+    test('Undo reverts arrow color change', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Get initial color
+      const initialColor = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke');
+      });
+
+      // Change color
+      await page.fill('#arrow-style-color', '#ff0000');
+      await page.waitForTimeout(50);
+
+      // Verify color changed
+      const afterChangeColor = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke');
+      });
+      expect(afterChangeColor).toBe('#ff0000');
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Get color after undo
+      const afterUndoColor = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke');
+      });
+
+      expect(afterUndoColor).toBe(initialColor);
+    });
+
+    test('Undo reverts curve mode toggle', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Verify initially not in curve mode (path has L for line)
+      const initialPath = await page.evaluate(() => {
+        const pathEl = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="black"]');
+        return pathEl.getAttribute('d');
+      });
+      expect(initialPath).toMatch(/L/);
+
+      // Toggle curve mode
+      await page.click('#arrow-style-curve');
+      await page.waitForTimeout(100);
+
+      // Verify now in curve mode (path has C for cubic Bezier)
+      const afterTogglePath = await page.evaluate(() => {
+        const pathEl = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="black"]');
+        return pathEl.getAttribute('d');
+      });
+      expect(afterTogglePath).toMatch(/C/);
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Verify back to straight line
+      const afterUndoPath = await page.evaluate(() => {
+        const pathEl = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="black"]');
+        return pathEl.getAttribute('d');
+      });
+      expect(afterUndoPath).toMatch(/L/);
+    });
+
+    test('Redo restores arrow position after undo', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Get initial position
+      const initialPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+
+      // Drag the end handle
+      const endHandle = page.locator('.editable-arrow-handle-end');
+      const box = await endHandle.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 100, box.y + 100, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+
+      // Get position after drag
+      const afterDragPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Verify undone
+      const afterUndoPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+      expect(Math.abs(afterUndoPos.left - initialPos.left)).toBeLessThan(1);
+
+      // Redo
+      await page.keyboard.press('Control+y');
+      await page.waitForTimeout(100);
+
+      // Get position after redo
+      const afterRedoPos = await page.evaluate(() => {
+        const handle = document.querySelector('.editable-arrow-handle-end');
+        return {
+          left: parseFloat(handle.style.left),
+          top: parseFloat(handle.style.top),
+        };
+      });
+
+      // Position should be restored to after drag
+      expect(Math.abs(afterRedoPos.left - afterDragPos.left)).toBeLessThan(1);
+      expect(Math.abs(afterRedoPos.top - afterDragPos.top)).toBeLessThan(1);
+    });
+
+    test('Undo reverts arrow width change', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Get initial width
+      const initialWidth = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-width');
+      });
+
+      // Change width
+      await page.fill('#arrow-style-width', '8');
+      await page.waitForTimeout(50);
+
+      // Verify width changed
+      const afterChangeWidth = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-width');
+      });
+      expect(afterChangeWidth).toBe('8');
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Get width after undo
+      const afterUndoWidth = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl.getAttribute('stroke-width');
+      });
+
+      expect(afterUndoWidth).toBe(initialWidth);
+    });
+
+    test('Undo reverts arrow head style change', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Get initial marker path
+      const initialMarkerPath = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const marker = container.querySelector('marker path');
+        return marker.getAttribute('d');
+      });
+
+      // Change head style
+      await page.selectOption('#arrow-style-head', 'diamond');
+      await page.waitForTimeout(50);
+
+      // Verify marker changed
+      const afterChangeMarkerPath = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const marker = container.querySelector('marker path');
+        return marker.getAttribute('d');
+      });
+      expect(afterChangeMarkerPath).not.toBe(initialMarkerPath);
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Get marker after undo
+      const afterUndoMarkerPath = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const marker = container.querySelector('marker path');
+        return marker.getAttribute('d');
+      });
+
+      expect(afterUndoMarkerPath).toBe(initialMarkerPath);
+    });
+
+    test('Undo reverts arrow body drag', async ({ page }) => {
+      await setupPage(page, 'arrows.html');
+
+      await clickAddArrow(page);
+
+      // Get initial positions of both handles
+      const initialPositions = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        return {
+          startLeft: parseFloat(startHandle.style.left),
+          startTop: parseFloat(startHandle.style.top),
+          endLeft: parseFloat(endHandle.style.left),
+          endTop: parseFloat(endHandle.style.top),
+        };
+      });
+
+      // Drag arrow body
+      await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const hitArea = container.querySelector('svg path[stroke="transparent"]');
+
+        const downEvent = new MouseEvent('mousedown', {
+          bubbles: true,
+          clientX: 500,
+          clientY: 350
+        });
+        hitArea.dispatchEvent(downEvent);
+
+        const moveEvent = new MouseEvent('mousemove', {
+          bubbles: true,
+          clientX: 600,
+          clientY: 400
+        });
+        document.dispatchEvent(moveEvent);
+
+        const upEvent = new MouseEvent('mouseup', { bubbles: true });
+        document.dispatchEvent(upEvent);
+      });
+      await page.waitForTimeout(50);
+
+      // Get positions after drag
+      const afterDragPositions = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        return {
+          startLeft: parseFloat(startHandle.style.left),
+          startTop: parseFloat(startHandle.style.top),
+          endLeft: parseFloat(endHandle.style.left),
+          endTop: parseFloat(endHandle.style.top),
+        };
+      });
+
+      // Verify positions changed
+      expect(afterDragPositions.startLeft).not.toBe(initialPositions.startLeft);
+
+      // Undo
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(100);
+
+      // Get positions after undo
+      const afterUndoPositions = await page.evaluate(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const startHandle = container.querySelector('.editable-arrow-handle-start');
+        const endHandle = container.querySelector('.editable-arrow-handle-end');
+        return {
+          startLeft: parseFloat(startHandle.style.left),
+          startTop: parseFloat(startHandle.style.top),
+          endLeft: parseFloat(endHandle.style.left),
+          endTop: parseFloat(endHandle.style.top),
+        };
+      });
+
+      // Positions should be reverted
+      expect(Math.abs(afterUndoPositions.startLeft - initialPositions.startLeft)).toBeLessThan(1);
+      expect(Math.abs(afterUndoPositions.endLeft - initialPositions.endLeft)).toBeLessThan(1);
+    });
+
+  });
+
   test.describe('Event Listener Cleanup', () => {
 
     test('Arrow handles have AbortControllers attached to DOM elements', async ({ page }) => {

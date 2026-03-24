@@ -8,6 +8,7 @@ import { CONFIG } from './config.js';
 import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, debug } from './utils.js';
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
+import { pushUndoState } from './undo.js';
 
 /** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
@@ -227,6 +228,7 @@ export function createArrowStyleControls() {
     swatch.title = color;
     swatch.addEventListener("click", () => {
       if (activeArrow) {
+        pushUndoState();
         activeArrow.color = color;
         updateArrowAppearance(activeArrow);
         const picker = container.querySelector("#arrow-style-color");
@@ -246,6 +248,9 @@ export function createArrowStyleControls() {
   colorPicker.className = "arrow-toolbar-color";
   colorPicker.value = "#000000";
   colorPicker.title = "Custom color";
+  colorPicker.addEventListener("focus", () => {
+    if (activeArrow) pushUndoState();
+  });
   colorPicker.addEventListener("input", (e) => {
     if (activeArrow) {
       activeArrow.color = e.target.value;
@@ -264,6 +269,9 @@ export function createArrowStyleControls() {
   widthInput.max = "20";
   widthInput.value = "2";
   widthInput.title = "Width";
+  widthInput.addEventListener("focus", () => {
+    if (activeArrow) pushUndoState();
+  });
   widthInput.addEventListener("input", (e) => {
     if (activeArrow) {
       const val = parseInt(e.target.value);
@@ -288,6 +296,7 @@ export function createArrowStyleControls() {
   });
   headSelect.addEventListener("change", (e) => {
     if (activeArrow) {
+      pushUndoState();
       activeArrow.head = e.target.value;
       updateArrowAppearance(activeArrow);
     }
@@ -307,6 +316,7 @@ export function createArrowStyleControls() {
   });
   dashSelect.addEventListener("change", (e) => {
     if (activeArrow) {
+      pushUndoState();
       activeArrow.dash = e.target.value;
       updateArrowAppearance(activeArrow);
     }
@@ -326,6 +336,7 @@ export function createArrowStyleControls() {
   });
   lineSelect.addEventListener("change", (e) => {
     if (activeArrow) {
+      pushUndoState();
       activeArrow.line = e.target.value;
       updateArrowAppearance(activeArrow);
     }
@@ -342,6 +353,9 @@ export function createArrowStyleControls() {
   opacityInput.step = "0.1";
   opacityInput.value = "1";
   opacityInput.title = "Opacity";
+  opacityInput.addEventListener("mousedown", () => {
+    if (activeArrow) pushUndoState();
+  });
   opacityInput.addEventListener("input", (e) => {
     if (activeArrow) {
       activeArrow.opacity = parseFloat(e.target.value);
@@ -358,6 +372,7 @@ export function createArrowStyleControls() {
   curveToggle.title = "Toggle curve mode";
   curveToggle.addEventListener("click", () => {
     if (activeArrow) {
+      pushUndoState();
       toggleCurveMode(activeArrow);
       updateCurveToggleInToolbar(activeArrow);
     }
@@ -689,6 +704,7 @@ export async function addNewArrow() {
     return null;
   }
 
+  pushUndoState();
   const slideIndex = getCurrentSlideIndex();
   const slideWidth = currentSlide.offsetWidth || 960;
   const slideHeight = currentSlide.offsetHeight || 700;
@@ -853,6 +869,7 @@ export function createArrowElement(arrowData) {
     e.stopPropagation();
     setActiveArrow(arrowData);
 
+    pushUndoState();
     isDraggingArrow = true;
     arrowDragScale = getSlideScale();
 
@@ -966,6 +983,7 @@ function createArrowHandle(arrowData, position) {
   let cachedScale = 1;
 
   const startDrag = (e) => {
+    pushUndoState();
     isDragging = true;
     cachedScale = getSlideScale();
     e.preventDefault();
