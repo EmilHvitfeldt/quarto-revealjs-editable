@@ -212,6 +212,52 @@ Styles use CSS custom properties for theming. Key properties:
 cd testing && npm run test:e2e
 ```
 
+## Arrow System
+
+The arrow system (`arrows.js`) provides interactive SVG arrows with two mutually exclusive path modes:
+
+### Curve Mode
+- Single cubic Bezier curve between start and end points
+- Two control points (`control1`, `control2`) for shaping the curve
+- Path: `M from C control1 control2 to`
+
+### Waypoint Mode
+- Multiple intermediate points for complex paths
+- `waypoints` array stores `{x, y}` objects
+- When `smooth=false`: Polyline path `M from L wp1 L wp2 ... L to`
+- When `smooth=true`: Catmull-Rom spline interpolation through all points
+
+### Mode Switching
+- Enabling curve mode clears any waypoints
+- Adding a waypoint clears curve mode (control points)
+- UI prevents enabling curve mode when waypoints exist
+
+### Arrow Data Model
+
+```javascript
+arrowData = {
+  // Position
+  fromX, fromY, toX, toY,
+
+  // Curve mode
+  control1X, control1Y, control2X, control2Y,
+  curveMode: boolean,
+
+  // Waypoint mode
+  waypoints: [{x, y}, ...],
+  smooth: boolean,
+
+  // Styling
+  color, width, head, dash, line, opacity,
+  label, labelPosition, labelOffset,
+
+  // DOM references
+  _path, _hitArea, _svg, _container,
+  _startHandle, _endHandle, _control1Handle, _control2Handle,
+  _waypointHandles: [],
+}
+```
+
 ## Performance Considerations
 
 1. **Cached slide scale** - Scale is cached at interaction start

@@ -147,6 +147,9 @@ const arrowControlRefs = {
   labelInput: null,
   labelPositionSelect: null,
   labelOffsetInput: null,
+  smoothToggle: null,
+  waypointBadge: null,
+  curveToggle: null,
 };
 
 /**
@@ -203,6 +206,16 @@ export function cleanupArrowListeners(arrowData) {
     if (handle && handle._dragController) {
       handle._dragController.abort();
       handle._dragController = null;
+    }
+  }
+
+  // Clean up waypoint handles
+  if (arrowData._waypointHandles) {
+    for (const handle of arrowData._waypointHandles) {
+      if (handle && handle._dragController) {
+        handle._dragController.abort();
+        handle._dragController = null;
+      }
     }
   }
 }
@@ -376,11 +389,43 @@ export function createArrowStyleControls() {
   curveToggle.addEventListener("click", () => {
     if (activeArrow) {
       pushUndoState();
+      // Clear waypoints if they exist (switching to curve mode)
+      if (activeArrow.waypoints && activeArrow.waypoints.length > 0) {
+        activeArrow.waypoints = [];
+        activeArrow.smooth = false;
+        rebuildWaypointHandles(activeArrow);
+        updateSmoothToggleInToolbar(activeArrow);
+      }
       toggleCurveMode(activeArrow);
       updateCurveToggleInToolbar(activeArrow);
     }
   });
   container.appendChild(curveToggle);
+
+  // Smooth toggle (for waypoints)
+  const smoothToggle = document.createElement("button");
+  smoothToggle.id = "arrow-style-smooth";
+  smoothToggle.className = "arrow-toolbar-smooth";
+  smoothToggle.innerHTML = "〰 Smooth";
+  smoothToggle.title = "Toggle smooth curves through waypoints";
+  smoothToggle.style.display = "none"; // Hidden by default, shown when waypoints exist
+  smoothToggle.addEventListener("click", () => {
+    if (activeArrow && activeArrow.waypoints && activeArrow.waypoints.length > 0) {
+      pushUndoState();
+      activeArrow.smooth = !activeArrow.smooth;
+      updateArrowPath(activeArrow);
+      updateSmoothToggleInToolbar(activeArrow);
+    }
+  });
+  container.appendChild(smoothToggle);
+
+  // Waypoint count badge
+  const waypointBadge = document.createElement("span");
+  waypointBadge.id = "arrow-style-waypoint-count";
+  waypointBadge.className = "arrow-toolbar-waypoint-badge";
+  waypointBadge.style.display = "none"; // Hidden by default
+  waypointBadge.title = "Number of waypoints (double-click arrow to add, right-click waypoint to remove)";
+  container.appendChild(waypointBadge);
 
   // Label section separator
   const labelSeparator = document.createElement("div");
@@ -452,6 +497,9 @@ export function createArrowStyleControls() {
   arrowControlRefs.labelInput = labelInput;
   arrowControlRefs.labelPositionSelect = labelPositionSelect;
   arrowControlRefs.labelOffsetInput = labelOffsetInput;
+  arrowControlRefs.smoothToggle = smoothToggle;
+  arrowControlRefs.waypointBadge = waypointBadge;
+  arrowControlRefs.curveToggle = curveToggle;
 
   return container;
 }
@@ -512,6 +560,7 @@ export function updateArrowStylePanel(arrowData) {
     }
 
     updateCurveToggleInToolbar(arrowData);
+    updateSmoothToggleInToolbar(arrowData);
 
     buttonsContainer.style.display = "none";
     arrowControls.style.display = "flex";
@@ -525,10 +574,49 @@ function updateCurveToggleInToolbar(arrowData) {
   const curveToggle = document.querySelector("#arrow-style-curve");
   if (!curveToggle) return;
 
-  if (arrowData && arrowData.curveMode) {
-    curveToggle.classList.add("active");
-  } else {
+  const hasWaypoints = arrowData && arrowData.waypoints && arrowData.waypoints.length > 0;
+
+  if (hasWaypoints) {
+    // Clicking will clear waypoints and switch to curve mode
+    curveToggle.classList.remove("disabled");
     curveToggle.classList.remove("active");
+    curveToggle.title = "Switch to curve mode (clears waypoints)";
+  } else {
+    curveToggle.classList.remove("disabled");
+    curveToggle.title = "Toggle curve mode";
+    if (arrowData && arrowData.curveMode) {
+      curveToggle.classList.add("active");
+    } else {
+      curveToggle.classList.remove("active");
+    }
+  }
+}
+
+/**
+ * Update smooth toggle button state in toolbar.
+ * @param {Object} arrowData - Arrow data object
+ */
+function updateSmoothToggleInToolbar(arrowData) {
+  const smoothToggle = arrowControlRefs.smoothToggle || document.querySelector("#arrow-style-smooth");
+  const waypointBadge = arrowControlRefs.waypointBadge || document.querySelector("#arrow-style-waypoint-count");
+
+  if (!smoothToggle || !waypointBadge) return;
+
+  const hasWaypoints = arrowData && arrowData.waypoints && arrowData.waypoints.length > 0;
+
+  if (hasWaypoints) {
+    smoothToggle.style.display = "";
+    waypointBadge.style.display = "";
+    waypointBadge.textContent = `${arrowData.waypoints.length} wp`;
+
+    if (arrowData.smooth) {
+      smoothToggle.classList.add("active");
+    } else {
+      smoothToggle.classList.remove("active");
+    }
+  } else {
+    smoothToggle.style.display = "none";
+    waypointBadge.style.display = "none";
   }
 }
 
@@ -802,6 +890,8 @@ export async function addNewArrow() {
     control2X: null,
     control2Y: null,
     curveMode: false,
+    waypoints: [],
+    smooth: false,
     color: CONFIG.ARROW_DEFAULT_COLOR,
     width: CONFIG.ARROW_DEFAULT_WIDTH,
     head: "arrow",
@@ -952,6 +1042,18 @@ export function createArrowElement(arrowData) {
   arrowData._control1Handle = control1Handle;
   arrowData._control2Handle = control2Handle;
 
+  // Initialize waypoint handles array
+  arrowData._waypointHandles = [];
+
+  // Create handles for any existing waypoints
+  if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+    for (let i = 0; i < arrowData.waypoints.length; i++) {
+      const handle = createWaypointHandle(arrowData, i);
+      container.appendChild(handle);
+      arrowData._waypointHandles.push(handle);
+    }
+  }
+
   const arrowDragController = new AbortController();
   arrowData._dragController = arrowDragController;
 
@@ -1000,6 +1102,14 @@ export function createArrowElement(arrowData) {
       arrowData.control2Y += deltaY;
     }
 
+    // Move waypoints along with arrow
+    if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+      for (const wp of arrowData.waypoints) {
+        wp.x += deltaX;
+        wp.y += deltaY;
+      }
+    }
+
     dragStartX = clientX;
     dragStartY = clientY;
 
@@ -1015,6 +1125,21 @@ export function createArrowElement(arrowData) {
   hitArea.addEventListener("mousedown", startArrowDrag);
   document.addEventListener("mousemove", onArrowDrag, { signal: arrowDragController.signal });
   document.addEventListener("mouseup", endArrowDrag, { signal: arrowDragController.signal });
+
+  // Double-click to add waypoint
+  hitArea.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = container.getBoundingClientRect();
+    const scale = getSlideScale();
+    const x = (e.clientX - rect.left) / scale;
+    const y = (e.clientY - rect.top) / scale;
+
+    // Find the best insertion index based on path segment closest to click
+    const insertIndex = findWaypointInsertIndex(arrowData, x, y);
+    addWaypoint(arrowData, x, y, insertIndex);
+  });
 
   hitArea.style.cursor = "grab";
 
@@ -1140,17 +1265,353 @@ function createArrowHandle(arrowData, position) {
 }
 
 /**
+ * Create a draggable handle for a waypoint.
+ * @param {Object} arrowData - Arrow data object
+ * @param {number} waypointIndex - Index of the waypoint in the waypoints array
+ * @returns {HTMLElement} Handle element
+ */
+function createWaypointHandle(arrowData, waypointIndex) {
+  const handle = document.createElement("div");
+  handle.className = "editable-arrow-handle editable-arrow-handle-waypoint";
+  handle.style.position = "absolute";
+  handle.dataset.waypointIndex = waypointIndex;
+
+  const handleSize = CONFIG.ARROW_WAYPOINT_HANDLE_SIZE;
+  const bgColor = CONFIG.ARROW_WAYPOINT_COLOR;
+
+  handle.style.width = handleSize + "px";
+  handle.style.height = handleSize + "px";
+  handle.style.borderRadius = "50%";
+  handle.style.backgroundColor = bgColor;
+  handle.style.border = "2px solid white";
+  handle.style.cursor = "move";
+  handle.style.pointerEvents = "auto";
+  handle.style.transform = "translate(-50%, -50%)";
+  handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+  handle.setAttribute("role", "slider");
+  handle.setAttribute("aria-label", `Arrow waypoint ${waypointIndex + 1}`);
+  handle.setAttribute("tabindex", "0");
+
+  const handleDragController = new AbortController();
+  handle._dragController = handleDragController;
+
+  let isDragging = false;
+  let cachedScale = 1;
+
+  const startDrag = (e) => {
+    pushUndoState();
+    isDragging = true;
+    cachedScale = getSlideScale();
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onDrag = (e) => {
+    if (!isDragging) return;
+    if (!arrowData.element) return;
+
+    const rect = arrowData.element.getBoundingClientRect();
+    const scale = cachedScale;
+
+    let clientX, clientY;
+    if (e.type.startsWith("touch")) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const x = (clientX - rect.left) / scale;
+    const y = (clientY - rect.top) / scale;
+
+    const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+    if (arrowData.waypoints[wpIndex]) {
+      arrowData.waypoints[wpIndex].x = x;
+      arrowData.waypoints[wpIndex].y = y;
+    }
+
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+
+    e.preventDefault();
+  };
+
+  const stopDrag = () => {
+    isDragging = false;
+  };
+
+  handle.addEventListener("mousedown", startDrag);
+  handle.addEventListener("touchstart", startDrag);
+  document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
+  document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
+  document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
+  document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
+
+  // Right-click to delete waypoint
+  handle.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+    removeWaypoint(arrowData, wpIndex);
+  });
+
+  // Delete key to remove waypoint when focused
+  handle.addEventListener("keydown", (e) => {
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+      removeWaypoint(arrowData, wpIndex);
+    }
+  });
+
+  return handle;
+}
+
+/**
+ * Calculate distance from a point to a line segment.
+ * @param {number} px - Point X
+ * @param {number} py - Point Y
+ * @param {number} x1 - Line start X
+ * @param {number} y1 - Line start Y
+ * @param {number} x2 - Line end X
+ * @param {number} y2 - Line end Y
+ * @returns {number} Distance to segment
+ */
+function distanceToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lengthSq = dx * dx + dy * dy;
+
+  if (lengthSq === 0) {
+    // Segment is a point
+    return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+  }
+
+  // Project point onto line, clamped to segment
+  let t = ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+  t = Math.max(0, Math.min(1, t));
+
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+
+  return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
+}
+
+/**
+ * Find the best index to insert a waypoint based on click position.
+ * Returns the index in the waypoints array where the new waypoint should be inserted.
+ * @param {Object} arrowData - Arrow data object
+ * @param {number} clickX - Click X coordinate
+ * @param {number} clickY - Click Y coordinate
+ * @returns {number} Index to insert at
+ */
+function findWaypointInsertIndex(arrowData, clickX, clickY) {
+  const { fromX, fromY, toX, toY, waypoints } = arrowData;
+
+  // Build list of all points (start, waypoints, end)
+  const points = [
+    { x: fromX, y: fromY },
+    ...(waypoints || []),
+    { x: toX, y: toY }
+  ];
+
+  // If no waypoints yet, insert at index 0 (between start and end)
+  if (!waypoints || waypoints.length === 0) {
+    return 0;
+  }
+
+  // Find which segment is closest to the click
+  let minDist = Infinity;
+  let bestIndex = 0;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const dist = distanceToSegment(
+      clickX, clickY,
+      points[i].x, points[i].y,
+      points[i + 1].x, points[i + 1].y
+    );
+    if (dist < minDist) {
+      minDist = dist;
+      bestIndex = i;
+    }
+  }
+
+  // bestIndex is the segment index (0 = start-to-first-waypoint)
+  // We want to insert the new waypoint at waypoints[bestIndex]
+  return bestIndex;
+}
+
+/**
+ * Add a waypoint to an arrow at the specified position.
+ * @param {Object} arrowData - Arrow data object
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @param {number} [insertIndex] - Index to insert at (default: end)
+ */
+export function addWaypoint(arrowData, x, y, insertIndex) {
+  pushUndoState();
+
+  // If in curve mode, switch to waypoint mode (clear control points)
+  if (arrowData.curveMode) {
+    arrowData.curveMode = false;
+    arrowData.control1X = null;
+    arrowData.control1Y = null;
+    arrowData.control2X = null;
+    arrowData.control2Y = null;
+    if (arrowData._container) {
+      arrowData._container.classList.remove("curve-mode");
+    }
+    if (arrowData._guideLine1) arrowData._guideLine1.style.display = "none";
+    if (arrowData._guideLine2) arrowData._guideLine2.style.display = "none";
+    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "none";
+    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "none";
+  }
+
+  if (!arrowData.waypoints) {
+    arrowData.waypoints = [];
+  }
+
+  const newWaypoint = { x, y };
+  if (insertIndex !== undefined && insertIndex >= 0 && insertIndex <= arrowData.waypoints.length) {
+    arrowData.waypoints.splice(insertIndex, 0, newWaypoint);
+  } else {
+    arrowData.waypoints.push(newWaypoint);
+  }
+
+  // Rebuild all waypoint handles (indices may have changed)
+  rebuildWaypointHandles(arrowData);
+  updateArrowPath(arrowData);
+  updateArrowHandles(arrowData);
+  updateArrowStylePanel(arrowData);
+}
+
+/**
+ * Remove a waypoint from an arrow.
+ * @param {Object} arrowData - Arrow data object
+ * @param {number} waypointIndex - Index of waypoint to remove
+ */
+export function removeWaypoint(arrowData, waypointIndex) {
+  if (!arrowData.waypoints || waypointIndex < 0 || waypointIndex >= arrowData.waypoints.length) {
+    return;
+  }
+
+  pushUndoState();
+  arrowData.waypoints.splice(waypointIndex, 1);
+
+  // Rebuild all waypoint handles (indices have changed)
+  rebuildWaypointHandles(arrowData);
+  updateArrowPath(arrowData);
+  updateArrowHandles(arrowData);
+  updateArrowStylePanel(arrowData);
+}
+
+/**
+ * Rebuild all waypoint handles for an arrow.
+ * Called when waypoints are added or removed.
+ * @param {Object} arrowData - Arrow data object
+ */
+function rebuildWaypointHandles(arrowData) {
+  // Remove existing waypoint handles
+  if (arrowData._waypointHandles) {
+    for (const handle of arrowData._waypointHandles) {
+      if (handle._dragController) {
+        handle._dragController.abort();
+      }
+      handle.remove();
+    }
+  }
+
+  arrowData._waypointHandles = [];
+
+  // Create new handles for each waypoint
+  if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+    for (let i = 0; i < arrowData.waypoints.length; i++) {
+      const handle = createWaypointHandle(arrowData, i);
+      arrowData._container.appendChild(handle);
+      arrowData._waypointHandles.push(handle);
+    }
+  }
+
+  // Update handle positions
+  updateArrowHandles(arrowData);
+}
+
+/**
+ * Generate Catmull-Rom spline path through a series of points.
+ * Uses tension parameter of 0 for standard Catmull-Rom.
+ * @param {Array<{x: number, y: number}>} points - Points to interpolate
+ * @returns {string} SVG path d attribute
+ */
+function catmullRomPath(points) {
+  if (points.length < 2) return "";
+  if (points.length === 2) {
+    return `M ${points[0].x},${points[0].y} L ${points[1].x},${points[1].y}`;
+  }
+
+  let path = `M ${points[0].x},${points[0].y}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 >= points.length ? points.length - 1 : i + 2];
+
+    // Catmull-Rom to cubic bezier conversion
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+
+  return path;
+}
+
+/**
+ * Generate polyline path through waypoints.
+ * @param {number} fromX - Start X
+ * @param {number} fromY - Start Y
+ * @param {Array<{x: number, y: number}>} waypoints - Intermediate points
+ * @param {number} toX - End X
+ * @param {number} toY - End Y
+ * @returns {string} SVG path d attribute
+ */
+function waypointPolylinePath(fromX, fromY, waypoints, toX, toY) {
+  let path = `M ${fromX},${fromY}`;
+  for (const wp of waypoints) {
+    path += ` L ${wp.x},${wp.y}`;
+  }
+  path += ` L ${toX},${toY}`;
+  return path;
+}
+
+/**
  * Update the SVG path for an arrow based on its coordinates.
- * Handles straight lines, quadratic curves, and cubic Bezier curves.
+ * Handles straight lines, quadratic curves, cubic Bezier curves, and waypoints.
  * @param {Object} arrowData - Arrow data object
  */
 export function updateArrowPath(arrowData) {
   if (!arrowData._path) return;
 
-  const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+  const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y, waypoints, smooth } = arrowData;
   let pathD;
 
-  if (control1X !== null && control2X !== null) {
+  // Waypoint mode takes precedence over curve mode
+  if (waypoints && waypoints.length > 0) {
+    const allPoints = [
+      { x: fromX, y: fromY },
+      ...waypoints,
+      { x: toX, y: toY }
+    ];
+
+    if (smooth) {
+      pathD = catmullRomPath(allPoints);
+    } else {
+      pathD = waypointPolylinePath(fromX, fromY, waypoints, toX, toY);
+    }
+  } else if (control1X !== null && control2X !== null) {
     pathD = `M ${fromX},${fromY} C ${control1X},${control1Y} ${control2X},${control2Y} ${toX},${toY}`;
   } else if (control1X !== null) {
     pathD = `M ${fromX},${fromY} Q ${control1X},${control1Y} ${toX},${toY}`;
@@ -1216,6 +1677,18 @@ export function updateArrowHandles(arrowData) {
   if (arrowData._control2Handle && arrowData.control2X !== null) {
     arrowData._control2Handle.style.left = arrowData.control2X + "px";
     arrowData._control2Handle.style.top = arrowData.control2Y + "px";
+  }
+
+  // Update waypoint handles
+  if (arrowData._waypointHandles && arrowData.waypoints) {
+    for (let i = 0; i < arrowData._waypointHandles.length; i++) {
+      const handle = arrowData._waypointHandles[i];
+      const wp = arrowData.waypoints[i];
+      if (handle && wp) {
+        handle.style.left = wp.x + "px";
+        handle.style.top = wp.y + "px";
+      }
+    }
   }
 }
 
@@ -1335,6 +1808,13 @@ export function toggleCurveMode(arrowData) {
   arrowData.curveMode = !arrowData.curveMode;
 
   if (arrowData.curveMode) {
+    // Clear any existing waypoints (mutually exclusive modes)
+    if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+      arrowData.waypoints = [];
+      arrowData.smooth = false;
+      rebuildWaypointHandles(arrowData);
+    }
+
     const { fromX, fromY, toX, toY } = arrowData;
 
     const dx = toX - fromX;
@@ -1352,6 +1832,10 @@ export function toggleCurveMode(arrowData) {
       arrowData._container.classList.add("curve-mode");
     }
 
+    // Show control handles
+    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "";
+    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "";
+
   } else {
     arrowData.control1X = null;
     arrowData.control1Y = null;
@@ -1364,10 +1848,13 @@ export function toggleCurveMode(arrowData) {
 
     if (arrowData._guideLine1) arrowData._guideLine1.style.display = "none";
     if (arrowData._guideLine2) arrowData._guideLine2.style.display = "none";
+    if (arrowData._control1Handle) arrowData._control1Handle.style.display = "none";
+    if (arrowData._control2Handle) arrowData._control2Handle.style.display = "none";
 
   }
 
   updateArrowPath(arrowData);
   updateArrowHandles(arrowData);
+  updateSmoothToggleInToolbar(arrowData);
 }
 
