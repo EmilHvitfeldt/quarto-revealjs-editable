@@ -1,6 +1,10 @@
 project:
   type: website
   output-dir: _site
+  pre-render:
+    - "cp -r ../_extensions ."
+  post-render:
+    - "rm -rf _extensions"
 
 website:
   title: "Editable Extension"
