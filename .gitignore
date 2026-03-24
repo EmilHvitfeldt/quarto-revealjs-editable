@@ -13,3 +13,4 @@ docs/demo-text.mp4
 
 # Extension build artifacts
 _extensions/editable/node_modules/
+test-results/
