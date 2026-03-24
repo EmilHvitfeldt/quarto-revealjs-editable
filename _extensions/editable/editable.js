@@ -81,6 +81,8 @@ var EditableModule = (() => {
     return document.querySelectorAll("div.editable:not(.editable-new)");
   }
   function getCurrentSlideIndex() {
+    if (typeof Reveal === "undefined")
+      return 0;
     const indices = Reveal.getIndices();
     return indices.h;
   }
@@ -88,6 +90,8 @@ var EditableModule = (() => {
     return document.querySelector("section.present:not(.stack)") || document.querySelector("section.present");
   }
   function hasTitleSlide() {
+    if (typeof Reveal === "undefined")
+      return false;
     const firstSlide = Reveal.getSlide(0);
     if (!firstSlide)
       return false;
@@ -1357,6 +1361,17 @@ var EditableModule = (() => {
     return confirmed;
   }
   var activeArrow = null;
+  var globalClickHandlerInstalled = false;
+  function installGlobalClickHandler() {
+    if (globalClickHandlerInstalled)
+      return;
+    globalClickHandlerInstalled = true;
+    document.addEventListener("click", (e) => {
+      if (activeArrow && !e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar")) {
+        setActiveArrow(null);
+      }
+    });
+  }
   var arrowControlRefs = {
     colorPicker: null,
     widthInput: null,
@@ -1959,14 +1974,7 @@ var EditableModule = (() => {
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
     setActiveArrow(arrowData);
-    if (!container._clickOutsideHandler) {
-      container._clickOutsideHandler = true;
-      document.addEventListener("click", (e) => {
-        if (!e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar") && activeArrow === arrowData) {
-          setActiveArrow(null);
-        }
-      });
-    }
+    installGlobalClickHandler();
     return container;
   }
   function createArrowHandle(arrowData, position) {
@@ -2008,6 +2016,8 @@ var EditableModule = (() => {
     };
     const onDrag = (e) => {
       if (!isDragging)
+        return;
+      if (!arrowData.element)
         return;
       const rect = arrowData.element.getBoundingClientRect();
       const scale = cachedScale;
@@ -2777,6 +2787,8 @@ ${fence}`;
     return window._input_file;
   }
   function getEditableFilename() {
+    if (!window._input_filename)
+      return "untitled.qmd";
     return window._input_filename.split(/[/\\]/).pop();
   }
   async function downloadString(content, mimeType = "text/plain") {

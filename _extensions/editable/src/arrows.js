@@ -131,6 +131,26 @@ export async function showArrowExtensionWarning() {
 /** @type {Object|null} Currently selected arrow data */
 let activeArrow = null;
 
+/** @type {boolean} Whether the global click-outside handler has been installed */
+let globalClickHandlerInstalled = false;
+
+/**
+ * Install a single global click-outside handler for deselecting arrows.
+ * This is called once and handles all arrows, avoiding redundant listeners.
+ */
+function installGlobalClickHandler() {
+  if (globalClickHandlerInstalled) return;
+  globalClickHandlerInstalled = true;
+
+  document.addEventListener("click", (e) => {
+    if (activeArrow &&
+        !e.target.closest(".editable-arrow-container") &&
+        !e.target.closest(".editable-toolbar")) {
+      setActiveArrow(null);
+    }
+  });
+}
+
 /** @type {Object} Cached references to arrow control DOM elements */
 const arrowControlRefs = {
   colorPicker: null,
@@ -908,16 +928,7 @@ export function createArrowElement(arrowData) {
 
   setActiveArrow(arrowData);
 
-  if (!container._clickOutsideHandler) {
-    container._clickOutsideHandler = true;
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest(".editable-arrow-container") &&
-          !e.target.closest(".editable-toolbar") &&
-          activeArrow === arrowData) {
-        setActiveArrow(null);
-      }
-    });
-  }
+  installGlobalClickHandler();
 
   return container;
 }
