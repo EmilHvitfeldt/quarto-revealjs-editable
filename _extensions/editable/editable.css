@@ -33,8 +33,10 @@
   --editable-arrow-end-color: #28a745;
   --editable-arrow-control1-color: #ff6600;
   --editable-arrow-control2-color: #9933ff;
+  --editable-arrow-waypoint-color: #f59e0b;
   --editable-arrow-handle-size: 12px;
   --editable-arrow-control-handle-size: 10px;
+  --editable-arrow-waypoint-handle-size: 10px;
   --editable-toolbar-add-arrow-color: #6f42c1;
 }
 
@@ -853,6 +855,12 @@
   background-color: var(--editable-arrow-control2-color);
 }
 
+.editable-arrow-handle-waypoint {
+  background-color: var(--editable-arrow-waypoint-color);
+  width: var(--editable-arrow-waypoint-handle-size);
+  height: var(--editable-arrow-waypoint-handle-size);
+}
+
 /* Curve mode toggle button */
 .editable-arrow-curve-toggle {
   display: none;
@@ -993,10 +1001,42 @@
   border-color: var(--editable-accent-color, #007cba);
 }
 
+
+/* Smooth toggle for waypoints */
+.arrow-toolbar-smooth {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--editable-arrow-waypoint-color);
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
+  cursor: pointer;
+  box-sizing: border-box;
+  color: var(--editable-arrow-waypoint-color);
+}
+
+.arrow-toolbar-smooth.active {
+  background: var(--editable-arrow-waypoint-color);
+  color: white;
+}
+
+/* Waypoint count badge */
+.arrow-toolbar-waypoint-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--editable-arrow-waypoint-color);
+  color: white;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
 .arrow-toolbar-color:focus,
 .arrow-toolbar-width:focus,
 .arrow-toolbar-select:focus,
 .arrow-toolbar-curve:focus,
+.arrow-toolbar-smooth:focus,
 .arrow-toolbar-label:focus {
   outline: none;
   border-color: var(--editable-accent-color, #007cba);

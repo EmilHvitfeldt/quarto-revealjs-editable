@@ -25,6 +25,14 @@ All notable changes to the quarto-revealjs-editable extension will be documented
     - Label offset for perpendicular distance from arrow line
     - Labels automatically rotate to follow arrow direction
     - Labels follow arrow when dragged and update color to match arrow
+  - **Waypoints and smooth curves** - Complex multi-point arrow paths (#59)
+    - Double-click on arrow path to add waypoints
+    - Waypoints shown as amber handles, distinct from start/end (blue/green) and control points
+    - Right-click or Delete key to remove waypoints
+    - Smooth toggle for Catmull-Rom spline interpolation through waypoints
+    - Waypoints and smooth attributes serialized in shortcode (`waypoints="x1,y1 x2,y2"`, `smooth="true"`)
+    - Curve mode and waypoint mode are mutually exclusive (clicking Curve clears waypoints)
+    - Waypoint badge shows count in toolbar when waypoints exist
   - **Undo/redo support** - Arrow operations (creation, movement, styling, curve mode) integrated with Ctrl+Z/Ctrl+Y (#65)
 
 ### Fixed

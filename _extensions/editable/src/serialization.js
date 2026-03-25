@@ -249,6 +249,19 @@ export function serializeArrowToShortcode(arrow) {
     shortcode += ` control2="${c2x},${c2y}"`;
   }
 
+  // Add waypoints if they exist
+  if (arrow.waypoints && arrow.waypoints.length > 0) {
+    const waypointsStr = arrow.waypoints
+      .map(wp => `${round(wp.x)},${round(wp.y)}`)
+      .join(" ");
+    shortcode += ` waypoints="${waypointsStr}"`;
+
+    // Add smooth only if waypoints exist and smooth is enabled
+    if (arrow.smooth) {
+      shortcode += ` smooth="true"`;
+    }
+  }
+
   // Add styling (only if non-default)
   const normalizedArrowColor = normalizeColor(arrow.color);
   if (arrow.color && normalizedArrowColor !== "#000000") {

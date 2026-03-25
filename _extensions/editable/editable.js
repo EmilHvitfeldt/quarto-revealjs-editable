@@ -40,6 +40,8 @@ var EditableModule = (() => {
         ARROW_DEFAULT_WIDTH: 2,
         ARROW_CONTROL1_COLOR: "#ff6600",
         ARROW_CONTROL2_COLOR: "#9933ff",
+        ARROW_WAYPOINT_COLOR: "#f59e0b",
+        ARROW_WAYPOINT_HANDLE_SIZE: 10,
         ARROW_DEFAULT_LABEL_POSITION: "middle",
         ARROW_DEFAULT_LABEL_OFFSET: 10,
         // Polling config
@@ -796,11 +798,13 @@ var EditableModule = (() => {
   __export(arrows_exports, {
     ARROW_HEAD_STYLES: () => ARROW_HEAD_STYLES,
     addNewArrow: () => addNewArrow,
+    addWaypoint: () => addWaypoint,
     cleanupArrowListeners: () => cleanupArrowListeners,
     createArrowElement: () => createArrowElement,
     createArrowStyleControls: () => createArrowStyleControls,
     getActiveArrow: () => getActiveArrow,
     hasArrowExtension: () => hasArrowExtension,
+    removeWaypoint: () => removeWaypoint,
     setActiveArrow: () => setActiveArrow,
     showArrowExtensionWarning: () => showArrowExtensionWarning,
     toggleCurveMode: () => toggleCurveMode,
@@ -939,6 +943,14 @@ var EditableModule = (() => {
       if (handle && handle._dragController) {
         handle._dragController.abort();
         handle._dragController = null;
+      }
+    }
+    if (arrowData._waypointHandles) {
+      for (const handle of arrowData._waypointHandles) {
+        if (handle && handle._dragController) {
+          handle._dragController.abort();
+          handle._dragController = null;
+        }
       }
     }
   }
@@ -1093,11 +1105,38 @@ var EditableModule = (() => {
     curveToggle.addEventListener("click", () => {
       if (activeArrow) {
         pushUndoState();
+        if (activeArrow.waypoints && activeArrow.waypoints.length > 0) {
+          activeArrow.waypoints = [];
+          activeArrow.smooth = false;
+          rebuildWaypointHandles(activeArrow);
+          updateSmoothToggleInToolbar(activeArrow);
+        }
         toggleCurveMode(activeArrow);
         updateCurveToggleInToolbar(activeArrow);
       }
     });
     container.appendChild(curveToggle);
+    const smoothToggle = document.createElement("button");
+    smoothToggle.id = "arrow-style-smooth";
+    smoothToggle.className = "arrow-toolbar-smooth";
+    smoothToggle.innerHTML = "\u3030 Smooth";
+    smoothToggle.title = "Toggle smooth curves through waypoints";
+    smoothToggle.style.display = "none";
+    smoothToggle.addEventListener("click", () => {
+      if (activeArrow && activeArrow.waypoints && activeArrow.waypoints.length > 0) {
+        pushUndoState();
+        activeArrow.smooth = !activeArrow.smooth;
+        updateArrowPath(activeArrow);
+        updateSmoothToggleInToolbar(activeArrow);
+      }
+    });
+    container.appendChild(smoothToggle);
+    const waypointBadge = document.createElement("span");
+    waypointBadge.id = "arrow-style-waypoint-count";
+    waypointBadge.className = "arrow-toolbar-waypoint-badge";
+    waypointBadge.style.display = "none";
+    waypointBadge.title = "Number of waypoints (double-click arrow to add, right-click waypoint to remove)";
+    container.appendChild(waypointBadge);
     const labelSeparator = document.createElement("div");
     labelSeparator.className = "arrow-toolbar-separator";
     labelSeparator.textContent = "Label";
@@ -1159,6 +1198,9 @@ var EditableModule = (() => {
     arrowControlRefs.labelInput = labelInput;
     arrowControlRefs.labelPositionSelect = labelPositionSelect;
     arrowControlRefs.labelOffsetInput = labelOffsetInput;
+    arrowControlRefs.smoothToggle = smoothToggle;
+    arrowControlRefs.waypointBadge = waypointBadge;
+    arrowControlRefs.curveToggle = curveToggle;
     return container;
   }
   function updateArrowStylePanel(arrowData) {
@@ -1207,6 +1249,7 @@ var EditableModule = (() => {
         labelOffsetInput.value = (arrowData.labelOffset !== void 0 ? arrowData.labelOffset : CONFIG.ARROW_DEFAULT_LABEL_OFFSET).toString();
       }
       updateCurveToggleInToolbar(arrowData);
+      updateSmoothToggleInToolbar(arrowData);
       buttonsContainer.style.display = "none";
       arrowControls.style.display = "flex";
     } else {
@@ -1218,10 +1261,39 @@ var EditableModule = (() => {
     const curveToggle = document.querySelector("#arrow-style-curve");
     if (!curveToggle)
       return;
-    if (arrowData && arrowData.curveMode) {
-      curveToggle.classList.add("active");
-    } else {
+    const hasWaypoints = arrowData && arrowData.waypoints && arrowData.waypoints.length > 0;
+    if (hasWaypoints) {
+      curveToggle.classList.remove("disabled");
       curveToggle.classList.remove("active");
+      curveToggle.title = "Switch to curve mode (clears waypoints)";
+    } else {
+      curveToggle.classList.remove("disabled");
+      curveToggle.title = "Toggle curve mode";
+      if (arrowData && arrowData.curveMode) {
+        curveToggle.classList.add("active");
+      } else {
+        curveToggle.classList.remove("active");
+      }
+    }
+  }
+  function updateSmoothToggleInToolbar(arrowData) {
+    const smoothToggle = arrowControlRefs.smoothToggle || document.querySelector("#arrow-style-smooth");
+    const waypointBadge = arrowControlRefs.waypointBadge || document.querySelector("#arrow-style-waypoint-count");
+    if (!smoothToggle || !waypointBadge)
+      return;
+    const hasWaypoints = arrowData && arrowData.waypoints && arrowData.waypoints.length > 0;
+    if (hasWaypoints) {
+      smoothToggle.style.display = "";
+      waypointBadge.style.display = "";
+      waypointBadge.textContent = `${arrowData.waypoints.length} wp`;
+      if (arrowData.smooth) {
+        smoothToggle.classList.add("active");
+      } else {
+        smoothToggle.classList.remove("active");
+      }
+    } else {
+      smoothToggle.style.display = "none";
+      waypointBadge.style.display = "none";
     }
   }
   function updateArrowAppearance(arrowData) {
@@ -1444,6 +1516,8 @@ var EditableModule = (() => {
       control2X: null,
       control2Y: null,
       curveMode: false,
+      waypoints: [],
+      smooth: false,
       color: CONFIG.ARROW_DEFAULT_COLOR,
       width: CONFIG.ARROW_DEFAULT_WIDTH,
       head: "arrow",
@@ -1567,6 +1641,14 @@ var EditableModule = (() => {
     container.appendChild(control2Handle);
     arrowData._control1Handle = control1Handle;
     arrowData._control2Handle = control2Handle;
+    arrowData._waypointHandles = [];
+    if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+      for (let i = 0; i < arrowData.waypoints.length; i++) {
+        const handle = createWaypointHandle(arrowData, i);
+        container.appendChild(handle);
+        arrowData._waypointHandles.push(handle);
+      }
+    }
     const arrowDragController = new AbortController();
     arrowData._dragController = arrowDragController;
     let isDraggingArrow = false;
@@ -1605,6 +1687,12 @@ var EditableModule = (() => {
         arrowData.control2X += deltaX;
         arrowData.control2Y += deltaY;
       }
+      if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+        for (const wp of arrowData.waypoints) {
+          wp.x += deltaX;
+          wp.y += deltaY;
+        }
+      }
       dragStartX = clientX;
       dragStartY = clientY;
       updateArrowPath(arrowData);
@@ -1617,6 +1705,16 @@ var EditableModule = (() => {
     hitArea.addEventListener("mousedown", startArrowDrag);
     document.addEventListener("mousemove", onArrowDrag, { signal: arrowDragController.signal });
     document.addEventListener("mouseup", endArrowDrag, { signal: arrowDragController.signal });
+    hitArea.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = container.getBoundingClientRect();
+      const scale = getSlideScale();
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
+      const insertIndex = findWaypointInsertIndex(arrowData, x, y);
+      addWaypoint(arrowData, x, y, insertIndex);
+    });
     hitArea.style.cursor = "grab";
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
@@ -1715,12 +1813,236 @@ var EditableModule = (() => {
     document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
     return handle;
   }
+  function createWaypointHandle(arrowData, waypointIndex) {
+    const handle = document.createElement("div");
+    handle.className = "editable-arrow-handle editable-arrow-handle-waypoint";
+    handle.style.position = "absolute";
+    handle.dataset.waypointIndex = waypointIndex;
+    const handleSize = CONFIG.ARROW_WAYPOINT_HANDLE_SIZE;
+    const bgColor = CONFIG.ARROW_WAYPOINT_COLOR;
+    handle.style.width = handleSize + "px";
+    handle.style.height = handleSize + "px";
+    handle.style.borderRadius = "50%";
+    handle.style.backgroundColor = bgColor;
+    handle.style.border = "2px solid white";
+    handle.style.cursor = "move";
+    handle.style.pointerEvents = "auto";
+    handle.style.transform = "translate(-50%, -50%)";
+    handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+    handle.setAttribute("role", "slider");
+    handle.setAttribute("aria-label", `Arrow waypoint ${waypointIndex + 1}`);
+    handle.setAttribute("tabindex", "0");
+    const handleDragController = new AbortController();
+    handle._dragController = handleDragController;
+    let isDragging = false;
+    let cachedScale = 1;
+    const startDrag = (e) => {
+      pushUndoState();
+      isDragging = true;
+      cachedScale = getSlideScale();
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onDrag = (e) => {
+      if (!isDragging)
+        return;
+      if (!arrowData.element)
+        return;
+      const rect = arrowData.element.getBoundingClientRect();
+      const scale = cachedScale;
+      let clientX, clientY;
+      if (e.type.startsWith("touch")) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      const x = (clientX - rect.left) / scale;
+      const y = (clientY - rect.top) / scale;
+      const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+      if (arrowData.waypoints[wpIndex]) {
+        arrowData.waypoints[wpIndex].x = x;
+        arrowData.waypoints[wpIndex].y = y;
+      }
+      updateArrowPath(arrowData);
+      updateArrowHandles(arrowData);
+      e.preventDefault();
+    };
+    const stopDrag = () => {
+      isDragging = false;
+    };
+    handle.addEventListener("mousedown", startDrag);
+    handle.addEventListener("touchstart", startDrag);
+    document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
+    document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
+    document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
+    document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
+    handle.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+      removeWaypoint(arrowData, wpIndex);
+    });
+    handle.addEventListener("keydown", (e) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+        removeWaypoint(arrowData, wpIndex);
+      }
+    });
+    return handle;
+  }
+  function distanceToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq === 0) {
+      return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+    }
+    let t = ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = x1 + t * dx;
+    const projY = y1 + t * dy;
+    return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
+  }
+  function findWaypointInsertIndex(arrowData, clickX, clickY) {
+    const { fromX, fromY, toX, toY, waypoints } = arrowData;
+    const points = [
+      { x: fromX, y: fromY },
+      ...waypoints || [],
+      { x: toX, y: toY }
+    ];
+    if (!waypoints || waypoints.length === 0) {
+      return 0;
+    }
+    let minDist = Infinity;
+    let bestIndex = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const dist = distanceToSegment(
+        clickX,
+        clickY,
+        points[i].x,
+        points[i].y,
+        points[i + 1].x,
+        points[i + 1].y
+      );
+      if (dist < minDist) {
+        minDist = dist;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
+  function addWaypoint(arrowData, x, y, insertIndex) {
+    pushUndoState();
+    if (arrowData.curveMode) {
+      arrowData.curveMode = false;
+      arrowData.control1X = null;
+      arrowData.control1Y = null;
+      arrowData.control2X = null;
+      arrowData.control2Y = null;
+      if (arrowData._container) {
+        arrowData._container.classList.remove("curve-mode");
+      }
+      if (arrowData._guideLine1)
+        arrowData._guideLine1.style.display = "none";
+      if (arrowData._guideLine2)
+        arrowData._guideLine2.style.display = "none";
+      if (arrowData._control1Handle)
+        arrowData._control1Handle.style.display = "none";
+      if (arrowData._control2Handle)
+        arrowData._control2Handle.style.display = "none";
+    }
+    if (!arrowData.waypoints) {
+      arrowData.waypoints = [];
+    }
+    const newWaypoint = { x, y };
+    if (insertIndex !== void 0 && insertIndex >= 0 && insertIndex <= arrowData.waypoints.length) {
+      arrowData.waypoints.splice(insertIndex, 0, newWaypoint);
+    } else {
+      arrowData.waypoints.push(newWaypoint);
+    }
+    rebuildWaypointHandles(arrowData);
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+    updateArrowStylePanel(arrowData);
+  }
+  function removeWaypoint(arrowData, waypointIndex) {
+    if (!arrowData.waypoints || waypointIndex < 0 || waypointIndex >= arrowData.waypoints.length) {
+      return;
+    }
+    pushUndoState();
+    arrowData.waypoints.splice(waypointIndex, 1);
+    rebuildWaypointHandles(arrowData);
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+    updateArrowStylePanel(arrowData);
+  }
+  function rebuildWaypointHandles(arrowData) {
+    if (arrowData._waypointHandles) {
+      for (const handle of arrowData._waypointHandles) {
+        if (handle._dragController) {
+          handle._dragController.abort();
+        }
+        handle.remove();
+      }
+    }
+    arrowData._waypointHandles = [];
+    if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+      for (let i = 0; i < arrowData.waypoints.length; i++) {
+        const handle = createWaypointHandle(arrowData, i);
+        arrowData._container.appendChild(handle);
+        arrowData._waypointHandles.push(handle);
+      }
+    }
+    updateArrowHandles(arrowData);
+  }
+  function catmullRomPath(points) {
+    if (points.length < 2)
+      return "";
+    if (points.length === 2) {
+      return `M ${points[0].x},${points[0].y} L ${points[1].x},${points[1].y}`;
+    }
+    let path = `M ${points[0].x},${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? 0 : i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2 >= points.length ? points.length - 1 : i + 2];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return path;
+  }
+  function waypointPolylinePath(fromX, fromY, waypoints, toX, toY) {
+    let path = `M ${fromX},${fromY}`;
+    for (const wp of waypoints) {
+      path += ` L ${wp.x},${wp.y}`;
+    }
+    path += ` L ${toX},${toY}`;
+    return path;
+  }
   function updateArrowPath(arrowData) {
     if (!arrowData._path)
       return;
-    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
+    const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y, waypoints, smooth } = arrowData;
     let pathD;
-    if (control1X !== null && control2X !== null) {
+    if (waypoints && waypoints.length > 0) {
+      const allPoints = [
+        { x: fromX, y: fromY },
+        ...waypoints,
+        { x: toX, y: toY }
+      ];
+      if (smooth) {
+        pathD = catmullRomPath(allPoints);
+      } else {
+        pathD = waypointPolylinePath(fromX, fromY, waypoints, toX, toY);
+      }
+    } else if (control1X !== null && control2X !== null) {
       pathD = `M ${fromX},${fromY} C ${control1X},${control1Y} ${control2X},${control2Y} ${toX},${toY}`;
     } else if (control1X !== null) {
       pathD = `M ${fromX},${fromY} Q ${control1X},${control1Y} ${toX},${toY}`;
@@ -1774,6 +2096,16 @@ var EditableModule = (() => {
     if (arrowData._control2Handle && arrowData.control2X !== null) {
       arrowData._control2Handle.style.left = arrowData.control2X + "px";
       arrowData._control2Handle.style.top = arrowData.control2Y + "px";
+    }
+    if (arrowData._waypointHandles && arrowData.waypoints) {
+      for (let i = 0; i < arrowData._waypointHandles.length; i++) {
+        const handle = arrowData._waypointHandles[i];
+        const wp = arrowData.waypoints[i];
+        if (handle && wp) {
+          handle.style.left = wp.x + "px";
+          handle.style.top = wp.y + "px";
+        }
+      }
     }
   }
   function getPointOnArrow(t, arrowData) {
@@ -1847,6 +2179,11 @@ var EditableModule = (() => {
   function toggleCurveMode(arrowData) {
     arrowData.curveMode = !arrowData.curveMode;
     if (arrowData.curveMode) {
+      if (arrowData.waypoints && arrowData.waypoints.length > 0) {
+        arrowData.waypoints = [];
+        arrowData.smooth = false;
+        rebuildWaypointHandles(arrowData);
+      }
       const { fromX, fromY, toX, toY } = arrowData;
       const dx = toX - fromX;
       const dy = toY - fromY;
@@ -1860,6 +2197,10 @@ var EditableModule = (() => {
       if (arrowData._container) {
         arrowData._container.classList.add("curve-mode");
       }
+      if (arrowData._control1Handle)
+        arrowData._control1Handle.style.display = "";
+      if (arrowData._control2Handle)
+        arrowData._control2Handle.style.display = "";
     } else {
       arrowData.control1X = null;
       arrowData.control1Y = null;
@@ -1872,9 +2213,14 @@ var EditableModule = (() => {
         arrowData._guideLine1.style.display = "none";
       if (arrowData._guideLine2)
         arrowData._guideLine2.style.display = "none";
+      if (arrowData._control1Handle)
+        arrowData._control1Handle.style.display = "none";
+      if (arrowData._control2Handle)
+        arrowData._control2Handle.style.display = "none";
     }
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
+    updateSmoothToggleInToolbar(arrowData);
   }
   var arrowExtensionWarningShown, activeArrow, globalClickOutsideHandlerRegistered, arrowControlRefs, ARROW_HEAD_STYLES;
   var init_arrows = __esm({
@@ -1897,7 +2243,10 @@ var EditableModule = (() => {
         colorPresetsRow: null,
         labelInput: null,
         labelPositionSelect: null,
-        labelOffsetInput: null
+        labelOffsetInput: null,
+        smoothToggle: null,
+        waypointBadge: null,
+        curveToggle: null
       };
       ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
     }
@@ -2688,6 +3037,13 @@ ${innerFence}`;
       const c2x = round(arrow.control2X);
       const c2y = round(arrow.control2Y);
       shortcode += ` control2="${c2x},${c2y}"`;
+    }
+    if (arrow.waypoints && arrow.waypoints.length > 0) {
+      const waypointsStr = arrow.waypoints.map((wp) => `${round(wp.x)},${round(wp.y)}`).join(" ");
+      shortcode += ` waypoints="${waypointsStr}"`;
+      if (arrow.smooth) {
+        shortcode += ` smooth="true"`;
+      }
     }
     const normalizedArrowColor = normalizeColor(arrow.color);
     if (arrow.color && normalizedArrowColor !== "#000000") {
