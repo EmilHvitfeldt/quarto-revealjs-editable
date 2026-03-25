@@ -2,7 +2,7 @@
 
 All notable changes to the quarto-revealjs-editable extension will be documented in this file.
 
-## [Unreleased]
+## [7.0.0] - 2025-03-25
 
 ### Added
 

@@ -1,6 +1,6 @@
 title: editable
 author: Emil Hvitfeldt
-version: 6.0.0
+version: 7.0.0
 quarto-required: ">=1.6.0"
 contributes:
   filters:
