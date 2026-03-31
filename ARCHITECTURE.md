@@ -48,7 +48,7 @@ _extensions/editable/
     ├── serialization.js # QMD transformation and property serializers
     ├── quill.js        # Rich text editor integration
     ├── arrows.js       # Arrow system
-    ├── toolbar.js      # Floating toolbar
+    ├── toolbar.js      # Top bar toolbar
     └── main.js         # Plugin entry point
 ```
 
@@ -96,7 +96,7 @@ Element types map to capabilities via `ELEMENT_CAPABILITIES`:
 Three registries manage extensible behaviors:
 
 1. **ControlRegistry** - UI buttons shown on elements (font size, alignment, edit mode)
-2. **ToolbarRegistry** - Floating toolbar actions (save, copy, add)
+2. **ToolbarRegistry** - Top bar toolbar actions (save, copy, add)
 3. **NewElementRegistry** - Tracks dynamically added elements/slides/arrows
 
 ### Serialization
@@ -139,7 +139,7 @@ When saving, brand colors are converted to `{{< brand color name >}}` shortcodes
    ├─▶ Initialize each capability
    └─▶ Attach event listeners
    │
-4. Create floating toolbar
+4. Create top bar toolbar (triggers reveal.js resize to account for 100px offset)
 5. Setup undo/redo keyboard shortcuts
 ```
 

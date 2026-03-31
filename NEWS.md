@@ -2,6 +2,17 @@
 
 All notable changes to the quarto-revealjs-editable extension will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Toolbar redesign** - Replaced the floating vertical toolbar with a fixed 100px top bar spanning the full viewport width
+  - Slides automatically shift down and resize to fill the remaining viewport area
+  - Button labels are always visible (no hover-to-expand)
+  - Add submenu now opens downward
+  - Arrow style controls appear right-aligned in the top bar when an arrow is selected, keeping Save/Copy/Add always visible
+  - Removed drag handle; toolbar is no longer draggable
+
 ## [7.0.0] - 2025-03-25
 
 ### Added
