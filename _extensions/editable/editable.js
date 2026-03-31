@@ -813,6 +813,10 @@ var EditableModule = (() => {
     rightZoneEl.querySelectorAll(".toolbar-panel").forEach((panel) => {
       panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? "" : "none";
     });
+    const isContext = panelName !== "default";
+    contextHideElements.forEach((el) => {
+      el.style.display = isContext ? "none" : "";
+    });
   }
   function createFloatingToolbar() {
     if (document.getElementById("editable-toolbar")) {
@@ -832,10 +836,23 @@ var EditableModule = (() => {
     const divider = document.createElement("div");
     divider.className = "editable-toolbar-divider";
     leftZone.appendChild(divider);
+    const leftButtonStack = document.createElement("div");
+    leftButtonStack.className = "editable-toolbar-button-stack";
+    const unstackedButtons = [];
     ToolbarRegistry.getActionsForZone("left").forEach((action) => {
-      leftZone.appendChild(
-        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
-      );
+      const btn = action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action);
+      if (action.stacked === false) {
+        unstackedButtons.push({ btn, action });
+      } else {
+        leftButtonStack.appendChild(btn);
+      }
+    });
+    contextHideElements.push(leftButtonStack);
+    leftZone.appendChild(leftButtonStack);
+    unstackedButtons.forEach(({ btn, action }) => {
+      leftZone.appendChild(btn);
+      if (action.hideOnContext)
+        contextHideElements.push(btn);
     });
     toolbar.appendChild(leftZone);
     const rightZone = document.createElement("div");
@@ -860,11 +877,12 @@ var EditableModule = (() => {
     });
     return toolbar;
   }
-  var rightZoneEl;
+  var rightZoneEl, contextHideElements;
   var init_toolbar = __esm({
     "src/toolbar.js"() {
       init_registries();
       rightZoneEl = null;
+      contextHideElements = [];
     }
   });
 
@@ -1075,6 +1093,8 @@ var EditableModule = (() => {
       }
     });
     container.appendChild(colorPicker);
+    const controlsWrap = document.createElement("div");
+    controlsWrap.className = "arrow-controls-wrap";
     const widthInput = document.createElement("input");
     widthInput.type = "number";
     widthInput.id = "arrow-style-width";
@@ -1096,7 +1116,7 @@ var EditableModule = (() => {
         }
       }
     });
-    container.appendChild(widthInput);
+    controlsWrap.appendChild(widthInput);
     const headSelect = document.createElement("select");
     headSelect.id = "arrow-style-head";
     headSelect.className = "arrow-toolbar-select";
@@ -1114,7 +1134,7 @@ var EditableModule = (() => {
         updateArrowAppearance(activeArrow);
       }
     });
-    container.appendChild(headSelect);
+    controlsWrap.appendChild(headSelect);
     const dashSelect = document.createElement("select");
     dashSelect.id = "arrow-style-dash";
     dashSelect.className = "arrow-toolbar-select";
@@ -1132,7 +1152,7 @@ var EditableModule = (() => {
         updateArrowAppearance(activeArrow);
       }
     });
-    container.appendChild(dashSelect);
+    controlsWrap.appendChild(dashSelect);
     const lineSelect = document.createElement("select");
     lineSelect.id = "arrow-style-line";
     lineSelect.className = "arrow-toolbar-select";
@@ -1150,7 +1170,7 @@ var EditableModule = (() => {
         updateArrowAppearance(activeArrow);
       }
     });
-    container.appendChild(lineSelect);
+    controlsWrap.appendChild(lineSelect);
     const opacityInput = document.createElement("input");
     opacityInput.type = "range";
     opacityInput.id = "arrow-style-opacity";
@@ -1170,7 +1190,7 @@ var EditableModule = (() => {
         updateArrowAppearance(activeArrow);
       }
     });
-    container.appendChild(opacityInput);
+    controlsWrap.appendChild(opacityInput);
     const curveToggle = document.createElement("button");
     curveToggle.id = "arrow-style-curve";
     curveToggle.className = "arrow-toolbar-curve";
@@ -1189,7 +1209,7 @@ var EditableModule = (() => {
         updateCurveToggleInToolbar(activeArrow);
       }
     });
-    container.appendChild(curveToggle);
+    controlsWrap.appendChild(curveToggle);
     const smoothToggle = document.createElement("button");
     smoothToggle.id = "arrow-style-smooth";
     smoothToggle.className = "arrow-toolbar-smooth";
@@ -1204,17 +1224,17 @@ var EditableModule = (() => {
         updateSmoothToggleInToolbar(activeArrow);
       }
     });
-    container.appendChild(smoothToggle);
+    controlsWrap.appendChild(smoothToggle);
     const waypointBadge = document.createElement("span");
     waypointBadge.id = "arrow-style-waypoint-count";
     waypointBadge.className = "arrow-toolbar-waypoint-badge";
     waypointBadge.style.display = "none";
     waypointBadge.title = "Number of waypoints (double-click arrow to add, right-click waypoint to remove)";
-    container.appendChild(waypointBadge);
+    controlsWrap.appendChild(waypointBadge);
     const labelSeparator = document.createElement("div");
     labelSeparator.className = "arrow-toolbar-separator";
     labelSeparator.textContent = "Label";
-    container.appendChild(labelSeparator);
+    controlsWrap.appendChild(labelSeparator);
     const labelInput = document.createElement("input");
     labelInput.type = "text";
     labelInput.id = "arrow-style-label";
@@ -1227,7 +1247,7 @@ var EditableModule = (() => {
         updateArrowLabel(activeArrow);
       }
     });
-    container.appendChild(labelInput);
+    controlsWrap.appendChild(labelInput);
     const labelPositionSelect = document.createElement("select");
     labelPositionSelect.id = "arrow-style-label-position";
     labelPositionSelect.className = "arrow-toolbar-select";
@@ -1245,7 +1265,7 @@ var EditableModule = (() => {
         updateArrowLabel(activeArrow);
       }
     });
-    container.appendChild(labelPositionSelect);
+    controlsWrap.appendChild(labelPositionSelect);
     const labelOffsetInput = document.createElement("input");
     labelOffsetInput.type = "number";
     labelOffsetInput.id = "arrow-style-label-offset";
@@ -1261,7 +1281,8 @@ var EditableModule = (() => {
         }
       }
     });
-    container.appendChild(labelOffsetInput);
+    controlsWrap.appendChild(labelOffsetInput);
+    container.appendChild(controlsWrap);
     arrowControlRefs.colorPicker = colorPicker;
     arrowControlRefs.widthInput = widthInput;
     arrowControlRefs.headSelect = headSelect;
@@ -3367,7 +3388,9 @@ ${fence}`;
     label: "Add",
     title: "Add new elements",
     className: "toolbar-add",
-    zone: "right",
+    zone: "left",
+    stacked: false,
+    hideOnContext: true,
     submenu: [
       {
         icon: "\u{1F4DD}",

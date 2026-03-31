@@ -276,6 +276,10 @@ export function createArrowStyleControls() {
   });
   container.appendChild(colorPicker);
 
+  // Wrapping sub-container for all non-color controls
+  const controlsWrap = document.createElement("div");
+  controlsWrap.className = "arrow-controls-wrap";
+
   // Width input
   const widthInput = document.createElement("input");
   widthInput.type = "number";
@@ -297,7 +301,7 @@ export function createArrowStyleControls() {
       }
     }
   });
-  container.appendChild(widthInput);
+  controlsWrap.appendChild(widthInput);
 
   // Head style select
   const headSelect = document.createElement("select");
@@ -317,7 +321,7 @@ export function createArrowStyleControls() {
       updateArrowAppearance(activeArrow);
     }
   });
-  container.appendChild(headSelect);
+  controlsWrap.appendChild(headSelect);
 
   // Dash select
   const dashSelect = document.createElement("select");
@@ -337,7 +341,7 @@ export function createArrowStyleControls() {
       updateArrowAppearance(activeArrow);
     }
   });
-  container.appendChild(dashSelect);
+  controlsWrap.appendChild(dashSelect);
 
   // Line select
   const lineSelect = document.createElement("select");
@@ -357,7 +361,7 @@ export function createArrowStyleControls() {
       updateArrowAppearance(activeArrow);
     }
   });
-  container.appendChild(lineSelect);
+  controlsWrap.appendChild(lineSelect);
 
   // Opacity input
   const opacityInput = document.createElement("input");
@@ -378,7 +382,7 @@ export function createArrowStyleControls() {
       updateArrowAppearance(activeArrow);
     }
   });
-  container.appendChild(opacityInput);
+  controlsWrap.appendChild(opacityInput);
 
   // Curve mode toggle
   const curveToggle = document.createElement("button");
@@ -400,7 +404,7 @@ export function createArrowStyleControls() {
       updateCurveToggleInToolbar(activeArrow);
     }
   });
-  container.appendChild(curveToggle);
+  controlsWrap.appendChild(curveToggle);
 
   // Smooth toggle (for waypoints)
   const smoothToggle = document.createElement("button");
@@ -417,7 +421,7 @@ export function createArrowStyleControls() {
       updateSmoothToggleInToolbar(activeArrow);
     }
   });
-  container.appendChild(smoothToggle);
+  controlsWrap.appendChild(smoothToggle);
 
   // Waypoint count badge
   const waypointBadge = document.createElement("span");
@@ -425,13 +429,13 @@ export function createArrowStyleControls() {
   waypointBadge.className = "arrow-toolbar-waypoint-badge";
   waypointBadge.style.display = "none"; // Hidden by default
   waypointBadge.title = "Number of waypoints (double-click arrow to add, right-click waypoint to remove)";
-  container.appendChild(waypointBadge);
+  controlsWrap.appendChild(waypointBadge);
 
   // Label section separator
   const labelSeparator = document.createElement("div");
   labelSeparator.className = "arrow-toolbar-separator";
   labelSeparator.textContent = "Label";
-  container.appendChild(labelSeparator);
+  controlsWrap.appendChild(labelSeparator);
 
   // Label text input
   const labelInput = document.createElement("input");
@@ -446,7 +450,7 @@ export function createArrowStyleControls() {
       updateArrowLabel(activeArrow);
     }
   });
-  container.appendChild(labelInput);
+  controlsWrap.appendChild(labelInput);
 
   // Label position select
   const labelPositionSelect = document.createElement("select");
@@ -466,7 +470,7 @@ export function createArrowStyleControls() {
       updateArrowLabel(activeArrow);
     }
   });
-  container.appendChild(labelPositionSelect);
+  controlsWrap.appendChild(labelPositionSelect);
 
   // Label offset input
   const labelOffsetInput = document.createElement("input");
@@ -484,7 +488,8 @@ export function createArrowStyleControls() {
       }
     }
   });
-  container.appendChild(labelOffsetInput);
+  controlsWrap.appendChild(labelOffsetInput);
+  container.appendChild(controlsWrap);
 
   // Cache references for efficient updates
   arrowControlRefs.colorPicker = colorPicker;

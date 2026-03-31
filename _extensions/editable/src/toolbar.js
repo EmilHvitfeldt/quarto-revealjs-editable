@@ -15,6 +15,9 @@ import { ToolbarRegistry } from './registries.js';
 /** @type {HTMLElement|null} The right-zone container */
 let rightZoneEl = null;
 
+/** @type {HTMLElement[]} Elements to hide when a context panel is active */
+const contextHideElements = [];
+
 /**
  * Switch the visible panel in the right zone.
  * All panels are hidden except the one matching panelName.
@@ -24,6 +27,10 @@ export function showRightPanel(panelName) {
   if (!rightZoneEl) return;
   rightZoneEl.querySelectorAll('.toolbar-panel').forEach(panel => {
     panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? '' : 'none';
+  });
+  const isContext = panelName !== 'default';
+  contextHideElements.forEach(el => {
+    el.style.display = isContext ? 'none' : '';
   });
 }
 
@@ -55,12 +62,24 @@ export function createFloatingToolbar() {
   divider.className = "editable-toolbar-divider";
   leftZone.appendChild(divider);
 
+  const leftButtonStack = document.createElement("div");
+  leftButtonStack.className = "editable-toolbar-button-stack";
+  const unstackedButtons = [];
   ToolbarRegistry.getActionsForZone("left").forEach(action => {
-    leftZone.appendChild(
-      action.submenu
-        ? ToolbarRegistry.createSubmenuButton(action)
-        : ToolbarRegistry.createButton(action)
-    );
+    const btn = action.submenu
+      ? ToolbarRegistry.createSubmenuButton(action)
+      : ToolbarRegistry.createButton(action);
+    if (action.stacked === false) {
+      unstackedButtons.push({ btn, action });
+    } else {
+      leftButtonStack.appendChild(btn);
+    }
+  });
+  contextHideElements.push(leftButtonStack);
+  leftZone.appendChild(leftButtonStack);
+  unstackedButtons.forEach(({ btn, action }) => {
+    leftZone.appendChild(btn);
+    if (action.hideOnContext) contextHideElements.push(btn);
   });
 
   toolbar.appendChild(leftZone);

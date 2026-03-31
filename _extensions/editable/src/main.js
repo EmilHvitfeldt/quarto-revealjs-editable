@@ -52,7 +52,9 @@ ToolbarRegistry.register("add", {
   label: "Add",
   title: "Add new elements",
   className: "toolbar-add",
-  zone: "right",
+  zone: "left",
+  stacked: false,
+  hideOnContext: true,
   submenu: [
     {
       icon: "📝",

@@ -228,6 +228,8 @@
   flex-direction: row;
   align-items: center;
   margin-left: auto;
+  min-width: 0;
+  flex: 1;
 }
 
 /* Individual context panels inside the right zone */
@@ -236,6 +238,21 @@
   flex-direction: row;
   align-items: center;
   gap: var(--editable-toolbar-gap);
+  min-width: 0;
+  flex: 1;
+}
+
+/* Stacked button group (save + copy in left zone) */
+.editable-toolbar-button-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editable-toolbar-button-stack .toolbar-button {
+  font-size: 11px;
+  padding: 2px 8px;
+  height: auto;
 }
 
 /* Vertical divider between left zone and any section */
@@ -255,6 +272,13 @@
   text-transform: uppercase;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .editable-toolbar-title,
+  .editable-toolbar-divider {
+    display: none;
+  }
 }
 
 /* Disabled toolbar button (e.g. Modify placeholder) */
@@ -931,16 +955,28 @@
 .arrow-style-controls {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 8px;
   padding: 0;
   flex-wrap: nowrap;
-  flex-shrink: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.arrow-controls-wrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 
 .arrow-color-presets {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-rows: repeat(3, 20px);
+  grid-auto-flow: column;
   gap: 4px;
   flex-shrink: 0;
 }
