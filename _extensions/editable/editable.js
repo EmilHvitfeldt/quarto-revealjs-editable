@@ -1250,10 +1250,8 @@ var EditableModule = (() => {
       }
       updateCurveToggleInToolbar(arrowData);
       updateSmoothToggleInToolbar(arrowData);
-      buttonsContainer.style.display = "none";
       arrowControls.style.display = "flex";
     } else {
-      buttonsContainer.style.display = "flex";
       arrowControls.style.display = "none";
     }
   }
@@ -2790,11 +2788,10 @@ var EditableModule = (() => {
     toolbar.className = "editable-toolbar";
     toolbar.setAttribute("role", "toolbar");
     toolbar.setAttribute("aria-label", "Editable tools");
-    const dragHandle = document.createElement("div");
-    dragHandle.className = "editable-toolbar-handle";
-    dragHandle.innerHTML = "\u22EE\u22EE";
-    dragHandle.title = "Drag to move toolbar";
-    toolbar.appendChild(dragHandle);
+    const title = document.createElement("span");
+    title.className = "editable-toolbar-title";
+    title.textContent = "Editable";
+    toolbar.appendChild(title);
     const buttonsContainer = document.createElement("div");
     buttonsContainer.className = "editable-toolbar-buttons";
     ToolbarRegistry.getActions().forEach((action) => {
@@ -2807,62 +2804,11 @@ var EditableModule = (() => {
       buttonsContainer.appendChild(element);
     });
     toolbar.appendChild(buttonsContainer);
-    makeToolbarDraggable(toolbar, dragHandle);
     document.body.appendChild(toolbar);
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
     return toolbar;
-  }
-  function makeToolbarDraggable(toolbar, handle) {
-    let isDragging = false;
-    let startX, startY, initialX, initialY;
-    function startDrag(e) {
-      if (e.target !== handle && !handle.contains(e.target))
-        return;
-      isDragging = true;
-      handle.style.cursor = "grabbing";
-      const rect = toolbar.getBoundingClientRect();
-      initialX = rect.left;
-      initialY = rect.top;
-      if (e.type === "touchstart") {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-      } else {
-        startX = e.clientX;
-        startY = e.clientY;
-      }
-      toolbar.style.right = "auto";
-      toolbar.style.transform = "none";
-      toolbar.style.left = initialX + "px";
-      toolbar.style.top = initialY + "px";
-      e.preventDefault();
-    }
-    function drag(e) {
-      if (!isDragging)
-        return;
-      let clientX, clientY;
-      if (e.type === "touchmove") {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else {
-        clientX = e.clientX;
-        clientY = e.clientY;
-      }
-      const deltaX = clientX - startX;
-      const deltaY = clientY - startY;
-      toolbar.style.left = initialX + deltaX + "px";
-      toolbar.style.top = initialY + deltaY + "px";
-    }
-    function stopDrag() {
-      if (isDragging) {
-        isDragging = false;
-        handle.style.cursor = "grab";
-      }
-    }
-    handle.addEventListener("mousedown", startDrag);
-    handle.addEventListener("touchstart", startDrag);
-    document.addEventListener("mousemove", drag);
-    document.addEventListener("touchmove", drag);
-    document.addEventListener("mouseup", stopDrag);
-    document.addEventListener("touchend", stopDrag);
   }
 
   // src/main.js

@@ -562,10 +562,8 @@ export function updateArrowStylePanel(arrowData) {
     updateCurveToggleInToolbar(arrowData);
     updateSmoothToggleInToolbar(arrowData);
 
-    buttonsContainer.style.display = "none";
     arrowControls.style.display = "flex";
   } else {
-    buttonsContainer.style.display = "flex";
     arrowControls.style.display = "none";
   }
 }

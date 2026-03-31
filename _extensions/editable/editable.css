@@ -186,48 +186,47 @@
 }
 
 /* =============================================================================
-   Floating Toolbar
+   Top Bar Toolbar
    ============================================================================= */
 
 .editable-toolbar {
   position: fixed;
-  top: 50%;
-  right: 20px;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--editable-toolbar-gap);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  z-index: 9999;
   background: var(--editable-toolbar-bg);
-  padding: var(--editable-toolbar-padding);
-  border-radius: var(--editable-toolbar-border-radius);
   box-shadow: var(--editable-toolbar-shadow);
-  z-index: 1000;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
-.editable-toolbar-handle {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 4px 8px;
-  color: #999;
-  cursor: grab;
-  user-select: none;
-  font-size: 14px;
-  letter-spacing: 2px;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 4px;
+/* Push reveal.js viewport below the top bar */
+.reveal {
+  top: 100px !important;
+  height: calc(100vh - 100px) !important;
 }
 
-.editable-toolbar-handle:active {
-  cursor: grabbing;
+.editable-toolbar-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #555;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .editable-toolbar-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--editable-toolbar-gap);
 }
 
@@ -265,16 +264,8 @@
 }
 
 .editable-toolbar-button .toolbar-label {
-  opacity: 0;
-  width: 0;
-  overflow: hidden;
-  transition: all var(--editable-transition);
-}
-
-/* Show all labels when hovering anywhere on the toolbar buttons */
-.editable-toolbar-buttons:hover .toolbar-label {
   opacity: 1;
-  width: 36px;
+  width: auto;
 }
 
 /* Toolbar button colors */
@@ -300,9 +291,10 @@
 /* Submenu container */
 .editable-toolbar-submenu {
   position: absolute;
-  right: 100%;
-  top: 0;
-  margin-right: 8px;
+  top: 100%;
+  left: 0;
+  right: auto;
+  margin-top: 4px;
   display: none;
   flex-direction: column;
   gap: var(--editable-toolbar-gap);
@@ -312,7 +304,7 @@
   box-shadow: var(--editable-toolbar-shadow);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 1001;
+  z-index: 10000;
 }
 
 .editable-toolbar-submenu.open {
@@ -905,26 +897,31 @@
 
 .arrow-style-controls {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
   gap: 6px;
-  padding: 4px 0;
+  padding: 0;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .arrow-color-presets {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-direction: row;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .arrow-color-swatch {
-  width: 100%;
-  aspect-ratio: 1;
+  width: 20px;
+  height: 20px;
   border: 1px solid #ccc;
   border-radius: 3px;
   cursor: pointer;
   padding: 0;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .arrow-color-swatch:hover {
@@ -938,7 +935,7 @@
 }
 
 .arrow-toolbar-color {
-  width: 100%;
+  width: 36px;
   height: 28px;
   padding: 0;
   border: 1px solid #ccc;
@@ -946,6 +943,7 @@
   cursor: pointer;
   background: none;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-color::-webkit-color-swatch-wrapper {
@@ -958,17 +956,18 @@
 }
 
 .arrow-toolbar-width {
-  width: 100%;
+  width: 52px;
   padding: 4px 6px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 12px;
   text-align: center;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-select {
-  width: 100%;
+  width: auto;
   padding: 4px 6px;
   border: 1px solid #ccc;
   border-radius: 4px;
@@ -976,16 +975,18 @@
   background: white;
   cursor: pointer;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-opacity {
-  width: 100%;
+  width: 80px;
   cursor: pointer;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-curve {
-  width: 100%;
+  width: auto;
   padding: 6px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
@@ -993,6 +994,8 @@
   background: white;
   cursor: pointer;
   box-sizing: border-box;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-curve.active {
@@ -1004,7 +1007,7 @@
 
 /* Smooth toggle for waypoints */
 .arrow-toolbar-smooth {
-  width: 100%;
+  width: auto;
   padding: 6px 8px;
   border: 1px solid var(--editable-arrow-waypoint-color);
   border-radius: 4px;
@@ -1013,6 +1016,8 @@
   cursor: pointer;
   box-sizing: border-box;
   color: var(--editable-arrow-waypoint-color);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-smooth.active {
@@ -1050,16 +1055,18 @@
   color: #666;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-top: 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid #eee;
+  padding: 0 4px 0 8px;
+  border-left: 1px solid #eee;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .arrow-toolbar-label {
-  width: 100%;
+  width: 120px;
   padding: 6px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 13px;
   background: white;
+  flex-shrink: 0;
 }
