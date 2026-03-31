@@ -1345,31 +1345,32 @@ test.describe('Arrow Feature', () => {
     test('Toolbar shows arrow controls when arrow is selected', async ({ page }) => {
       await setupPage(page, 'arrows.html');
 
-      // Initially toolbar shows normal buttons
-      let toolbarState = await page.evaluate(() => {
-        const buttons = document.querySelector('.editable-toolbar-buttons');
-        const arrowControls = document.querySelector('.arrow-style-controls');
+      // Initially default panel visible, arrow panel hidden
+      let panelState = await page.evaluate(() => {
+        const defaultPanel = document.querySelector('.toolbar-panel-default');
+        const arrowPanel = document.querySelector('.toolbar-panel-arrow');
         return {
-          buttonsDisplay: buttons ? buttons.style.display : null,
-          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+          defaultDisplay: defaultPanel ? defaultPanel.style.display : null,
+          arrowDisplay: arrowPanel ? arrowPanel.style.display : null,
         };
       });
-      expect(toolbarState.buttonsDisplay).not.toBe('none');
+      expect(panelState.defaultDisplay).not.toBe('none');
+      expect(panelState.arrowDisplay).toBe('none');
 
       // Add arrow - it starts selected
       await clickAddArrow(page);
 
-      // Arrow controls should be visible; main buttons remain visible (top bar layout)
-      toolbarState = await page.evaluate(() => {
-        const buttons = document.querySelector('.editable-toolbar-buttons');
-        const arrowControls = document.querySelector('.arrow-style-controls');
+      // Arrow panel should be visible, default panel hidden
+      panelState = await page.evaluate(() => {
+        const defaultPanel = document.querySelector('.toolbar-panel-default');
+        const arrowPanel = document.querySelector('.toolbar-panel-arrow');
         return {
-          buttonsDisplay: buttons ? buttons.style.display : null,
-          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+          defaultDisplay: defaultPanel ? defaultPanel.style.display : null,
+          arrowDisplay: arrowPanel ? arrowPanel.style.display : null,
         };
       });
-      expect(toolbarState.buttonsDisplay).not.toBe('none');
-      expect(toolbarState.arrowControlsDisplay).toBe('flex');
+      expect(panelState.defaultDisplay).toBe('none');
+      expect(panelState.arrowDisplay).not.toBe('none');
     });
 
     test('Toolbar shows normal buttons when arrow is deselected', async ({ page }) => {
@@ -1378,19 +1379,19 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Click outside to deselect
-      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.mouse.click(10, 150);
       await page.waitForTimeout(100);
 
-      const toolbarState = await page.evaluate(() => {
-        const buttons = document.querySelector('.editable-toolbar-buttons');
-        const arrowControls = document.querySelector('.arrow-style-controls');
+      const panelState = await page.evaluate(() => {
+        const defaultPanel = document.querySelector('.toolbar-panel-default');
+        const arrowPanel = document.querySelector('.toolbar-panel-arrow');
         return {
-          buttonsDisplay: buttons ? buttons.style.display : null,
-          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+          defaultDisplay: defaultPanel ? defaultPanel.style.display : null,
+          arrowDisplay: arrowPanel ? arrowPanel.style.display : null,
         };
       });
-      expect(toolbarState.buttonsDisplay).not.toBe('none');
-      expect(toolbarState.arrowControlsDisplay).toBe('none');
+      expect(panelState.defaultDisplay).not.toBe('none');
+      expect(panelState.arrowDisplay).toBe('none');
     });
 
     test('Color picker changes arrow color', async ({ page }) => {

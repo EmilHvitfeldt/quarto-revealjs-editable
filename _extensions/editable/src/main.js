@@ -34,6 +34,7 @@ ToolbarRegistry.register("save", {
   label: "Save",
   title: "Save edits to file",
   className: "toolbar-save",
+  zone: "left",
   onClick: () => saveMovedElts(),
 });
 
@@ -42,6 +43,7 @@ ToolbarRegistry.register("copy", {
   label: "Copy",
   title: "Copy QMD to clipboard",
   className: "toolbar-copy",
+  zone: "left",
   onClick: () => copyQmdToClipboard(),
 });
 
@@ -50,6 +52,7 @@ ToolbarRegistry.register("add", {
   label: "Add",
   title: "Add new elements",
   className: "toolbar-add",
+  zone: "right",
   submenu: [
     {
       icon: "📝",
@@ -73,6 +76,17 @@ ToolbarRegistry.register("add", {
       onClick: () => addNewArrow(),
     },
   ],
+});
+
+// TODO: #48 — implement click-to-edit mode
+ToolbarRegistry.register("modify", {
+  icon: "✏️",
+  label: "Modify",
+  title: "Select any element to edit (coming soon)",
+  className: "toolbar-modify",
+  zone: "right",
+  disabled: true,
+  onClick: () => {},
 });
 
 /**

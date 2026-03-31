@@ -723,6 +723,14 @@ var EditableModule = (() => {
           return [...this.actions.values()];
         },
         /**
+         * Get registered actions for a specific zone.
+         * @param {string} zone - Zone name ('left' or 'right')
+         * @returns {Object[]} Array of action configs for that zone
+         */
+        getActionsForZone(zone) {
+          return [...this.actions.values()].filter((a) => a.zone === zone);
+        },
+        /**
          * Create a button element from an action config.
          * @param {Object} config - Action configuration
          * @returns {HTMLButtonElement} The created button
@@ -733,10 +741,15 @@ var EditableModule = (() => {
           btn.setAttribute("aria-label", config.label);
           btn.title = config.title;
           btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+          if (config.disabled) {
+            btn.disabled = true;
+            btn.classList.add("toolbar-button-disabled");
+          }
           btn.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            config.onClick(e);
+            if (!config.disabled)
+              config.onClick(e);
           });
           return btn;
         },
@@ -790,6 +803,68 @@ var EditableModule = (() => {
           return wrapper;
         }
       };
+    }
+  });
+
+  // src/toolbar.js
+  function showRightPanel(panelName) {
+    if (!rightZoneEl)
+      return;
+    rightZoneEl.querySelectorAll(".toolbar-panel").forEach((panel) => {
+      panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? "" : "none";
+    });
+  }
+  function createFloatingToolbar() {
+    if (document.getElementById("editable-toolbar")) {
+      return document.getElementById("editable-toolbar");
+    }
+    const toolbar = document.createElement("div");
+    toolbar.id = "editable-toolbar";
+    toolbar.className = "editable-toolbar";
+    toolbar.setAttribute("role", "toolbar");
+    toolbar.setAttribute("aria-label", "Editable tools");
+    const leftZone = document.createElement("div");
+    leftZone.className = "editable-toolbar-left";
+    const title = document.createElement("span");
+    title.className = "editable-toolbar-title";
+    title.textContent = "Editable";
+    leftZone.appendChild(title);
+    const divider = document.createElement("div");
+    divider.className = "editable-toolbar-divider";
+    leftZone.appendChild(divider);
+    ToolbarRegistry.getActionsForZone("left").forEach((action) => {
+      leftZone.appendChild(
+        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
+      );
+    });
+    toolbar.appendChild(leftZone);
+    const rightZone = document.createElement("div");
+    rightZone.className = "editable-toolbar-right";
+    rightZoneEl = rightZone;
+    const defaultPanel = document.createElement("div");
+    defaultPanel.className = "toolbar-panel toolbar-panel-default";
+    ToolbarRegistry.getActionsForZone("right").forEach((action) => {
+      defaultPanel.appendChild(
+        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
+      );
+    });
+    rightZone.appendChild(defaultPanel);
+    const arrowPanel = document.createElement("div");
+    arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
+    arrowPanel.style.display = "none";
+    rightZone.appendChild(arrowPanel);
+    toolbar.appendChild(rightZone);
+    document.body.appendChild(toolbar);
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    return toolbar;
+  }
+  var rightZoneEl;
+  var init_toolbar = __esm({
+    "src/toolbar.js"() {
+      init_registries();
+      rightZoneEl = null;
     }
   });
 
@@ -957,7 +1032,6 @@ var EditableModule = (() => {
   function createArrowStyleControls() {
     const container = document.createElement("div");
     container.className = "arrow-style-controls";
-    container.style.display = "none";
     const colorPresetsRow = document.createElement("div");
     colorPresetsRow.className = "arrow-color-presets";
     const defaultColors = ["#000000"];
@@ -1207,11 +1281,13 @@ var EditableModule = (() => {
     const toolbar = document.getElementById("editable-toolbar");
     if (!toolbar)
       return;
-    const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
-    let arrowControls = toolbar.querySelector(".arrow-style-controls");
+    const arrowPanel = toolbar.querySelector(".toolbar-panel-arrow");
+    if (!arrowPanel)
+      return;
+    let arrowControls = arrowPanel.querySelector(".arrow-style-controls");
     if (!arrowControls) {
       arrowControls = createArrowStyleControls();
-      toolbar.appendChild(arrowControls);
+      arrowPanel.appendChild(arrowControls);
     }
     if (arrowData) {
       const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
@@ -1250,9 +1326,9 @@ var EditableModule = (() => {
       }
       updateCurveToggleInToolbar(arrowData);
       updateSmoothToggleInToolbar(arrowData);
-      arrowControls.style.display = "flex";
+      showRightPanel("arrow");
     } else {
-      arrowControls.style.display = "none";
+      showRightPanel("default");
     }
   }
   function updateCurveToggleInToolbar(arrowData) {
@@ -2228,6 +2304,7 @@ var EditableModule = (() => {
       init_colors();
       init_registries();
       init_undo();
+      init_toolbar();
       arrowExtensionWarningShown = false;
       activeArrow = null;
       globalClickOutsideHandlerRegistered = false;
@@ -2777,41 +2854,8 @@ var EditableModule = (() => {
     return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);
   }
 
-  // src/toolbar.js
-  init_registries();
-  function createFloatingToolbar() {
-    if (document.getElementById("editable-toolbar")) {
-      return document.getElementById("editable-toolbar");
-    }
-    const toolbar = document.createElement("div");
-    toolbar.id = "editable-toolbar";
-    toolbar.className = "editable-toolbar";
-    toolbar.setAttribute("role", "toolbar");
-    toolbar.setAttribute("aria-label", "Editable tools");
-    const title = document.createElement("span");
-    title.className = "editable-toolbar-title";
-    title.textContent = "Editable";
-    toolbar.appendChild(title);
-    const buttonsContainer = document.createElement("div");
-    buttonsContainer.className = "editable-toolbar-buttons";
-    ToolbarRegistry.getActions().forEach((action) => {
-      let element;
-      if (action.submenu) {
-        element = ToolbarRegistry.createSubmenuButton(action);
-      } else {
-        element = ToolbarRegistry.createButton(action);
-      }
-      buttonsContainer.appendChild(element);
-    });
-    toolbar.appendChild(buttonsContainer);
-    document.body.appendChild(toolbar);
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event("resize"));
-    });
-    return toolbar;
-  }
-
   // src/main.js
+  init_toolbar();
   init_arrows();
 
   // src/serialization.js
@@ -3307,6 +3351,7 @@ ${fence}`;
     label: "Save",
     title: "Save edits to file",
     className: "toolbar-save",
+    zone: "left",
     onClick: () => saveMovedElts()
   });
   ToolbarRegistry.register("copy", {
@@ -3314,6 +3359,7 @@ ${fence}`;
     label: "Copy",
     title: "Copy QMD to clipboard",
     className: "toolbar-copy",
+    zone: "left",
     onClick: () => copyQmdToClipboard()
   });
   ToolbarRegistry.register("add", {
@@ -3321,6 +3367,7 @@ ${fence}`;
     label: "Add",
     title: "Add new elements",
     className: "toolbar-add",
+    zone: "right",
     submenu: [
       {
         icon: "\u{1F4DD}",
@@ -3344,6 +3391,16 @@ ${fence}`;
         onClick: () => addNewArrow()
       }
     ]
+  });
+  ToolbarRegistry.register("modify", {
+    icon: "\u270F\uFE0F",
+    label: "Modify",
+    title: "Select any element to edit (coming soon)",
+    className: "toolbar-modify",
+    zone: "right",
+    disabled: true,
+    onClick: () => {
+    }
   });
   async function addNewTextElement() {
     const currentSlide = getCurrentSlide();

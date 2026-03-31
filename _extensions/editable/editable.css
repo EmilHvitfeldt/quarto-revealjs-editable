@@ -202,7 +202,7 @@
   flex-direction: row;
   align-items: center;
   padding: 0 16px;
-  gap: 8px;
+  gap: 0;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -213,6 +213,40 @@
   height: calc(100vh - 100px) !important;
 }
 
+/* Left zone: title + persistent actions (save, copy) */
+.editable-toolbar-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--editable-toolbar-gap);
+  flex-shrink: 0;
+}
+
+/* Right zone: contextual panels (default, arrow, image…) */
+.editable-toolbar-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* Individual context panels inside the right zone */
+.toolbar-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--editable-toolbar-gap);
+}
+
+/* Vertical divider between left zone and any section */
+.editable-toolbar-divider {
+  width: 1px;
+  height: 32px;
+  background: #ddd;
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+
 .editable-toolbar-title {
   font-size: 13px;
   font-weight: 700;
@@ -220,14 +254,13 @@
   letter-spacing: 0.5px;
   text-transform: uppercase;
   white-space: nowrap;
-  margin-right: 8px;
   flex-shrink: 0;
 }
 
-.editable-toolbar-buttons {
-  display: flex;
-  flex-direction: row;
-  gap: var(--editable-toolbar-gap);
+/* Disabled toolbar button (e.g. Modify placeholder) */
+.editable-toolbar-button.toolbar-button-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .editable-toolbar-button {
@@ -902,7 +935,6 @@
   gap: 6px;
   padding: 0;
   flex-wrap: nowrap;
-  margin-left: auto;
   flex-shrink: 0;
 }
 

@@ -307,6 +307,15 @@ export const ToolbarRegistry = {
   },
 
   /**
+   * Get registered actions for a specific zone.
+   * @param {string} zone - Zone name ('left' or 'right')
+   * @returns {Object[]} Array of action configs for that zone
+   */
+  getActionsForZone(zone) {
+    return [...this.actions.values()].filter(a => a.zone === zone);
+  },
+
+  /**
    * Create a button element from an action config.
    * @param {Object} config - Action configuration
    * @returns {HTMLButtonElement} The created button
@@ -317,10 +326,14 @@ export const ToolbarRegistry = {
     btn.setAttribute("aria-label", config.label);
     btn.title = config.title;
     btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+    if (config.disabled) {
+      btn.disabled = true;
+      btn.classList.add("toolbar-button-disabled");
+    }
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      config.onClick(e);
+      if (!config.disabled) config.onClick(e);
     });
     return btn;
   },

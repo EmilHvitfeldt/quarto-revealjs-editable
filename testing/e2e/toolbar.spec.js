@@ -25,17 +25,21 @@ test.describe('Floating Toolbar', () => {
       const toolbar = document.getElementById('editable-toolbar');
       if (!toolbar) return null;
       return {
-        hasHandle: !!toolbar.querySelector('.editable-toolbar-handle'),
-        hasButtonsContainer: !!toolbar.querySelector('.editable-toolbar-buttons'),
+        hasLeftZone: !!toolbar.querySelector('.editable-toolbar-left'),
+        hasRightZone: !!toolbar.querySelector('.editable-toolbar-right'),
+        hasDefaultPanel: !!toolbar.querySelector('.toolbar-panel-default'),
+        hasArrowPanel: !!toolbar.querySelector('.toolbar-panel-arrow'),
         buttonCount: toolbar.querySelectorAll('.editable-toolbar-button').length,
         hasRole: toolbar.getAttribute('role') === 'toolbar',
       };
     });
 
     expect(structure).not.toBeNull();
-    expect(structure.hasHandle).toBe(true);
-    expect(structure.hasButtonsContainer).toBe(true);
-    expect(structure.buttonCount).toBe(3); // save, copy, add (with submenu)
+    expect(structure.hasLeftZone).toBe(true);
+    expect(structure.hasRightZone).toBe(true);
+    expect(structure.hasDefaultPanel).toBe(true);
+    expect(structure.hasArrowPanel).toBe(true);
+    expect(structure.buttonCount).toBe(4); // save, copy, add (submenu), modify
     expect(structure.hasRole).toBe(true);
   });
 
@@ -52,13 +56,14 @@ test.describe('Floating Toolbar', () => {
       }));
     });
 
-    expect(buttons.length).toBe(3);
+    expect(buttons.length).toBe(4); // save, copy, add, modify
 
     // Check for specific button classes
     const classNames = buttons.map(b => b.className);
     expect(classNames.some(c => c.includes('toolbar-save'))).toBe(true);
     expect(classNames.some(c => c.includes('toolbar-copy'))).toBe(true);
     expect(classNames.some(c => c.includes('toolbar-add'))).toBe(true);
+    expect(classNames.some(c => c.includes('toolbar-modify'))).toBe(true);
   });
 
   test('Add button has submenu with Text and Slide options', async ({ page }) => {
@@ -83,36 +88,24 @@ test.describe('Floating Toolbar', () => {
     expect(submenuItems.some(c => c.includes('toolbar-add-slide'))).toBe(true);
     // Arrow option only appears when arrow filter is enabled
 
-    // Click outside to close submenu
-    await page.click('body', { position: { x: 10, y: 10 } });
+    // Click outside the submenu to close it
+    await page.mouse.click(10, 50);
     await expect(submenu).toBeHidden();
   });
 
-  test('Toolbar is draggable', async ({ page }) => {
+  test('Toolbar is fixed at the top of the viewport', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Get initial position
-    const initialPos = await page.evaluate(() => {
+    const pos = await page.evaluate(() => {
       const toolbar = document.getElementById('editable-toolbar');
       const rect = toolbar.getBoundingClientRect();
-      return { left: rect.left, top: rect.top };
+      return { left: rect.left, top: rect.top, right: rect.right };
     });
 
-    // Drag the handle
-    const handle = await page.locator('.editable-toolbar-handle');
-    await handle.dragTo(page.locator('body'), {
-      targetPosition: { x: 100, y: 100 },
-    });
-
-    // Get new position
-    const newPos = await page.evaluate(() => {
-      const toolbar = document.getElementById('editable-toolbar');
-      const rect = toolbar.getBoundingClientRect();
-      return { left: rect.left, top: rect.top };
-    });
-
-    // Position should have changed
-    expect(newPos.left !== initialPos.left || newPos.top !== initialPos.top).toBe(true);
+    expect(pos.top).toBe(0);
+    expect(pos.left).toBe(0);
+    // Spans the full viewport width
+    expect(pos.right).toBeGreaterThan(0);
   });
 
   test('Toolbar buttons have hover labels', async ({ page }) => {

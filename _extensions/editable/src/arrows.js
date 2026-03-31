@@ -9,6 +9,7 @@ import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingInde
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 import { pushUndoState } from './undo.js';
+import { showRightPanel } from './toolbar.js';
 
 /** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
@@ -227,7 +228,6 @@ export function cleanupArrowListeners(arrowData) {
 export function createArrowStyleControls() {
   const container = document.createElement("div");
   container.className = "arrow-style-controls";
-  container.style.display = "none";
 
   // Color presets row
   const colorPresetsRow = document.createElement("div");
@@ -513,12 +513,13 @@ export function updateArrowStylePanel(arrowData) {
   const toolbar = document.getElementById("editable-toolbar");
   if (!toolbar) return;
 
-  const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
-  let arrowControls = toolbar.querySelector(".arrow-style-controls");
+  const arrowPanel = toolbar.querySelector(".toolbar-panel-arrow");
+  if (!arrowPanel) return;
 
+  let arrowControls = arrowPanel.querySelector(".arrow-style-controls");
   if (!arrowControls) {
     arrowControls = createArrowStyleControls();
-    toolbar.appendChild(arrowControls);
+    arrowPanel.appendChild(arrowControls);
   }
 
   if (arrowData) {
@@ -562,9 +563,9 @@ export function updateArrowStylePanel(arrowData) {
     updateCurveToggleInToolbar(arrowData);
     updateSmoothToggleInToolbar(arrowData);
 
-    arrowControls.style.display = "flex";
+    showRightPanel('arrow');
   } else {
-    arrowControls.style.display = "none";
+    showRightPanel('default');
   }
 }
 
