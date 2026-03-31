@@ -203,10 +203,10 @@ test.describe('Arrow Feature', () => {
 
         if (!slide || !startHandle || !endHandle) return null;
 
-        const slideRect = slide.getBoundingClientRect();
+        // Use natural (offsetWidth/Height) coordinates — same space as arrow positions
         const slideCenter = {
-          x: slideRect.width / 2,
-          y: slideRect.height / 2,
+          x: slide.offsetWidth / 2,
+          y: slide.offsetHeight / 2,
         };
 
         // Get handle positions from style
@@ -270,35 +270,21 @@ test.describe('Arrow Feature', () => {
       // Deselect by clicking outside
       await deselectArrow(page);
 
-      // Get arrow path position and click on it
-      const pathCenter = await page.evaluate(() => {
+      // Get the hit area's center in viewport coordinates (accounts for CSS scaling)
+      const viewportCenter = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
         const svg = container.querySelector('svg');
         const path = svg.querySelector('path[stroke-width="20"]'); // hit area
         if (!path) return null;
-
-        const pathD = path.getAttribute('d');
-        // Parse simple "M x1,y1 L x2,y2" format
-        const match = pathD.match(/M\s*([\d.]+),([\d.]+)\s*L\s*([\d.]+),([\d.]+)/);
-        if (!match) return null;
-
-        const x1 = parseFloat(match[1]);
-        const y1 = parseFloat(match[2]);
-        const x2 = parseFloat(match[3]);
-        const y2 = parseFloat(match[4]);
-
+        const rect = path.getBoundingClientRect();
         return {
-          x: (x1 + x2) / 2,
-          y: (y1 + y2) / 2,
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
         };
       });
 
-      if (pathCenter) {
-        // Click on the arrow path (need to account for slide position)
-        const slideBox = await page.locator('section.present').boundingBox();
-        await page.click('section.present', {
-          position: { x: pathCenter.x, y: pathCenter.y }
-        });
+      if (viewportCenter) {
+        await page.mouse.click(viewportCenter.x, viewportCenter.y);
         await page.waitForTimeout(100);
 
         const arrows = await getArrowData(page);
@@ -1373,7 +1359,7 @@ test.describe('Arrow Feature', () => {
       // Add arrow - it starts selected
       await clickAddArrow(page);
 
-      // Arrow controls should be visible, normal buttons hidden
+      // Arrow controls should be visible; main buttons remain visible (top bar layout)
       toolbarState = await page.evaluate(() => {
         const buttons = document.querySelector('.editable-toolbar-buttons');
         const arrowControls = document.querySelector('.arrow-style-controls');
@@ -1382,7 +1368,7 @@ test.describe('Arrow Feature', () => {
           arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
         };
       });
-      expect(toolbarState.buttonsDisplay).toBe('none');
+      expect(toolbarState.buttonsDisplay).not.toBe('none');
       expect(toolbarState.arrowControlsDisplay).toBe('flex');
     });
 
@@ -1403,7 +1389,7 @@ test.describe('Arrow Feature', () => {
           arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
         };
       });
-      expect(toolbarState.buttonsDisplay).toBe('flex');
+      expect(toolbarState.buttonsDisplay).not.toBe('none');
       expect(toolbarState.arrowControlsDisplay).toBe('none');
     });
 

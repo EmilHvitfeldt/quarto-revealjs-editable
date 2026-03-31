@@ -91,7 +91,8 @@ async function clickAddArrow(page) {
     return arrowControls && arrowControls.style.display !== 'none';
   });
   if (arrowControlsVisible) {
-    await page.click('body', { position: { x: 10, y: 10 } });
+    // Click below the top bar (y > 100px) to deselect the arrow
+    await page.mouse.click(10, 150);
     await page.waitForFunction(() => {
       const arrowControls = document.querySelector('.arrow-style-controls');
       return !arrowControls || arrowControls.style.display === 'none';
@@ -147,7 +148,8 @@ async function getArrowData(page) {
  * @param {import('@playwright/test').Page} page
  */
 async function deselectArrow(page) {
-  await page.click('body', { position: { x: 10, y: 10 } });
+  // Click below the top bar (y > 100px) and away from arrow containers
+  await page.mouse.click(10, 150);
   await page.waitForFunction(() => {
     const active = document.querySelector('.editable-arrow-container.active');
     return !active;
