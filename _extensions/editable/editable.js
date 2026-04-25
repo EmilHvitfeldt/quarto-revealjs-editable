@@ -1055,15 +1055,14 @@ var EditableModule = (() => {
       popover.style.display = "";
     }
     function createNumberInput({ id, className, title, defaultValue, min, max, onUndo, onUpdate, updateFn }) {
-      const input = document.createElement("wa-input");
+      const input = document.createElement("input");
       input.type = "number";
       input.id = id;
       input.className = className;
-      input.setAttribute("size", "small");
       if (min !== void 0)
-        input.setAttribute("min", min);
+        input.min = min;
       if (max !== void 0)
-        input.setAttribute("max", max);
+        input.max = max;
       input.value = defaultValue.toString();
       input.title = title;
       input.addEventListener("focus", () => {
@@ -1173,9 +1172,8 @@ var EditableModule = (() => {
     function createIconSelect(options, onChange) {
       const wrapper = document.createElement("div");
       wrapper.className = "arrow-icon-select";
-      const btn = document.createElement("wa-button");
-      btn.setAttribute("size", "small");
-      btn.setAttribute("appearance", "outlined");
+      const btn = document.createElement("button");
+      btn.className = "arrow-icon-select-btn";
       let currentValue = options[0].value;
       const dropdown = document.createElement("div");
       dropdown.className = "arrow-icon-select-dropdown";
@@ -1293,11 +1291,9 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(opacityInput);
-    const curveToggle = document.createElement("wa-button");
+    const curveToggle = document.createElement("button");
     curveToggle.id = "arrow-style-curve";
-    curveToggle.className = "arrow-toolbar-curve";
-    curveToggle.setAttribute("size", "small");
-    curveToggle.setAttribute("appearance", "outlined");
+    curveToggle.className = "arrow-toolbar-curve arrow-toolbar-btn";
     curveToggle.innerHTML = "\u2934";
     curveToggle.title = "Toggle curve mode";
     curveToggle.addEventListener("click", () => {
@@ -1314,11 +1310,9 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(curveToggle);
-    const smoothToggle = document.createElement("wa-button");
+    const smoothToggle = document.createElement("button");
     smoothToggle.id = "arrow-style-smooth";
-    smoothToggle.className = "arrow-toolbar-smooth";
-    smoothToggle.setAttribute("size", "small");
-    smoothToggle.setAttribute("appearance", "outlined");
+    smoothToggle.className = "arrow-toolbar-smooth arrow-toolbar-btn";
     smoothToggle.innerHTML = "\u3030";
     smoothToggle.title = "Toggle smooth curves through waypoints";
     smoothToggle.addEventListener("click", () => {
@@ -1335,12 +1329,11 @@ var EditableModule = (() => {
     waypointBadge.title = "Number of waypoints (double-click arrow to add, double-click waypoint to remove)";
     const labelSection = document.createElement("div");
     labelSection.className = "arrow-label-section";
-    const labelInput = document.createElement("wa-input");
+    const labelInput = document.createElement("input");
     labelInput.type = "text";
     labelInput.id = "arrow-style-label";
     labelInput.className = "arrow-toolbar-label";
-    labelInput.setAttribute("size", "small");
-    labelInput.setAttribute("placeholder", "Label...");
+    labelInput.placeholder = "Label...";
     labelInput.title = "Label text";
     labelInput.addEventListener("input", (e) => {
       if (activeArrow) {

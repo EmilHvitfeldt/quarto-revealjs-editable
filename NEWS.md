@@ -11,7 +11,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - Button labels are always visible (no hover-to-expand)
   - Add submenu now opens downward
   - Arrow style controls appear centered in the top bar when an arrow is selected, keeping Save/Copy/Add always visible; controls scroll horizontally if the window is too narrow
-  - Arrow style controls use [Web Awesome](https://backers.webawesome.com/) components for consistent button/input sizing
+  - Arrow style controls use native HTML elements styled with CSS for consistent sizing and no external dependencies
   - Two-row grid layout for arrow controls fits more options without wrapping
   - Removed drag handle; toolbar is no longer draggable
 

@@ -247,13 +247,12 @@ export function createArrowStyleControls() {
   // Create a wa-input number spinner with scroll-wheel support.
   // opts: { id, className, title, defaultValue, min, max, onUndo, onUpdate, updateFn }
   function createNumberInput({ id, className, title, defaultValue, min, max, onUndo, onUpdate, updateFn }) {
-    const input = document.createElement("wa-input");
+    const input = document.createElement("input");
     input.type = "number";
     input.id = id;
     input.className = className;
-    input.setAttribute("size", "small");
-    if (min !== undefined) input.setAttribute("min", min);
-    if (max !== undefined) input.setAttribute("max", max);
+    if (min !== undefined) input.min = min;
+    if (max !== undefined) input.max = max;
     input.value = defaultValue.toString();
     input.title = title;
     input.addEventListener("focus", () => { if (activeArrow && onUndo) onUndo(); });
@@ -385,9 +384,8 @@ export function createArrowStyleControls() {
     const wrapper = document.createElement("div");
     wrapper.className = "arrow-icon-select";
 
-    const btn = document.createElement("wa-button");
-    btn.setAttribute("size", "small");
-    btn.setAttribute("appearance", "outlined");
+    const btn = document.createElement("button");
+    btn.className = "arrow-icon-select-btn";
 
     let currentValue = options[0].value;
 
@@ -510,11 +508,9 @@ export function createArrowStyleControls() {
   controlsWrap.appendChild(opacityInput);
 
   // Curve mode toggle
-  const curveToggle = document.createElement("wa-button");
+  const curveToggle = document.createElement("button");
   curveToggle.id = "arrow-style-curve";
-  curveToggle.className = "arrow-toolbar-curve";
-  curveToggle.setAttribute("size", "small");
-  curveToggle.setAttribute("appearance", "outlined");
+  curveToggle.className = "arrow-toolbar-curve arrow-toolbar-btn";
   curveToggle.innerHTML = "⤴";
   curveToggle.title = "Toggle curve mode";
   curveToggle.addEventListener("click", () => {
@@ -534,11 +530,9 @@ export function createArrowStyleControls() {
   controlsWrap.appendChild(curveToggle);
 
   // Smooth toggle (for waypoints)
-  const smoothToggle = document.createElement("wa-button");
+  const smoothToggle = document.createElement("button");
   smoothToggle.id = "arrow-style-smooth";
-  smoothToggle.className = "arrow-toolbar-smooth";
-  smoothToggle.setAttribute("size", "small");
-  smoothToggle.setAttribute("appearance", "outlined");
+  smoothToggle.className = "arrow-toolbar-smooth arrow-toolbar-btn";
   smoothToggle.innerHTML = "〰";
   smoothToggle.title = "Toggle smooth curves through waypoints";
   smoothToggle.addEventListener("click", () => {
@@ -559,12 +553,11 @@ export function createArrowStyleControls() {
   const labelSection = document.createElement("div");
   labelSection.className = "arrow-label-section";
 
-  const labelInput = document.createElement("wa-input");
+  const labelInput = document.createElement("input");
   labelInput.type = "text";
   labelInput.id = "arrow-style-label";
   labelInput.className = "arrow-toolbar-label";
-  labelInput.setAttribute("size", "small");
-  labelInput.setAttribute("placeholder", "Label...");
+  labelInput.placeholder = "Label...";
   labelInput.title = "Label text";
   labelInput.addEventListener("input", (e) => {
     if (activeArrow) {
