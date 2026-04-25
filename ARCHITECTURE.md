@@ -224,6 +224,7 @@ The arrow system (`arrows.js`) provides interactive SVG arrows with two mutually
 ### Waypoint Mode
 - Multiple intermediate points for complex paths
 - `waypoints` array stores `{x, y}` objects
+- Double-click on arrow path to add a waypoint; double-click or right-click a waypoint handle to remove it (Delete/Backspace key also works)
 - When `smooth=false`: Polyline path `M from L wp1 L wp2 ... L to`
 - When `smooth=true`: Catmull-Rom spline interpolation through all points
 
