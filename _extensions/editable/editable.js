@@ -1125,7 +1125,10 @@ var EditableModule = (() => {
     document.addEventListener("click", () => {
       colorPresetsPopover.style.display = "none";
     });
-    container.appendChild(colorSection);
+    const centerWrap = document.createElement("div");
+    centerWrap.className = "arrow-center-wrap";
+    centerWrap.appendChild(colorSection);
+    container.appendChild(centerWrap);
     const controlsWrap = document.createElement("div");
     controlsWrap.className = "arrow-controls-wrap";
     function createIconSelect(options, onChange) {
@@ -1384,7 +1387,7 @@ var EditableModule = (() => {
     controlsWrap.appendChild(labelSection);
     controlsWrap.appendChild(smoothToggle);
     controlsWrap.appendChild(waypointBadge);
-    container.appendChild(controlsWrap);
+    centerWrap.appendChild(controlsWrap);
     arrowControlRefs.colorPicker = colorPicker;
     arrowControlRefs.colorPickerBtn = colorPickerBtn;
     arrowControlRefs.widthInput = widthInput;

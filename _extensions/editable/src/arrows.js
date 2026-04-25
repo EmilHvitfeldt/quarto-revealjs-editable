@@ -327,7 +327,11 @@ export function createArrowStyleControls() {
     colorPresetsPopover.style.display = "none";
   });
 
-  container.appendChild(colorSection);
+  // Centering wrapper — holds color section + controls as one unit
+  const centerWrap = document.createElement("div");
+  centerWrap.className = "arrow-center-wrap";
+  centerWrap.appendChild(colorSection);
+  container.appendChild(centerWrap);
 
   // Wrapping sub-container for all non-color controls
   const controlsWrap = document.createElement("div");
@@ -607,7 +611,7 @@ export function createArrowStyleControls() {
   controlsWrap.appendChild(labelSection);
   controlsWrap.appendChild(smoothToggle);
   controlsWrap.appendChild(waypointBadge);
-  container.appendChild(controlsWrap);
+  centerWrap.appendChild(controlsWrap);
 
   // Cache references for efficient updates
   arrowControlRefs.colorPicker = colorPicker;

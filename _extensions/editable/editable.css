@@ -237,9 +237,14 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: var(--editable-toolbar-gap);
   min-width: 0;
   flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbar-panel::-webkit-scrollbar {
+  display: none;
 }
 
 /* Stacked button group (save + copy in left zone) */
@@ -963,22 +968,46 @@
   flex: 1;
 }
 
+.arrow-center-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
 .arrow-controls-wrap {
   display: grid;
-  grid-template-rows: 28px 28px;
+  grid-template-rows: auto auto;
   grid-auto-flow: column;
   grid-auto-columns: max-content;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-  flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+  flex-shrink: 0;
 }
 
 .arrow-controls-wrap::-webkit-scrollbar {
   display: none;
+}
+
+/* Uniform height for all arrow toolbar controls */
+:root {
+  --arrow-ctrl-h: 40px;
+}
+
+.arrow-controls-wrap wa-button::part(base),
+.arrow-controls-wrap wa-input::part(base),
+.arrow-icon-select wa-button::part(base) {
+  border-radius: 4px;
+  height: var(--arrow-ctrl-h);
+  min-height: var(--arrow-ctrl-h);
+  max-height: var(--arrow-ctrl-h);
+  box-sizing: border-box;
+}
+
+.arrow-color-btn {
+  border-radius: 4px;
 }
 
 /* Two stacked color buttons */
@@ -991,8 +1020,8 @@
 }
 
 .arrow-color-btn {
-  width: 28px;
-  height: 28px;
+  width: var(--arrow-ctrl-h);
+  height: var(--arrow-ctrl-h);
   padding: 0;
   border: 1px solid #ccc;
   border-radius: 4px;
@@ -1110,7 +1139,7 @@
 .arrow-toolbar-opacity {
   --arrow-opacity-color: #000000;
   width: 80px;
-  height: 20px;
+  height: var(--arrow-ctrl-h);
   cursor: pointer;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -1126,8 +1155,8 @@
 
 .arrow-toolbar-opacity::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: transparent;
   border: 2px solid white;
@@ -1136,7 +1165,7 @@
 }
 
 .arrow-toolbar-opacity::-moz-range-track {
-  height: 20px;
+  height: 40px;
   border-radius: 10px;
   background:
     linear-gradient(to right, transparent, var(--arrow-opacity-color)),
@@ -1187,7 +1216,9 @@
 
 .arrow-label-subrow .arrow-icon-select wa-button::part(base),
 .arrow-label-subrow .arrow-toolbar-width::part(base) {
-  height: 28px;
+  height: var(--arrow-ctrl-h);
+  min-height: var(--arrow-ctrl-h);
+  max-height: var(--arrow-ctrl-h);
   box-sizing: border-box;
 }
 
@@ -1198,8 +1229,8 @@
 /* Waypoint count badge */
 .arrow-toolbar-waypoint-badge {
   display: inline-block;
-  height: 28px;
-  line-height: 28px;
+  height: var(--arrow-ctrl-h);
+  line-height: var(--arrow-ctrl-h);
   padding: 0 8px;
   background: var(--editable-arrow-waypoint-color);
   color: white;
