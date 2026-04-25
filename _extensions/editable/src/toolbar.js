@@ -53,15 +53,6 @@ export function createFloatingToolbar() {
   const leftZone = document.createElement("div");
   leftZone.className = "editable-toolbar-left";
 
-  const title = document.createElement("span");
-  title.className = "editable-toolbar-title";
-  title.textContent = "Editable";
-  leftZone.appendChild(title);
-
-  const divider = document.createElement("div");
-  divider.className = "editable-toolbar-divider";
-  leftZone.appendChild(divider);
-
   const leftButtonStack = document.createElement("div");
   leftButtonStack.className = "editable-toolbar-button-stack";
   const unstackedButtons = [];
