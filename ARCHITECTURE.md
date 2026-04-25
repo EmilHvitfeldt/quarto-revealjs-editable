@@ -48,7 +48,7 @@ _extensions/editable/
     ├── serialization.js # QMD transformation and property serializers
     ├── quill.js        # Rich text editor integration
     ├── arrows.js       # Arrow system
-    ├── toolbar.js      # Floating toolbar
+    ├── toolbar.js      # Top bar toolbar
     └── main.js         # Plugin entry point
 ```
 
@@ -96,7 +96,7 @@ Element types map to capabilities via `ELEMENT_CAPABILITIES`:
 Three registries manage extensible behaviors:
 
 1. **ControlRegistry** - UI buttons shown on elements (font size, alignment, edit mode)
-2. **ToolbarRegistry** - Floating toolbar actions (save, copy, add)
+2. **ToolbarRegistry** - Top bar toolbar actions (save, copy, add)
 3. **NewElementRegistry** - Tracks dynamically added elements/slides/arrows
 
 ### Serialization
@@ -113,6 +113,19 @@ The serialization system converts element state to QMD format:
    - Insert new arrows
    - Update text content (HTML → Quarto markdown)
    - Replace `{.editable}` with `{.absolute ...}` attributes
+
+### Toolbar (`toolbar.js`)
+
+The toolbar is a fixed 100px top bar spanning the full viewport width. Slides shift down via `.reveal { top: 100px; height: calc(100vh - 100px) }` and a `window.dispatchEvent(new Event('resize'))` triggers reveal.js to rescale slides into the reduced area.
+
+The toolbar has two zones:
+
+- **Left zone** - Persistent stacked button group (save, copy); hidden when a context panel is active
+- **Right zone** - Swappable context panels:
+  - `default` panel: Add + Modify actions (shown when nothing is selected)
+  - `arrow` panel: Arrow style controls (shown when an arrow is selected; centered, horizontally scrollable)
+
+`showRightPanel(panelName)` switches which panel is visible. Arrow controls live inside `.arrow-center-wrap` (holds color section + `.arrow-controls-wrap` grid as one unit) so they center together in the right zone.
 
 ### Brand Color Integration
 
@@ -139,7 +152,7 @@ When saving, brand colors are converted to `{{< brand color name >}}` shortcodes
    ├─▶ Initialize each capability
    └─▶ Attach event listeners
    │
-4. Create floating toolbar
+4. Create top bar toolbar (triggers reveal.js resize to account for 100px offset)
 5. Setup undo/redo keyboard shortcuts
 ```
 
@@ -224,6 +237,7 @@ The arrow system (`arrows.js`) provides interactive SVG arrows with two mutually
 ### Waypoint Mode
 - Multiple intermediate points for complex paths
 - `waypoints` array stores `{x, y}` objects
+- Double-click on arrow path to add a waypoint; double-click or right-click a waypoint handle to remove it (Delete/Backspace key also works)
 - When `smooth=false`: Polyline path `M from L wp1 L wp2 ... L to`
 - When `smooth=true`: Catmull-Rom spline interpolation through all points
 

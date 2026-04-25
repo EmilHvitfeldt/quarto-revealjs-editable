@@ -85,16 +85,17 @@ async function clickAddSlide(page) {
  * @param {import('@playwright/test').Page} page
  */
 async function clickAddArrow(page) {
-  // First ensure normal toolbar buttons are visible by deselecting any arrow
-  const arrowControlsVisible = await page.evaluate(() => {
-    const arrowControls = document.querySelector('.arrow-style-controls');
-    return arrowControls && arrowControls.style.display !== 'none';
+  // First ensure the default panel is visible by deselecting any active arrow
+  const arrowPanelVisible = await page.evaluate(() => {
+    const arrowPanel = document.querySelector('.toolbar-panel-arrow');
+    return arrowPanel && arrowPanel.style.display !== 'none';
   });
-  if (arrowControlsVisible) {
-    await page.click('body', { position: { x: 10, y: 10 } });
+  if (arrowPanelVisible) {
+    // Click below the top bar (y > 100px) to deselect the arrow
+    await page.mouse.click(10, 150);
     await page.waitForFunction(() => {
-      const arrowControls = document.querySelector('.arrow-style-controls');
-      return !arrowControls || arrowControls.style.display === 'none';
+      const arrowPanel = document.querySelector('.toolbar-panel-arrow');
+      return !arrowPanel || arrowPanel.style.display === 'none';
     }, { timeout: 1000 }).catch(() => {});
   }
 
@@ -147,7 +148,8 @@ async function getArrowData(page) {
  * @param {import('@playwright/test').Page} page
  */
 async function deselectArrow(page) {
-  await page.click('body', { position: { x: 10, y: 10 } });
+  // Click below the top bar (y > 100px) and away from arrow containers
+  await page.mouse.click(10, 150);
   await page.waitForFunction(() => {
     const active = document.querySelector('.editable-arrow-container.active');
     return !active;

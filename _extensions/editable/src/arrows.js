@@ -9,6 +9,7 @@ import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingInde
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 import { pushUndoState } from './undo.js';
+import { showRightPanel } from './toolbar.js';
 
 /** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
@@ -152,6 +153,11 @@ const arrowControlRefs = {
   curveToggle: null,
 };
 
+function syncOpacitySliderColor(color) {
+  const el = arrowControlRefs.opacityInput;
+  if (el) el.style.setProperty("--arrow-opacity-color", color);
+}
+
 /**
  * Available arrow head styles for the quarto-arrows extension.
  * @type {string[]}
@@ -227,11 +233,104 @@ export function cleanupArrowListeners(arrowData) {
 export function createArrowStyleControls() {
   const container = document.createElement("div");
   container.className = "arrow-style-controls";
-  container.style.display = "none";
 
-  // Color presets row
+  // ── Shared helpers ───────────────────────────────────────────────────────
+
+  // Position a fixed popover below an anchor element.
+  function openPopoverBelow(popover, anchor) {
+    const rect = anchor.getBoundingClientRect();
+    popover.style.top = (rect.bottom + 4) + "px";
+    popover.style.left = rect.left + "px";
+    popover.style.display = "";
+  }
+
+  // Create a wa-input number spinner with scroll-wheel support.
+  // opts: { id, className, title, defaultValue, min, max, onUndo, onUpdate, updateFn }
+  function createNumberInput({ id, className, title, defaultValue, min, max, onUndo, onUpdate, updateFn }) {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.id = id;
+    input.className = className;
+    if (min !== undefined) input.min = min;
+    if (max !== undefined) input.max = max;
+    input.value = defaultValue.toString();
+    input.title = title;
+    input.addEventListener("focus", () => { if (activeArrow && onUndo) onUndo(); });
+    input.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (activeArrow) {
+        if (onUndo) onUndo();
+        const delta = e.deltaY < 0 ? 1 : -1;
+        const raw = (parseInt(input.value) || 0) + delta;
+        const clamped = min !== undefined || max !== undefined
+          ? Math.max(min ?? -Infinity, Math.min(max ?? Infinity, raw))
+          : raw;
+        input.value = clamped.toString();
+        onUpdate(clamped);
+        updateFn(activeArrow);
+      }
+    }, { passive: false });
+    input.addEventListener("input", (e) => {
+      if (activeArrow) {
+        const val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+          const clamped = min !== undefined || max !== undefined
+            ? Math.max(min ?? -Infinity, Math.min(max ?? Infinity, val))
+            : val;
+          onUpdate(clamped);
+          updateFn(activeArrow);
+        }
+      }
+    });
+    return input;
+  }
+
+  // ── Color section: two stacked buttons ──────────────────────────────────
+  const colorSection = document.createElement("div");
+  colorSection.className = "arrow-color-section";
+
+  // Top button: triggers native OS color picker
+  const colorPickerBtn = document.createElement("button");
+  colorPickerBtn.className = "arrow-color-btn";
+  colorPickerBtn.style.backgroundColor = "#000000";
+  colorPickerBtn.title = "Custom color";
+
+  const colorPicker = document.createElement("input");
+  colorPicker.type = "color";
+  colorPicker.id = "arrow-style-color";
+  colorPicker.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none";
+  colorPicker.value = "#000000";
+  colorPickerBtn.appendChild(colorPicker);
+  colorPickerBtn.addEventListener("click", () => colorPicker.click());
+  colorPicker.addEventListener("focus", () => {
+    if (activeArrow) pushUndoState();
+  });
+  colorPicker.addEventListener("input", (e) => {
+    if (activeArrow) {
+      activeArrow.color = e.target.value;
+      updateArrowAppearance(activeArrow);
+      colorPickerBtn.style.backgroundColor = e.target.value;
+      syncOpacitySliderColor(e.target.value);
+      colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
+    }
+  });
+  colorSection.appendChild(colorPickerBtn);
+
+  // Bottom button: toggles preset swatches popover
+  const presetsToggleBtn = document.createElement("button");
+  presetsToggleBtn.className = "arrow-color-btn arrow-color-presets-toggle";
+  presetsToggleBtn.title = "Preset colors";
+  colorSection.appendChild(presetsToggleBtn);
+
+  // Floating presets popover (appended to body, not toolbar)
+  const colorPresetsPopover = document.createElement("div");
+  colorPresetsPopover.className = "arrow-color-presets-popover";
+  colorPresetsPopover.style.display = "none";
+  document.body.appendChild(colorPresetsPopover);
+
   const colorPresetsRow = document.createElement("div");
   colorPresetsRow.className = "arrow-color-presets";
+  colorPresetsPopover.appendChild(colorPresetsRow);
 
   const defaultColors = ["#000000"];
   const paletteColors = getColorPalette();
@@ -247,117 +346,145 @@ export function createArrowStyleControls() {
         pushUndoState();
         activeArrow.color = color;
         updateArrowAppearance(activeArrow);
-        const picker = container.querySelector("#arrow-style-color");
-        if (picker) picker.value = color;
+        colorPicker.value = color;
+        colorPickerBtn.style.backgroundColor = color;
+        syncOpacitySliderColor(color);
         colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
         swatch.classList.add("selected");
+        colorPresetsPopover.style.display = "none";
       }
     });
     colorPresetsRow.appendChild(swatch);
   });
-  container.appendChild(colorPresetsRow);
 
-  // Color picker for custom colors
-  const colorPicker = document.createElement("input");
-  colorPicker.type = "color";
-  colorPicker.id = "arrow-style-color";
-  colorPicker.className = "arrow-toolbar-color";
-  colorPicker.value = "#000000";
-  colorPicker.title = "Custom color";
-  colorPicker.addEventListener("focus", () => {
-    if (activeArrow) pushUndoState();
+  presetsToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = colorPresetsPopover.style.display !== "none";
+    colorPresetsPopover.style.display = "none";
+    if (!isOpen) openPopoverBelow(colorPresetsPopover, presetsToggleBtn);
   });
-  colorPicker.addEventListener("input", (e) => {
-    if (activeArrow) {
-      activeArrow.color = e.target.value;
-      updateArrowAppearance(activeArrow);
-      colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => s.classList.remove("selected"));
-    }
-  });
-  container.appendChild(colorPicker);
+
+  // Prevent mousedown from deselecting the active arrow
+  colorPresetsPopover.addEventListener("mousedown", (e) => e.preventDefault());
+
+
+  // Centering wrapper — holds color section + controls as one unit
+  const centerWrap = document.createElement("div");
+  centerWrap.className = "arrow-center-wrap";
+  centerWrap.appendChild(colorSection);
+  container.appendChild(centerWrap);
+
+  // Wrapping sub-container for all non-color controls
+  const controlsWrap = document.createElement("div");
+  controlsWrap.className = "arrow-controls-wrap";
+
+  // Helper: icon-select button — shows the active icon, click opens a dropdown
+  // with icon + label for each option. Exposes .value getter/setter.
+  function createIconSelect(options, onChange) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "arrow-icon-select";
+
+    const btn = document.createElement("button");
+    btn.className = "arrow-icon-select-btn";
+
+    let currentValue = options[0].value;
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "arrow-icon-select-dropdown";
+    dropdown.style.display = "none";
+    document.body.appendChild(dropdown);
+
+    options.forEach(({ value, icon, title }) => {
+      const item = document.createElement("button");
+      item.className = "arrow-icon-select-item";
+      item.dataset.value = value;
+      item.innerHTML = `<span class="arrow-icon-select-icon">${icon}</span><span>${title}</span>`;
+      item.addEventListener("mousedown", (e) => e.preventDefault());
+      item.addEventListener("click", () => {
+        if (activeArrow) {
+          pushUndoState();
+          onChange(value);
+        }
+        wrapper.value = value;
+        dropdown.style.display = "none";
+      });
+      dropdown.appendChild(item);
+    });
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = dropdown.style.display !== "none";
+      document.querySelectorAll(".arrow-icon-select-dropdown").forEach(d => d.style.display = "none");
+      if (!isOpen) openPopoverBelow(dropdown, btn);
+    });
+
+    wrapper.appendChild(btn);
+
+    Object.defineProperty(wrapper, "value", {
+      get() { return currentValue; },
+      set(val) {
+        currentValue = val;
+        const opt = options.find(o => o.value === val);
+        if (opt) btn.innerHTML = opt.icon;
+        dropdown.querySelectorAll(".arrow-icon-select-item").forEach(item => {
+          item.classList.toggle("active", item.dataset.value === val);
+        });
+      }
+    });
+
+    // Set initial value
+    wrapper.value = options[0].value;
+
+    return wrapper;
+  }
 
   // Width input
-  const widthInput = document.createElement("input");
-  widthInput.type = "number";
-  widthInput.id = "arrow-style-width";
-  widthInput.className = "arrow-toolbar-width";
-  widthInput.min = "1";
-  widthInput.max = "20";
-  widthInput.value = "2";
-  widthInput.title = "Width";
-  widthInput.addEventListener("focus", () => {
-    if (activeArrow) pushUndoState();
+  const widthInput = createNumberInput({
+    id: "arrow-style-width",
+    className: "arrow-toolbar-width",
+    title: "Width",
+    defaultValue: 2,
+    min: 1,
+    max: 20,
+    onUndo: () => pushUndoState(),
+    onUpdate: (val) => { activeArrow.width = val; },
+    updateFn: updateArrowAppearance,
   });
-  widthInput.addEventListener("input", (e) => {
-    if (activeArrow) {
-      const val = parseInt(e.target.value);
-      if (!isNaN(val)) {
-        activeArrow.width = Math.max(1, Math.min(20, val));
-        updateArrowAppearance(activeArrow);
-      }
-    }
-  });
-  container.appendChild(widthInput);
+  controlsWrap.appendChild(widthInput);
 
-  // Head style select
-  const headSelect = document.createElement("select");
+  // Head style icon-select
+  const headSelect = createIconSelect([
+    { value: "arrow",   icon: "→", title: "Arrow" },
+    { value: "stealth", icon: "▶", title: "Stealth" },
+    { value: "diamond", icon: "◆", title: "Diamond" },
+    { value: "circle",  icon: "●", title: "Circle" },
+    { value: "square",  icon: "■", title: "Square" },
+    { value: "bar",     icon: "|", title: "Bar" },
+    { value: "none",    icon: "✕", title: "None" },
+  ], (value) => { activeArrow.head = value; updateArrowAppearance(activeArrow); });
   headSelect.id = "arrow-style-head";
-  headSelect.className = "arrow-toolbar-select";
-  headSelect.title = "Head style";
-  ARROW_HEAD_STYLES.forEach(style => {
-    const opt = document.createElement("option");
-    opt.value = style;
-    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
-    headSelect.appendChild(opt);
-  });
-  headSelect.addEventListener("change", (e) => {
-    if (activeArrow) {
-      pushUndoState();
-      activeArrow.head = e.target.value;
-      updateArrowAppearance(activeArrow);
-    }
-  });
-  container.appendChild(headSelect);
+  headSelect.value = "arrow";
+  controlsWrap.appendChild(headSelect);
 
-  // Dash select
-  const dashSelect = document.createElement("select");
+  // Dash style icon-select
+  const dashSelect = createIconSelect([
+    { value: "solid",  icon: "─", title: "Solid" },
+    { value: "dashed", icon: "╌", title: "Dashed" },
+    { value: "dotted", icon: "·", title: "Dotted" },
+  ], (value) => { activeArrow.dash = value; updateArrowAppearance(activeArrow); });
   dashSelect.id = "arrow-style-dash";
-  dashSelect.className = "arrow-toolbar-select";
-  dashSelect.title = "Dash style";
-  ["solid", "dashed", "dotted"].forEach(style => {
-    const opt = document.createElement("option");
-    opt.value = style;
-    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
-    dashSelect.appendChild(opt);
-  });
-  dashSelect.addEventListener("change", (e) => {
-    if (activeArrow) {
-      pushUndoState();
-      activeArrow.dash = e.target.value;
-      updateArrowAppearance(activeArrow);
-    }
-  });
-  container.appendChild(dashSelect);
+  dashSelect.value = "solid";
+  controlsWrap.appendChild(dashSelect);
 
-  // Line select
-  const lineSelect = document.createElement("select");
+  // Line style icon-select
+  const lineSelect = createIconSelect([
+    { value: "single", icon: "─", title: "Single" },
+    { value: "double", icon: "═", title: "Double" },
+    { value: "triple", icon: "≡", title: "Triple" },
+  ], (value) => { activeArrow.line = value; updateArrowAppearance(activeArrow); });
   lineSelect.id = "arrow-style-line";
-  lineSelect.className = "arrow-toolbar-select";
-  lineSelect.title = "Line style";
-  ["single", "double", "triple"].forEach(style => {
-    const opt = document.createElement("option");
-    opt.value = style;
-    opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
-    lineSelect.appendChild(opt);
-  });
-  lineSelect.addEventListener("change", (e) => {
-    if (activeArrow) {
-      pushUndoState();
-      activeArrow.line = e.target.value;
-      updateArrowAppearance(activeArrow);
-    }
-  });
-  container.appendChild(lineSelect);
+  lineSelect.value = "single";
+  controlsWrap.appendChild(lineSelect);
 
   // Opacity input
   const opacityInput = document.createElement("input");
@@ -378,13 +505,13 @@ export function createArrowStyleControls() {
       updateArrowAppearance(activeArrow);
     }
   });
-  container.appendChild(opacityInput);
+  controlsWrap.appendChild(opacityInput);
 
   // Curve mode toggle
   const curveToggle = document.createElement("button");
   curveToggle.id = "arrow-style-curve";
-  curveToggle.className = "arrow-toolbar-curve";
-  curveToggle.innerHTML = "⤴ Curve";
+  curveToggle.className = "arrow-toolbar-curve arrow-toolbar-btn";
+  curveToggle.innerHTML = "⤴";
   curveToggle.title = "Toggle curve mode";
   curveToggle.addEventListener("click", () => {
     if (activeArrow) {
@@ -400,15 +527,14 @@ export function createArrowStyleControls() {
       updateCurveToggleInToolbar(activeArrow);
     }
   });
-  container.appendChild(curveToggle);
+  controlsWrap.appendChild(curveToggle);
 
   // Smooth toggle (for waypoints)
   const smoothToggle = document.createElement("button");
   smoothToggle.id = "arrow-style-smooth";
-  smoothToggle.className = "arrow-toolbar-smooth";
-  smoothToggle.innerHTML = "〰 Smooth";
+  smoothToggle.className = "arrow-toolbar-smooth arrow-toolbar-btn";
+  smoothToggle.innerHTML = "〰";
   smoothToggle.title = "Toggle smooth curves through waypoints";
-  smoothToggle.style.display = "none"; // Hidden by default, shown when waypoints exist
   smoothToggle.addEventListener("click", () => {
     if (activeArrow && activeArrow.waypoints && activeArrow.waypoints.length > 0) {
       pushUndoState();
@@ -417,28 +543,21 @@ export function createArrowStyleControls() {
       updateSmoothToggleInToolbar(activeArrow);
     }
   });
-  container.appendChild(smoothToggle);
-
   // Waypoint count badge
   const waypointBadge = document.createElement("span");
   waypointBadge.id = "arrow-style-waypoint-count";
   waypointBadge.className = "arrow-toolbar-waypoint-badge";
-  waypointBadge.style.display = "none"; // Hidden by default
-  waypointBadge.title = "Number of waypoints (double-click arrow to add, right-click waypoint to remove)";
-  container.appendChild(waypointBadge);
+  waypointBadge.title = "Number of waypoints (double-click arrow to add, double-click waypoint to remove)";
 
-  // Label section separator
-  const labelSeparator = document.createElement("div");
-  labelSeparator.className = "arrow-toolbar-separator";
-  labelSeparator.textContent = "Label";
-  container.appendChild(labelSeparator);
+  // Label section: text input on row 1, position + offset on row 2
+  const labelSection = document.createElement("div");
+  labelSection.className = "arrow-label-section";
 
-  // Label text input
   const labelInput = document.createElement("input");
   labelInput.type = "text";
   labelInput.id = "arrow-style-label";
   labelInput.className = "arrow-toolbar-label";
-  labelInput.placeholder = "Label text...";
+  labelInput.placeholder = "Label...";
   labelInput.title = "Label text";
   labelInput.addEventListener("input", (e) => {
     if (activeArrow) {
@@ -446,48 +565,39 @@ export function createArrowStyleControls() {
       updateArrowLabel(activeArrow);
     }
   });
-  container.appendChild(labelInput);
+  labelSection.appendChild(labelInput);
 
-  // Label position select
-  const labelPositionSelect = document.createElement("select");
+  const labelSubRow = document.createElement("div");
+  labelSubRow.className = "arrow-label-subrow";
+
+  const labelPositionSelect = createIconSelect([
+    { value: "start",  icon: "◄", title: "Label at start" },
+    { value: "middle", icon: "◆", title: "Label at middle" },
+    { value: "end",    icon: "►", title: "Label at end" },
+  ], (value) => { if (activeArrow) { activeArrow.labelPosition = value; updateArrowLabel(activeArrow); } });
   labelPositionSelect.id = "arrow-style-label-position";
-  labelPositionSelect.className = "arrow-toolbar-select";
-  labelPositionSelect.title = "Label position";
-  ["start", "middle", "end"].forEach(pos => {
-    const opt = document.createElement("option");
-    opt.value = pos;
-    opt.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
-    labelPositionSelect.appendChild(opt);
-  });
   labelPositionSelect.value = CONFIG.ARROW_DEFAULT_LABEL_POSITION;
-  labelPositionSelect.addEventListener("change", (e) => {
-    if (activeArrow) {
-      activeArrow.labelPosition = e.target.value;
-      updateArrowLabel(activeArrow);
-    }
-  });
-  container.appendChild(labelPositionSelect);
+  labelSubRow.appendChild(labelPositionSelect);
 
-  // Label offset input
-  const labelOffsetInput = document.createElement("input");
-  labelOffsetInput.type = "number";
-  labelOffsetInput.id = "arrow-style-label-offset";
-  labelOffsetInput.className = "arrow-toolbar-width";
-  labelOffsetInput.value = CONFIG.ARROW_DEFAULT_LABEL_OFFSET.toString();
-  labelOffsetInput.title = "Label offset (positive = above, negative = below)";
-  labelOffsetInput.addEventListener("input", (e) => {
-    if (activeArrow) {
-      const val = parseInt(e.target.value);
-      if (!isNaN(val)) {
-        activeArrow.labelOffset = val;
-        updateArrowLabel(activeArrow);
-      }
-    }
+  const labelOffsetInput = createNumberInput({
+    id: "arrow-style-label-offset",
+    className: "arrow-toolbar-width",
+    title: "Label offset (positive = above, negative = below)",
+    defaultValue: CONFIG.ARROW_DEFAULT_LABEL_OFFSET,
+    onUpdate: (val) => { activeArrow.labelOffset = val; },
+    updateFn: updateArrowLabel,
   });
-  container.appendChild(labelOffsetInput);
+  labelSubRow.appendChild(labelOffsetInput);
+
+  labelSection.appendChild(labelSubRow);
+  controlsWrap.appendChild(labelSection);
+  controlsWrap.appendChild(smoothToggle);
+  controlsWrap.appendChild(waypointBadge);
+  centerWrap.appendChild(controlsWrap);
 
   // Cache references for efficient updates
   arrowControlRefs.colorPicker = colorPicker;
+  arrowControlRefs.colorPickerBtn = colorPickerBtn;
   arrowControlRefs.widthInput = widthInput;
   arrowControlRefs.headSelect = headSelect;
   arrowControlRefs.dashSelect = dashSelect;
@@ -513,20 +623,23 @@ export function updateArrowStylePanel(arrowData) {
   const toolbar = document.getElementById("editable-toolbar");
   if (!toolbar) return;
 
-  const buttonsContainer = toolbar.querySelector(".editable-toolbar-buttons");
-  let arrowControls = toolbar.querySelector(".arrow-style-controls");
+  const arrowPanel = toolbar.querySelector(".toolbar-panel-arrow");
+  if (!arrowPanel) return;
 
+  let arrowControls = arrowPanel.querySelector(".arrow-style-controls");
   if (!arrowControls) {
     arrowControls = createArrowStyleControls();
-    toolbar.appendChild(arrowControls);
+    arrowPanel.appendChild(arrowControls);
   }
 
   if (arrowData) {
-    const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
+    const { colorPicker, colorPickerBtn, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
 
     if (colorPicker) {
       const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
       colorPicker.value = colorValue;
+      if (colorPickerBtn) colorPickerBtn.style.backgroundColor = colorValue;
+      syncOpacitySliderColor(colorValue);
       if (colorPresetsRow) {
         colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach(s => {
           s.classList.toggle("selected", s.style.backgroundColor === colorValue ||
@@ -562,11 +675,9 @@ export function updateArrowStylePanel(arrowData) {
     updateCurveToggleInToolbar(arrowData);
     updateSmoothToggleInToolbar(arrowData);
 
-    buttonsContainer.style.display = "none";
-    arrowControls.style.display = "flex";
+    showRightPanel('arrow');
   } else {
-    buttonsContainer.style.display = "flex";
-    arrowControls.style.display = "none";
+    showRightPanel('default');
   }
 }
 
@@ -604,20 +715,8 @@ function updateSmoothToggleInToolbar(arrowData) {
 
   const hasWaypoints = arrowData && arrowData.waypoints && arrowData.waypoints.length > 0;
 
-  if (hasWaypoints) {
-    smoothToggle.style.display = "";
-    waypointBadge.style.display = "";
-    waypointBadge.textContent = `${arrowData.waypoints.length} wp`;
-
-    if (arrowData.smooth) {
-      smoothToggle.classList.add("active");
-    } else {
-      smoothToggle.classList.remove("active");
-    }
-  } else {
-    smoothToggle.style.display = "none";
-    waypointBadge.style.display = "none";
-  }
+  waypointBadge.textContent = hasWaypoints ? `${arrowData.waypoints.length} wp` : "0 wp";
+  smoothToggle.classList.toggle("active", !!(arrowData && arrowData.smooth && hasWaypoints));
 }
 
 /**
@@ -1153,9 +1252,17 @@ export function createArrowElement(arrowData) {
   if (!globalClickOutsideHandlerRegistered) {
     globalClickOutsideHandlerRegistered = true;
     document.addEventListener("click", (e) => {
+      // Close any open dropdowns/popovers unless the click was inside one
+      if (!e.target.closest(".arrow-color-presets-popover") &&
+          !e.target.closest(".arrow-icon-select-dropdown")) {
+        document.querySelectorAll(".arrow-icon-select-dropdown, .arrow-color-presets-popover")
+          .forEach(el => el.style.display = "none");
+      }
       if (activeArrow &&
           !e.target.closest(".editable-arrow-container") &&
-          !e.target.closest(".editable-toolbar")) {
+          !e.target.closest(".editable-toolbar") &&
+          !e.target.closest(".arrow-color-presets-popover") &&
+          !e.target.closest(".arrow-icon-select-dropdown")) {
         setActiveArrow(null);
       }
     });
@@ -1348,7 +1455,13 @@ function createWaypointHandle(arrowData, waypointIndex) {
   document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
   document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
 
-  // Right-click to delete waypoint
+  // Double-click or right-click to delete waypoint
+  handle.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
+    removeWaypoint(arrowData, wpIndex);
+  });
   handle.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();

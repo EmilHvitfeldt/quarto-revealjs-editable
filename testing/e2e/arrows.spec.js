@@ -5,6 +5,21 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const { TESTING_DIR, setupPage, clickAddArrow, getArrowData, deselectArrow } = require('./test-helpers');
 
+// Helper for custom icon-based select widgets (not native <select> elements)
+async function selectIconOption(page, selectId, value) {
+  await page.waitForSelector(`#${selectId} .arrow-icon-select-btn`, { state: 'visible' });
+  await page.click(`#${selectId} .arrow-icon-select-btn`);
+  await page.waitForSelector(`.arrow-icon-select-item[data-value="${value}"]`, { state: 'visible' });
+  await page.click(`.arrow-icon-select-item[data-value="${value}"]`);
+}
+
+// Helper to open color presets popover then click a swatch
+async function clickColorSwatch(page, nth) {
+  await page.click('.arrow-color-presets-toggle');
+  await page.waitForSelector('.arrow-color-presets-popover', { state: 'visible' });
+  await page.click(`.arrow-color-swatch:nth-child(${nth})`);
+}
+
 test.describe('Arrow Feature', () => {
 
   test.describe('Toolbar Integration', () => {
@@ -203,10 +218,10 @@ test.describe('Arrow Feature', () => {
 
         if (!slide || !startHandle || !endHandle) return null;
 
-        const slideRect = slide.getBoundingClientRect();
+        // Use natural (offsetWidth/Height) coordinates — same space as arrow positions
         const slideCenter = {
-          x: slideRect.width / 2,
-          y: slideRect.height / 2,
+          x: slide.offsetWidth / 2,
+          y: slide.offsetHeight / 2,
         };
 
         // Get handle positions from style
@@ -270,35 +285,21 @@ test.describe('Arrow Feature', () => {
       // Deselect by clicking outside
       await deselectArrow(page);
 
-      // Get arrow path position and click on it
-      const pathCenter = await page.evaluate(() => {
+      // Get the hit area's center in viewport coordinates (accounts for CSS scaling)
+      const viewportCenter = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
         const svg = container.querySelector('svg');
         const path = svg.querySelector('path[stroke-width="20"]'); // hit area
         if (!path) return null;
-
-        const pathD = path.getAttribute('d');
-        // Parse simple "M x1,y1 L x2,y2" format
-        const match = pathD.match(/M\s*([\d.]+),([\d.]+)\s*L\s*([\d.]+),([\d.]+)/);
-        if (!match) return null;
-
-        const x1 = parseFloat(match[1]);
-        const y1 = parseFloat(match[2]);
-        const x2 = parseFloat(match[3]);
-        const y2 = parseFloat(match[4]);
-
+        const rect = path.getBoundingClientRect();
         return {
-          x: (x1 + x2) / 2,
-          y: (y1 + y2) / 2,
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
         };
       });
 
-      if (pathCenter) {
-        // Click on the arrow path (need to account for slide position)
-        const slideBox = await page.locator('section.present').boundingBox();
-        await page.click('section.present', {
-          position: { x: pathCenter.x, y: pathCenter.y }
-        });
+      if (viewportCenter) {
+        await page.mouse.click(viewportCenter.x, viewportCenter.y);
         await page.waitForTimeout(100);
 
         const arrows = await getArrowData(page);
@@ -1359,31 +1360,32 @@ test.describe('Arrow Feature', () => {
     test('Toolbar shows arrow controls when arrow is selected', async ({ page }) => {
       await setupPage(page, 'arrows.html');
 
-      // Initially toolbar shows normal buttons
-      let toolbarState = await page.evaluate(() => {
-        const buttons = document.querySelector('.editable-toolbar-buttons');
-        const arrowControls = document.querySelector('.arrow-style-controls');
+      // Initially default panel visible, arrow panel hidden
+      let panelState = await page.evaluate(() => {
+        const defaultPanel = document.querySelector('.toolbar-panel-default');
+        const arrowPanel = document.querySelector('.toolbar-panel-arrow');
         return {
-          buttonsDisplay: buttons ? buttons.style.display : null,
-          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+          defaultDisplay: defaultPanel ? defaultPanel.style.display : null,
+          arrowDisplay: arrowPanel ? arrowPanel.style.display : null,
         };
       });
-      expect(toolbarState.buttonsDisplay).not.toBe('none');
+      expect(panelState.defaultDisplay).not.toBe('none');
+      expect(panelState.arrowDisplay).toBe('none');
 
       // Add arrow - it starts selected
       await clickAddArrow(page);
 
-      // Arrow controls should be visible, normal buttons hidden
-      toolbarState = await page.evaluate(() => {
-        const buttons = document.querySelector('.editable-toolbar-buttons');
-        const arrowControls = document.querySelector('.arrow-style-controls');
+      // Arrow panel should be visible, default panel hidden
+      panelState = await page.evaluate(() => {
+        const defaultPanel = document.querySelector('.toolbar-panel-default');
+        const arrowPanel = document.querySelector('.toolbar-panel-arrow');
         return {
-          buttonsDisplay: buttons ? buttons.style.display : null,
-          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+          defaultDisplay: defaultPanel ? defaultPanel.style.display : null,
+          arrowDisplay: arrowPanel ? arrowPanel.style.display : null,
         };
       });
-      expect(toolbarState.buttonsDisplay).toBe('none');
-      expect(toolbarState.arrowControlsDisplay).toBe('flex');
+      expect(panelState.defaultDisplay).toBe('none');
+      expect(panelState.arrowDisplay).not.toBe('none');
     });
 
     test('Toolbar shows normal buttons when arrow is deselected', async ({ page }) => {
@@ -1392,19 +1394,19 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Click outside to deselect
-      await page.click('.reveal', { position: { x: 10, y: 10 } });
+      await page.mouse.click(10, 150);
       await page.waitForTimeout(100);
 
-      const toolbarState = await page.evaluate(() => {
-        const buttons = document.querySelector('.editable-toolbar-buttons');
-        const arrowControls = document.querySelector('.arrow-style-controls');
+      const panelState = await page.evaluate(() => {
+        const defaultPanel = document.querySelector('.toolbar-panel-default');
+        const arrowPanel = document.querySelector('.toolbar-panel-arrow');
         return {
-          buttonsDisplay: buttons ? buttons.style.display : null,
-          arrowControlsDisplay: arrowControls ? arrowControls.style.display : null
+          defaultDisplay: defaultPanel ? defaultPanel.style.display : null,
+          arrowDisplay: arrowPanel ? arrowPanel.style.display : null,
         };
       });
-      expect(toolbarState.buttonsDisplay).toBe('flex');
-      expect(toolbarState.arrowControlsDisplay).toBe('none');
+      expect(panelState.defaultDisplay).not.toBe('none');
+      expect(panelState.arrowDisplay).toBe('none');
     });
 
     test('Color picker changes arrow color', async ({ page }) => {
@@ -1456,7 +1458,7 @@ test.describe('Arrow Feature', () => {
       });
 
       // Change head to diamond
-      await page.selectOption('#arrow-style-head', 'diamond');
+      await selectIconOption(page, 'arrow-style-head', 'diamond');
       await page.waitForTimeout(50);
 
       // Verify marker path changed
@@ -1474,7 +1476,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Change head to none
-      await page.selectOption('#arrow-style-head', 'none');
+      await selectIconOption(page, 'arrow-style-head', 'none');
       await page.waitForTimeout(50);
 
       // Verify marker-end is removed
@@ -1512,7 +1514,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Change dash to dashed
-      await page.selectOption('#arrow-style-dash', 'dashed');
+      await selectIconOption(page, 'arrow-style-dash', 'dashed');
       await page.waitForTimeout(50);
 
       // Verify path has stroke-dasharray
@@ -1549,7 +1551,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Change line to double
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       // Verify extra lines were created
@@ -1647,7 +1649,7 @@ test.describe('Arrow Feature', () => {
       });
 
       // Click the second swatch
-      await page.click('.arrow-color-swatch:nth-child(2)');
+      await clickColorSwatch(page, 2);
       await page.waitForTimeout(50);
 
       // Verify arrow color changed
@@ -1686,7 +1688,7 @@ test.describe('Arrow Feature', () => {
       expect(selectedCount).toBe(1);
 
       // Click second swatch
-      await page.click('.arrow-color-swatch:nth-child(2)');
+      await clickColorSwatch(page, 2);
       await page.waitForTimeout(50);
 
       // Verify second swatch is now selected and only one is selected
@@ -1733,7 +1735,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Click second swatch to set a non-black color
-      await page.click('.arrow-color-swatch:nth-child(2)');
+      await clickColorSwatch(page, 2);
       await page.waitForTimeout(50);
 
       // Deselect arrow
@@ -1773,7 +1775,7 @@ test.describe('Arrow Feature', () => {
       expect(dashArray).toBeFalsy();
 
       // Change to dashed
-      await page.selectOption('#arrow-style-dash', 'dashed');
+      await selectIconOption(page, 'arrow-style-dash', 'dashed');
       await page.waitForTimeout(50);
 
       dashArray = await page.evaluate(() => {
@@ -1784,7 +1786,7 @@ test.describe('Arrow Feature', () => {
       expect(dashArray).toBeTruthy();
 
       // Change to dotted
-      await page.selectOption('#arrow-style-dash', 'dotted');
+      await selectIconOption(page, 'arrow-style-dash', 'dotted');
       await page.waitForTimeout(50);
 
       const dottedArray = await page.evaluate(() => {
@@ -1796,7 +1798,7 @@ test.describe('Arrow Feature', () => {
       expect(dottedArray).not.toBe(dashArray);
 
       // Change back to solid
-      await page.selectOption('#arrow-style-dash', 'solid');
+      await selectIconOption(page, 'arrow-style-dash', 'solid');
       await page.waitForTimeout(50);
 
       dashArray = await page.evaluate(() => {
@@ -1813,7 +1815,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Set dashed with width 2
-      await page.selectOption('#arrow-style-dash', 'dashed');
+      await selectIconOption(page, 'arrow-style-dash', 'dashed');
       await page.fill('#arrow-style-width', '2');
       await page.waitForTimeout(50);
 
@@ -1842,7 +1844,7 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      await page.selectOption('#arrow-style-dash', 'dotted');
+      await selectIconOption(page, 'arrow-style-dash', 'dotted');
       await page.waitForTimeout(50);
 
       // Deselect
@@ -1869,7 +1871,7 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      await page.selectOption('#arrow-style-line', 'triple');
+      await selectIconOption(page, 'arrow-style-line', 'triple');
       await page.waitForTimeout(50);
 
       const result = await page.evaluate(() => {
@@ -1890,7 +1892,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       // Set to double
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       let extraCount = await page.evaluate(() => {
@@ -1900,7 +1902,7 @@ test.describe('Arrow Feature', () => {
       expect(extraCount).toBe(2);
 
       // Switch back to single
-      await page.selectOption('#arrow-style-line', 'single');
+      await selectIconOption(page, 'arrow-style-line', 'single');
       await page.waitForTimeout(50);
 
       extraCount = await page.evaluate(() => {
@@ -1915,7 +1917,7 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       // Get initial extra line paths
@@ -1952,8 +1954,8 @@ test.describe('Arrow Feature', () => {
 
       // Set color, dash, and line style
       await page.fill('#arrow-style-color', '#ff0000');
-      await page.selectOption('#arrow-style-dash', 'dashed');
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-dash', 'dashed');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       const extraLineStyles = await page.evaluate(() => {
@@ -1977,7 +1979,7 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       // Main path should have marker-end and be visible (even if stroke is transparent)
@@ -2000,7 +2002,7 @@ test.describe('Arrow Feature', () => {
       await page.waitForTimeout(100);
 
       // Set double line
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       const result = await page.evaluate(() => {
@@ -2043,7 +2045,7 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await page.fill('#arrow-style-opacity', '0.5');
-      await page.selectOption('#arrow-style-line', 'double');
+      await selectIconOption(page, 'arrow-style-line', 'double');
       await page.waitForTimeout(50);
 
       const opacities = await page.evaluate(() => {
@@ -2283,8 +2285,8 @@ test.describe('Arrow Feature', () => {
       // Change multiple styles
       await page.fill('#arrow-style-color', '#0000ff');
       await page.fill('#arrow-style-width', '5');
-      await page.selectOption('#arrow-style-head', 'diamond');
-      await page.selectOption('#arrow-style-dash', 'dotted');
+      await selectIconOption(page, 'arrow-style-head', 'diamond');
+      await selectIconOption(page, 'arrow-style-dash', 'dotted');
       await page.fill('#arrow-style-opacity', '0.7');
       await page.waitForTimeout(50);
 
@@ -2311,7 +2313,7 @@ test.describe('Arrow Feature', () => {
       // Create first arrow and change styles
       await clickAddArrow(page);
       await page.fill('#arrow-style-color', '#ff0000');
-      await page.selectOption('#arrow-style-dash', 'dashed');
+      await selectIconOption(page, 'arrow-style-dash', 'dashed');
       await page.waitForTimeout(50);
 
       // Deselect
@@ -2582,7 +2584,7 @@ test.describe('Arrow Feature', () => {
       });
 
       // Change head style
-      await page.selectOption('#arrow-style-head', 'diamond');
+      await selectIconOption(page, 'arrow-style-head', 'diamond');
       await page.waitForTimeout(50);
 
       // Verify marker changed
@@ -2818,11 +2820,14 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
       await clickAddArrow(page);
 
+      // Open the dropdown to populate it, then read data-value from items
+      await page.click('#arrow-style-label-position .arrow-icon-select-btn');
       const options = await page.evaluate(() => {
-        const select = document.getElementById('arrow-style-label-position');
-        if (!select) return [];
-        return Array.from(select.options).map(o => o.value);
+        return Array.from(document.querySelectorAll('.arrow-icon-select-item[data-value]'))
+          .map(o => o.dataset.value);
       });
+      // Close dropdown
+      await page.keyboard.press('Escape');
 
       expect(options).toContain('start');
       expect(options).toContain('middle');
@@ -2880,7 +2885,7 @@ test.describe('Arrow Feature', () => {
       });
 
       // Change to start position
-      await page.selectOption('#arrow-style-label-position', 'start');
+      await selectIconOption(page, 'arrow-style-label-position', 'start');
 
       const startX = await page.evaluate(() => {
         const label = document.querySelector('.editable-arrow-label');
@@ -3009,7 +3014,7 @@ test.describe('Arrow Feature', () => {
 
       // Set label on first arrow
       await page.fill('#arrow-style-label', 'Arrow 1');
-      await page.selectOption('#arrow-style-label-position', 'start');
+      await selectIconOption(page, 'arrow-style-label-position', 'start');
 
       // Click outside to deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });

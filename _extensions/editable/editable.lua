@@ -192,5 +192,6 @@ function Pandoc(doc)
   script = script .. "</script>"
 
   quarto.doc.include_text("in-header", script)
+
   return doc
 end

@@ -287,6 +287,16 @@ npm run test:e2e
 
 ---
 
+## Layout Considerations
+
+The toolbar is a fixed 100px top bar. E2E tests that click toolbar buttons or measure viewport-relative positions should account for this offset:
+
+- The toolbar occupies `y: 0–100px` in the viewport
+- The reveal.js presentation area starts at `y: 100px`
+- Toolbar buttons (Save, Copy, Add) are in the left zone; arrow style controls appear in the right zone when an arrow is selected
+
+---
+
 ## Testing Conventions
 
 ### Save Integration Tests Must Verify Ordering

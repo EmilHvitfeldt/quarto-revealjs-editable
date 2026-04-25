@@ -2,6 +2,19 @@
 
 All notable changes to the quarto-revealjs-editable extension will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Toolbar redesign** - Replaced the floating vertical toolbar with a fixed 100px top bar spanning the full viewport width
+  - Slides automatically shift down and resize to fill the remaining viewport area
+  - Button labels are always visible (no hover-to-expand)
+  - Add submenu now opens downward
+  - Arrow style controls appear centered in the top bar when an arrow is selected, keeping Save/Copy/Add always visible; controls scroll horizontally if the window is too narrow
+  - Arrow style controls use native HTML elements styled with CSS for consistent sizing and no external dependencies
+  - Two-row grid layout for arrow controls fits more options without wrapping
+  - Removed drag handle; toolbar is no longer draggable
+
 ## [7.0.0] - 2025-03-25
 
 ### Added
@@ -28,7 +41,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - **Waypoints and smooth curves** - Complex multi-point arrow paths (#59)
     - Double-click on arrow path to add waypoints
     - Waypoints shown as amber handles, distinct from start/end (blue/green) and control points
-    - Right-click or Delete key to remove waypoints
+    - Double-click or right-click waypoint to remove it (Delete key also works)
     - Smooth toggle for Catmull-Rom spline interpolation through waypoints
     - Waypoints and smooth attributes serialized in shortcode (`waypoints="x1,y1 x2,y2"`, `smooth="true"`)
     - Curve mode and waypoint mode are mutually exclusive (clicking Curve clears waypoints)

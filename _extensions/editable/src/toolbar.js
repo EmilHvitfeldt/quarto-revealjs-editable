@@ -1,130 +1,110 @@
 /**
- * Floating toolbar for save, copy, and add actions.
+ * Top bar toolbar with left (persistent) and right (contextual) zones.
+ *
+ * Left zone: title + save + copy — always visible.
+ * Right zone: swappable panels.
+ *   - "default" panel: Add + Modify (shown when nothing is selected)
+ *   - "arrow"   panel: arrow style controls (shown when an arrow is selected)
+ *   - future panels: image controls, etc.
+ *
  * @module toolbar
  */
 
 import { ToolbarRegistry } from './registries.js';
 
+/** @type {HTMLElement|null} The right-zone container */
+let rightZoneEl = null;
+
+/** @type {HTMLElement[]} Elements to hide when a context panel is active */
+const contextHideElements = [];
+
 /**
- * Create the floating toolbar with actions from ToolbarRegistry.
- * Toolbar is draggable via the handle.
+ * Switch the visible panel in the right zone.
+ * All panels are hidden except the one matching panelName.
+ * @param {string} panelName - e.g. 'default', 'arrow'
+ */
+export function showRightPanel(panelName) {
+  if (!rightZoneEl) return;
+  rightZoneEl.querySelectorAll('.toolbar-panel').forEach(panel => {
+    panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? '' : 'none';
+  });
+  const isContext = panelName !== 'default';
+  contextHideElements.forEach(el => {
+    el.style.display = isContext ? 'none' : '';
+  });
+}
+
+/**
+ * Create the fixed top bar toolbar.
  * @returns {HTMLElement} The toolbar element
  */
 export function createFloatingToolbar() {
-  // Check if toolbar already exists
   if (document.getElementById("editable-toolbar")) {
     return document.getElementById("editable-toolbar");
   }
 
-  // Create toolbar container
   const toolbar = document.createElement("div");
   toolbar.id = "editable-toolbar";
   toolbar.className = "editable-toolbar";
   toolbar.setAttribute("role", "toolbar");
   toolbar.setAttribute("aria-label", "Editable tools");
 
-  // Create drag handle
-  const dragHandle = document.createElement("div");
-  dragHandle.className = "editable-toolbar-handle";
-  dragHandle.innerHTML = "⋮⋮";
-  dragHandle.title = "Drag to move toolbar";
-  toolbar.appendChild(dragHandle);
+  // ── Left zone ─────────────────────────────────────────────────────────────
+  const leftZone = document.createElement("div");
+  leftZone.className = "editable-toolbar-left";
 
-  // Create buttons container
-  const buttonsContainer = document.createElement("div");
-  buttonsContainer.className = "editable-toolbar-buttons";
-
-  // Add buttons from registry
-  ToolbarRegistry.getActions().forEach((action) => {
-    let element;
-    if (action.submenu) {
-      // Create button with submenu
-      element = ToolbarRegistry.createSubmenuButton(action);
+  const leftButtonStack = document.createElement("div");
+  leftButtonStack.className = "editable-toolbar-button-stack";
+  const unstackedButtons = [];
+  ToolbarRegistry.getActionsForZone("left").forEach(action => {
+    const btn = action.submenu
+      ? ToolbarRegistry.createSubmenuButton(action)
+      : ToolbarRegistry.createButton(action);
+    if (action.stacked === false) {
+      unstackedButtons.push({ btn, action });
     } else {
-      // Create regular button
-      element = ToolbarRegistry.createButton(action);
+      leftButtonStack.appendChild(btn);
     }
-    buttonsContainer.appendChild(element);
+  });
+  contextHideElements.push(leftButtonStack);
+  leftZone.appendChild(leftButtonStack);
+  unstackedButtons.forEach(({ btn, action }) => {
+    leftZone.appendChild(btn);
+    if (action.hideOnContext) contextHideElements.push(btn);
   });
 
-  toolbar.appendChild(buttonsContainer);
+  toolbar.appendChild(leftZone);
 
-  // Make toolbar draggable
-  makeToolbarDraggable(toolbar, dragHandle);
+  // ── Right zone ────────────────────────────────────────────────────────────
+  const rightZone = document.createElement("div");
+  rightZone.className = "editable-toolbar-right";
+  rightZoneEl = rightZone;
 
-  // Add to document
+  // Default panel: shown when no element is selected
+  const defaultPanel = document.createElement("div");
+  defaultPanel.className = "toolbar-panel toolbar-panel-default";
+  ToolbarRegistry.getActionsForZone("right").forEach(action => {
+    defaultPanel.appendChild(
+      action.submenu
+        ? ToolbarRegistry.createSubmenuButton(action)
+        : ToolbarRegistry.createButton(action)
+    );
+  });
+  rightZone.appendChild(defaultPanel);
+
+  // Arrow panel: empty container, populated by arrows.js on first selection
+  const arrowPanel = document.createElement("div");
+  arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
+  arrowPanel.style.display = "none";
+  rightZone.appendChild(arrowPanel);
+
+  toolbar.appendChild(rightZone);
   document.body.appendChild(toolbar);
 
+  // Trigger reveal.js relayout to account for the 100px top bar
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('resize'));
+  });
+
   return toolbar;
-}
-
-/**
- * Make the toolbar draggable via its handle.
- * @param {HTMLElement} toolbar - The toolbar element
- * @param {HTMLElement} handle - The drag handle element
- */
-function makeToolbarDraggable(toolbar, handle) {
-  let isDragging = false;
-  let startX, startY, initialX, initialY;
-
-  function startDrag(e) {
-    if (e.target !== handle && !handle.contains(e.target)) return;
-
-    isDragging = true;
-    handle.style.cursor = "grabbing";
-
-    const rect = toolbar.getBoundingClientRect();
-    initialX = rect.left;
-    initialY = rect.top;
-
-    if (e.type === "touchstart") {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-    } else {
-      startX = e.clientX;
-      startY = e.clientY;
-    }
-
-    // Switch from right positioning to left positioning
-    // Clear the transform that was used for initial centering
-    toolbar.style.right = "auto";
-    toolbar.style.transform = "none";
-    toolbar.style.left = initialX + "px";
-    toolbar.style.top = initialY + "px";
-
-    e.preventDefault();
-  }
-
-  function drag(e) {
-    if (!isDragging) return;
-
-    let clientX, clientY;
-    if (e.type === "touchmove") {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    const deltaX = clientX - startX;
-    const deltaY = clientY - startY;
-
-    toolbar.style.left = (initialX + deltaX) + "px";
-    toolbar.style.top = (initialY + deltaY) + "px";
-  }
-
-  function stopDrag() {
-    if (isDragging) {
-      isDragging = false;
-      handle.style.cursor = "grab";
-    }
-  }
-
-  handle.addEventListener("mousedown", startDrag);
-  handle.addEventListener("touchstart", startDrag);
-  document.addEventListener("mousemove", drag);
-  document.addEventListener("touchmove", drag);
-  document.addEventListener("mouseup", stopDrag);
-  document.addEventListener("touchend", stopDrag);
 }
