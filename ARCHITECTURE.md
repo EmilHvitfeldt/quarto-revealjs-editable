@@ -114,6 +114,19 @@ The serialization system converts element state to QMD format:
    - Update text content (HTML → Quarto markdown)
    - Replace `{.editable}` with `{.absolute ...}` attributes
 
+### Toolbar (`toolbar.js`)
+
+The toolbar is a fixed 100px top bar spanning the full viewport width. Slides shift down via `.reveal { top: 100px; height: calc(100vh - 100px) }` and a `window.dispatchEvent(new Event('resize'))` triggers reveal.js to rescale slides into the reduced area.
+
+The toolbar has two zones:
+
+- **Left zone** - Persistent stacked button group (save, copy); hidden when a context panel is active
+- **Right zone** - Swappable context panels:
+  - `default` panel: Add + Modify actions (shown when nothing is selected)
+  - `arrow` panel: Arrow style controls (shown when an arrow is selected; centered, horizontally scrollable)
+
+`showRightPanel(panelName)` switches which panel is visible. Arrow controls live inside `.arrow-center-wrap` (holds color section + `.arrow-controls-wrap` grid as one unit) so they center together in the right zone.
+
 ### Brand Color Integration
 
 The Lua filter extracts colors from `_brand.yml` and injects them as globals:
