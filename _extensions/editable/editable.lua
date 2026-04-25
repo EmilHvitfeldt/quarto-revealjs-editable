@@ -192,5 +192,14 @@ function Pandoc(doc)
   script = script .. "</script>"
 
   quarto.doc.include_text("in-header", script)
+
+  -- Inject Web Awesome CDN for consistent toolbar UI components
+  local wa_cdn = [[
+<link rel="stylesheet" href="https://ka-f.webawesome.com/webawesome@3.5.0/styles/themes/default.css">
+<link rel="stylesheet" href="https://ka-f.webawesome.com/webawesome@3.5.0/styles/native.css">
+<script type="module" src="https://ka-f.webawesome.com/webawesome@3.5.0/webawesome.loader.js"></script>
+]]
+  quarto.doc.include_text("in-header", wa_cdn)
+
   return doc
 end
