@@ -2820,11 +2820,14 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
       await clickAddArrow(page);
 
+      // Open the dropdown to populate it, then read data-value from items
+      await page.click('#arrow-style-label-position .arrow-icon-select-btn');
       const options = await page.evaluate(() => {
-        const select = document.getElementById('arrow-style-label-position');
-        if (!select) return [];
-        return Array.from(select.options).map(o => o.value);
+        return Array.from(document.querySelectorAll('.arrow-icon-select-item[data-value]'))
+          .map(o => o.dataset.value);
       });
+      // Close dropdown
+      await page.keyboard.press('Escape');
 
       expect(options).toContain('start');
       expect(options).toContain('middle');
