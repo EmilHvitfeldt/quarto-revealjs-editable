@@ -829,13 +829,6 @@ var EditableModule = (() => {
     toolbar.setAttribute("aria-label", "Editable tools");
     const leftZone = document.createElement("div");
     leftZone.className = "editable-toolbar-left";
-    const title = document.createElement("span");
-    title.className = "editable-toolbar-title";
-    title.textContent = "Editable";
-    leftZone.appendChild(title);
-    const divider = document.createElement("div");
-    divider.className = "editable-toolbar-divider";
-    leftZone.appendChild(divider);
     const leftButtonStack = document.createElement("div");
     leftButtonStack.className = "editable-toolbar-button-stack";
     const unstackedButtons = [];
@@ -1050,8 +1043,43 @@ var EditableModule = (() => {
   function createArrowStyleControls() {
     const container = document.createElement("div");
     container.className = "arrow-style-controls";
+    const colorSection = document.createElement("div");
+    colorSection.className = "arrow-color-section";
+    const colorPickerBtn = document.createElement("button");
+    colorPickerBtn.className = "arrow-color-btn";
+    colorPickerBtn.style.backgroundColor = "#000000";
+    colorPickerBtn.title = "Custom color";
+    const colorPicker = document.createElement("input");
+    colorPicker.type = "color";
+    colorPicker.id = "arrow-style-color";
+    colorPicker.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none";
+    colorPicker.value = "#000000";
+    colorPickerBtn.appendChild(colorPicker);
+    colorPickerBtn.addEventListener("click", () => colorPicker.click());
+    colorPicker.addEventListener("focus", () => {
+      if (activeArrow)
+        pushUndoState();
+    });
+    colorPicker.addEventListener("input", (e) => {
+      if (activeArrow) {
+        activeArrow.color = e.target.value;
+        updateArrowAppearance(activeArrow);
+        colorPickerBtn.style.backgroundColor = e.target.value;
+        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
+      }
+    });
+    colorSection.appendChild(colorPickerBtn);
+    const presetsToggleBtn = document.createElement("button");
+    presetsToggleBtn.className = "arrow-color-btn arrow-color-presets-toggle";
+    presetsToggleBtn.title = "Preset colors";
+    colorSection.appendChild(presetsToggleBtn);
+    const colorPresetsPopover = document.createElement("div");
+    colorPresetsPopover.className = "arrow-color-presets-popover";
+    colorPresetsPopover.style.display = "none";
+    document.body.appendChild(colorPresetsPopover);
     const colorPresetsRow = document.createElement("div");
     colorPresetsRow.className = "arrow-color-presets";
+    colorPresetsPopover.appendChild(colorPresetsRow);
     const defaultColors = ["#000000"];
     const paletteColors = getColorPalette();
     const allColors = [...defaultColors, ...paletteColors.filter((c) => c.toLowerCase() !== "#000000")];
@@ -1065,42 +1093,41 @@ var EditableModule = (() => {
           pushUndoState();
           activeArrow.color = color;
           updateArrowAppearance(activeArrow);
-          const picker = container.querySelector("#arrow-style-color");
-          if (picker)
-            picker.value = color;
+          colorPicker.value = color;
+          colorPickerBtn.style.backgroundColor = color;
           colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
           swatch.classList.add("selected");
+          colorPresetsPopover.style.display = "none";
         }
       });
       colorPresetsRow.appendChild(swatch);
     });
-    container.appendChild(colorPresetsRow);
-    const colorPicker = document.createElement("input");
-    colorPicker.type = "color";
-    colorPicker.id = "arrow-style-color";
-    colorPicker.className = "arrow-toolbar-color";
-    colorPicker.value = "#000000";
-    colorPicker.title = "Custom color";
-    colorPicker.addEventListener("focus", () => {
-      if (activeArrow)
-        pushUndoState();
-    });
-    colorPicker.addEventListener("input", (e) => {
-      if (activeArrow) {
-        activeArrow.color = e.target.value;
-        updateArrowAppearance(activeArrow);
-        colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => s.classList.remove("selected"));
+    presetsToggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = colorPresetsPopover.style.display !== "none";
+      if (isOpen) {
+        colorPresetsPopover.style.display = "none";
+      } else {
+        const rect = presetsToggleBtn.getBoundingClientRect();
+        colorPresetsPopover.style.top = rect.bottom + 4 + "px";
+        colorPresetsPopover.style.left = rect.left + "px";
+        colorPresetsPopover.style.display = "";
       }
     });
-    container.appendChild(colorPicker);
+    colorPresetsPopover.addEventListener("mousedown", (e) => e.preventDefault());
+    document.addEventListener("click", () => {
+      colorPresetsPopover.style.display = "none";
+    });
+    container.appendChild(colorSection);
     const controlsWrap = document.createElement("div");
     controlsWrap.className = "arrow-controls-wrap";
-    const widthInput = document.createElement("input");
+    const widthInput = document.createElement("wa-input");
     widthInput.type = "number";
     widthInput.id = "arrow-style-width";
     widthInput.className = "arrow-toolbar-width";
-    widthInput.min = "1";
-    widthInput.max = "20";
+    widthInput.setAttribute("size", "small");
+    widthInput.setAttribute("min", "1");
+    widthInput.setAttribute("max", "20");
     widthInput.value = "2";
     widthInput.title = "Width";
     widthInput.addEventListener("focus", () => {
@@ -1117,12 +1144,13 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(widthInput);
-    const headSelect = document.createElement("select");
+    const headSelect = document.createElement("wa-select");
     headSelect.id = "arrow-style-head";
     headSelect.className = "arrow-toolbar-select";
+    headSelect.setAttribute("size", "small");
     headSelect.title = "Head style";
     ARROW_HEAD_STYLES.forEach((style) => {
-      const opt = document.createElement("option");
+      const opt = document.createElement("wa-option");
       opt.value = style;
       opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
       headSelect.appendChild(opt);
@@ -1135,12 +1163,13 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(headSelect);
-    const dashSelect = document.createElement("select");
+    const dashSelect = document.createElement("wa-select");
     dashSelect.id = "arrow-style-dash";
     dashSelect.className = "arrow-toolbar-select";
+    dashSelect.setAttribute("size", "small");
     dashSelect.title = "Dash style";
     ["solid", "dashed", "dotted"].forEach((style) => {
-      const opt = document.createElement("option");
+      const opt = document.createElement("wa-option");
       opt.value = style;
       opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
       dashSelect.appendChild(opt);
@@ -1153,12 +1182,13 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(dashSelect);
-    const lineSelect = document.createElement("select");
+    const lineSelect = document.createElement("wa-select");
     lineSelect.id = "arrow-style-line";
     lineSelect.className = "arrow-toolbar-select";
+    lineSelect.setAttribute("size", "small");
     lineSelect.title = "Line style";
     ["single", "double", "triple"].forEach((style) => {
-      const opt = document.createElement("option");
+      const opt = document.createElement("wa-option");
       opt.value = style;
       opt.textContent = style.charAt(0).toUpperCase() + style.slice(1);
       lineSelect.appendChild(opt);
@@ -1191,9 +1221,11 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(opacityInput);
-    const curveToggle = document.createElement("button");
+    const curveToggle = document.createElement("wa-button");
     curveToggle.id = "arrow-style-curve";
     curveToggle.className = "arrow-toolbar-curve";
+    curveToggle.setAttribute("size", "small");
+    curveToggle.setAttribute("appearance", "outlined");
     curveToggle.innerHTML = "\u2934 Curve";
     curveToggle.title = "Toggle curve mode";
     curveToggle.addEventListener("click", () => {
@@ -1210,9 +1242,11 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(curveToggle);
-    const smoothToggle = document.createElement("button");
+    const smoothToggle = document.createElement("wa-button");
     smoothToggle.id = "arrow-style-smooth";
     smoothToggle.className = "arrow-toolbar-smooth";
+    smoothToggle.setAttribute("size", "small");
+    smoothToggle.setAttribute("appearance", "outlined");
     smoothToggle.innerHTML = "\u3030 Smooth";
     smoothToggle.title = "Toggle smooth curves through waypoints";
     smoothToggle.style.display = "none";
@@ -1231,15 +1265,12 @@ var EditableModule = (() => {
     waypointBadge.style.display = "none";
     waypointBadge.title = "Number of waypoints (double-click arrow to add, right-click waypoint to remove)";
     controlsWrap.appendChild(waypointBadge);
-    const labelSeparator = document.createElement("div");
-    labelSeparator.className = "arrow-toolbar-separator";
-    labelSeparator.textContent = "Label";
-    controlsWrap.appendChild(labelSeparator);
-    const labelInput = document.createElement("input");
+    const labelInput = document.createElement("wa-input");
     labelInput.type = "text";
     labelInput.id = "arrow-style-label";
     labelInput.className = "arrow-toolbar-label";
-    labelInput.placeholder = "Label text...";
+    labelInput.setAttribute("size", "small");
+    labelInput.setAttribute("placeholder", "Label text...");
     labelInput.title = "Label text";
     labelInput.addEventListener("input", (e) => {
       if (activeArrow) {
@@ -1248,12 +1279,13 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(labelInput);
-    const labelPositionSelect = document.createElement("select");
+    const labelPositionSelect = document.createElement("wa-select");
     labelPositionSelect.id = "arrow-style-label-position";
     labelPositionSelect.className = "arrow-toolbar-select";
+    labelPositionSelect.setAttribute("size", "small");
     labelPositionSelect.title = "Label position";
     ["start", "middle", "end"].forEach((pos) => {
-      const opt = document.createElement("option");
+      const opt = document.createElement("wa-option");
       opt.value = pos;
       opt.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
       labelPositionSelect.appendChild(opt);
@@ -1266,10 +1298,11 @@ var EditableModule = (() => {
       }
     });
     controlsWrap.appendChild(labelPositionSelect);
-    const labelOffsetInput = document.createElement("input");
+    const labelOffsetInput = document.createElement("wa-input");
     labelOffsetInput.type = "number";
     labelOffsetInput.id = "arrow-style-label-offset";
     labelOffsetInput.className = "arrow-toolbar-width";
+    labelOffsetInput.setAttribute("size", "small");
     labelOffsetInput.value = CONFIG.ARROW_DEFAULT_LABEL_OFFSET.toString();
     labelOffsetInput.title = "Label offset (positive = above, negative = below)";
     labelOffsetInput.addEventListener("input", (e) => {
@@ -1284,6 +1317,7 @@ var EditableModule = (() => {
     controlsWrap.appendChild(labelOffsetInput);
     container.appendChild(controlsWrap);
     arrowControlRefs.colorPicker = colorPicker;
+    arrowControlRefs.colorPickerBtn = colorPickerBtn;
     arrowControlRefs.widthInput = widthInput;
     arrowControlRefs.headSelect = headSelect;
     arrowControlRefs.dashSelect = dashSelect;
@@ -1311,10 +1345,12 @@ var EditableModule = (() => {
       arrowPanel.appendChild(arrowControls);
     }
     if (arrowData) {
-      const { colorPicker, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
+      const { colorPicker, colorPickerBtn, widthInput, headSelect, dashSelect, lineSelect, opacityInput, colorPresetsRow, labelInput, labelPositionSelect, labelOffsetInput } = arrowControlRefs;
       if (colorPicker) {
         const colorValue = arrowData.color === "black" ? "#000000" : arrowData.color;
         colorPicker.value = colorValue;
+        if (colorPickerBtn)
+          colorPickerBtn.style.backgroundColor = colorValue;
         if (colorPresetsRow) {
           colorPresetsRow.querySelectorAll(".arrow-color-swatch").forEach((s) => {
             s.classList.toggle("selected", s.style.backgroundColor === colorValue || rgbToHex(s.style.backgroundColor) === colorValue.toLowerCase());
@@ -1818,7 +1854,7 @@ var EditableModule = (() => {
     if (!globalClickOutsideHandlerRegistered) {
       globalClickOutsideHandlerRegistered = true;
       document.addEventListener("click", (e) => {
-        if (activeArrow && !e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar")) {
+        if (activeArrow && !e.target.closest(".editable-arrow-container") && !e.target.closest(".editable-toolbar") && !e.target.closest(".arrow-color-presets-popover")) {
           setActiveArrow(null);
         }
       });
