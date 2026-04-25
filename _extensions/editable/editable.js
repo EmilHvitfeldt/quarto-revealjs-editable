@@ -404,8 +404,10 @@ var EditableModule = (() => {
       <button class="ql-italic">I</button>
       <button class="ql-underline">U</button>
       <button class="ql-strike">S</button>
+      <span class="quill-toolbar-separator"></span>
       <select class="ql-color">${colorOptionsWithExtras}</select>
       <select class="ql-background">${colorOptionsWithExtras}</select>
+      <span class="quill-toolbar-separator"></span>
       <button class="ql-align" value=""></button>
       <button class="ql-align" value="center"></button>
       <button class="ql-align" value="right"></button>
@@ -476,6 +478,85 @@ var EditableModule = (() => {
     }
   });
 
+  // src/toolbar.js
+  function showRightPanel(panelName) {
+    if (!rightZoneEl)
+      return;
+    rightZoneEl.querySelectorAll(".toolbar-panel").forEach((panel) => {
+      panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? "" : "none";
+    });
+    const isContext = panelName !== "default";
+    contextHideElements.forEach((el) => {
+      el.style.display = isContext ? "none" : "";
+    });
+  }
+  function createFloatingToolbar() {
+    if (document.getElementById("editable-toolbar")) {
+      return document.getElementById("editable-toolbar");
+    }
+    const toolbar = document.createElement("div");
+    toolbar.id = "editable-toolbar";
+    toolbar.className = "editable-toolbar";
+    toolbar.setAttribute("role", "toolbar");
+    toolbar.setAttribute("aria-label", "Editable tools");
+    const leftZone = document.createElement("div");
+    leftZone.className = "editable-toolbar-left";
+    const leftButtonStack = document.createElement("div");
+    leftButtonStack.className = "editable-toolbar-button-stack";
+    const unstackedButtons = [];
+    ToolbarRegistry.getActionsForZone("left").forEach((action) => {
+      const btn = action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action);
+      if (action.stacked === false) {
+        unstackedButtons.push({ btn, action });
+      } else {
+        leftButtonStack.appendChild(btn);
+      }
+    });
+    contextHideElements.push(leftButtonStack);
+    leftZone.appendChild(leftButtonStack);
+    unstackedButtons.forEach(({ btn, action }) => {
+      leftZone.appendChild(btn);
+      if (action.hideOnContext)
+        contextHideElements.push(btn);
+    });
+    toolbar.appendChild(leftZone);
+    const rightZone = document.createElement("div");
+    rightZone.className = "editable-toolbar-right";
+    rightZoneEl = rightZone;
+    const defaultPanel = document.createElement("div");
+    defaultPanel.className = "toolbar-panel toolbar-panel-default";
+    ToolbarRegistry.getActionsForZone("right").forEach((action) => {
+      defaultPanel.appendChild(
+        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
+      );
+    });
+    rightZone.appendChild(defaultPanel);
+    const arrowPanel = document.createElement("div");
+    arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
+    arrowPanel.style.display = "none";
+    rightZone.appendChild(arrowPanel);
+    const textPanel = document.createElement("div");
+    textPanel.className = "toolbar-panel toolbar-panel-text";
+    textPanel.style.display = "none";
+    rightZone.appendChild(textPanel);
+    textPanelEl = textPanel;
+    toolbar.appendChild(rightZone);
+    document.body.appendChild(toolbar);
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    return toolbar;
+  }
+  var rightZoneEl, textPanelEl, contextHideElements;
+  var init_toolbar = __esm({
+    "src/toolbar.js"() {
+      init_registries();
+      rightZoneEl = null;
+      textPanelEl = null;
+      contextHideElements = [];
+    }
+  });
+
   // src/registries.js
   var ControlRegistry, NewElementRegistry, ToolbarRegistry;
   var init_registries = __esm({
@@ -485,6 +566,7 @@ var EditableModule = (() => {
       init_editable_element();
       init_undo();
       init_quill();
+      init_toolbar();
       ControlRegistry = {
         /** @type {Map<string, Object>} Registered controls by name */
         controls: /* @__PURE__ */ new Map(),
@@ -602,25 +684,28 @@ var EditableModule = (() => {
         onClick: (element, btn) => {
           const isEditing = btn.classList.contains("active");
           const quillData = quillInstances.get(element);
+          const textPanel = document.querySelector(".toolbar-panel-text");
           if (!isEditing) {
             if (quillData) {
-              if (quillData.toolbarContainer) {
-                quillData.toolbarContainer.classList.add("editing");
+              if (quillData.toolbarContainer && textPanel) {
+                textPanel.appendChild(quillData.toolbarContainer);
               }
               quillData.isEditing = true;
               quillData.quill.enable(true);
               quillData.quill.focus();
             }
+            showRightPanel("text");
             btn.classList.add("active");
             btn.title = "Exit Edit Mode";
           } else {
             if (quillData) {
               if (quillData.toolbarContainer) {
-                quillData.toolbarContainer.classList.remove("editing");
+                element.insertBefore(quillData.toolbarContainer, element.firstChild);
               }
               quillData.isEditing = false;
               quillData.quill.enable(false);
             }
+            showRightPanel("default");
             btn.classList.remove("active");
             btn.title = "Edit Text";
             window.getSelection().removeAllRanges();
@@ -803,79 +888,6 @@ var EditableModule = (() => {
           return wrapper;
         }
       };
-    }
-  });
-
-  // src/toolbar.js
-  function showRightPanel(panelName) {
-    if (!rightZoneEl)
-      return;
-    rightZoneEl.querySelectorAll(".toolbar-panel").forEach((panel) => {
-      panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? "" : "none";
-    });
-    const isContext = panelName !== "default";
-    contextHideElements.forEach((el) => {
-      el.style.display = isContext ? "none" : "";
-    });
-  }
-  function createFloatingToolbar() {
-    if (document.getElementById("editable-toolbar")) {
-      return document.getElementById("editable-toolbar");
-    }
-    const toolbar = document.createElement("div");
-    toolbar.id = "editable-toolbar";
-    toolbar.className = "editable-toolbar";
-    toolbar.setAttribute("role", "toolbar");
-    toolbar.setAttribute("aria-label", "Editable tools");
-    const leftZone = document.createElement("div");
-    leftZone.className = "editable-toolbar-left";
-    const leftButtonStack = document.createElement("div");
-    leftButtonStack.className = "editable-toolbar-button-stack";
-    const unstackedButtons = [];
-    ToolbarRegistry.getActionsForZone("left").forEach((action) => {
-      const btn = action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action);
-      if (action.stacked === false) {
-        unstackedButtons.push({ btn, action });
-      } else {
-        leftButtonStack.appendChild(btn);
-      }
-    });
-    contextHideElements.push(leftButtonStack);
-    leftZone.appendChild(leftButtonStack);
-    unstackedButtons.forEach(({ btn, action }) => {
-      leftZone.appendChild(btn);
-      if (action.hideOnContext)
-        contextHideElements.push(btn);
-    });
-    toolbar.appendChild(leftZone);
-    const rightZone = document.createElement("div");
-    rightZone.className = "editable-toolbar-right";
-    rightZoneEl = rightZone;
-    const defaultPanel = document.createElement("div");
-    defaultPanel.className = "toolbar-panel toolbar-panel-default";
-    ToolbarRegistry.getActionsForZone("right").forEach((action) => {
-      defaultPanel.appendChild(
-        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
-      );
-    });
-    rightZone.appendChild(defaultPanel);
-    const arrowPanel = document.createElement("div");
-    arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
-    arrowPanel.style.display = "none";
-    rightZone.appendChild(arrowPanel);
-    toolbar.appendChild(rightZone);
-    document.body.appendChild(toolbar);
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event("resize"));
-    });
-    return toolbar;
-  }
-  var rightZoneEl, contextHideElements;
-  var init_toolbar = __esm({
-    "src/toolbar.js"() {
-      init_registries();
-      rightZoneEl = null;
-      contextHideElements = [];
     }
   });
 

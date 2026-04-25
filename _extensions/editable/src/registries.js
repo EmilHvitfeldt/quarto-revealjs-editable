@@ -8,6 +8,7 @@ import { createButton, changeFontSize } from './utils.js';
 import { editableRegistry } from './editable-element.js';
 import { pushUndoState } from './undo.js';
 import { quillInstances } from './quill.js';
+import { showRightPanel } from './toolbar.js';
 
 /**
  * Registry for element control buttons (font size, alignment, edit mode).
@@ -150,31 +151,32 @@ ControlRegistry.register("editMode", {
     // Quill should already be initialized at page load
     const quillData = quillInstances.get(element);
 
+    const textPanel = document.querySelector(".toolbar-panel-text");
+
     if (!isEditing) {
       // Entering edit mode
       if (quillData) {
-        // Show toolbar and enable editing
-        if (quillData.toolbarContainer) {
-          quillData.toolbarContainer.classList.add("editing");
+        // Move toolbar into top-bar text panel
+        if (quillData.toolbarContainer && textPanel) {
+          textPanel.appendChild(quillData.toolbarContainer);
         }
         quillData.isEditing = true;
         quillData.quill.enable(true);
         quillData.quill.focus();
       }
-
+      showRightPanel("text");
       btn.classList.add("active");
       btn.title = "Exit Edit Mode";
     } else {
-      // Exiting edit mode
+      // Exiting edit mode — move toolbar back into its element
       if (quillData) {
-        // Hide toolbar and disable editing
         if (quillData.toolbarContainer) {
-          quillData.toolbarContainer.classList.remove("editing");
+          element.insertBefore(quillData.toolbarContainer, element.firstChild);
         }
         quillData.isEditing = false;
         quillData.quill.enable(false);
       }
-
+      showRightPanel("default");
       btn.classList.remove("active");
       btn.title = "Edit Text";
 
