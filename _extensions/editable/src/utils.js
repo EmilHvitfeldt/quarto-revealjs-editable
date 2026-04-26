@@ -116,6 +116,18 @@ export function getOriginalEditableDivs() {
 }
 
 /**
+ * Get raw client coordinates from mouse or touch event (no scale adjustment).
+ * @param {MouseEvent|TouchEvent} e - The event object
+ * @returns {{clientX: number, clientY: number}} Raw coordinates
+ */
+export function getRawClient(e) {
+  if (e.type.startsWith("touch")) {
+    return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+  }
+  return { clientX: e.clientX, clientY: e.clientY };
+}
+
+/**
  * Get current Reveal.js slide index.
  * @returns {number} Horizontal slide index
  */

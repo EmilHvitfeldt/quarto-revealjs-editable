@@ -176,7 +176,7 @@ export function serializeToQmd(dimensions) {
 export function getFenceForContent(content) {
   // Find the longest sequence of colons at the start of any line
   const matches = content.match(/^:+/gm) || [];
-  let maxColons = 3; // Default fence is :::
+  let maxColons = CONFIG.NEW_FENCE_LENGTH;
   for (const match of matches) {
     if (match.length >= maxColons) {
       maxColons = match.length + 1;
@@ -571,37 +571,30 @@ export function insertNewSlides(text) {
 }
 
 /**
- * Insert new text divs into QMD content (for divs on original slides).
- * @param {string} text - QMD content (may already have new slides inserted)
- * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
+ * Group items by slideIndex and insert generated content into QMD lines.
+ * Items must have a `slideIndex` property; `buildContent` receives the group
+ * and returns an array of strings to splice in before the next slide heading.
+ * @param {string} text - QMD content
+ * @param {Array} items - Items to insert (each has `slideIndex`)
+ * @param {Function} buildContent - (items) => string[]
  * @returns {string} Updated QMD content
  */
-export function insertNewDivs(text, slideLinePositions = new Map()) {
-  const divsOnOriginalSlides = NewElementRegistry.newDivs.filter(
-    (div) => !div.newSlideRef
-  );
-
-  if (divsOnOriginalSlides.length === 0) {
-    return text;
-  }
+function insertContentBySlide(text, items, buildContent) {
+  if (items.length === 0) return text;
 
   const lines = text.split("\n");
   const slideHeadingLines = findSlideHeadingLines(lines);
 
-  const divsBySlide = new Map();
-  for (const newDiv of divsOnOriginalSlides) {
-    const slideIdx = newDiv.slideIndex;
-    if (!divsBySlide.has(slideIdx)) {
-      divsBySlide.set(slideIdx, []);
-    }
-    divsBySlide.get(slideIdx).push(newDiv);
+  const bySlide = new Map();
+  for (const item of items) {
+    const idx = item.slideIndex;
+    if (!bySlide.has(idx)) bySlide.set(idx, []);
+    bySlide.get(idx).push(item);
   }
 
-  const slideIndices = [...divsBySlide.keys()].sort((a, b) => b - a);
+  const slideIndices = [...bySlide.keys()].sort((a, b) => b - a);
 
   for (const slideIdx of slideIndices) {
-    const divsForSlide = divsBySlide.get(slideIdx);
-
     let insertLineIndex;
     if (slideIdx >= slideHeadingLines.length) {
       insertLineIndex = lines.length;
@@ -611,27 +604,10 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
       insertLineIndex = lines.length;
     }
 
-    const newContent = [];
-    for (const divInfo of divsForSlide) {
-      const editableElt = editableRegistry.get(divInfo.element);
-      if (editableElt) {
-        const dims = editableElt.toDimensions();
-        const attrStr = serializeToQmd(dims);
-        const textContent =
-          elementToText(divInfo.element) || CONFIG.NEW_TEXT_CONTENT;
-
-        const fence = getFenceForContent(textContent);
-
-        newContent.push("");
-        newContent.push(`${fence} ${attrStr}`);
-        newContent.push(textContent);
-        newContent.push(fence);
-      }
-    }
+    const newContent = buildContent(bySlide.get(slideIdx));
 
     if (newContent.length > 0) {
       lines.splice(insertLineIndex, 0, ...newContent);
-
       for (let i = 0; i < slideHeadingLines.length; i++) {
         if (slideHeadingLines[i] >= insertLineIndex) {
           slideHeadingLines[i] += newContent.length;
@@ -644,66 +620,44 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
 }
 
 /**
+ * Insert new text divs into QMD content (for divs on original slides).
+ * @param {string} text - QMD content (may already have new slides inserted)
+ * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
+ * @returns {string} Updated QMD content
+ */
+export function insertNewDivs(text, slideLinePositions = new Map()) {
+  const items = NewElementRegistry.newDivs.filter((div) => !div.newSlideRef);
+  return insertContentBySlide(text, items, (divsForSlide) => {
+    const newContent = [];
+    for (const divInfo of divsForSlide) {
+      const editableElt = editableRegistry.get(divInfo.element);
+      if (editableElt) {
+        const dims = editableElt.toDimensions();
+        const attrStr = serializeToQmd(dims);
+        const textContent = elementToText(divInfo.element) || CONFIG.NEW_TEXT_CONTENT;
+        const fence = getFenceForContent(textContent);
+        newContent.push("", `${fence} ${attrStr}`, textContent, fence);
+      }
+    }
+    return newContent;
+  });
+}
+
+/**
  * Insert new arrows into QMD content (for arrows on original slides).
  * @param {string} text - QMD content
  * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
  * @returns {string} Updated QMD content
  */
 export function insertNewArrows(text, slideLinePositions = new Map()) {
-  const arrowsOnOriginalSlides = NewElementRegistry.newArrows.filter(
-    (arrow) => !arrow.newSlideRef
-  );
-
-  if (arrowsOnOriginalSlides.length === 0) {
-    return text;
-  }
-
-  const lines = text.split("\n");
-  const slideHeadingLines = findSlideHeadingLines(lines);
-
-  const arrowsBySlide = new Map();
-  for (const arrow of arrowsOnOriginalSlides) {
-    const slideIdx = arrow.slideIndex;
-    if (!arrowsBySlide.has(slideIdx)) {
-      arrowsBySlide.set(slideIdx, []);
-    }
-    arrowsBySlide.get(slideIdx).push(arrow);
-  }
-
-  const slideIndices = [...arrowsBySlide.keys()].sort((a, b) => b - a);
-
-  for (const slideIdx of slideIndices) {
-    const arrowsForSlide = arrowsBySlide.get(slideIdx);
-
-    let insertLineIndex;
-    if (slideIdx >= slideHeadingLines.length) {
-      insertLineIndex = lines.length;
-    } else if (slideIdx + 1 < slideHeadingLines.length) {
-      insertLineIndex = slideHeadingLines[slideIdx + 1];
-    } else {
-      insertLineIndex = lines.length;
-    }
-
+  const items = NewElementRegistry.newArrows.filter((arrow) => !arrow.newSlideRef);
+  return insertContentBySlide(text, items, (arrowsForSlide) => {
     const newContent = [];
     for (const arrow of arrowsForSlide) {
-      const shortcode = serializeArrowToShortcode(arrow);
-      newContent.push("");
-      newContent.push(shortcode);
-      newContent.push("");
+      newContent.push("", serializeArrowToShortcode(arrow), "");
     }
-
-    if (newContent.length > 0) {
-      lines.splice(insertLineIndex, 0, ...newContent);
-
-      for (let i = 0; i < slideHeadingLines.length; i++) {
-        if (slideHeadingLines[i] >= insertLineIndex) {
-          slideHeadingLines[i] += newContent.length;
-        }
-      }
-    }
-  }
-
-  return lines.join("\n");
+    return newContent;
+  });
 }
 
 /**

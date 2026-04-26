@@ -104,9 +104,8 @@ ControlRegistry.register("alignLeft", {
   appliesTo: ["div"],
   onClick: (element) => {
     pushUndoState();
-    element.style.textAlign = "left";
     const editableElt = editableRegistry.get(element);
-    if (editableElt) editableElt.state.textAlign = "left";
+    if (editableElt) { editableElt.setState({ textAlign: "left" }); editableElt.syncToDOM(); }
   },
 });
 
@@ -118,9 +117,8 @@ ControlRegistry.register("alignCenter", {
   appliesTo: ["div"],
   onClick: (element) => {
     pushUndoState();
-    element.style.textAlign = "center";
     const editableElt = editableRegistry.get(element);
-    if (editableElt) editableElt.state.textAlign = "center";
+    if (editableElt) { editableElt.setState({ textAlign: "center" }); editableElt.syncToDOM(); }
   },
 });
 
@@ -132,9 +130,8 @@ ControlRegistry.register("alignRight", {
   appliesTo: ["div"],
   onClick: (element) => {
     pushUndoState();
-    element.style.textAlign = "right";
     const editableElt = editableRegistry.get(element);
-    if (editableElt) editableElt.state.textAlign = "right";
+    if (editableElt) { editableElt.setState({ textAlign: "right" }); editableElt.syncToDOM(); }
   },
 });
 

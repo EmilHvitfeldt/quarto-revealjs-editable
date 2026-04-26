@@ -14,6 +14,23 @@ const undoStack = [];
 /** @type {Array<Array<Object>>} Stack of undone states for redo */
 const redoStack = [];
 
+/** @type {Function|null} Callback registered by arrows.js to update arrow DOM */
+let restoreArrowDOMFn = null;
+
+/**
+ * Register the arrow DOM restore callback (called by arrows.js to break circular import).
+ * @param {Function} fn - Function that accepts snapshots and updates arrow DOM
+ */
+export function registerRestoreArrowDOM(fn) {
+  restoreArrowDOMFn = fn;
+}
+
+/** Clear undo/redo stacks — for use in tests only. */
+export function clearUndoStacks() {
+  undoStack.length = 0;
+  redoStack.length = 0;
+}
+
 /**
  * Capture a snapshot of a single element's state.
  * @param {HTMLElement} element - The element to capture
@@ -77,21 +94,13 @@ export function captureArrowState() {
  * @param {Array<{arrowData: Object, state: Object}>} snapshots - States to restore
  */
 export function restoreArrowState(snapshots) {
-  // Dynamically import arrow update functions to avoid circular dependency
-  import('./arrows.js').then(({ updateArrowPath, updateArrowHandles, updateArrowAppearance, updateArrowActiveState }) => {
-    for (const snapshot of snapshots) {
-      const arrowData = snapshot.arrowData;
-      // Restore state properties
-      for (const key of ARROW_STATE_KEYS) {
-        arrowData[key] = snapshot.state[key];
-      }
-      // Update DOM to reflect restored state
-      updateArrowPath(arrowData);
-      updateArrowHandles(arrowData);
-      updateArrowAppearance(arrowData);
-      updateArrowActiveState(arrowData);
+  for (const snapshot of snapshots) {
+    const arrowData = snapshot.arrowData;
+    for (const key of ARROW_STATE_KEYS) {
+      arrowData[key] = snapshot.state[key];
     }
-  });
+  }
+  if (restoreArrowDOMFn) restoreArrowDOMFn(snapshots);
 }
 
 /**

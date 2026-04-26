@@ -13,4 +13,6 @@ docs/demo-text.mp4
 
 # Extension build artifacts
 _extensions/editable/node_modules/
+_extensions/editable/editable.js
+_extensions/editable/quill.css
 test-results/

@@ -41,8 +41,23 @@ export const CONFIG = {
   ARROW_DEFAULT_LABEL_POSITION: "middle",
   ARROW_DEFAULT_LABEL_OFFSET: 10,
 
+  // Rotation steps (degrees)
+  ROTATE_SNAP_STEP: 15,
+  ROTATE_KEY_STEP: 5,
+
+  // Arrow geometry
+  ARROW_DOUBLE_LINE_OFFSET_MULTIPLIER: 1.5,  // offset = width * this
+  ARROW_CONTROL_POINT_DISPLACEMENT: 50,      // perpendicular offset for bezier control points
+  ARROW_LABEL_T_START: 0.15,
+  ARROW_LABEL_T_END: 0.85,
+  ARROW_LABEL_T_MIDDLE: 0.5,
+  ARROW_LABEL_FLIP_THRESHOLD: 90,            // degrees, label flips past this angle
+  ARROW_HANDLE_OFFSET: -6,                   // px, center handles on path point
+
   // Polling config
   POLL_MAX_ATTEMPTS: 50,
   POLL_INTERVAL_MS: 100,
 
+  // New fence default
+  NEW_FENCE_LENGTH: 3,
 };
