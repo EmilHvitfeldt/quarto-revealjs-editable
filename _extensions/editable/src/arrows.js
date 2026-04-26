@@ -5,11 +5,12 @@
  */
 
 import { CONFIG } from './config.js';
-import { getSlideScale, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, debug } from './utils.js';
+import { getSlideScale, getRawClient, getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, debug } from './utils.js';
 import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
-import { pushUndoState } from './undo.js';
+import { pushUndoState, registerRestoreArrowDOM } from './undo.js';
 import { showRightPanel } from './toolbar.js';
+import { registerDeselectArrow, deselectImage } from './selection.js';
 
 /** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
@@ -36,78 +37,75 @@ function showArrowExtensionModal() {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "editable-modal-overlay";
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100000;
-    `;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "editable-modal-title");
 
     const modal = document.createElement("div");
     modal.className = "editable-modal";
-    modal.style.cssText = `
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 450px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      font-family: system-ui, -apple-system, sans-serif;
-    `;
 
-    modal.innerHTML = `
-      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
-      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
-        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
-      </p>
-      <p style="margin: 0 0 16px 0; color: #555;">
-        Install with:<br>
-        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
-      </p>
-      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
-        Continue? (Arrows will work in the editor but won't render until the extension is installed)
-      </p>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="editable-modal-cancel" style="
-          padding: 8px 16px;
-          border: 1px solid #ccc;
-          background: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Cancel</button>
-        <button class="editable-modal-confirm" style="
-          padding: 8px 16px;
-          border: none;
-          background: var(--editable-accent-color, #007cba);
-          color: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Continue</button>
-      </div>
-    `;
+    const title = document.createElement("h3");
+    title.id = "editable-modal-title";
+    title.className = "editable-modal-title";
+    title.textContent = "Arrow Extension Required";
 
+    const p1 = document.createElement("p");
+    p1.className = "editable-modal-body";
+    p1.innerHTML = 'Arrows are saved as <code class="editable-modal-code">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" class="editable-modal-link">quarto-arrows</a> extension to render.';
+
+    const p2 = document.createElement("p");
+    p2.className = "editable-modal-body";
+    const installCode = document.createElement("code");
+    installCode.className = "editable-modal-code editable-modal-code-block";
+    installCode.textContent = "quarto add EmilHvitfeldt/quarto-arrows";
+    p2.appendChild(document.createTextNode("Install with:"));
+    p2.appendChild(document.createElement("br"));
+    p2.appendChild(installCode);
+
+    const p3 = document.createElement("p");
+    p3.className = "editable-modal-body editable-modal-body-small";
+    p3.textContent = "Continue? (Arrows will work in the editor but won't render until the extension is installed)";
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "editable-modal-buttons";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "editable-modal-cancel";
+    cancelBtn.textContent = "Cancel";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.className = "editable-modal-confirm";
+    confirmBtn.textContent = "Continue";
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    modal.appendChild(title);
+    modal.appendChild(p1);
+    modal.appendChild(p2);
+    modal.appendChild(p3);
+    modal.appendChild(btnRow);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    const cleanup = (result) => {
-      overlay.remove();
-      resolve(result);
-    };
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
 
-    modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
-    modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
-    overlay.onclick = (e) => {
-      if (e.target === overlay) cleanup(false);
-    };
+    cancelBtn.onclick = () => cleanup(false);
+    confirmBtn.onclick = () => cleanup(true);
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
 
-    modal.querySelector(".editable-modal-confirm").focus();
+    // Focus trap: keep Tab inside the modal
+    overlay.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { cleanup(false); return; }
+      if (e.key !== "Tab") return;
+      const focusable = [...modal.querySelectorAll("button, a, [tabindex]:not([tabindex='-1'])")];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    confirmBtn.focus();
   });
 }
 
@@ -168,10 +166,23 @@ export const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "squa
  * Set the active (selected) arrow. Only one arrow can be active at a time.
  * @param {Object|null} arrowData - Arrow to select, or null to deselect
  */
+registerDeselectArrow(() => setActiveArrow(null));
+registerRestoreArrowDOM((snapshots) => {
+  for (const snapshot of snapshots) {
+    updateArrowPath(snapshot.arrowData);
+    updateArrowHandles(snapshot.arrowData);
+    updateArrowAppearance(snapshot.arrowData);
+    updateArrowActiveState(snapshot.arrowData);
+  }
+});
+
 export function setActiveArrow(arrowData) {
   if (activeArrow && activeArrow !== arrowData) {
     activeArrow.isActive = false;
     updateArrowActiveState(activeArrow);
+  }
+  if (arrowData && arrowData !== activeArrow) {
+    deselectImage();
   }
 
   activeArrow = arrowData;
@@ -723,6 +734,12 @@ function updateSmoothToggleInToolbar(arrowData) {
  * Update arrow visual appearance based on its data (color, width, dash, etc.).
  * @param {Object} arrowData - Arrow data object
  */
+function getDashArray(dash, width) {
+  if (dash === "dashed") return `${width * 4},${width * 2}`;
+  if (dash === "dotted") return `${width},${width * 2}`;
+  return "none";
+}
+
 export function updateArrowAppearance(arrowData) {
   if (!arrowData._path) return;
 
@@ -734,12 +751,7 @@ export function updateArrowAppearance(arrowData) {
     arrowData._labelText.setAttribute("fill", arrowData.color);
   }
 
-  const dashPatterns = {
-    solid: "none",
-    dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-    dotted: `${arrowData.width},${arrowData.width * 2}`
-  };
-  const dashArray = dashPatterns[arrowData.dash] || "none";
+  const dashArray = getDashArray(arrowData.dash, arrowData.width);
   if (dashArray === "none") {
     arrowData._path.removeAttribute("stroke-dasharray");
   } else {
@@ -753,7 +765,7 @@ export function updateArrowAppearance(arrowData) {
   updateArrowheadMarker(arrowData);
 }
 
-function offsetPointPerpendicular(x, y, tangentX, tangentY, offsetAmount) {
+export function offsetPointPerpendicular(x, y, tangentX, tangentY, offsetAmount) {
   const len = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
   if (len === 0) return { x, y };
   const normalX = -tangentY / len;
@@ -811,7 +823,7 @@ function updateArrowLineStyle(arrowData) {
     return;
   }
 
-  const offset = arrowData.width * 1.5;
+  const offset = arrowData.width * CONFIG.ARROW_DOUBLE_LINE_OFFSET_MULTIPLIER;
 
   const createOffsetPath = (offsetAmount) => {
     const extraPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -821,12 +833,7 @@ function updateArrowLineStyle(arrowData) {
     extraPath.setAttribute("fill", "none");
     extraPath.style.pointerEvents = "none";
 
-    const dashPatterns = {
-      solid: "none",
-      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-      dotted: `${arrowData.width},${arrowData.width * 2}`
-    };
-    const dashArray = dashPatterns[arrowData.dash] || "none";
+    const dashArray = getDashArray(arrowData.dash, arrowData.width);
     if (dashArray !== "none") {
       extraPath.setAttribute("stroke-dasharray", dashArray);
     }
@@ -972,8 +979,8 @@ export async function addNewArrow() {
 
   pushUndoState();
   const slideIndex = getCurrentSlideIndex();
-  const slideWidth = currentSlide.offsetWidth || 960;
-  const slideHeight = currentSlide.offsetHeight || 700;
+  const slideWidth = currentSlide.offsetWidth || CONFIG.DEFAULT_SLIDE_WIDTH;
+  const slideHeight = currentSlide.offsetHeight || CONFIG.DEFAULT_SLIDE_HEIGHT;
 
   const centerX = slideWidth / 2;
   const centerY = slideHeight / 2;
@@ -1169,10 +1176,7 @@ export function createArrowElement(arrowData) {
     isDraggingArrow = true;
     arrowDragScale = getSlideScale();
 
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-    dragStartX = clientX;
-    dragStartY = clientY;
+    ({ clientX: dragStartX, clientY: dragStartY } = getRawClient(e));
 
     hitArea.style.cursor = "grabbing";
   };
@@ -1181,9 +1185,7 @@ export function createArrowElement(arrowData) {
     if (!isDraggingArrow) return;
     e.preventDefault();
 
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
+    const { clientX, clientY } = getRawClient(e);
     const deltaX = (clientX - dragStartX) / arrowDragScale;
     const deltaY = (clientY - dragStartY) / arrowDragScale;
 
@@ -1272,27 +1274,19 @@ export function createArrowElement(arrowData) {
 }
 
 /**
- * Create a draggable handle for an arrow endpoint or control point.
- * @param {Object} arrowData - Arrow data object
- * @param {string} position - Handle position ("start", "end", "control1", "control2")
- * @returns {HTMLElement} Handle element
+ * Create the base handle DOM element and attach drag events.
+ * @param {string} className - CSS class for the handle
+ * @param {string} ariaLabel - Accessible label
+ * @param {number} size - Handle diameter in px
+ * @param {string} bgColor - Background color
+ * @returns {{handle: HTMLElement, controller: AbortController}} Handle and its abort controller
  */
-function createArrowHandle(arrowData, position) {
+function createHandleElement(className, ariaLabel, size, bgColor) {
   const handle = document.createElement("div");
-  handle.className = `editable-arrow-handle editable-arrow-handle-${position}`;
+  handle.className = className;
   handle.style.position = "absolute";
-
-  const isControlPoint = position === "control1" || position === "control2";
-  const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
-
-  let bgColor;
-  if (position === "start") bgColor = "#007cba";
-  else if (position === "end") bgColor = "#28a745";
-  else if (position === "control1") bgColor = CONFIG.ARROW_CONTROL1_COLOR;
-  else if (position === "control2") bgColor = CONFIG.ARROW_CONTROL2_COLOR;
-
-  handle.style.width = handleSize + "px";
-  handle.style.height = handleSize + "px";
+  handle.style.width = size + "px";
+  handle.style.height = size + "px";
   handle.style.borderRadius = "50%";
   handle.style.backgroundColor = bgColor;
   handle.style.border = "2px solid white";
@@ -1301,12 +1295,21 @@ function createArrowHandle(arrowData, position) {
   handle.style.transform = "translate(-50%, -50%)";
   handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
   handle.setAttribute("role", "slider");
-  handle.setAttribute("aria-label", `Arrow ${position} point`);
+  handle.setAttribute("aria-label", ariaLabel);
   handle.setAttribute("tabindex", "0");
 
-  const handleDragController = new AbortController();
-  handle._dragController = handleDragController;
+  const controller = new AbortController();
+  handle._dragController = controller;
+  return { handle, controller };
+}
 
+/**
+ * Attach mouse/touch drag listeners that call onDrag each move event.
+ * @param {HTMLElement} handle
+ * @param {AbortController} controller
+ * @param {Function} onDrag - (e) => void, receives move events
+ */
+function setupHandleDrag(handle, controller, onDrag) {
   let isDragging = false;
   let cachedScale = 1;
 
@@ -1318,55 +1321,56 @@ function createArrowHandle(arrowData, position) {
     e.stopPropagation();
   };
 
-  const onDrag = (e) => {
+  const duringDrag = (e) => {
     if (!isDragging) return;
-    if (!arrowData.element) return;
-
-    const rect = arrowData.element.getBoundingClientRect();
-    const scale = cachedScale;
-
-    let clientX, clientY;
-    if (e.type.startsWith("touch")) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    const x = (clientX - rect.left) / scale;
-    const y = (clientY - rect.top) / scale;
-
-    if (position === "start") {
-      arrowData.fromX = x;
-      arrowData.fromY = y;
-    } else if (position === "end") {
-      arrowData.toX = x;
-      arrowData.toY = y;
-    } else if (position === "control1") {
-      arrowData.control1X = x;
-      arrowData.control1Y = y;
-    } else if (position === "control2") {
-      arrowData.control2X = x;
-      arrowData.control2Y = y;
-    }
-
-    updateArrowPath(arrowData);
-    updateArrowHandles(arrowData);
-
-    e.preventDefault();
+    onDrag(e, cachedScale);
   };
 
-  const stopDrag = () => {
-    isDragging = false;
-  };
+  const stopDrag = () => { isDragging = false; };
 
   handle.addEventListener("mousedown", startDrag);
   handle.addEventListener("touchstart", startDrag);
-  document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
-  document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
-  document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
-  document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
+  document.addEventListener("mousemove", duringDrag, { signal: controller.signal });
+  document.addEventListener("touchmove", duringDrag, { signal: controller.signal });
+  document.addEventListener("mouseup", stopDrag, { signal: controller.signal });
+  document.addEventListener("touchend", stopDrag, { signal: controller.signal });
+}
+
+/**
+ * Create a draggable handle for an arrow endpoint or control point.
+ * @param {Object} arrowData - Arrow data object
+ * @param {string} position - Handle position ("start", "end", "control1", "control2")
+ * @returns {HTMLElement} Handle element
+ */
+function createArrowHandle(arrowData, position) {
+  const isControlPoint = position === "control1" || position === "control2";
+  const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
+  // start/end colors come from CSS vars (--editable-arrow-start-color / --editable-arrow-end-color)
+  const bgColor = position === "control1" ? CONFIG.ARROW_CONTROL1_COLOR
+                : position === "control2" ? CONFIG.ARROW_CONTROL2_COLOR
+                : "";
+
+  const { handle, controller } = createHandleElement(
+    `editable-arrow-handle editable-arrow-handle-${position}`,
+    `Arrow ${position} point`,
+    handleSize,
+    bgColor
+  );
+
+  setupHandleDrag(handle, controller, (e, scale) => {
+    if (!arrowData.element) return;
+    const rect = arrowData.element.getBoundingClientRect();
+    const { clientX, clientY } = getRawClient(e);
+    const x = (clientX - rect.left) / scale;
+    const y = (clientY - rect.top) / scale;
+    if (position === "start") { arrowData.fromX = x; arrowData.fromY = y; }
+    else if (position === "end") { arrowData.toX = x; arrowData.toY = y; }
+    else if (position === "control1") { arrowData.control1X = x; arrowData.control1Y = y; }
+    else if (position === "control2") { arrowData.control2X = x; arrowData.control2Y = y; }
+    updateArrowPath(arrowData);
+    updateArrowHandles(arrowData);
+    e.preventDefault();
+  });
 
   return handle;
 }
@@ -1378,104 +1382,40 @@ function createArrowHandle(arrowData, position) {
  * @returns {HTMLElement} Handle element
  */
 function createWaypointHandle(arrowData, waypointIndex) {
-  const handle = document.createElement("div");
-  handle.className = "editable-arrow-handle editable-arrow-handle-waypoint";
-  handle.style.position = "absolute";
+  const { handle, controller } = createHandleElement(
+    "editable-arrow-handle editable-arrow-handle-waypoint",
+    `Arrow waypoint ${waypointIndex + 1}`,
+    CONFIG.ARROW_WAYPOINT_HANDLE_SIZE,
+    CONFIG.ARROW_WAYPOINT_COLOR
+  );
   handle.dataset.waypointIndex = waypointIndex;
 
-  const handleSize = CONFIG.ARROW_WAYPOINT_HANDLE_SIZE;
-  const bgColor = CONFIG.ARROW_WAYPOINT_COLOR;
-
-  handle.style.width = handleSize + "px";
-  handle.style.height = handleSize + "px";
-  handle.style.borderRadius = "50%";
-  handle.style.backgroundColor = bgColor;
-  handle.style.border = "2px solid white";
-  handle.style.cursor = "move";
-  handle.style.pointerEvents = "auto";
-  handle.style.transform = "translate(-50%, -50%)";
-  handle.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
-  handle.setAttribute("role", "slider");
-  handle.setAttribute("aria-label", `Arrow waypoint ${waypointIndex + 1}`);
-  handle.setAttribute("tabindex", "0");
-
-  const handleDragController = new AbortController();
-  handle._dragController = handleDragController;
-
-  let isDragging = false;
-  let cachedScale = 1;
-
-  const startDrag = (e) => {
-    pushUndoState();
-    isDragging = true;
-    cachedScale = getSlideScale();
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const onDrag = (e) => {
-    if (!isDragging) return;
+  setupHandleDrag(handle, controller, (e, scale) => {
     if (!arrowData.element) return;
-
     const rect = arrowData.element.getBoundingClientRect();
-    const scale = cachedScale;
-
-    let clientX, clientY;
-    if (e.type.startsWith("touch")) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
+    const { clientX, clientY } = getRawClient(e);
     const x = (clientX - rect.left) / scale;
     const y = (clientY - rect.top) / scale;
-
     const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
     if (arrowData.waypoints[wpIndex]) {
       arrowData.waypoints[wpIndex].x = x;
       arrowData.waypoints[wpIndex].y = y;
     }
-
     updateArrowPath(arrowData);
     updateArrowHandles(arrowData);
-
     e.preventDefault();
-  };
-
-  const stopDrag = () => {
-    isDragging = false;
-  };
-
-  handle.addEventListener("mousedown", startDrag);
-  handle.addEventListener("touchstart", startDrag);
-  document.addEventListener("mousemove", onDrag, { signal: handleDragController.signal });
-  document.addEventListener("touchmove", onDrag, { signal: handleDragController.signal });
-  document.addEventListener("mouseup", stopDrag, { signal: handleDragController.signal });
-  document.addEventListener("touchend", stopDrag, { signal: handleDragController.signal });
-
-  // Double-click or right-click to delete waypoint
-  handle.addEventListener("dblclick", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
-    removeWaypoint(arrowData, wpIndex);
-  });
-  handle.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
-    removeWaypoint(arrowData, wpIndex);
   });
 
-  // Delete key to remove waypoint when focused
+  const deleteWaypoint = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    removeWaypoint(arrowData, parseInt(handle.dataset.waypointIndex, 10));
+  };
+
+  handle.addEventListener("dblclick", deleteWaypoint);
+  handle.addEventListener("contextmenu", deleteWaypoint);
   handle.addEventListener("keydown", (e) => {
-    if (e.key === "Delete" || e.key === "Backspace") {
-      e.preventDefault();
-      const wpIndex = parseInt(handle.dataset.waypointIndex, 10);
-      removeWaypoint(arrowData, wpIndex);
-    }
+    if (e.key === "Delete" || e.key === "Backspace") deleteWaypoint(e);
   });
 
   return handle;
@@ -1491,7 +1431,7 @@ function createWaypointHandle(arrowData, waypointIndex) {
  * @param {number} y2 - Line end Y
  * @returns {number} Distance to segment
  */
-function distanceToSegment(px, py, x1, y1, x2, y2) {
+export function distanceToSegment(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const lengthSq = dx * dx + dy * dy;
@@ -1656,7 +1596,7 @@ function rebuildWaypointHandles(arrowData) {
  * @param {Array<{x: number, y: number}>} points - Points to interpolate
  * @returns {string} SVG path d attribute
  */
-function catmullRomPath(points) {
+export function catmullRomPath(points) {
   if (points.length < 2) return "";
   if (points.length === 2) {
     return `M ${points[0].x},${points[0].y} L ${points[1].x},${points[1].y}`;
@@ -1811,7 +1751,7 @@ export function updateArrowHandles(arrowData) {
  * @param {Object} arrowData - Arrow data object
  * @returns {{x: number, y: number, angle: number}} Point coordinates and tangent angle
  */
-function getPointOnArrow(t, arrowData) {
+export function getPointOnArrow(t, arrowData) {
   const { fromX, fromY, toX, toY, control1X, control1Y, control2X, control2Y } = arrowData;
 
   let x, y, dx, dy;
@@ -1876,14 +1816,14 @@ export function updateArrowLabel(arrowData) {
   let t;
   switch (arrowData.labelPosition) {
     case "start":
-      t = 0.15;
+      t = CONFIG.ARROW_LABEL_T_START;
       break;
     case "end":
-      t = 0.85;
+      t = CONFIG.ARROW_LABEL_T_END;
       break;
     case "middle":
     default:
-      t = 0.5;
+      t = CONFIG.ARROW_LABEL_T_MIDDLE;
   }
 
   const point = getPointOnArrow(t, arrowData);
@@ -1902,7 +1842,7 @@ export function updateArrowLabel(arrowData) {
 
   // Rotate label to follow arrow direction, but keep text readable (not upside down)
   let rotationAngle = point.angle;
-  if (rotationAngle > 90 || rotationAngle < -90) {
+  if (rotationAngle > CONFIG.ARROW_LABEL_FLIP_THRESHOLD || rotationAngle < -CONFIG.ARROW_LABEL_FLIP_THRESHOLD) {
     rotationAngle += 180;
   }
 
@@ -1933,8 +1873,8 @@ export function toggleCurveMode(arrowData) {
     const dx = toX - fromX;
     const dy = toY - fromY;
     const len = Math.sqrt(dx * dx + dy * dy);
-    const perpX = -dy / len * 50;
-    const perpY = dx / len * 50;
+    const perpX = -dy / len * CONFIG.ARROW_CONTROL_POINT_DISPLACEMENT;
+    const perpY = dx / len * CONFIG.ARROW_CONTROL_POINT_DISPLACEMENT;
 
     arrowData.control1X = fromX + dx / 3 + perpX;
     arrowData.control1Y = fromY + dy / 3 + perpY;

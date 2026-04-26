@@ -184,6 +184,15 @@ export class EditableElement {
    * Syncs from DOM first to capture current values.
    * @returns {Object} Dimensions formatted for PropertySerializers
    */
+  /**
+   * Return all resize handle elements in this element's container.
+   * @returns {HTMLElement[]}
+   */
+  getResizeHandles() {
+    if (!this.container) return [];
+    return Array.from(this.container.querySelectorAll(".resize-handle"));
+  }
+
   toDimensions() {
     this.syncFromDOM();
 

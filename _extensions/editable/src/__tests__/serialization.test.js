@@ -6,6 +6,7 @@ vi.mock('../config.js', () => ({
     ARROW_DEFAULT_COLOR: 'black',
     ARROW_DEFAULT_WIDTH: 2,
     ARROW_DEFAULT_LABEL_OFFSET: 10,
+    NEW_FENCE_LENGTH: 3,
   }
 }));
 

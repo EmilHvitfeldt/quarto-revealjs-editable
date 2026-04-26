@@ -47,6 +47,19 @@ jobs:
           chmod +x run-tests.sh
           ./run-tests.sh
 
+  # Verify the extension builds without errors
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: cd _extensions/editable && npm ci
+      - name: Build extension
+        run: cd _extensions/editable && npm run build
+
   # Playwright E2E tests run only on Ubuntu (JS behavior is cross-platform)
   e2e:
     runs-on: ubuntu-latest
@@ -88,7 +101,7 @@ jobs:
         run: |
           cd testing
           npm install
-          npx playwright install chromium
+          npx playwright install chromium firefox
 
       - name: Run Playwright tests
         run: |

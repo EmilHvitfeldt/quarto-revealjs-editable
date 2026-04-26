@@ -176,7 +176,7 @@ export function serializeToQmd(dimensions) {
 export function getFenceForContent(content) {
   // Find the longest sequence of colons at the start of any line
   const matches = content.match(/^:+/gm) || [];
-  let maxColons = 3; // Default fence is :::
+  let maxColons = CONFIG.NEW_FENCE_LENGTH;
   for (const match of matches) {
     if (match.length >= maxColons) {
       maxColons = match.length + 1;
@@ -194,16 +194,41 @@ export function getFenceForContent(content) {
 export function elementToText(element) {
   // If Quill was used, get content from .ql-editor
   const quillEditor = element.querySelector(".ql-editor");
-  let text = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
+  let html = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
+
+  // Use \x00N\x00 tokens so user-typed content can never collide.
+  // U+0000 is not valid in HTML, so these markers are unambiguous.
+  const tokens = [];
+  const placeholder = (data) => {
+    const idx = tokens.length;
+    tokens.push(data);
+    return `\x00${idx}\x00`;
+  };
+
+  // Process color spans first (before alignment extraction) so they are resolved
+  // inside aligned paragraphs as well as outside them.
+  // Background color (must be before foreground to avoid false matches on "color:")
+  html = html.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+    (match, colorVal, content) => {
+      const colorOutput = getBrandColorOutput(colorVal.trim());
+      return `[${content}]{style='background-color: ${colorOutput}'}`;
+    });
+
+  // Foreground color
+  html = html.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+    (match, colorVal, content) => {
+      if (colorVal.trim().toLowerCase() === 'inherit') return content;
+      const colorOutput = getBrandColorOutput(colorVal.trim());
+      return `[${content}]{style='color: ${colorOutput}'}`;
+    });
+
+  // Handle Quill alignment classes on paragraphs — capture before stripping tags
+  html = html.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+    (match, align, content) => placeholder({ type: "align", align, content }) + "\n\n");
 
   // Convert HTML tags to Quarto/Markdown equivalents
+  let text = html;
   text = text.replace(/<br\s*\/?>/gi, "\n");
-
-  // Handle Quill alignment classes on paragraphs using placeholder approach
-  text = text.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
-    (match, align) => `__ALIGN_START_${align}__`);
-  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
-    (match, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__\n\n`);
 
   // Handle remaining p tags (left-aligned or no alignment)
   text = text.replace(/<p[^>]*>/gi, "");
@@ -235,25 +260,6 @@ export function elementToText(element) {
   text = text.replace(/<u[^>]*>/gi, "[");
   text = text.replace(/<\/u>/gi, "]{.underline}");
 
-  // Background color spans (must be processed BEFORE color to avoid false matches)
-  text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
-  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
-    const colorOutput = getBrandColorOutput(colorVal);
-    return `${content}]{style='background-color: ${colorOutput}'}`;
-  });
-
-  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
-  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match, colorVal) => {
-    if (colorVal.trim().toLowerCase() === 'inherit') {
-      return '';
-    }
-    return `[__COLOR_START__${colorVal}__`;
-  });
-  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
-    const colorOutput = getBrandColorOutput(colorVal);
-    return `${content}]{style='color: ${colorOutput}'}`;
-  });
-
   // Links: <a href="url">text</a> → [text](url)
   text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
 
@@ -271,16 +277,19 @@ export function elementToText(element) {
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");
 
-  // Convert brand color placeholders back to shortcodes
-  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
+  // Resolve alignment tokens into fenced divs
+  text = text.replace(/\x00(\d+)\x00/g, (match, idx) => {
+    const token = tokens[parseInt(idx, 10)];
+    if (token.type === "align") {
+      const innerText = elementToText({ innerHTML: token.content, querySelector: () => null });
+      const innerFence = getFenceForContent(innerText);
+      return `${innerFence} {style="text-align: ${token.align}"}\n${innerText}\n${innerFence}`;
+    }
+    return match;
+  });
 
-  // Convert alignment placeholders to fenced div syntax
-  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
-    (match, align, content) => {
-      const trimmed = content.trim();
-      const innerFence = getFenceForContent(trimmed);
-      return `${innerFence} {style="text-align: ${align}"}\n${trimmed}\n${innerFence}`;
-    });
+  // Convert brand color shortcode markers (inserted by getBrandColorOutput)
+  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
 
   return text.trim();
 }
@@ -562,37 +571,30 @@ export function insertNewSlides(text) {
 }
 
 /**
- * Insert new text divs into QMD content (for divs on original slides).
- * @param {string} text - QMD content (may already have new slides inserted)
- * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
+ * Group items by slideIndex and insert generated content into QMD lines.
+ * Items must have a `slideIndex` property; `buildContent` receives the group
+ * and returns an array of strings to splice in before the next slide heading.
+ * @param {string} text - QMD content
+ * @param {Array} items - Items to insert (each has `slideIndex`)
+ * @param {Function} buildContent - (items) => string[]
  * @returns {string} Updated QMD content
  */
-export function insertNewDivs(text, slideLinePositions = new Map()) {
-  const divsOnOriginalSlides = NewElementRegistry.newDivs.filter(
-    (div) => !div.newSlideRef
-  );
-
-  if (divsOnOriginalSlides.length === 0) {
-    return text;
-  }
+function insertContentBySlide(text, items, buildContent) {
+  if (items.length === 0) return text;
 
   const lines = text.split("\n");
   const slideHeadingLines = findSlideHeadingLines(lines);
 
-  const divsBySlide = new Map();
-  for (const newDiv of divsOnOriginalSlides) {
-    const slideIdx = newDiv.slideIndex;
-    if (!divsBySlide.has(slideIdx)) {
-      divsBySlide.set(slideIdx, []);
-    }
-    divsBySlide.get(slideIdx).push(newDiv);
+  const bySlide = new Map();
+  for (const item of items) {
+    const idx = item.slideIndex;
+    if (!bySlide.has(idx)) bySlide.set(idx, []);
+    bySlide.get(idx).push(item);
   }
 
-  const slideIndices = [...divsBySlide.keys()].sort((a, b) => b - a);
+  const slideIndices = [...bySlide.keys()].sort((a, b) => b - a);
 
   for (const slideIdx of slideIndices) {
-    const divsForSlide = divsBySlide.get(slideIdx);
-
     let insertLineIndex;
     if (slideIdx >= slideHeadingLines.length) {
       insertLineIndex = lines.length;
@@ -602,27 +604,10 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
       insertLineIndex = lines.length;
     }
 
-    const newContent = [];
-    for (const divInfo of divsForSlide) {
-      const editableElt = editableRegistry.get(divInfo.element);
-      if (editableElt) {
-        const dims = editableElt.toDimensions();
-        const attrStr = serializeToQmd(dims);
-        const textContent =
-          elementToText(divInfo.element) || CONFIG.NEW_TEXT_CONTENT;
-
-        const fence = getFenceForContent(textContent);
-
-        newContent.push("");
-        newContent.push(`${fence} ${attrStr}`);
-        newContent.push(textContent);
-        newContent.push(fence);
-      }
-    }
+    const newContent = buildContent(bySlide.get(slideIdx));
 
     if (newContent.length > 0) {
       lines.splice(insertLineIndex, 0, ...newContent);
-
       for (let i = 0; i < slideHeadingLines.length; i++) {
         if (slideHeadingLines[i] >= insertLineIndex) {
           slideHeadingLines[i] += newContent.length;
@@ -635,66 +620,44 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
 }
 
 /**
+ * Insert new text divs into QMD content (for divs on original slides).
+ * @param {string} text - QMD content (may already have new slides inserted)
+ * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
+ * @returns {string} Updated QMD content
+ */
+export function insertNewDivs(text) {
+  const items = NewElementRegistry.newDivs.filter((div) => !div.newSlideRef);
+  return insertContentBySlide(text, items, (divsForSlide) => {
+    const newContent = [];
+    for (const divInfo of divsForSlide) {
+      const editableElt = editableRegistry.get(divInfo.element);
+      if (editableElt) {
+        const dims = editableElt.toDimensions();
+        const attrStr = serializeToQmd(dims);
+        const textContent = elementToText(divInfo.element) || CONFIG.NEW_TEXT_CONTENT;
+        const fence = getFenceForContent(textContent);
+        newContent.push("", `${fence} ${attrStr}`, textContent, fence);
+      }
+    }
+    return newContent;
+  });
+}
+
+/**
  * Insert new arrows into QMD content (for arrows on original slides).
  * @param {string} text - QMD content
  * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
  * @returns {string} Updated QMD content
  */
-export function insertNewArrows(text, slideLinePositions = new Map()) {
-  const arrowsOnOriginalSlides = NewElementRegistry.newArrows.filter(
-    (arrow) => !arrow.newSlideRef
-  );
-
-  if (arrowsOnOriginalSlides.length === 0) {
-    return text;
-  }
-
-  const lines = text.split("\n");
-  const slideHeadingLines = findSlideHeadingLines(lines);
-
-  const arrowsBySlide = new Map();
-  for (const arrow of arrowsOnOriginalSlides) {
-    const slideIdx = arrow.slideIndex;
-    if (!arrowsBySlide.has(slideIdx)) {
-      arrowsBySlide.set(slideIdx, []);
-    }
-    arrowsBySlide.get(slideIdx).push(arrow);
-  }
-
-  const slideIndices = [...arrowsBySlide.keys()].sort((a, b) => b - a);
-
-  for (const slideIdx of slideIndices) {
-    const arrowsForSlide = arrowsBySlide.get(slideIdx);
-
-    let insertLineIndex;
-    if (slideIdx >= slideHeadingLines.length) {
-      insertLineIndex = lines.length;
-    } else if (slideIdx + 1 < slideHeadingLines.length) {
-      insertLineIndex = slideHeadingLines[slideIdx + 1];
-    } else {
-      insertLineIndex = lines.length;
-    }
-
+export function insertNewArrows(text) {
+  const items = NewElementRegistry.newArrows.filter((arrow) => !arrow.newSlideRef);
+  return insertContentBySlide(text, items, (arrowsForSlide) => {
     const newContent = [];
     for (const arrow of arrowsForSlide) {
-      const shortcode = serializeArrowToShortcode(arrow);
-      newContent.push("");
-      newContent.push(shortcode);
-      newContent.push("");
+      newContent.push("", serializeArrowToShortcode(arrow), "");
     }
-
-    if (newContent.length > 0) {
-      lines.splice(insertLineIndex, 0, ...newContent);
-
-      for (let i = 0; i < slideHeadingLines.length; i++) {
-        if (slideHeadingLines[i] >= insertLineIndex) {
-          slideHeadingLines[i] += newContent.length;
-        }
-      }
-    }
-  }
-
-  return lines.join("\n");
+    return newContent;
+  });
 }
 
 /**
@@ -747,18 +710,23 @@ export function htmlToQuarto(div) {
  */
 export function replaceEditableOccurrences(text, replacements, srcReplacements = []) {
   // For images: consume ](src) so we can replace src too
-  const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable[^}]*\}/gm;
+  const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable([^}]*)\}/gm;
 
   let index = 0;
-  return text.replace(regex, (match, fenceColons, originalSrc) => {
+  return text.replace(regex, (match, fenceColons, originalSrc, extraAttrs) => {
     const isDiv = fenceColons !== undefined;
     const attrs = replacements[index] || "";
     const newSrc = srcReplacements[index] || null;
     index++;
+
+    // Preserve any extra classes/attributes beyond .editable (e.g. {.editable .other})
+    const extra = (extraAttrs || "").trim();
+    const finalAttrs = extra ? attrs.replace(/^\{/, `{${extra} `) : attrs;
+
     if (isDiv) {
-      return fenceColons + ' ' + attrs;
+      return fenceColons + ' ' + finalAttrs;
     } else {
-      return `](${newSrc ?? originalSrc})${attrs}`;
+      return `](${newSrc ?? originalSrc})${finalAttrs}`;
     }
   });
 }

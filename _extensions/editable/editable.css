@@ -207,8 +207,8 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* Push reveal.js viewport below the top bar */
-.reveal {
+/* Push reveal.js viewport below the top bar (only when toolbar is present) */
+.has-editable-toolbar .reveal {
   top: 100px !important;
   height: calc(100vh - 100px) !important;
 }
@@ -296,6 +296,20 @@
   .editable-toolbar-title,
   .editable-toolbar-divider {
     display: none;
+  }
+  /* Collapse label text on toolbar buttons to icon-only on small screens */
+  .editable-toolbar-button .toolbar-label {
+    display: none;
+  }
+  /* Stack the toolbar panels vertically so controls remain accessible */
+  .editable-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--editable-toolbar-height);
+  }
+  .editable-toolbar-right {
+    flex: 1 1 100%;
+    overflow-x: auto;
   }
 }
 
@@ -757,10 +771,6 @@
   vertical-align: top !important;
 }
 
-/* Debug: uncomment to see element boundaries */
-/* .quill-wrapper { outline: 1px solid red !important; }
-.ql-container { outline: 1px solid blue !important; }
-.ql-editor { outline: 1px solid green !important; } */
 
 /* Remove Quill's default border on container */
 .quill-wrapper .ql-container.ql-snow,
@@ -1528,4 +1538,99 @@ button.arrow-toolbar-smooth.active {
   cursor: crosshair;
   background-color: var(--editable-accent-color, #007cba);
   opacity: 0.9;
+}
+
+/* ── Arrow extension modal ───────────────────────────────────────────────── */
+
+.editable-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+}
+
+.editable-modal {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 450px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.editable-modal-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.editable-modal-body {
+  margin: 0 0 12px 0;
+  color: #555;
+  line-height: 1.5;
+}
+
+.editable-modal-body-small {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.editable-modal-code {
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.editable-modal-code-block {
+  display: inline-block;
+  padding: 4px 8px;
+  margin-top: 4px;
+}
+
+.editable-modal-link {
+  color: var(--editable-accent-color, #007cba);
+}
+
+.editable-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.editable-modal-cancel {
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.editable-modal-confirm {
+  padding: 8px 16px;
+  border: none;
+  background: var(--editable-accent-color, #007cba);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --editable-transition: 0s;
+  }
+
+  .editable-toolbar-button,
+  .editable-toolbar-submenu-item,
+  .editable-button {
+    transition: none !important;
+  }
 }

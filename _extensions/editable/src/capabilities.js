@@ -297,10 +297,6 @@ export const Capabilities = {
   fontControls: {
     name: "fontControls",
 
-    init(context) {
-      // No special state needed
-    },
-
     createControls(context) {
       const { container } = context;
 
@@ -311,9 +307,6 @@ export const Capabilities = {
       return fontControls;
     },
 
-    attachEvents(context) {
-      // Events are attached via ControlRegistry.createButton
-    },
   },
 
   /**
@@ -321,10 +314,6 @@ export const Capabilities = {
    */
   editText: {
     name: "editText",
-
-    init(context) {
-      // No special state needed
-    },
 
     createControls(context) {
       const { container, element } = context;
@@ -348,9 +337,6 @@ export const Capabilities = {
       return null;
     },
 
-    attachEvents(context) {
-      // Events are attached via ControlRegistry.createButton
-    },
   },
 
   /**
@@ -437,9 +423,9 @@ export const Capabilities = {
       const angleDiff = (currentAngle - context.rotateStartAngle) * (180 / Math.PI);
       let newRotation = context.rotateInitialRotation + angleDiff;
 
-      // Snap to 15-degree increments if Shift key is pressed
+      // Snap to ROTATE_SNAP_STEP-degree increments if Shift key is pressed
       if (e.shiftKey) {
-        newRotation = Math.round(newRotation / 15) * 15;
+        newRotation = Math.round(newRotation / CONFIG.ROTATE_SNAP_STEP) * CONFIG.ROTATE_SNAP_STEP;
       }
 
       // Normalize angle to -180 to 180 range
@@ -464,7 +450,7 @@ export const Capabilities = {
       // Ctrl/Cmd + arrow keys for rotation
       if (!e.ctrlKey && !e.metaKey) return false;
 
-      const step = e.shiftKey ? 15 : 5; // Shift for larger steps
+      const step = e.shiftKey ? CONFIG.ROTATE_SNAP_STEP : CONFIG.ROTATE_KEY_STEP;
       const state = editableElt.getState();
 
       // Capture state for undo before keyboard rotate

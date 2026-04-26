@@ -4,9 +4,6 @@
  * @type {Object}
  */
 export const CONFIG = {
-  // Debug mode - set window.EDITABLE_DEBUG = true to enable
-  DEBUG: typeof window !== 'undefined' && window.EDITABLE_DEBUG,
-
   // Sizing constraints
   MIN_ELEMENT_SIZE: 50,
   KEYBOARD_MOVE_STEP: 10,
@@ -41,13 +38,27 @@ export const CONFIG = {
   ARROW_DEFAULT_LABEL_POSITION: "middle",
   ARROW_DEFAULT_LABEL_OFFSET: 10,
 
+  // Rotation steps (degrees)
+  ROTATE_SNAP_STEP: 15,
+  ROTATE_KEY_STEP: 5,
+
+  // Arrow geometry
+  ARROW_DOUBLE_LINE_OFFSET_MULTIPLIER: 1.5,  // offset = width * this
+  ARROW_CONTROL_POINT_DISPLACEMENT: 50,      // perpendicular offset for bezier control points
+  ARROW_LABEL_T_START: 0.15,
+  ARROW_LABEL_T_END: 0.85,
+  ARROW_LABEL_T_MIDDLE: 0.5,
+  ARROW_LABEL_FLIP_THRESHOLD: 90,            // degrees, label flips past this angle
+  ARROW_HANDLE_OFFSET: -6,                   // px, center handles on path point
+
   // Polling config
   POLL_MAX_ATTEMPTS: 50,
   POLL_INTERVAL_MS: 100,
 
-  // Quill Editor CDN
-  QUILL_CSS:
-    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
-  QUILL_JS:
-    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js",
+  // New fence default
+  NEW_FENCE_LENGTH: 3,
+
+  // Default slide dimensions (fallback when offsetWidth/Height is unavailable)
+  DEFAULT_SLIDE_WIDTH: 960,
+  DEFAULT_SLIDE_HEIGHT: 700,
 };

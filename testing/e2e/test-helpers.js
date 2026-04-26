@@ -12,9 +12,15 @@ const TESTING_DIR = path.join(__dirname, '..');
 async function setupPage(page, htmlFile = 'basic.html') {
   const htmlPath = path.join(TESTING_DIR, htmlFile);
   await page.goto(`file://${htmlPath}`);
-  await page.waitForFunction(() => window.Reveal && window.Reveal.isReady());
+  await page.waitForFunction(() => window.Reveal && window.Reveal.isReady(), {
+    timeout: 10000,
+    message: `Reveal.js did not become ready in ${htmlFile} — is the file rendered? Run ./run-tests.sh first.`,
+  });
   // Wait for editable infrastructure to be set up
-  await page.waitForSelector('.editable-container, #editable-toolbar', { timeout: 5000 });
+  await page.waitForSelector('.editable-container, #editable-toolbar', {
+    timeout: 5000,
+    message: `Editable toolbar/container not found in ${htmlFile} — the extension may not have initialized.`,
+  });
 }
 
 /**
@@ -161,6 +167,20 @@ async function deselectArrow(page) {
 }
 
 /**
+ * Navigate to a specific Reveal.js slide index and wait for the transition.
+ * @param {import('@playwright/test').Page} page
+ * @param {number} index - Horizontal slide index
+ */
+async function navigateToSlide(page, index) {
+  await page.evaluate((i) => Reveal.slide(i), index);
+  await page.waitForFunction(
+    (i) => Reveal.getIndices().h === i,
+    index,
+    { timeout: 3000 }
+  );
+}
+
+/**
  * Add multiple slides with text markers efficiently using direct JS calls.
  * Much faster than clicking UI for each slide in a loop.
  * @param {import('@playwright/test').Page} page
@@ -231,6 +251,7 @@ async function addSlideViaJS(page) {
 module.exports = {
   TESTING_DIR,
   setupPage,
+  navigateToSlide,
   waitForReveal,
   waitForElement,
   waitForCondition,

@@ -306,3 +306,13 @@ arrowData = {
 1. **Cached slide scale** - Scale is cached at interaction start
 2. **requestAnimationFrame throttling** - Pointer events are throttled
 3. **Lazy state sync** - `syncFromDOM()` only called when needed
+
+## Known Limitations
+
+### QMD source embedded in published output
+
+`editable.lua` unconditionally injects the full QMD source as `window._input_file` (base64-encoded) into the HTML output. This means that in a published presentation the complete source — including speaker notes, comments, and file paths — is visible to anyone who inspects the page source. This is a fundamental requirement of the save-back mechanism (the JS needs the original source to rewrite it) and is an accepted tradeoff.
+
+### Filename in inline script has limited escaping
+
+`editable.lua` embeds the source filename inside an inline `<script>` block using only `\` and `'` escaping. A filename containing `</script>` could theoretically break out of the script context. This is an accepted limitation given the low likelihood of such filenames in practice.

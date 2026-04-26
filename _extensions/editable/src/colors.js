@@ -61,8 +61,15 @@ export function normalizeColor(color) {
     if (hex) return hex.toLowerCase();
   }
 
-  // Handle named color "black"
-  if (normalized === 'black') return '#000000';
+  // Handle CSS named colors
+  const namedColors = {
+    black: '#000000', white: '#ffffff', red: '#ff0000', lime: '#00ff00',
+    blue: '#0000ff', yellow: '#ffff00', cyan: '#00ffff', magenta: '#ff00ff',
+    silver: '#c0c0c0', gray: '#808080', grey: '#808080', maroon: '#800000',
+    olive: '#808000', green: '#008000', purple: '#800080', teal: '#008080',
+    navy: '#000080', orange: '#ffa500', transparent: '#00000000',
+  };
+  if (namedColors[normalized]) return namedColors[normalized];
 
   // Handle short hex (#000 -> #000000)
   if (normalized.match(/^#[0-9a-f]{3}$/i)) {

@@ -7,6 +7,7 @@
 import { pushUndoState } from './undo.js';
 import { editableRegistry } from './editable-element.js';
 import { showRightPanel } from './toolbar.js';
+import { registerDeselectImage, deselectArrow } from './selection.js';
 
 /** @type {HTMLElement|null} The currently active image element */
 export let activeImage = null;
@@ -24,6 +25,8 @@ function showReplaceWarning(message, anchorEl) {
 
   const popup = document.createElement("div");
   popup.className = "image-replace-warning";
+  popup.setAttribute("role", "alert");
+  popup.setAttribute("aria-live", "assertive");
   popup.textContent = `⚠ ${message}`;
   document.body.appendChild(popup);
   replaceWarningEl = popup;
@@ -59,6 +62,17 @@ export const imageControlRefs = {
 /** @type {boolean} Whether crop mode is currently active */
 let cropModeActive = false;
 
+/**
+ * Run fn only when there is an active image and it has an editableElt.
+ * @param {Function} fn - (editableEl) => void
+ */
+function withActiveImage(fn) {
+  if (!activeImage) return;
+  const el = editableRegistry.get(activeImage);
+  if (!el) return;
+  fn(el);
+}
+
 /** @type {Map<HTMLElement, Function>} Capture-phase listeners attached to resize handles in crop mode */
 const cropHandleListeners = new Map();
 
@@ -66,9 +80,14 @@ const cropHandleListeners = new Map();
  * Set the active image and sync the panel controls to its current state.
  * @param {HTMLElement|null} imgEl
  */
+registerDeselectImage(() => setActiveImage(null));
+
 export function setActiveImage(imgEl) {
   if (activeImage && activeImage !== imgEl) {
     exitCropMode();
+  }
+  if (imgEl && imgEl !== activeImage) {
+    deselectArrow();
   }
   activeImage = imgEl;
   if (imgEl) {
@@ -138,7 +157,7 @@ function applyCrop(imgEl) {
 
   if (cropModeActive && editableEl.container) {
     const offset = -6; // matches --editable-handle-offset
-    editableEl.container.querySelectorAll(".resize-handle").forEach(handle => {
+    editableEl.getResizeHandles().forEach(handle => {
       const pos = handle.dataset.position;
       handle.style.top    = pos.includes("n") ? `${ct + offset}px` : "";
       handle.style.bottom = pos.includes("s") ? `${cb + offset}px` : "";
@@ -163,7 +182,7 @@ function enterCropMode() {
 
   applyCrop(activeImage); // position handles to match any existing crop
 
-  editableEl.container.querySelectorAll(".resize-handle").forEach(handle => {
+  editableEl.getResizeHandles().forEach(handle => {
     const listener = (e) => onCropHandleMousedown(e, activeImage);
     handle.addEventListener("mousedown", listener, true); // capture — fires before resize
     cropHandleListeners.set(handle, listener);
@@ -186,7 +205,7 @@ function exitCropMode() {
     const editableEl = editableRegistry.get(activeImage);
     if (editableEl?.container) {
       editableEl.container.classList.remove("crop-mode");
-      editableEl.container.querySelectorAll(".resize-handle").forEach(handle => {
+      editableEl.getResizeHandles().forEach(handle => {
         handle.style.top = "";
         handle.style.bottom = "";
         handle.style.left = "";
@@ -265,124 +284,113 @@ export function createImageStyleControls() {
   const container = document.createElement("div");
   container.className = "image-style-controls";
 
-  // Centering wrapper — mirrors .arrow-center-wrap
   const centerWrap = document.createElement("div");
   centerWrap.className = "image-center-wrap";
 
-  // Two-row grid — mirrors .arrow-controls-wrap
   const controlsWrap = document.createElement("div");
   controlsWrap.className = "image-controls-wrap";
 
-  // ── Shared helper: add a labelled cell to the grid ───────────────────────
-  // Returns the control container (row 2) for appending the actual widget.
   function addCell(labelText) {
     const label = document.createElement("span");
     label.className = "image-ctrl-label";
     label.textContent = labelText;
-    controlsWrap.appendChild(label);   // row 1
-
+    controlsWrap.appendChild(label);
     const cell = document.createElement("div");
     cell.className = "image-ctrl-cell";
-    controlsWrap.appendChild(cell);    // row 2
+    controlsWrap.appendChild(cell);
     return cell;
   }
 
-  // ── Opacity ──────────────────────────────────────────────────────────────
-  const opacityCell = addCell("Opacity");
+  buildOpacityControl(addCell);
+  buildBorderRadiusControl(addCell);
+  buildCropControl(addCell);
+  buildFlipControl(addCell);
+  buildReplaceControl(addCell);
+  buildResetControl(addCell);
 
-  const opacitySlider = document.createElement("input");
-  opacitySlider.type = "range";
-  opacitySlider.min = "0";
-  opacitySlider.max = "100";
-  opacitySlider.step = "1";
-  opacitySlider.value = "100";
-  opacitySlider.className = "image-toolbar-opacity";
-  opacitySlider.title = "Opacity";
+  centerWrap.appendChild(controlsWrap);
+  container.appendChild(centerWrap);
+  return container;
+}
 
-  const opacityLabel = document.createElement("span");
-  opacityLabel.className = "image-opacity-label";
-  opacityLabel.style.display = "none";
+function buildOpacityControl(addCell) {
+  const cell = addCell("Opacity");
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.min = "0";
+  slider.max = "100";
+  slider.step = "1";
+  slider.value = "100";
+  slider.className = "image-toolbar-opacity";
+  slider.title = "Opacity";
 
-  opacitySlider.addEventListener("mousedown", () => {
-    if (activeImage) pushUndoState();
+  const label = document.createElement("span");
+  label.className = "image-opacity-label";
+  label.style.display = "none";
+
+  slider.addEventListener("mousedown", () => { if (activeImage) pushUndoState(); });
+  slider.addEventListener("input", () => {
+    const val = parseInt(slider.value, 10);
+    label.textContent = `${val}%`;
+    withActiveImage((el) => el.setState({ opacity: val }));
   });
-  opacitySlider.addEventListener("input", () => {
+
+  imageControlRefs.opacitySlider = slider;
+  imageControlRefs.opacityLabel = label;
+  cell.appendChild(slider);
+  cell.appendChild(label);
+}
+
+function buildBorderRadiusControl(addCell) {
+  const cell = addCell("Radius");
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.step = "1";
+  input.value = "0";
+  input.className = "image-toolbar-btn image-toolbar-radius";
+  input.title = "Border radius (px)";
+
+  input.addEventListener("focus", () => { if (activeImage) pushUndoState(); });
+  input.addEventListener("input", () => {
+    const val = Math.max(0, parseInt(input.value, 10) || 0);
+    withActiveImage((el) => el.setState({ borderRadius: val }));
+  });
+
+  imageControlRefs.borderRadiusInput = input;
+  cell.appendChild(input);
+}
+
+function buildCropControl(addCell) {
+  const cell = addCell("Crop");
+  const btn = document.createElement("button");
+  btn.className = "image-toolbar-btn";
+  btn.textContent = "✂";
+  btn.title = "Toggle crop mode — drag edge handles to crop";
+  btn.addEventListener("click", () => {
     if (!activeImage) return;
-    const val = parseInt(opacitySlider.value, 10);
-    opacityLabel.textContent = `${val}%`;
-    const editableEl = editableRegistry.get(activeImage);
-    if (editableEl) {
-      editableEl.state.opacity = val;
-      activeImage.style.opacity = val / 100;
-    }
+    if (cropModeActive) exitCropMode(); else enterCropMode();
   });
+  imageControlRefs.cropBtn = btn;
+  cell.appendChild(btn);
+}
 
-  imageControlRefs.opacitySlider = opacitySlider;
-  imageControlRefs.opacityLabel = opacityLabel;
-  opacityCell.appendChild(opacitySlider);
-  opacityCell.appendChild(opacityLabel);
-
-  // ── Border radius ────────────────────────────────────────────────────────
-  const radiusCell = addCell("Radius");
-
-  const borderRadiusInput = document.createElement("input");
-  borderRadiusInput.type = "number";
-  borderRadiusInput.min = "0";
-  borderRadiusInput.step = "1";
-  borderRadiusInput.value = "0";
-  borderRadiusInput.className = "image-toolbar-btn image-toolbar-radius";
-  borderRadiusInput.title = "Border radius (px)";
-
-  borderRadiusInput.addEventListener("focus", () => {
-    if (activeImage) pushUndoState();
-  });
-  borderRadiusInput.addEventListener("input", () => {
-    if (!activeImage) return;
-    const val = Math.max(0, parseInt(borderRadiusInput.value, 10) || 0);
-    const editableEl = editableRegistry.get(activeImage);
-    if (editableEl) {
-      editableEl.state.borderRadius = val;
-      activeImage.style.borderRadius = val ? `${val}px` : "";
-    }
-  });
-
-  imageControlRefs.borderRadiusInput = borderRadiusInput;
-  radiusCell.appendChild(borderRadiusInput);
-
-  // ── Crop ─────────────────────────────────────────────────────────────────
-  const cropCell = addCell("Crop");
-  const cropBtn = document.createElement("button");
-  cropBtn.className = "image-toolbar-btn";
-  cropBtn.textContent = "✂";
-  cropBtn.title = "Toggle crop mode — drag edge handles to crop";
-  cropBtn.addEventListener("click", () => {
-    if (!activeImage) return;
-    if (cropModeActive) {
-      exitCropMode();
-    } else {
-      enterCropMode();
-    }
-  });
-  imageControlRefs.cropBtn = cropBtn;
-  cropCell.appendChild(cropBtn);
-
-  // ── Flip ─────────────────────────────────────────────────────────────────
-  const flipCell = addCell("Flip");
-  const flipWrap = document.createElement("div");
-  flipWrap.className = "image-btn-group";
+function buildFlipControl(addCell) {
+  const cell = addCell("Flip");
+  const wrap = document.createElement("div");
+  wrap.className = "image-btn-group";
 
   const flipHBtn = document.createElement("button");
   flipHBtn.className = "image-toolbar-btn";
   flipHBtn.textContent = "⇆";
   flipHBtn.title = "Flip horizontal";
   flipHBtn.addEventListener("click", () => {
-    if (!activeImage) return;
     pushUndoState();
-    const editableEl = editableRegistry.get(activeImage);
-    if (!editableEl) return;
-    editableEl.state.flipH = !editableEl.state.flipH;
-    flipHBtn.classList.toggle("active", editableEl.state.flipH);
-    applyTransform(activeImage);
+    withActiveImage((el) => {
+      el.state.flipH = !el.state.flipH;
+      flipHBtn.classList.toggle("active", el.state.flipH);
+      applyTransform(activeImage);
+    });
   });
   imageControlRefs.flipHBtn = flipHBtn;
 
@@ -391,87 +399,81 @@ export function createImageStyleControls() {
   flipVBtn.textContent = "⇅";
   flipVBtn.title = "Flip vertical";
   flipVBtn.addEventListener("click", () => {
-    if (!activeImage) return;
     pushUndoState();
-    const editableEl = editableRegistry.get(activeImage);
-    if (!editableEl) return;
-    editableEl.state.flipV = !editableEl.state.flipV;
-    flipVBtn.classList.toggle("active", editableEl.state.flipV);
-    applyTransform(activeImage);
+    withActiveImage((el) => {
+      el.state.flipV = !el.state.flipV;
+      flipVBtn.classList.toggle("active", el.state.flipV);
+      applyTransform(activeImage);
+    });
   });
   imageControlRefs.flipVBtn = flipVBtn;
 
-  flipWrap.appendChild(flipHBtn);
-  flipWrap.appendChild(flipVBtn);
-  flipCell.appendChild(flipWrap);
+  wrap.appendChild(flipHBtn);
+  wrap.appendChild(flipVBtn);
+  cell.appendChild(wrap);
+}
 
-  // ── Replace image ────────────────────────────────────────────────────────
-  const replaceCell = addCell("Replace");
+function buildReplaceControl(addCell) {
+  const cell = addCell("Replace");
 
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/*";
   fileInput.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none";
 
-  const replaceBtn = document.createElement("button");
-  replaceBtn.className = "image-toolbar-btn";
-  replaceBtn.textContent = "Replace";
-  replaceBtn.title = "Replace image source";
-  replaceBtn.addEventListener("click", () => {
-    if (activeImage) fileInput.click();
-  });
+  const btn = document.createElement("button");
+  btn.className = "image-toolbar-btn";
+  btn.textContent = "Replace";
+  btn.title = "Replace image source";
+  btn.addEventListener("click", () => { if (activeImage) fileInput.click(); });
 
   fileInput.addEventListener("change", () => {
     const file = fileInput.files[0];
     if (!file || !activeImage) return;
     pushUndoState();
-    const editableEl = editableRegistry.get(activeImage);
-    if (editableEl) editableEl.state.src = file.name;
+    const el = editableRegistry.get(activeImage);
+    if (el) el.state.src = file.name;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
       const tmp = new Image();
       tmp.onload = () => {
         const img = activeImage;
-        const el = editableRegistry.get(img);
-        if (!el) return;
-        const currentWidth = el.state.width;
-        const newHeight = Math.round(currentWidth * tmp.naturalHeight / tmp.naturalWidth);
-        el.state.height = newHeight;
+        const imgEl = editableRegistry.get(img);
+        if (!imgEl) return;
+        const newHeight = Math.round(imgEl.state.width * tmp.naturalHeight / tmp.naturalWidth);
+        imgEl.state.height = newHeight;
         img.style.height = `${newHeight}px`;
-        if (el.container) el.container.style.height = `${newHeight}px`;
+        if (imgEl.container) imgEl.container.style.height = `${newHeight}px`;
       };
       tmp.src = dataUrl;
       activeImage.src = dataUrl;
-      showReplaceWarning(`Place "${file.name}" next to your QMD file.`, replaceBtn);
+      showReplaceWarning(`Place "${file.name}" next to your QMD file.`, btn);
     };
     reader.readAsDataURL(file);
     fileInput.value = "";
   });
 
-  replaceCell.appendChild(replaceBtn);
-  replaceCell.appendChild(fileInput);
+  cell.appendChild(btn);
+  cell.appendChild(fileInput);
+}
 
-  // ── Reset ────────────────────────────────────────────────────────────────
-  const resetCell = addCell("");
-
-  const resetBtn = document.createElement("button");
-  resetBtn.className = "image-toolbar-btn image-toolbar-reset";
-  resetBtn.textContent = "Reset";
-  resetBtn.title = "Reset image style properties";
-  resetBtn.addEventListener("click", () => {
+function buildResetControl(addCell) {
+  const cell = addCell("");
+  const btn = document.createElement("button");
+  btn.className = "image-toolbar-btn image-toolbar-reset";
+  btn.textContent = "Reset";
+  btn.title = "Reset image style properties";
+  btn.addEventListener("click", () => {
     if (!activeImage) return;
     pushUndoState();
-    const editableEl = editableRegistry.get(activeImage);
-    if (!editableEl) return;
-    editableEl.state.opacity = 100;
-    editableEl.state.borderRadius = 0;
-    editableEl.state.cropTop = 0;
-    editableEl.state.cropRight = 0;
-    editableEl.state.cropBottom = 0;
-    editableEl.state.cropLeft = 0;
-    editableEl.state.flipH = false;
-    editableEl.state.flipV = false;
+    const el = editableRegistry.get(activeImage);
+    if (!el) return;
+    Object.assign(el.state, {
+      opacity: 100, borderRadius: 0,
+      cropTop: 0, cropRight: 0, cropBottom: 0, cropLeft: 0,
+      flipH: false, flipV: false,
+    });
     activeImage.style.opacity = "";
     activeImage.style.borderRadius = "";
     activeImage.style.clipPath = "";
@@ -479,10 +481,5 @@ export function createImageStyleControls() {
     exitCropMode();
     updateImageStylePanel(activeImage);
   });
-  resetCell.appendChild(resetBtn);
-
-  centerWrap.appendChild(controlsWrap);
-  container.appendChild(centerWrap);
-
-  return container;
+  cell.appendChild(btn);
 }

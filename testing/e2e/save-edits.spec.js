@@ -21,16 +21,8 @@ test.describe('Save Edits Feature', () => {
     const inputFile = await page.evaluate(() => window._input_file);
     expect(inputFile).toContain('{.editable}');
 
-    // Get the saveMovedElts function result by mocking the download
-    const savedContent = await page.evaluate(() => {
-      // Call the internal functions to get what would be saved
-      const index = window._input_file;
-      const Elt_dim = extractEditableEltDimensions();
-      let result = updateTextDivs(index);
-      const Elt_attr = formatEditableEltStrings(Elt_dim);
-      result = replaceEditableOccurrences(result, Elt_attr);
-      return result;
-    });
+    // Get the transformed QMD via the public API
+    const savedContent = await page.evaluate(() => getTransformedQmd());
 
     // Verify transformations
     expect(savedContent).not.toContain('{.editable}');
@@ -87,7 +79,8 @@ test.describe('Save Edits Feature', () => {
     }
   });
 
-  test('Copy to clipboard contains transformed content', async ({ page, context }) => {
+  test('Copy to clipboard contains transformed content', async ({ page, context, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox does not support clipboard-read permission via Playwright');
     // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
