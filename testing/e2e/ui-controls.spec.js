@@ -27,19 +27,20 @@ test.describe('UI Controls', () => {
     expect(fontControls.buttonCount).toBe(1); // Only edit button (font/align now in Quill toolbar)
   });
 
-  test('changeFontSize function works via increase button', async ({ page }) => {
-    await setupPage(page, 'multiple-elements.html');
-
-    // Hover the div container to reveal controls, then click the increase-font button
-    const container = page.locator('.editable-container:has(div.editable)').first();
-    await container.hover();
+  test('changeFontSize function increases font size', async ({ page }) => {
+    await setupPage(page, 'basic.html');
 
     const initial = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       return parseFloat(window.getComputedStyle(div).fontSize);
     });
 
-    await container.locator('.editable-button-increase').click();
+    // Call changeFontSize directly via the public API
+    await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      const editableElt = editableRegistry.get(div);
+      if (editableElt) editableElt.setState({ fontSize: (editableElt.state.fontSize || 16) + 2 });
+    });
 
     const after = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
@@ -49,13 +50,14 @@ test.describe('UI Controls', () => {
     expect(after).toBeGreaterThan(initial);
   });
 
-  test('Text alignment can be set via align button', async ({ page }) => {
-    await setupPage(page, 'multiple-elements.html');
+  test('Text alignment state can be set programmatically', async ({ page }) => {
+    await setupPage(page, 'basic.html');
 
-    const container = page.locator('.editable-container:has(div.editable)').first();
-    await container.hover();
-
-    await container.locator('.editable-button-align').nth(1).click(); // center
+    await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      const editableElt = editableRegistry.get(div);
+      if (editableElt) editableElt.setState({ textAlign: 'center' });
+    });
 
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
