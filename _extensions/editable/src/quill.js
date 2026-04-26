@@ -108,8 +108,10 @@ export async function initializeQuillForElement(element) {
       <button class="ql-italic">I</button>
       <button class="ql-underline">U</button>
       <button class="ql-strike">S</button>
+      <span class="quill-toolbar-separator"></span>
       <select class="ql-color">${colorOptionsWithExtras}</select>
       <select class="ql-background">${colorOptionsWithExtras}</select>
+      <span class="quill-toolbar-separator"></span>
       <button class="ql-align" value=""></button>
       <button class="ql-align" value="center"></button>
       <button class="ql-align" value="right"></button>

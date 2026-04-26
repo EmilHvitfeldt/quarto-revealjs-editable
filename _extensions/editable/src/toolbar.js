@@ -15,6 +15,9 @@ import { ToolbarRegistry } from './registries.js';
 /** @type {HTMLElement|null} The right-zone container */
 let rightZoneEl = null;
 
+/** @type {HTMLElement|null} The text panel container (populated by registries.js on first edit) */
+export let textPanelEl = null;
+
 /** @type {HTMLElement[]} Elements to hide when a context panel is active */
 const contextHideElements = [];
 
@@ -97,6 +100,13 @@ export function createFloatingToolbar() {
   arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
   arrowPanel.style.display = "none";
   rightZone.appendChild(arrowPanel);
+
+  // Text panel: holds the active Quill toolbar when a div is in edit mode
+  const textPanel = document.createElement("div");
+  textPanel.className = "toolbar-panel toolbar-panel-text";
+  textPanel.style.display = "none";
+  rightZone.appendChild(textPanel);
+  textPanelEl = textPanel;
 
   toolbar.appendChild(rightZone);
   document.body.appendChild(toolbar);

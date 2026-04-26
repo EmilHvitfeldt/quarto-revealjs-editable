@@ -14,6 +14,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - Arrow style controls use native HTML elements styled with CSS for consistent sizing and no external dependencies
   - Two-row grid layout for arrow controls fits more options without wrapping
   - Removed drag handle; toolbar is no longer draggable
+  - Quill text formatting toolbar moved into the top bar as a context panel (`toolbar-panel-text`), replacing the floating toolbar above the element; the panel appears when entering edit mode and restores the default panel on exit
 
 ## [7.0.0] - 2025-03-25
 

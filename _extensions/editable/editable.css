@@ -240,7 +240,20 @@
   min-width: 0;
   flex: 1;
   overflow-x: auto;
+  overflow-y: visible;
   scrollbar-width: none;
+}
+
+.toolbar-panel-text {
+  overflow: visible;
+  justify-content: center;
+}
+
+.quill-toolbar-separator {
+  display: inline-block;
+  width: 0;
+  margin: 0 10px;
+  flex-shrink: 0;
 }
 
 .toolbar-panel::-webkit-scrollbar {
@@ -466,6 +479,19 @@
   display: none !important;
 }
 
+/* Quill toolbar hosted in the top-bar text panel */
+.toolbar-panel-text .ql-toolbar.ql-snow {
+  position: static !important;
+  bottom: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  display: flex !important;
+}
+
 .quill-toolbar-container .ql-formats {
   margin-right: 12px !important;
   display: inline-flex !important;
@@ -557,6 +583,33 @@
 
 .quill-toolbar-container .ql-picker-label .ql-stroke {
   stroke: #ffffff !important;
+}
+
+/* Dark icons/text for Quill toolbar on white top bar */
+.toolbar-panel-text .quill-toolbar-container .ql-stroke {
+  stroke: #333333 !important;
+}
+.toolbar-panel-text .quill-toolbar-container .ql-fill {
+  fill: #333333 !important;
+}
+.toolbar-panel-text .quill-toolbar-container button,
+.toolbar-panel-text .quill-toolbar-container .ql-picker-label {
+  color: #333333 !important;
+}
+.toolbar-panel-text .quill-toolbar-container button:hover .ql-stroke,
+.toolbar-panel-text .quill-toolbar-container button.ql-active .ql-stroke {
+  stroke: #007cba !important;
+}
+.toolbar-panel-text .quill-toolbar-container button:hover .ql-fill,
+.toolbar-panel-text .quill-toolbar-container button.ql-active .ql-fill {
+  fill: #007cba !important;
+}
+.toolbar-panel-text .quill-toolbar-container button:hover,
+.toolbar-panel-text .quill-toolbar-container button.ql-active {
+  color: #007cba !important;
+}
+.toolbar-panel-text .quill-toolbar-container .ql-picker-label .ql-stroke {
+  stroke: #333333 !important;
 }
 
 /* Dropdown options panel */
