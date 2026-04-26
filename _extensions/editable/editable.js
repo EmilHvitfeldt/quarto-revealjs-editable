@@ -16055,7 +16055,7 @@ ${fence}`;
           createFloatingToolbar();
           setupUndoRedoKeyboard();
           document.addEventListener("click", (e) => {
-            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar")) {
+            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar") && !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])")) {
               setActiveImage(null);
             }
           });
