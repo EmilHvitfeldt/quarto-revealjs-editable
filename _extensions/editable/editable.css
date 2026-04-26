@@ -1322,3 +1322,177 @@ button.arrow-toolbar-smooth.active {
   border-color: var(--editable-arrow-waypoint-color);
   color: white;
 }
+
+/* ── Image context panel ─────────────────────────────────────────────────── */
+
+:root {
+  --image-ctrl-h: 40px;
+}
+
+.image-style-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  flex-wrap: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.image-controls-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.image-controls-label {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.image-controls-unit {
+  font-size: 11px;
+  color: #888;
+  user-select: none;
+}
+
+/* Shared base for all image toolbar controls */
+.image-opacity-slider,
+.image-border-radius-input,
+.image-fit-btn,
+.image-flip-btn,
+.image-replace-btn,
+.image-reset-btn {
+  height: var(--image-ctrl-h);
+  min-height: var(--image-ctrl-h);
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: white;
+  color: #333;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Opacity slider */
+.image-opacity-slider {
+  width: 80px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+}
+
+.image-opacity-label {
+  font-size: 12px;
+  color: #555;
+  min-width: 34px;
+  text-align: right;
+  user-select: none;
+}
+
+/* Border radius number input */
+.image-border-radius-input {
+  width: 52px;
+  padding: 0 6px;
+  text-align: center;
+}
+
+.image-border-radius-input:focus {
+  outline: 2px solid var(--editable-accent-color, #007cba);
+  outline-offset: -1px;
+}
+
+/* Object fit toggle */
+.image-fit-toggle {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.image-fit-btn {
+  padding: 0 8px;
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.image-fit-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.image-fit-btn:last-child {
+  border-radius: 0 4px 4px 0;
+  border-right-width: 1px;
+}
+
+.image-fit-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.image-fit-btn.active {
+  background: var(--editable-accent-color, #007cba);
+  border-color: var(--editable-accent-color, #007cba);
+  color: white;
+}
+
+/* Flip toggle */
+.image-flip-toggle {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+.image-flip-btn {
+  padding: 0 8px;
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.image-flip-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.image-flip-btn:last-child {
+  border-radius: 0 4px 4px 0;
+  border-right-width: 1px;
+}
+
+.image-flip-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.image-flip-btn.active {
+  background: #6c757d;
+  border-color: #6c757d;
+  color: white;
+}
+
+/* Replace and Reset buttons */
+.image-replace-btn,
+.image-reset-btn {
+  padding: 0 10px;
+}
+
+.image-replace-btn:hover,
+.image-reset-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.image-reset-btn {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.image-reset-btn:hover {
+  background: #dc3545;
+  color: white;
+}
