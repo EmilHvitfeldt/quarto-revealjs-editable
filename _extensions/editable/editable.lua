@@ -33,22 +33,6 @@ local function has_editable_class(el)
   return false
 end
 
--- Check if document has any editable elements (Div or Image with class "editable")
--- Walk AST inside Pandoc to avoid module-level state that persists across files
-local function has_editable_elements(doc)
-  local found = false
-  local filter = {
-    Div = function(el)
-      if has_editable_class(el) then found = true end
-    end,
-    Image = function(el)
-      if has_editable_class(el) then found = true end
-    end
-  }
-  pandoc.walk_block(pandoc.Div(doc.blocks), filter)
-  return found
-end
-
 -- Check if quarto-arrows extension is installed
 local function has_arrow_extension()
   local input_file = quarto.doc.input_file
@@ -103,27 +87,30 @@ local function get_brand_palette_colors()
 
   if not brand_content then return colors, color_names end
 
-  -- Simple YAML parsing for color palette
-  -- Look for lines under color: palette: that have hex colors
+  -- Simple YAML parsing for color palette.
+  -- Handles the common _brand.yml structure; does not support YAML anchors or merge keys.
+  -- Look for lines under color: > palette: that have hex colors.
   local in_color_section = false
   local in_palette_section = false
 
   for line in brand_content:gmatch("[^\r\n]+") do
-    -- Check for color: section
-    if line:match("^color:") then
-      in_color_section = true
-      in_palette_section = false
-    elseif line:match("^%S") and not line:match("^color:") then
-      -- New top-level section, exit color section
-      in_color_section = false
-      in_palette_section = false
-    elseif in_color_section and line:match("^%s+palette:") then
-      in_palette_section = true
-    elseif in_color_section and line:match("^%s+%S") and not line:match("^%s+palette:") and in_palette_section then
-      -- Check if this is still in palette (same or deeper indent) or new section
-      local indent = line:match("^(%s+)")
-      if indent and #indent <= 2 then
+    -- Skip comment lines before checking section boundaries
+    if not line:match("^%s*#") then
+      if line:match("^color:") then
+        in_color_section = true
         in_palette_section = false
+      elseif line:match("^%S") then
+        -- New top-level key: exit color section
+        in_color_section = false
+        in_palette_section = false
+      elseif in_color_section and line:match("^%s+palette:") then
+        in_palette_section = true
+      elseif in_palette_section and line:match("^%s+%S") and not line:match("^%s+palette:") then
+        -- Exit palette section if indentation drops back to color-section level (≤2 spaces)
+        local indent = line:match("^(%s+)")
+        if indent and #indent <= 2 then
+          in_palette_section = false
+        end
       end
     end
 

@@ -13783,6 +13783,29 @@ ${escapeText(this.code(index, length))}
     }
   });
 
+  // src/selection.js
+  function registerDeselectImage(fn) {
+    deselectImageFn = fn;
+  }
+  function registerDeselectArrow(fn) {
+    deselectArrowFn = fn;
+  }
+  function deselectImage() {
+    if (deselectImageFn)
+      deselectImageFn();
+  }
+  function deselectArrow() {
+    if (deselectArrowFn)
+      deselectArrowFn();
+  }
+  var deselectImageFn, deselectArrowFn;
+  var init_selection2 = __esm({
+    "src/selection.js"() {
+      deselectImageFn = null;
+      deselectArrowFn = null;
+    }
+  });
+
   // src/images.js
   function showReplaceWarning(message, anchorEl) {
     if (replaceWarningEl)
@@ -13811,6 +13834,9 @@ ${escapeText(this.code(index, length))}
   function setActiveImage(imgEl) {
     if (activeImage && activeImage !== imgEl) {
       exitCropMode();
+    }
+    if (imgEl && imgEl !== activeImage) {
+      deselectArrow();
     }
     activeImage = imgEl;
     if (imgEl) {
@@ -14159,6 +14185,7 @@ ${escapeText(this.code(index, length))}
       init_undo();
       init_editable_element();
       init_toolbar2();
+      init_selection2();
       activeImage = null;
       replaceWarningEl = null;
       imageControlRefs = {
@@ -14171,6 +14198,7 @@ ${escapeText(this.code(index, length))}
       };
       cropModeActive = false;
       cropHandleListeners = /* @__PURE__ */ new Map();
+      registerDeselectImage(() => setActiveImage(null));
     }
   });
 
@@ -14722,6 +14750,9 @@ ${escapeText(this.code(index, length))}
     if (activeArrow && activeArrow !== arrowData) {
       activeArrow.isActive = false;
       updateArrowActiveState(activeArrow);
+    }
+    if (arrowData && arrowData !== activeArrow) {
+      deselectImage();
     }
     activeArrow = arrowData;
     if (arrowData) {
@@ -16132,6 +16163,7 @@ ${escapeText(this.code(index, length))}
       init_registries();
       init_undo();
       init_toolbar2();
+      init_selection2();
       arrowExtensionWarningShown = false;
       activeArrow = null;
       globalClickOutsideHandlerRegistered = false;
@@ -16151,6 +16183,7 @@ ${escapeText(this.code(index, length))}
         curveToggle: null
       };
       ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "square", "bar", "none"];
+      registerDeselectArrow(() => setActiveArrow(null));
     }
   });
 
@@ -16831,18 +16864,35 @@ ${escapeText(this.code(index, length))}
   }
   function elementToText(element) {
     const quillEditor = element.querySelector(".ql-editor");
-    let text = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
+    let html = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
+    const tokens = [];
+    const placeholder = (data) => {
+      const idx = tokens.length;
+      tokens.push(data);
+      return `\0${idx}\0`;
+    };
+    html = html.replace(
+      /<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+      (match2, colorVal, content) => {
+        const colorOutput = getBrandColorOutput(colorVal.trim());
+        return `[${content}]{style='background-color: ${colorOutput}'}`;
+      }
+    );
+    html = html.replace(
+      /<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+      (match2, colorVal, content) => {
+        if (colorVal.trim().toLowerCase() === "inherit")
+          return content;
+        const colorOutput = getBrandColorOutput(colorVal.trim());
+        return `[${content}]{style='color: ${colorOutput}'}`;
+      }
+    );
+    html = html.replace(
+      /<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+      (match2, align, content) => placeholder({ type: "align", align, content }) + "\n\n"
+    );
+    let text = html;
     text = text.replace(/<br\s*\/?>/gi, "\n");
-    text = text.replace(
-      /<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
-      (match2, align) => `__ALIGN_START_${align}__`
-    );
-    text = text.replace(
-      /__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
-      (match2, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__
-
-`
-    );
     text = text.replace(/<p[^>]*>/gi, "");
     text = text.replace(/<\/p>/gi, "\n\n");
     text = text.replace(/<code[^>]*>/gi, "`");
@@ -16863,21 +16913,6 @@ ${escapeText(this.code(index, length))}
     text = text.replace(/<\/strike>/gi, "~~");
     text = text.replace(/<u[^>]*>/gi, "[");
     text = text.replace(/<\/u>/gi, "]{.underline}");
-    text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, "[__BG_START__$1__");
-    text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match2, colorVal, content) => {
-      const colorOutput = getBrandColorOutput(colorVal);
-      return `${content}]{style='background-color: ${colorOutput}'}`;
-    });
-    text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match2, colorVal) => {
-      if (colorVal.trim().toLowerCase() === "inherit") {
-        return "";
-      }
-      return `[__COLOR_START__${colorVal}__`;
-    });
-    text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match2, colorVal, content) => {
-      const colorOutput = getBrandColorOutput(colorVal);
-      return `${content}]{style='color: ${colorOutput}'}`;
-    });
     text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
     text = text.replace(/<[^>]+>/g, "");
     text = text.replace(/&lt;/g, "<");
@@ -16887,17 +16922,18 @@ ${escapeText(this.code(index, length))}
     text = text.replace(/&#39;/g, "'");
     text = text.replace(/&nbsp;/g, " ");
     text = text.replace(/\n{3,}/g, "\n\n");
-    text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, "{{< brand color $1 >}}");
-    text = text.replace(
-      /__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
-      (match2, align, content) => {
-        const trimmed = content.trim();
-        const innerFence = getFenceForContent(trimmed);
-        return `${innerFence} {style="text-align: ${align}"}
-${trimmed}
+    text = text.replace(/\x00(\d+)\x00/g, (match2, idx) => {
+      const token = tokens[parseInt(idx, 10)];
+      if (token.type === "align") {
+        const innerText = elementToText({ innerHTML: token.content, querySelector: () => null });
+        const innerFence = getFenceForContent(innerText);
+        return `${innerFence} {style="text-align: ${token.align}"}
+${innerText}
 ${innerFence}`;
       }
-    );
+      return match2;
+    });
+    text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, "{{< brand color $1 >}}");
     return text.trim();
   }
   function serializeArrowToShortcode(arrow) {
@@ -17221,17 +17257,19 @@ ${contentFence}`;
 ${fence}`;
   }
   function replaceEditableOccurrences(text, replacements, srcReplacements = []) {
-    const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable[^}]*\}/gm;
+    const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable([^}]*)\}/gm;
     let index = 0;
-    return text.replace(regex, (match2, fenceColons, originalSrc) => {
+    return text.replace(regex, (match2, fenceColons, originalSrc, extraAttrs) => {
       const isDiv = fenceColons !== void 0;
       const attrs = replacements[index] || "";
       const newSrc = srcReplacements[index] || null;
       index++;
+      const extra = (extraAttrs || "").trim();
+      const finalAttrs = extra ? attrs.replace(/^\{/, `{${extra} `) : attrs;
       if (isDiv) {
-        return fenceColons + " " + attrs;
+        return fenceColons + " " + finalAttrs;
       } else {
-        return `](${newSrc ?? originalSrc})${attrs}`;
+        return `](${newSrc ?? originalSrc})${finalAttrs}`;
       }
     });
   }

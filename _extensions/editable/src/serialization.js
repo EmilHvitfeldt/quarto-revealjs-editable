@@ -194,16 +194,41 @@ export function getFenceForContent(content) {
 export function elementToText(element) {
   // If Quill was used, get content from .ql-editor
   const quillEditor = element.querySelector(".ql-editor");
-  let text = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
+  let html = quillEditor ? quillEditor.innerHTML.trim() : element.innerHTML.trim();
+
+  // Use \x00N\x00 tokens so user-typed content can never collide.
+  // U+0000 is not valid in HTML, so these markers are unambiguous.
+  const tokens = [];
+  const placeholder = (data) => {
+    const idx = tokens.length;
+    tokens.push(data);
+    return `\x00${idx}\x00`;
+  };
+
+  // Process color spans first (before alignment extraction) so they are resolved
+  // inside aligned paragraphs as well as outside them.
+  // Background color (must be before foreground to avoid false matches on "color:")
+  html = html.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+    (match, colorVal, content) => {
+      const colorOutput = getBrandColorOutput(colorVal.trim());
+      return `[${content}]{style='background-color: ${colorOutput}'}`;
+    });
+
+  // Foreground color
+  html = html.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>([^<]*)<\/span>/gi,
+    (match, colorVal, content) => {
+      if (colorVal.trim().toLowerCase() === 'inherit') return content;
+      const colorOutput = getBrandColorOutput(colorVal.trim());
+      return `[${content}]{style='color: ${colorOutput}'}`;
+    });
+
+  // Handle Quill alignment classes on paragraphs — capture before stripping tags
+  html = html.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+    (match, align, content) => placeholder({ type: "align", align, content }) + "\n\n");
 
   // Convert HTML tags to Quarto/Markdown equivalents
+  let text = html;
   text = text.replace(/<br\s*\/?>/gi, "\n");
-
-  // Handle Quill alignment classes on paragraphs using placeholder approach
-  text = text.replace(/<p[^>]*class="[^"]*ql-align-(center|right|justify)[^"]*"[^>]*>/gi,
-    (match, align) => `__ALIGN_START_${align}__`);
-  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)<\/p>/gi,
-    (match, align, content) => `__ALIGN_START_${align}__${content}__ALIGN_END_${align}__\n\n`);
 
   // Handle remaining p tags (left-aligned or no alignment)
   text = text.replace(/<p[^>]*>/gi, "");
@@ -235,25 +260,6 @@ export function elementToText(element) {
   text = text.replace(/<u[^>]*>/gi, "[");
   text = text.replace(/<\/u>/gi, "]{.underline}");
 
-  // Background color spans (must be processed BEFORE color to avoid false matches)
-  text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>/gi, '[__BG_START__$1__');
-  text = text.replace(/__BG_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
-    const colorOutput = getBrandColorOutput(colorVal);
-    return `${content}]{style='background-color: ${colorOutput}'}`;
-  });
-
-  // Color spans: <span style="color: ...">text</span> → [text]{style="color: ..."}
-  text = text.replace(/<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>/gi, (match, colorVal) => {
-    if (colorVal.trim().toLowerCase() === 'inherit') {
-      return '';
-    }
-    return `[__COLOR_START__${colorVal}__`;
-  });
-  text = text.replace(/__COLOR_START__([^_]+)__([^<]*)<\/span>/gi, (match, colorVal, content) => {
-    const colorOutput = getBrandColorOutput(colorVal);
-    return `${content}]{style='color: ${colorOutput}'}`;
-  });
-
   // Links: <a href="url">text</a> → [text](url)
   text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, "[$2]($1)");
 
@@ -271,16 +277,19 @@ export function elementToText(element) {
   // Clean up excessive newlines
   text = text.replace(/\n{3,}/g, "\n\n");
 
-  // Convert brand color placeholders back to shortcodes
-  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
+  // Resolve alignment tokens into fenced divs
+  text = text.replace(/\x00(\d+)\x00/g, (match, idx) => {
+    const token = tokens[parseInt(idx, 10)];
+    if (token.type === "align") {
+      const innerText = elementToText({ innerHTML: token.content, querySelector: () => null });
+      const innerFence = getFenceForContent(innerText);
+      return `${innerFence} {style="text-align: ${token.align}"}\n${innerText}\n${innerFence}`;
+    }
+    return match;
+  });
 
-  // Convert alignment placeholders to fenced div syntax
-  text = text.replace(/__ALIGN_START_(center|right|justify)__([\s\S]*?)__ALIGN_END_\1__/g,
-    (match, align, content) => {
-      const trimmed = content.trim();
-      const innerFence = getFenceForContent(trimmed);
-      return `${innerFence} {style="text-align: ${align}"}\n${trimmed}\n${innerFence}`;
-    });
+  // Convert brand color shortcode markers (inserted by getBrandColorOutput)
+  text = text.replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}');
 
   return text.trim();
 }
@@ -747,18 +756,23 @@ export function htmlToQuarto(div) {
  */
 export function replaceEditableOccurrences(text, replacements, srcReplacements = []) {
   // For images: consume ](src) so we can replace src too
-  const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable[^}]*\}/gm;
+  const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable([^}]*)\}/gm;
 
   let index = 0;
-  return text.replace(regex, (match, fenceColons, originalSrc) => {
+  return text.replace(regex, (match, fenceColons, originalSrc, extraAttrs) => {
     const isDiv = fenceColons !== undefined;
     const attrs = replacements[index] || "";
     const newSrc = srcReplacements[index] || null;
     index++;
+
+    // Preserve any extra classes/attributes beyond .editable (e.g. {.editable .other})
+    const extra = (extraAttrs || "").trim();
+    const finalAttrs = extra ? attrs.replace(/^\{/, `{${extra} `) : attrs;
+
     if (isDiv) {
-      return fenceColons + ' ' + attrs;
+      return fenceColons + ' ' + finalAttrs;
     } else {
-      return `](${newSrc ?? originalSrc})${attrs}`;
+      return `](${newSrc ?? originalSrc})${finalAttrs}`;
     }
   });
 }

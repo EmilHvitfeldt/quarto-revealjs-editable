@@ -393,11 +393,11 @@ check_quill_feature() {
     return
   fi
 
-  # Check for Quill CDN
-  if grep -q "quill@" "$js_path" 2>/dev/null; then
-    echo "  ✓ Quill CDN reference present"
+  # Check that Quill is bundled (no CDN dependency)
+  if grep -q "ql-editor\|ql-toolbar\|ql-snow" "$js_path" 2>/dev/null; then
+    echo "  ✓ Quill bundled (no CDN dependency)"
   else
-    echo "  ✗ Quill CDN reference missing"
+    echo "  ✗ Quill bundle not found in editable.js"
     FAILED=1
     return
   fi

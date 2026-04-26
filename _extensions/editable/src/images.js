@@ -7,6 +7,7 @@
 import { pushUndoState } from './undo.js';
 import { editableRegistry } from './editable-element.js';
 import { showRightPanel } from './toolbar.js';
+import { registerDeselectImage, deselectArrow } from './selection.js';
 
 /** @type {HTMLElement|null} The currently active image element */
 export let activeImage = null;
@@ -66,9 +67,14 @@ const cropHandleListeners = new Map();
  * Set the active image and sync the panel controls to its current state.
  * @param {HTMLElement|null} imgEl
  */
+registerDeselectImage(() => setActiveImage(null));
+
 export function setActiveImage(imgEl) {
   if (activeImage && activeImage !== imgEl) {
     exitCropMode();
+  }
+  if (imgEl && imgEl !== activeImage) {
+    deselectArrow();
   }
   activeImage = imgEl;
   if (imgEl) {

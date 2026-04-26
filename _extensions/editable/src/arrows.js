@@ -10,6 +10,7 @@ import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 import { pushUndoState } from './undo.js';
 import { showRightPanel } from './toolbar.js';
+import { registerDeselectArrow, deselectImage } from './selection.js';
 
 /** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
@@ -168,10 +169,15 @@ export const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "squa
  * Set the active (selected) arrow. Only one arrow can be active at a time.
  * @param {Object|null} arrowData - Arrow to select, or null to deselect
  */
+registerDeselectArrow(() => setActiveArrow(null));
+
 export function setActiveArrow(arrowData) {
   if (activeArrow && activeArrow !== arrowData) {
     activeArrow.isActive = false;
     updateArrowActiveState(activeArrow);
+  }
+  if (arrowData && arrowData !== activeArrow) {
+    deselectImage();
   }
 
   activeArrow = arrowData;
