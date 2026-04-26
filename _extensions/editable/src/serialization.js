@@ -72,6 +72,44 @@ export const PropertySerializers = {
     type: "style",
     serialize: (v) => (v ? `transform: rotate(${round(v)}deg);` : null),
   },
+
+  // Image-specific properties
+  opacity: {
+    type: "style",
+    serialize: (v) => (v !== 100 ? `opacity: ${Math.round((v / 100) * 1000) / 1000};` : null),
+  },
+  borderRadius: {
+    type: "style",
+    serialize: (v) => (v ? `border-radius: ${round(v)}px;` : null),
+  },
+  cropTop: {
+    type: "style",
+    serialize: () => null, // combined into crop serializer below
+  },
+  cropRight: {
+    type: "style",
+    serialize: () => null,
+  },
+  cropBottom: {
+    type: "style",
+    serialize: () => null,
+  },
+  cropLeft: {
+    type: "style",
+    serialize: () => null,
+  },
+  flipH: {
+    type: "style",
+    serialize: () => null, // combined into imageTransform
+  },
+  flipV: {
+    type: "style",
+    serialize: () => null, // combined into imageTransform
+  },
+  imageTransform: {
+    type: "style",
+    serialize: (v) => (v ? `transform: ${v};` : null),
+  },
 };
 
 /**
@@ -83,7 +121,31 @@ export function serializeToQmd(dimensions) {
   const attrs = [];
   const styles = [];
 
+  // Compose rotation and flips into a single transform value
+  const transformParts = [];
+  if (dimensions.rotation) {
+    transformParts.push(`rotate(${round(dimensions.rotation)}deg)`);
+  }
+  if (dimensions.flipH) {
+    transformParts.push("scaleX(-1)");
+  }
+  if (dimensions.flipV) {
+    transformParts.push("scaleY(-1)");
+  }
+  if (transformParts.length > 0) {
+    styles.push(`transform: ${transformParts.join(" ")};`);
+  }
+
+  // Compose clip-path from crop insets
+  const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = dimensions;
+  if (ct || cr || cb || cl) {
+    styles.push(`clip-path: inset(${ct || 0}px ${cr || 0}px ${cb || 0}px ${cl || 0}px);`);
+  }
+
+  const skipKeys = new Set(["rotation", "flipH", "flipV", "cropTop", "cropRight", "cropBottom", "cropLeft"]);
+
   for (const [key, value] of Object.entries(dimensions)) {
+    if (skipKeys.has(key)) continue;
     const serializer = PropertySerializers[key];
     if (serializer && value != null) {
       const result = serializer.serialize(value);
@@ -677,18 +739,27 @@ export function htmlToQuarto(div) {
 
 /**
  * Replace {.editable} attribute strings with {.absolute ...} in QMD.
+ * Also replaces image src when srcReplacements[i] is non-null.
  * @param {string} text - QMD content
  * @param {string[]} replacements - Array of replacement attribute strings
+ * @param {Array<string|null>} srcReplacements - Per-element new src (null = no change)
  * @returns {string} Updated QMD content
  */
-export function replaceEditableOccurrences(text, replacements) {
-  const regex = /(?:^(:{3,}) |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
+export function replaceEditableOccurrences(text, replacements, srcReplacements = []) {
+  // For images: consume ](src) so we can replace src too
+  const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable[^}]*\}/gm;
 
   let index = 0;
-  return text.replace(regex, (match, fenceColons) => {
+  return text.replace(regex, (match, fenceColons, originalSrc) => {
     const isDiv = fenceColons !== undefined;
-    const prefix = isDiv ? fenceColons + ' ' : '';
-    return prefix + (replacements[index++] || "");
+    const attrs = replacements[index] || "";
+    const newSrc = srcReplacements[index] || null;
+    index++;
+    if (isDiv) {
+      return fenceColons + ' ' + attrs;
+    } else {
+      return `](${newSrc ?? originalSrc})${attrs}`;
+    }
   });
 }
 

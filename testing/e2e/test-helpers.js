@@ -120,6 +120,10 @@ async function clickAddArrow(page) {
     initialCount,
     { timeout: 5000 }
   );
+
+  // Wait for the arrow panel controls to be visible before returning
+  await page.waitForSelector('.toolbar-panel-arrow', { state: 'visible', timeout: 5000 });
+  await page.waitForSelector('.toolbar-panel-arrow .arrow-icon-select-btn', { state: 'visible', timeout: 5000 });
 }
 
 /**

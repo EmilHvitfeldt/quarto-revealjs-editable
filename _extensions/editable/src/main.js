@@ -13,6 +13,7 @@ import { ToolbarRegistry, NewElementRegistry } from './registries.js';
 import { Capabilities, getCapabilitiesFor } from './capabilities.js';
 import { createFloatingToolbar } from './toolbar.js';
 import { addNewArrow } from './arrows.js';
+import { setActiveImage } from './images.js';
 import {
   extractEditableEltDimensions,
   formatEditableEltStrings,
@@ -223,7 +224,8 @@ function getTransformedQmd() {
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);
   const attributes = formatEditableEltStrings(dimensions);
-  content = replaceEditableOccurrences(content, attributes);
+  const srcReplacements = dimensions.map(d => d.src || null);
+  content = replaceEditableOccurrences(content, attributes, srcReplacements);
 
   return content;
 }
@@ -435,6 +437,10 @@ function setupDraggableElt(elt) {
   setupKeyboardNavigation(context, capabilities, editableElt);
 
   attachGlobalEvents(context, capabilities);
+
+  if (elementType === "img") {
+    container.addEventListener("mousedown", () => setActiveImage(elt));
+  }
 
   function createEltContainer(elt) {
     const container = document.createElement("div");
@@ -670,6 +676,14 @@ window.Revealeditable = function () {
         addSaveMenuButton();
         createFloatingToolbar();
         setupUndoRedoKeyboard();
+
+        // Deselect active image when clicking outside any image container or toolbar
+        document.addEventListener("click", (e) => {
+          if (!e.target.closest(".editable-container:has(img)") &&
+              !e.target.closest(".editable-toolbar")) {
+            setActiveImage(null);
+          }
+        });
       });
     },
   };
@@ -699,3 +713,5 @@ window.htmlToQuarto = htmlToQuarto;
 window.readIndexQmd = readIndexQmd;
 window.addNewSlide = addNewSlide;
 window.addNewTextElement = addNewTextElement;
+window.formatEditableEltStrings = formatEditableEltStrings;
+window.setActiveImage = setActiveImage;

@@ -1322,3 +1322,210 @@ button.arrow-toolbar-smooth.active {
   border-color: var(--editable-arrow-waypoint-color);
   color: white;
 }
+
+/* ── Image context panel ─────────────────────────────────────────────────── */
+
+.image-style-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  flex-wrap: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Centering wrapper — mirrors .arrow-center-wrap */
+.image-center-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+/* Two-row grid — mirrors .arrow-controls-wrap */
+.image-controls-wrap {
+  display: grid;
+  grid-template-rows: auto auto;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Row 1: small muted labels */
+.image-ctrl-label {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  user-select: none;
+  text-align: center;
+}
+
+/* Row 2: control containers */
+.image-ctrl-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+/* Base style for all image toolbar buttons and inputs — mirrors arrow-toolbar-btn */
+.image-toolbar-btn {
+  height: var(--arrow-ctrl-h);
+  min-height: var(--arrow-ctrl-h);
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: white;
+  color: #333;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 8px;
+  font-family: inherit;
+}
+
+.image-toolbar-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.image-toolbar-btn:focus {
+  outline: 2px solid var(--editable-accent-color, #007cba);
+  outline-offset: -1px;
+}
+
+.image-toolbar-btn.active {
+  background: var(--editable-accent-color, #007cba);
+  border-color: var(--editable-accent-color, #007cba);
+  color: white;
+}
+
+/* Grouped buttons (fit, flip) — joined pill style */
+.image-btn-group {
+  display: flex;
+  flex-direction: row;
+}
+
+.image-btn-group .image-toolbar-btn {
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.image-btn-group .image-toolbar-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.image-btn-group .image-toolbar-btn:last-child {
+  border-radius: 0 4px 4px 0;
+  border-right-width: 1px;
+}
+
+/* Opacity slider — mirrors .arrow-toolbar-opacity */
+.image-toolbar-opacity {
+  width: 80px;
+  height: var(--arrow-ctrl-h);
+  cursor: pointer;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  padding: 0;
+  background:
+    linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1)),
+    repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+}
+
+.image-toolbar-opacity::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.image-toolbar-opacity::-moz-range-track {
+  height: 40px;
+  border-radius: 10px;
+  background:
+    linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1)),
+    repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+}
+
+.image-toolbar-opacity::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.image-opacity-label {
+  font-size: 12px;
+  color: #555;
+  min-width: 34px;
+  text-align: right;
+  user-select: none;
+}
+
+/* Border radius number input */
+.image-toolbar-radius {
+  width: 52px;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.image-toolbar-radius::-webkit-outer-spin-button,
+.image-toolbar-radius::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Reset button — red tint to signal destructive */
+.image-toolbar-reset {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.image-toolbar-reset:hover {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+/* ── Replace warning popup ───────────────────────────────────────────────── */
+
+.image-replace-warning {
+  position: fixed;
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 99999;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── Crop mode ───────────────────────────────────────────────────────────── */
+
+.editable-container.crop-mode .resize-handle {
+  cursor: crosshair;
+  background-color: var(--editable-accent-color, #007cba);
+  opacity: 0.9;
+}

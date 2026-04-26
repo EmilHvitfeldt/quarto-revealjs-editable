@@ -5,12 +5,30 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const { TESTING_DIR, setupPage, clickAddArrow, getArrowData, deselectArrow } = require('./test-helpers');
 
+// Fill an input that may be clipped by overflow-x in the toolbar panel
+async function fillInput(page, selector, value) {
+  await page.evaluate(({ sel, val }) => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    el.value = val;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { sel: selector, val: value });
+}
+
 // Helper for custom icon-based select widgets (not native <select> elements)
 async function selectIconOption(page, selectId, value) {
-  await page.waitForSelector(`#${selectId} .arrow-icon-select-btn`, { state: 'visible' });
-  await page.click(`#${selectId} .arrow-icon-select-btn`);
+  // Click via JS to bypass Playwright's visibility check (element may be in overflow-scrollable container)
+  await page.evaluate((id) => {
+    const el = document.querySelector(`#${id} .arrow-icon-select-btn`);
+    if (el) { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); el.click(); }
+  }, selectId);
   await page.waitForSelector(`.arrow-icon-select-item[data-value="${value}"]`, { state: 'visible' });
-  await page.click(`.arrow-icon-select-item[data-value="${value}"]`);
+  await page.evaluate((val) => {
+    const el = document.querySelector(`.arrow-icon-select-item[data-value="${val}"]`);
+    if (el) el.click();
+  }, value);
 }
 
 // Helper to open color presets popover then click a swatch
@@ -1774,9 +1792,13 @@ test.describe('Arrow Feature', () => {
       });
       expect(dashArray).toBeFalsy();
 
-      // Change to dashed
+      // Change to dashed — wait for dasharray to appear
       await selectIconOption(page, 'arrow-style-dash', 'dashed');
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl?.getAttribute('stroke-dasharray');
+      });
 
       dashArray = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1785,9 +1807,13 @@ test.describe('Arrow Feature', () => {
       });
       expect(dashArray).toBeTruthy();
 
-      // Change to dotted
+      // Change to dotted — wait for dasharray to change
       await selectIconOption(page, 'arrow-style-dash', 'dotted');
-      await page.waitForTimeout(50);
+      await page.waitForFunction((prev) => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl?.getAttribute('stroke-dasharray') !== prev;
+      }, dashArray);
 
       const dottedArray = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1797,9 +1823,13 @@ test.describe('Arrow Feature', () => {
       expect(dottedArray).toBeTruthy();
       expect(dottedArray).not.toBe(dashArray);
 
-      // Change back to solid
+      // Change back to solid — wait for dasharray to be removed
       await selectIconOption(page, 'arrow-style-dash', 'solid');
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return !pathEl?.getAttribute('stroke-dasharray');
+      });
 
       dashArray = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1814,10 +1844,19 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      // Set dashed with width 2
+      // Set dashed — wait for dasharray to appear
       await selectIconOption(page, 'arrow-style-dash', 'dashed');
-      await page.fill('#arrow-style-width', '2');
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl?.getAttribute('stroke-dasharray');
+      });
+
+      await fillInput(page, '#arrow-style-width', '2');
+      await page.waitForFunction(() => {
+        const el = document.querySelector('#arrow-style-width');
+        return el?.value === '2';
+      });
 
       const dashArray2 = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1825,9 +1864,13 @@ test.describe('Arrow Feature', () => {
         return pathEl.getAttribute('stroke-dasharray');
       });
 
-      // Change width to 4
-      await page.fill('#arrow-style-width', '4');
-      await page.waitForTimeout(50);
+      // Change width to 4 — wait for dasharray to change
+      await fillInput(page, '#arrow-style-width', '4');
+      await page.waitForFunction((prev) => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl?.getAttribute('stroke-dasharray') !== prev;
+      }, dashArray2);
 
       const dashArray4 = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1891,9 +1934,12 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      // Set to double
+      // Set to double — wait for extra lines to appear
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        return container?.querySelectorAll('.arrow-extra-line').length === 2;
+      });
 
       let extraCount = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1901,9 +1947,12 @@ test.describe('Arrow Feature', () => {
       });
       expect(extraCount).toBe(2);
 
-      // Switch back to single
+      // Switch back to single — wait for extra lines to be removed
       await selectIconOption(page, 'arrow-style-line', 'single');
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        return container?.querySelectorAll('.arrow-extra-line').length === 0;
+      });
 
       extraCount = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1952,11 +2001,17 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      // Set color, dash, and line style
+      // Set color, dash, and line style — wait for extra lines to appear with expected attributes
       await page.fill('#arrow-style-color', '#ff0000');
       await selectIconOption(page, 'arrow-style-dash', 'dashed');
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const lines = container?.querySelectorAll('.arrow-extra-line');
+        return lines?.length === 2
+          && lines[0].getAttribute('stroke') === '#ff0000'
+          && lines[0].getAttribute('stroke-dasharray');
+      });
 
       const extraLineStyles = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -2282,13 +2337,21 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
 
-      // Change multiple styles
+      // Change multiple styles — wait for all to be applied on the path element
       await page.fill('#arrow-style-color', '#0000ff');
-      await page.fill('#arrow-style-width', '5');
+      await fillInput(page, '#arrow-style-width', '5');
       await selectIconOption(page, 'arrow-style-head', 'diamond');
       await selectIconOption(page, 'arrow-style-dash', 'dotted');
-      await page.fill('#arrow-style-opacity', '0.7');
-      await page.waitForTimeout(50);
+      await fillInput(page, '#arrow-style-opacity', '0.7');
+
+      await page.waitForFunction(() => {
+        const container = document.querySelector('.editable-arrow-container.editable-new');
+        const pathEl = container?.querySelector('svg path[stroke]:not([stroke="transparent"])');
+        return pathEl?.getAttribute('stroke') === '#0000ff'
+          && pathEl?.getAttribute('stroke-width') === '5'
+          && pathEl?.getAttribute('stroke-dasharray')
+          && pathEl?.getAttribute('opacity') === '0.7';
+      });
 
       const styles = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');

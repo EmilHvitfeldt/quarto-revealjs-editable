@@ -47,7 +47,8 @@ _extensions/editable/
     ├── capabilities.js # Capability system (move, resize, rotate, etc.)
     ├── serialization.js # QMD transformation and property serializers
     ├── quill.js        # Rich text editor integration
-    ├── arrows.js       # Arrow system
+    ├── arrows.js       # Arrow system and arrow context panel
+    ├── images.js       # Image context panel (opacity, radius, fit, flip, replace, reset)
     ├── toolbar.js      # Top bar toolbar
     └── main.js         # Plugin entry point
 ```
@@ -124,8 +125,36 @@ The toolbar has two zones:
 - **Right zone** - Swappable context panels:
   - `default` panel: Add + Modify actions (shown when nothing is selected)
   - `arrow` panel: Arrow style controls (shown when an arrow is selected; centered, horizontally scrollable)
+  - `image` panel: Image style controls (shown when an image element is selected)
+  - `text` panel: Quill formatting toolbar (shown when a div is in edit mode)
 
-`showRightPanel(panelName)` switches which panel is visible. Arrow controls live inside `.arrow-center-wrap` (holds color section + `.arrow-controls-wrap` grid as one unit) so they center together in the right zone.
+`showRightPanel(panelName)` switches which panel is visible by toggling `display: none` on all `.toolbar-panel` children of the right zone.
+
+#### Image panel (`images.js`)
+
+`createImageStyleControls()` builds the `.toolbar-panel-image` contents — a two-row grid of labelled control groups: opacity slider, border-radius input, crop toggle button, flip H/V toggle buttons, replace-image file picker, and a reset button. Cached references are stored in `imageControlRefs` for fast sync.
+
+`setActiveImage(imgEl)` is the selection entry point: sets `activeImage`, calls `updateImageStylePanel()` to sync all controls to the element's current state, then calls `showRightPanel('image')`. Passing `null` deselects and calls `showRightPanel('default')`.
+
+**State properties added to `EditableElement` for images:**
+
+| Property | Type | Default | Serializes as |
+|---|---|---|---|
+| `opacity` | number (0–100) | `100` | `opacity: 0.xx;` |
+| `borderRadius` | number (px) | `0` | `border-radius: Xpx;` |
+| `cropTop` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `cropRight` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `cropBottom` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `cropLeft` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `flipH` | boolean | `false` | composed into `transform:` |
+| `flipV` | boolean | `false` | composed into `transform:` |
+| `src` | string\|null | `null` | replaces `](src)` in image markdown |
+
+**Transform composition:** `serializeToQmd` composes `rotation`, `flipH`, and `flipV` into a single `transform:` style declaration to avoid duplicate properties: `transform: rotate(Xdeg) scaleX(-1) scaleY(-1);`. Crop values are similarly composed into a single `clip-path: inset(T R B L)` declaration.
+
+**Replace image:** stores only the filename in `state.src` (not a data URI); the element displays via a temporary data URI but the QMD receives the bare filename. `replaceEditableOccurrences` updates both the `](src)` and `{.absolute ...}` parts of the image markdown. Height is recalculated to match the new image's natural aspect ratio at the current width.
+
+**Crop mode:** toggled by the crop button; when active, the existing corner resize handles are intercepted via capture-phase `mousedown` listeners (using `stopImmediatePropagation`) so dragging adjusts the `cropTop/Right/Bottom/Left` insets instead of resizing the element. The container gets a `crop-mode` CSS class that changes the handle cursor.
 
 ### Brand Color Integration
 

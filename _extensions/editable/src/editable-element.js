@@ -36,7 +36,7 @@ export class EditableElement {
 
     /**
      * Internal state object tracking all editable properties.
-     * @type {{x: number, y: number, width: number, height: number, rotation: number, fontSize: number|null, textAlign: string|null}}
+     * @type {{x: number, y: number, width: number, height: number, rotation: number, fontSize: number|null, textAlign: string|null, opacity: number, borderRadius: number, objectFit: string|null, flipH: boolean, flipV: boolean}}
      */
     this.state = {
       x: 0,
@@ -47,6 +47,16 @@ export class EditableElement {
       // Div-specific properties
       fontSize: null,
       textAlign: null,
+      // Image-specific properties
+      src: null,
+      opacity: 100,
+      borderRadius: 0,
+      cropTop: 0,
+      cropRight: 0,
+      cropBottom: 0,
+      cropLeft: 0,
+      flipH: false,
+      flipV: false,
     };
   }
 
@@ -96,6 +106,20 @@ export class EditableElement {
     if (this.state.textAlign !== null) {
       this.element.style.textAlign = this.state.textAlign;
     }
+
+    if (this.type === "img") {
+      this.element.style.opacity = this.state.opacity !== 100 ? this.state.opacity / 100 : "";
+      this.element.style.borderRadius = this.state.borderRadius ? `${this.state.borderRadius}px` : "";
+      const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = this.state;
+      this.element.style.clipPath = (ct || cr || cb || cl)
+        ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)`
+        : "";
+      const scaleX = this.state.flipH ? -1 : 1;
+      const scaleY = this.state.flipV ? -1 : 1;
+      this.element.style.transform = (scaleX !== 1 || scaleY !== 1)
+        ? `scaleX(${scaleX}) scaleY(${scaleY})`
+        : "";
+    }
   }
 
   /**
@@ -132,6 +156,27 @@ export class EditableElement {
         this.state.textAlign = this.element.style.textAlign;
       }
     }
+
+    if (this.type === "img") {
+      const opacityStr = this.element.style.opacity;
+      this.state.opacity = opacityStr !== "" ? Math.round(parseFloat(opacityStr) * 100) : 100;
+      const radiusStr = this.element.style.borderRadius;
+      this.state.borderRadius = radiusStr ? parseFloat(radiusStr) : 0;
+      const clipPath = this.element.style.clipPath || "";
+      const insetMatch = clipPath.match(/inset\(([^)]+)\)/);
+      if (insetMatch) {
+        const parts = insetMatch[1].split(/\s+/).map(parseFloat);
+        this.state.cropTop = parts[0] || 0;
+        this.state.cropRight = parts[1] ?? parts[0] ?? 0;
+        this.state.cropBottom = parts[2] ?? parts[0] ?? 0;
+        this.state.cropLeft = parts[3] ?? parts[1] ?? parts[0] ?? 0;
+      } else {
+        this.state.cropTop = this.state.cropRight = this.state.cropBottom = this.state.cropLeft = 0;
+      }
+      const transform = this.element.style.transform || "";
+      this.state.flipH = /scaleX\(-1\)/.test(transform);
+      this.state.flipV = /scaleY\(-1\)/.test(transform);
+    }
   }
 
   /**
@@ -160,6 +205,29 @@ export class EditableElement {
       }
       if (this.state.textAlign !== null) {
         dims.textAlign = this.state.textAlign;
+      }
+    }
+
+    if (this.type === "img") {
+      if (this.state.src !== null) {
+        dims.src = this.state.src;
+      }
+      if (this.state.opacity !== 100) {
+        dims.opacity = this.state.opacity;
+      }
+      if (this.state.borderRadius) {
+        dims.borderRadius = this.state.borderRadius;
+      }
+      const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = this.state;
+      if (ct || cr || cb || cl) {
+        dims.cropTop = ct;
+        dims.cropRight = cr;
+        dims.cropBottom = cb;
+        dims.cropLeft = cl;
+      }
+      if (this.state.flipH || this.state.flipV) {
+        dims.flipH = this.state.flipH;
+        dims.flipV = this.state.flipV;
       }
     }
 

@@ -124,6 +124,45 @@ Sometimes you might find that images don't stay the size that you dragged them t
 }
 ```
 
+## Image Controls
+
+When you click an image element, the toolbar switches to an image-specific context panel with controls for styling the selected image.
+
+### Opacity
+
+A slider (0–100%) sets the image's CSS `opacity`. Changes apply immediately and are saved to the QMD `style=` attribute on the next Save.
+
+### Border Radius
+
+A number input (pixels) rounds the corners of the image with `border-radius`. Set to `0` for sharp corners.
+
+### Crop
+
+Click the **✂** button to enter crop mode. While active, the corner resize handles adjust the image's `clip-path` inset instead of resizing the element — dragging a corner inward crops that edge. The handles move with the crop boundary so you can see exactly what will be visible. Click the button again to exit crop mode.
+
+Crop values are saved as `clip-path: inset(top right bottom left)` in the QMD `style=` attribute.
+
+### Flip
+
+Two toggle buttons flip the image:
+
+- **⇆** — flips horizontally (`scaleX(-1)`)
+- **⇅** — flips vertically (`scaleY(-1)`)
+
+Flips compose correctly with any existing rotation into a single `transform:` declaration.
+
+### Replace Image
+
+Opens a file picker to swap the image source. The element's height is automatically recalculated to match the new image's aspect ratio while keeping the current width. The filename is written back to the QMD on Save.
+
+::: callout-warning
+Place the replacement image file in the same folder as your QMD file before rendering. A reminder popup appears after selecting a file.
+:::
+
+### Reset
+
+Reverts opacity, border radius, crop, and flips to their defaults without affecting the element's position or size.
+
 ## Arrow Support
 
 The extension integrates with [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) to add arrows to your slides visually.
