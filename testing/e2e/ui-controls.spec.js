@@ -505,12 +505,14 @@ test.describe('Font Size Controls', () => {
 
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
-      const toolbar = div.querySelector('.quill-toolbar-container');
+      // Toolbar moves to .toolbar-panel-text in the menu sidebar when editing
+      const textPanel = document.querySelector('.toolbar-panel-text');
+      const toolbar = textPanel ? textPanel.querySelector('.quill-toolbar-container') : null;
       const quillWrapper = div.querySelector('.quill-wrapper');
       return {
         hasToolbar: !!toolbar,
         hasQuillWrapper: !!quillWrapper,
-        toolbarVisible: toolbar ? toolbar.style.display !== 'none' : false,
+        toolbarVisible: textPanel ? textPanel.style.display !== 'none' : false,
       };
     });
 
@@ -530,14 +532,15 @@ test.describe('Font Size Controls', () => {
       editBtn.click();
     });
 
+    // Toolbar moves to .toolbar-panel-text in the menu sidebar when editing
     await page.waitForFunction(() => {
-      const div = document.querySelector('div.editable');
-      return div.querySelector('.quill-toolbar-container');
+      const textPanel = document.querySelector('.toolbar-panel-text');
+      return textPanel && textPanel.querySelector('.quill-toolbar-container');
     }, { timeout: 5000 });
 
     const result = await page.evaluate(() => {
-      const div = document.querySelector('div.editable');
-      const toolbar = div.querySelector('.quill-toolbar-container');
+      const textPanel = document.querySelector('.toolbar-panel-text');
+      const toolbar = textPanel.querySelector('.quill-toolbar-container');
       return {
         hasBold: !!toolbar.querySelector('.ql-bold'),
         hasItalic: !!toolbar.querySelector('.ql-italic'),
