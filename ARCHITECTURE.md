@@ -148,8 +148,11 @@ The toolbar has two zones:
 | `cropLeft` | number (px) | `0` | composed into `clip-path: inset(...)` |
 | `flipH` | boolean | `false` | composed into `transform:` |
 | `flipV` | boolean | `false` | composed into `transform:` |
+| `src` | string\|null | `null` | replaces `](src)` in image markdown |
 
 **Transform composition:** `serializeToQmd` composes `rotation`, `flipH`, and `flipV` into a single `transform:` style declaration to avoid duplicate properties: `transform: rotate(Xdeg) scaleX(-1) scaleY(-1);`. Crop values are similarly composed into a single `clip-path: inset(T R B L)` declaration.
+
+**Replace image:** stores only the filename in `state.src` (not a data URI); the element displays via a temporary data URI but the QMD receives the bare filename. `replaceEditableOccurrences` updates both the `](src)` and `{.absolute ...}` parts of the image markdown. Height is recalculated to match the new image's natural aspect ratio at the current width.
 
 **Crop mode:** toggled by the crop button; when active, the existing corner resize handles are intercepted via capture-phase `mousedown` listeners (using `stopImmediatePropagation`) so dragging adjusts the `cropTop/Right/Bottom/Left` insets instead of resizing the element. The container gets a `crop-mode` CSS class that changes the handle cursor.
 

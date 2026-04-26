@@ -85,14 +85,15 @@ npm run test:e2e
 | Opacity slider updates image | `img.style.opacity` set correctly |
 | Opacity slider syncs to state | `editableRegistry` state reflects slider value |
 | Border radius input updates image | `img.style.borderRadius` set to `Xpx` |
-| Object fit Cover sets object-fit | `img.style.objectFit === 'cover'`, button marked active |
-| Clicking active fit button clears it | `objectFit` cleared, button no longer active |
+| Crop button toggles crop-mode class | `.editable-container.crop-mode` added/removed |
+| Clicking crop button again exits crop mode | `crop-mode` class removed |
 | Flip H applies scaleX(-1) | `img.style.transform` contains `scaleX(-1)` |
 | Flip V applies scaleY(-1) | `img.style.transform` contains `scaleY(-1)` |
 | Flip H and V together | Both scale transforms present |
 | Reset reverts all style properties | opacity, borderRadius, transform cleared in DOM and state |
 | Ctrl+Z undoes opacity change | Opacity reverts after keyboard undo |
-| Image properties serialize to QMD | `opacity:`, `border-radius:`, `object-fit:` in style string |
+| Image properties serialize to QMD | `opacity:`, `border-radius:` in style string |
+| Crop values serialize as clip-path | `clip-path: inset(T R B L)` in style string |
 | Flip serializes as scaleX/scaleY | Flips produce correct `transform:` in QMD |
 | Rotation and flip compose | Single `transform:` declaration for both; correct values |
 | Panel controls sync on re-select | Slider/input values match state when image re-selected |

@@ -11,9 +11,9 @@ All notable changes to the quarto-revealjs-editable extension will be documented
   - **Border radius** - Number input (px) for rounded corners
   - **Crop** - Toggle crop mode; in crop mode the corner resize handles adjust `clip-path: inset(...)` instead of resizing
   - **Flip** - Horizontal and vertical flip toggles (compose correctly with rotation)
-  - **Replace image** - File picker to swap the image source (data URI)
+  - **Replace image** - File picker to swap the image source; height auto-adjusts to match the new image's aspect ratio; filename is written to QMD (a popup reminds you to place the file next to the QMD)
   - **Reset** - Reverts all image style properties to defaults
-  - All controls serialize to the saved QMD `style=` attribute; flips and rotation compose into a single `transform:` declaration
+  - All controls serialize to the saved QMD `style=` attribute; flips and rotation compose into a single `transform:` declaration; crop composes into a single `clip-path:` declaration
 
 ### Changed
 
