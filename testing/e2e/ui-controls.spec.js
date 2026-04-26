@@ -30,38 +30,28 @@ test.describe('UI Controls', () => {
   test('changeFontSize function increases font size', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    const initial = await page.evaluate(() => {
-      const div = document.querySelector('div.editable');
-      return parseFloat(window.getComputedStyle(div).fontSize);
-    });
-
-    // Call changeFontSize directly via the public API
-    await page.evaluate(() => {
+    const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
       const editableElt = editableRegistry.get(div);
-      if (editableElt) editableElt.setState({ fontSize: (editableElt.state.fontSize || 16) + 2 });
+      if (!editableElt) return null;
+      const before = editableElt.state.fontSize || 16;
+      editableElt.setState({ fontSize: before + 2 });
+      return { before, after: editableElt.state.fontSize };
     });
 
-    const after = await page.evaluate(() => {
-      const div = document.querySelector('div.editable');
-      return parseFloat(window.getComputedStyle(div).fontSize);
-    });
-
-    expect(after).toBeGreaterThan(initial);
+    expect(result).not.toBeNull();
+    expect(result.after).toBeGreaterThan(result.before);
   });
 
   test('Text alignment state can be set programmatically', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    await page.evaluate(() => {
-      const div = document.querySelector('div.editable');
-      const editableElt = editableRegistry.get(div);
-      if (editableElt) editableElt.setState({ textAlign: 'center' });
-    });
-
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
-      return window.getComputedStyle(div).textAlign;
+      const editableElt = editableRegistry.get(div);
+      if (!editableElt) return null;
+      editableElt.setState({ textAlign: 'center' });
+      return div.style.textAlign;
     });
 
     expect(result).toBe('center');
