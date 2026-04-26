@@ -72,6 +72,32 @@ export const PropertySerializers = {
     type: "style",
     serialize: (v) => (v ? `transform: rotate(${round(v)}deg);` : null),
   },
+
+  // Image-specific properties
+  opacity: {
+    type: "style",
+    serialize: (v) => (v !== 100 ? `opacity: ${Math.round((v / 100) * 1000) / 1000};` : null),
+  },
+  borderRadius: {
+    type: "style",
+    serialize: (v) => (v ? `border-radius: ${round(v)}px;` : null),
+  },
+  objectFit: {
+    type: "style",
+    serialize: (v) => (v ? `object-fit: ${v};` : null),
+  },
+  flipH: {
+    type: "style",
+    serialize: () => null, // combined into imageTransform
+  },
+  flipV: {
+    type: "style",
+    serialize: () => null, // combined into imageTransform
+  },
+  imageTransform: {
+    type: "style",
+    serialize: (v) => (v ? `transform: ${v};` : null),
+  },
 };
 
 /**
@@ -83,7 +109,25 @@ export function serializeToQmd(dimensions) {
   const attrs = [];
   const styles = [];
 
+  // Compose rotation and flips into a single transform value
+  const transformParts = [];
+  if (dimensions.rotation) {
+    transformParts.push(`rotate(${round(dimensions.rotation)}deg)`);
+  }
+  if (dimensions.flipH) {
+    transformParts.push("scaleX(-1)");
+  }
+  if (dimensions.flipV) {
+    transformParts.push("scaleY(-1)");
+  }
+  if (transformParts.length > 0) {
+    styles.push(`transform: ${transformParts.join(" ")};`);
+  }
+
+  const skipKeys = new Set(["rotation", "flipH", "flipV"]);
+
   for (const [key, value] of Object.entries(dimensions)) {
+    if (skipKeys.has(key)) continue;
     const serializer = PropertySerializers[key];
     if (serializer && value != null) {
       const result = serializer.serialize(value);

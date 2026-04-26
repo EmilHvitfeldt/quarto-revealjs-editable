@@ -11,6 +11,7 @@
  */
 
 import { ToolbarRegistry } from './registries.js';
+import { createImageStyleControls } from './images.js';
 
 /** @type {HTMLElement|null} The right-zone container */
 let rightZoneEl = null;
@@ -100,6 +101,13 @@ export function createFloatingToolbar() {
   arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
   arrowPanel.style.display = "none";
   rightZone.appendChild(arrowPanel);
+
+  // Image panel: shown when an image element is selected
+  const imagePanel = document.createElement("div");
+  imagePanel.className = "toolbar-panel toolbar-panel-image";
+  imagePanel.style.display = "none";
+  imagePanel.appendChild(createImageStyleControls());
+  rightZone.appendChild(imagePanel);
 
   // Text panel: holds the active Quill toolbar when a div is in edit mode
   const textPanel = document.createElement("div");

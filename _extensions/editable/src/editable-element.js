@@ -36,7 +36,7 @@ export class EditableElement {
 
     /**
      * Internal state object tracking all editable properties.
-     * @type {{x: number, y: number, width: number, height: number, rotation: number, fontSize: number|null, textAlign: string|null}}
+     * @type {{x: number, y: number, width: number, height: number, rotation: number, fontSize: number|null, textAlign: string|null, opacity: number, borderRadius: number, objectFit: string|null, flipH: boolean, flipV: boolean}}
      */
     this.state = {
       x: 0,
@@ -47,6 +47,12 @@ export class EditableElement {
       // Div-specific properties
       fontSize: null,
       textAlign: null,
+      // Image-specific properties
+      opacity: 100,
+      borderRadius: 0,
+      objectFit: null,
+      flipH: false,
+      flipV: false,
     };
   }
 
@@ -96,6 +102,17 @@ export class EditableElement {
     if (this.state.textAlign !== null) {
       this.element.style.textAlign = this.state.textAlign;
     }
+
+    if (this.type === "img") {
+      this.element.style.opacity = this.state.opacity !== 100 ? this.state.opacity / 100 : "";
+      this.element.style.borderRadius = this.state.borderRadius ? `${this.state.borderRadius}px` : "";
+      this.element.style.objectFit = this.state.objectFit ?? "";
+      const scaleX = this.state.flipH ? -1 : 1;
+      const scaleY = this.state.flipV ? -1 : 1;
+      this.element.style.transform = (scaleX !== 1 || scaleY !== 1)
+        ? `scaleX(${scaleX}) scaleY(${scaleY})`
+        : "";
+    }
   }
 
   /**
@@ -132,6 +149,17 @@ export class EditableElement {
         this.state.textAlign = this.element.style.textAlign;
       }
     }
+
+    if (this.type === "img") {
+      const opacityStr = this.element.style.opacity;
+      this.state.opacity = opacityStr !== "" ? Math.round(parseFloat(opacityStr) * 100) : 100;
+      const radiusStr = this.element.style.borderRadius;
+      this.state.borderRadius = radiusStr ? parseFloat(radiusStr) : 0;
+      this.state.objectFit = this.element.style.objectFit || null;
+      const transform = this.element.style.transform || "";
+      this.state.flipH = /scaleX\(-1\)/.test(transform);
+      this.state.flipV = /scaleY\(-1\)/.test(transform);
+    }
   }
 
   /**
@@ -160,6 +188,22 @@ export class EditableElement {
       }
       if (this.state.textAlign !== null) {
         dims.textAlign = this.state.textAlign;
+      }
+    }
+
+    if (this.type === "img") {
+      if (this.state.opacity !== 100) {
+        dims.opacity = this.state.opacity;
+      }
+      if (this.state.borderRadius) {
+        dims.borderRadius = this.state.borderRadius;
+      }
+      if (this.state.objectFit) {
+        dims.objectFit = this.state.objectFit;
+      }
+      if (this.state.flipH || this.state.flipV) {
+        dims.flipH = this.state.flipH;
+        dims.flipV = this.state.flipV;
       }
     }
 
