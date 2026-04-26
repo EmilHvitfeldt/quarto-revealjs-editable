@@ -15871,6 +15871,50 @@ ${fence}`;
   function formatEditableEltStrings(dimensions) {
     return dimensions.map((dim) => serializeToQmd(dim));
   }
+  function splitIntoSlideChunks(text) {
+    let preamble = "";
+    let body = text;
+    if (text.startsWith("---\n")) {
+      const closingIdx = text.indexOf("\n---\n", 4);
+      if (closingIdx !== -1) {
+        const end = closingIdx + 5;
+        preamble = text.slice(0, end);
+        body = text.slice(end);
+      }
+    }
+    const parts = body.split(/(?=^## )/m);
+    const firstIsSlide = parts[0].startsWith("## ");
+    const preslide = firstIsSlide ? "" : parts[0];
+    const slideChunks = firstIsSlide ? parts : parts.slice(1);
+    return [preamble + preslide, ...slideChunks];
+  }
+  function replaceModifiedImages(text) {
+    const imgs = Array.from(
+      document.querySelectorAll('img[data-editable-modified="true"]')
+    );
+    if (imgs.length === 0)
+      return text;
+    const chunks = splitIntoSlideChunks(text);
+    for (const img of imgs) {
+      const originalSrc = img.dataset.editableModifiedSrc;
+      if (!originalSrc)
+        continue;
+      const editableElt = editableRegistry.get(img);
+      if (!editableElt)
+        continue;
+      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
+      const chunkIndex = slideIndex + 1;
+      const dims = editableElt.toDimensions();
+      const attrs = serializeToQmd(dims);
+      const newSrc = dims.src || originalSrc;
+      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`);
+      if (chunkIndex < chunks.length) {
+        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, `](${newSrc})${attrs}`);
+      }
+    }
+    return chunks.join("");
+  }
 
   // src/io.js
   function readIndexQmd() {
@@ -15898,6 +15942,7 @@ ${fence}`;
     const attributes = formatEditableEltStrings(dimensions);
     const srcReplacements = dimensions.map((d) => d.src || null);
     content = replaceEditableOccurrences(content, attributes, srcReplacements);
+    content = replaceModifiedImages(content);
     return content;
   }
   async function downloadString(content, mimeType = "text/plain") {
@@ -15946,6 +15991,69 @@ ${fence}`;
     }).catch((err) => {
       console.error("Failed to copy to clipboard:", err);
     });
+  }
+
+  // src/modify-mode.js
+  var VALID_CLASS = "modify-mode-valid";
+  var INVALID_CLASS = "modify-mode-invalid";
+  var ROOT_CLASS = "modify-mode";
+  var abortController = null;
+  function getImgSrc(img) {
+    return img.getAttribute("src") || img.getAttribute("data-src") || null;
+  }
+  function srcInQmdSource(img) {
+    if (!window._input_file)
+      return false;
+    const src = getImgSrc(img);
+    return !!src && window._input_file.includes(src);
+  }
+  function classifyImages() {
+    const reveal = document.querySelector(".reveal");
+    const currentSlide = reveal?.querySelector(".slides .present");
+    const imgs = currentSlide ? Array.from(currentSlide.querySelectorAll("img")) : Array.from(document.querySelectorAll(".reveal .slides img"));
+    const valid = [];
+    const invalid = [];
+    for (const img of imgs) {
+      if (editableRegistry.has(img))
+        continue;
+      if (srcInQmdSource(img)) {
+        valid.push(img);
+      } else {
+        invalid.push(img);
+      }
+    }
+    return { valid, invalid };
+  }
+  function enterModifyMode() {
+    document.querySelector(".reveal")?.classList.add(ROOT_CLASS);
+    abortController = new AbortController();
+    const { signal } = abortController;
+    const { valid, invalid } = classifyImages();
+    valid.forEach((img) => {
+      img.classList.add(VALID_CLASS);
+      img.addEventListener("click", onValidImageClick, { signal, once: true });
+    });
+    invalid.forEach((img) => img.classList.add(INVALID_CLASS));
+  }
+  function exitModifyMode() {
+    document.querySelector(".reveal")?.classList.remove(ROOT_CLASS);
+    abortController?.abort();
+    abortController = null;
+    document.querySelectorAll(`.${VALID_CLASS}, .${INVALID_CLASS}`).forEach((img) => {
+      img.classList.remove(VALID_CLASS, INVALID_CLASS);
+    });
+  }
+  function onValidImageClick(e) {
+    e.stopPropagation();
+    const img = e.currentTarget;
+    img.dataset.editableModifiedSrc = getImgSrc(img);
+    img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+    img.dataset.editableModified = "true";
+    img.classList.remove(VALID_CLASS);
+    setupImageWhenReady(img);
+    exitModifyMode();
+    const btn = document.querySelector(".toolbar-modify");
+    btn?.classList.remove("active");
   }
 
   // src/menu.js
@@ -16024,14 +16132,23 @@ ${fence}`;
       { icon: "\u27A1\uFE0F", label: "Arrow", title: "Add arrow to current slide", className: "toolbar-add-arrow", onClick: () => addNewArrow() }
     ]
   });
+  var modifyModeActive = false;
   ToolbarRegistry.register("modify", {
     icon: "\u270F\uFE0F",
     label: "Modify",
-    title: "Select any element to edit (coming soon)",
+    title: "Click an image to make it editable",
     className: "toolbar-modify",
     zone: "right",
-    disabled: true,
     onClick: () => {
+      modifyModeActive = !modifyModeActive;
+      const btn = document.querySelector(".toolbar-modify");
+      if (modifyModeActive) {
+        enterModifyMode();
+        btn?.classList.add("active");
+      } else {
+        exitModifyMode();
+        btn?.classList.remove("active");
+      }
     }
   });
   window.Revealeditable = function() {

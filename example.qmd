@@ -10,7 +10,7 @@ filters:
 
 ## In the morning
 
-![](image.png){.editable}
+![](image.png)
 
 ::: {.editable}
 I think that I shall never see

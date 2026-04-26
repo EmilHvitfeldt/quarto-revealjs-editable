@@ -8,6 +8,7 @@ import {
   extractEditableEltDimensions,
   formatEditableEltStrings,
   replaceEditableOccurrences,
+  replaceModifiedImages,
   updateTextDivs,
   insertNewSlides,
   insertNewDivs,
@@ -53,6 +54,7 @@ export function getTransformedQmd() {
   const attributes = formatEditableEltStrings(dimensions);
   const srcReplacements = dimensions.map(d => d.src || null);
   content = replaceEditableOccurrences(content, attributes, srcReplacements);
+  content = replaceModifiedImages(content);
 
   return content;
 }

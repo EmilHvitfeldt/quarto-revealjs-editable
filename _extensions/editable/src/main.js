@@ -14,6 +14,7 @@ import { addNewArrow } from './arrows.js';
 import { setActiveImage } from './images.js';
 import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
+import { enterModifyMode, exitModifyMode } from './modify-mode.js';
 import { addSaveMenuButton } from './menu.js';
 import {
   extractEditableEltDimensions,
@@ -59,15 +60,25 @@ ToolbarRegistry.register("add", {
   ],
 });
 
-// TODO: #48 — implement click-to-edit mode
+let modifyModeActive = false;
+
 ToolbarRegistry.register("modify", {
   icon: "✏️",
   label: "Modify",
-  title: "Select any element to edit (coming soon)",
+  title: "Click an image to make it editable",
   className: "toolbar-modify",
   zone: "right",
-  disabled: true,
-  onClick: () => {},
+  onClick: () => {
+    modifyModeActive = !modifyModeActive;
+    const btn = document.querySelector(".toolbar-modify");
+    if (modifyModeActive) {
+      enterModifyMode();
+      btn?.classList.add("active");
+    } else {
+      exitModifyMode();
+      btn?.classList.remove("active");
+    }
+  },
 });
 
 /**

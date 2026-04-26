@@ -739,3 +739,77 @@ export function replaceEditableOccurrences(text, replacements, srcReplacements =
 export function formatEditableEltStrings(dimensions) {
   return dimensions.map((dim) => serializeToQmd(dim));
 }
+
+/**
+ * Replace plain image markdown with positioned attributes for images
+ * that were made editable via modify mode (data-editable-modified).
+ * These are not in the positional .editable index, so they need their
+ * own write-back path that matches by src.
+ * @param {string} text - QMD content
+ * @returns {string} Updated QMD content
+ */
+/**
+ * Split QMD source into per-slide chunks using ## headers as boundaries.
+ * Returns [preamble, slide0, slide1, ...] where preamble is everything before
+ * the first ## header (including YAML front matter). Rejoining the array
+ * with '' recovers the original text.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function splitIntoSlideChunks(text) {
+  // Strip YAML front matter so its --- delimiters are not treated as boundaries
+  let preamble = '';
+  let body = text;
+  if (text.startsWith('---\n')) {
+    const closingIdx = text.indexOf('\n---\n', 4);
+    if (closingIdx !== -1) {
+      const end = closingIdx + 5; // include the closing ---\n
+      preamble = text.slice(0, end);
+      body = text.slice(end);
+    }
+  }
+
+  // Split body on ## slide headers
+  const parts = body.split(/(?=^## )/m);
+
+  // parts[0] may be pre-slide content (blank lines, etc.) or a ## slide itself
+  const firstIsSlide = parts[0].startsWith('## ');
+  const preslide = firstIsSlide ? '' : parts[0];
+  const slideChunks = firstIsSlide ? parts : parts.slice(1);
+
+  return [preamble + preslide, ...slideChunks];
+}
+
+export function replaceModifiedImages(text) {
+  const imgs = Array.from(
+    document.querySelectorAll('img[data-editable-modified="true"]')
+  );
+  if (imgs.length === 0) return text;
+
+  const chunks = splitIntoSlideChunks(text);
+  // chunks[0] is preamble; chunks[slideIndex + 1] is the slide content
+
+  for (const img of imgs) {
+    const originalSrc = img.dataset.editableModifiedSrc;
+    if (!originalSrc) continue;
+
+    const editableElt = editableRegistry.get(img);
+    if (!editableElt) continue;
+
+    const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
+    const chunkIndex = slideIndex + 1;
+
+    const dims = editableElt.toDimensions();
+    const attrs = serializeToQmd(dims);
+    const newSrc = dims.src || originalSrc;
+
+    const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`);
+
+    if (chunkIndex < chunks.length) {
+      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, `](${newSrc})${attrs}`);
+    }
+  }
+
+  return chunks.join('');
+}

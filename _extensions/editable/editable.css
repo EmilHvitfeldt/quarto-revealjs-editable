@@ -26,7 +26,9 @@
   --editable-toolbar-add-text-color: #28a745;
   --editable-toolbar-add-slide-color: #17a2b8;
   --editable-toolbar-add-color: #28a745;
-  /* TODO: Add --editable-toolbar-modify-color for issue #48 */
+  --editable-toolbar-modify-color: #fd7e14;
+  --editable-modify-valid-shadow: 0 0 0 3px #28a745, 0 0 8px rgba(40, 167, 69, 0.5);
+  --editable-modify-valid-hover-shadow: 0 0 0 4px #28a745, 0 0 16px rgba(40, 167, 69, 0.7);
 
   /* Arrow theming */
   --editable-arrow-start-color: #007cba;
@@ -370,7 +372,26 @@
   background-color: var(--editable-toolbar-add-color);
 }
 
-/* TODO: Add .toolbar-modify styles for issue #48 */
+.editable-toolbar-button.toolbar-modify {
+  background-color: var(--editable-toolbar-modify-color);
+}
+
+.editable-toolbar-button.toolbar-modify.active {
+  outline: 2px solid var(--editable-toolbar-modify-color);
+  outline-offset: 2px;
+  opacity: 0.85;
+}
+
+/* Modify mode: valid images get a persistent green ring */
+.modify-mode img.modify-mode-valid {
+  box-shadow: var(--editable-modify-valid-shadow);
+  cursor: pointer;
+  transition: box-shadow var(--editable-transition);
+}
+
+.modify-mode img.modify-mode-valid:hover {
+  box-shadow: var(--editable-modify-valid-hover-shadow);
+}
 
 /* Submenu wrapper */
 .editable-toolbar-submenu-wrapper {
