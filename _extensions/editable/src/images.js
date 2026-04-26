@@ -266,7 +266,7 @@ export function createImageStyleControls() {
 
   const opacityLabel = document.createElement("span");
   opacityLabel.className = "image-opacity-label";
-  opacityLabel.textContent = "100%";
+  opacityLabel.style.display = "none";
 
   opacitySlider.addEventListener("mousedown", () => {
     if (activeImage) pushUndoState();
@@ -318,7 +318,7 @@ export function createImageStyleControls() {
   const cropCell = addCell("Crop");
   const cropBtn = document.createElement("button");
   cropBtn.className = "image-toolbar-btn";
-  cropBtn.textContent = "✂ Crop";
+  cropBtn.textContent = "✂";
   cropBtn.title = "Toggle crop mode — drag edge handles to crop";
   cropBtn.addEventListener("click", () => {
     if (!activeImage) return;
@@ -338,7 +338,7 @@ export function createImageStyleControls() {
 
   const flipHBtn = document.createElement("button");
   flipHBtn.className = "image-toolbar-btn";
-  flipHBtn.textContent = "⇆ H";
+  flipHBtn.textContent = "⇆";
   flipHBtn.title = "Flip horizontal";
   flipHBtn.addEventListener("click", () => {
     if (!activeImage) return;
@@ -353,7 +353,7 @@ export function createImageStyleControls() {
 
   const flipVBtn = document.createElement("button");
   flipVBtn.className = "image-toolbar-btn";
-  flipVBtn.textContent = "⇅ V";
+  flipVBtn.textContent = "⇅";
   flipVBtn.title = "Flip vertical";
   flipVBtn.addEventListener("click", () => {
     if (!activeImage) return;

@@ -705,7 +705,7 @@ var EditableModule = (() => {
     opacitySlider.title = "Opacity";
     const opacityLabel = document.createElement("span");
     opacityLabel.className = "image-opacity-label";
-    opacityLabel.textContent = "100%";
+    opacityLabel.style.display = "none";
     opacitySlider.addEventListener("mousedown", () => {
       if (activeImage)
         pushUndoState();
@@ -752,7 +752,7 @@ var EditableModule = (() => {
     const cropCell = addCell("Crop");
     const cropBtn = document.createElement("button");
     cropBtn.className = "image-toolbar-btn";
-    cropBtn.textContent = "\u2702 Crop";
+    cropBtn.textContent = "\u2702";
     cropBtn.title = "Toggle crop mode \u2014 drag edge handles to crop";
     cropBtn.addEventListener("click", () => {
       if (!activeImage)
@@ -770,7 +770,7 @@ var EditableModule = (() => {
     flipWrap.className = "image-btn-group";
     const flipHBtn = document.createElement("button");
     flipHBtn.className = "image-toolbar-btn";
-    flipHBtn.textContent = "\u21C6 H";
+    flipHBtn.textContent = "\u21C6";
     flipHBtn.title = "Flip horizontal";
     flipHBtn.addEventListener("click", () => {
       if (!activeImage)
@@ -786,7 +786,7 @@ var EditableModule = (() => {
     imageControlRefs.flipHBtn = flipHBtn;
     const flipVBtn = document.createElement("button");
     flipVBtn.className = "image-toolbar-btn";
-    flipVBtn.textContent = "\u21C5 V";
+    flipVBtn.textContent = "\u21C5";
     flipVBtn.title = "Flip vertical";
     flipVBtn.addEventListener("click", () => {
       if (!activeImage)
