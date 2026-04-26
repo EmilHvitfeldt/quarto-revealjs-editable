@@ -4533,4 +4533,5 @@ ${fence}`;
   window.addNewSlide = addNewSlide;
   window.addNewTextElement = addNewTextElement;
   window.formatEditableEltStrings = formatEditableEltStrings;
+  window.setActiveImage = setActiveImage;
 })();

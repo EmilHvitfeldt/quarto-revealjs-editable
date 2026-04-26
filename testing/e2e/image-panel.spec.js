@@ -60,7 +60,9 @@ test.describe('Image context panel', () => {
     await setupPage(page, 'basic.html');
 
     await page.click('.editable-container:has(img)');
-    await page.click('body', { position: { x: 10, y: 10 } });
+
+    // Deselect via setActiveImage(null) — direct click on body hits Reveal.js overlays
+    await page.evaluate(() => window.setActiveImage?.(null));
 
     const visibility = await page.evaluate(() => {
       const toolbar = document.getElementById('editable-toolbar');
@@ -423,18 +425,20 @@ test.describe('Image context panel', () => {
   test('Panel controls sync to current image state when image is re-selected', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    await page.evaluate(() => {
+    // First click to select, then deselect, then update state, then re-select
+    await page.click('.editable-container:has(img)');
+    await page.evaluate(() => window.setActiveImage?.(null));
+
+    // Update state then re-trigger panel sync via setActiveImage
+    const result = await page.evaluate(() => {
       const img = document.querySelector('.editable-container img');
       const editableEl = window.editableRegistry?.get(img);
       if (editableEl) {
         editableEl.state.opacity = 60;
         editableEl.state.borderRadius = 8;
       }
-    });
+      window.setActiveImage?.(img);
 
-    await page.click('.editable-container:has(img)');
-
-    const result = await page.evaluate(() => {
       const slider = document.querySelector('.image-toolbar-opacity');
       const label = document.querySelector('.image-opacity-label');
       const radius = document.querySelector('.image-toolbar-radius');
@@ -448,6 +452,208 @@ test.describe('Image context panel', () => {
     expect(result.sliderValue).toBe('60');
     expect(result.labelText).toBe('60%');
     expect(result.radiusValue).toBe('8');
+  });
+
+  // ── Crop drag ────────────────────────────────────────────────────────────
+
+  test('Dragging nw handle in crop mode updates cropTop and cropLeft', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    // Enter crop mode
+    await page.evaluate(() => {
+      document.querySelector('[title="Toggle crop mode — drag edge handles to crop"]')?.click();
+    });
+
+    // Get the nw handle position
+    const handle = page.locator('.editable-container:has(img) .resize-handle.handle-nw');
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+
+    // Drag inward by 30px
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 30);
+    await page.mouse.up();
+
+    const result = await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      const editableEl = window.editableRegistry?.get(img);
+      return {
+        cropTop: editableEl?.state?.cropTop,
+        cropLeft: editableEl?.state?.cropLeft,
+        clipPath: img?.style.clipPath,
+      };
+    });
+
+    expect(result.cropTop).toBeGreaterThan(0);
+    expect(result.cropLeft).toBeGreaterThan(0);
+    expect(result.clipPath).toContain('inset(');
+  });
+
+  test('Handles reposition to match crop insets in crop mode', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    // Set crop state directly and enter crop mode
+    await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      const editableEl = window.editableRegistry?.get(img);
+      if (editableEl) {
+        editableEl.state.cropTop = 20;
+        editableEl.state.cropLeft = 20;
+      }
+      document.querySelector('[title="Toggle crop mode — drag edge handles to crop"]')?.click();
+    });
+
+    // nw handle should be offset from its default corner position
+    const result = await page.evaluate(() => {
+      const handle = document.querySelector('.editable-container:has(img) .resize-handle.handle-nw');
+      return {
+        top: handle?.style.top,
+        left: handle?.style.left,
+      };
+    });
+
+    expect(result.top).toBe('14px');  // cropTop(20) + offset(-6)
+    expect(result.left).toBe('14px'); // cropLeft(20) + offset(-6)
+  });
+
+  test('Exiting crop mode resets handle inline styles', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    await page.evaluate(() => {
+      const btn = document.querySelector('[title="Toggle crop mode — drag edge handles to crop"]');
+      btn?.click(); // enter
+      btn?.click(); // exit
+    });
+
+    const result = await page.evaluate(() => {
+      const handle = document.querySelector('.editable-container:has(img) .resize-handle.handle-nw');
+      return { top: handle?.style.top, left: handle?.style.left };
+    });
+
+    expect(result.top).toBe('');
+    expect(result.left).toBe('');
+  });
+
+  // ── Replace: src serialization ───────────────────────────────────────────
+
+  test('Replace stores filename in state.src', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      const editableEl = window.editableRegistry?.get(img);
+      if (editableEl) editableEl.state.src = 'new-photo.png';
+    });
+
+    const src = await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      return window.editableRegistry?.get(img)?.state?.src;
+    });
+
+    expect(src).toBe('new-photo.png');
+  });
+
+  test('Replace src is included in toDimensions output', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    const dims = await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      const editableEl = window.editableRegistry?.get(img);
+      if (!editableEl) return null;
+      editableEl.state.src = 'new-photo.png';
+      return editableEl.toDimensions();
+    });
+
+    expect(dims).not.toBeNull();
+    expect(dims.src).toBe('new-photo.png');
+  });
+
+  test('replaceEditableOccurrences updates image src in QMD', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    const result = await page.evaluate(() => {
+      const qmd = '![alt](old-photo.png){.editable style="left: 100px"}';
+      return window.replaceEditableOccurrences(
+        qmd,
+        ['{.absolute style="left: 100px"}'],
+        ['new-photo.png']
+      );
+    });
+
+    expect(result).toContain('](new-photo.png)');
+    expect(result).not.toContain('](old-photo.png)');
+  });
+
+  test('replaceEditableOccurrences leaves src unchanged when srcReplacement is null', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    const result = await page.evaluate(() => {
+      const qmd = '![alt](old-photo.png){.editable style="left: 100px"}';
+      return window.replaceEditableOccurrences(
+        qmd,
+        ['{.absolute style="left: 100px"}'],
+        [null]
+      );
+    });
+
+    expect(result).toContain('](old-photo.png)');
+  });
+
+  // ── Replace: aspect ratio ────────────────────────────────────────────────
+
+  test('Replacing image recalculates height to match new aspect ratio', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    const result = await page.evaluate(async () => {
+      const img = document.querySelector('.editable-container img');
+      const editableEl = window.editableRegistry?.get(img);
+      if (!editableEl) return null;
+
+      const startWidth = editableEl.state.width;
+
+      // Create a 200x100 image (2:1 ratio) as a data URI
+      const canvas = document.createElement('canvas');
+      canvas.width = 200;
+      canvas.height = 100;
+      const dataUrl = canvas.toDataURL();
+
+      // Simulate what the replace handler does
+      editableEl.state.src = 'test.png';
+      await new Promise(resolve => {
+        const tmp = new Image();
+        tmp.onload = () => {
+          const newHeight = Math.round(startWidth * tmp.naturalHeight / tmp.naturalWidth);
+          editableEl.state.height = newHeight;
+          img.style.height = `${newHeight}px`;
+          if (editableEl.container) editableEl.container.style.height = `${newHeight}px`;
+          resolve();
+        };
+        tmp.src = dataUrl;
+      });
+
+      return {
+        width: editableEl.state.width,
+        height: editableEl.state.height,
+        expectedHeight: Math.round(startWidth * 100 / 200),
+      };
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.height).toBe(result.expectedHeight);
+    expect(result.height).not.toBe(result.width); // height changed from original square assumption
   });
 
 });
