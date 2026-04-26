@@ -540,6 +540,30 @@ var EditableModule = (() => {
   });
 
   // src/images.js
+  function showReplaceWarning(message, anchorEl) {
+    if (replaceWarningEl)
+      replaceWarningEl.remove();
+    const popup = document.createElement("div");
+    popup.className = "image-replace-warning";
+    popup.textContent = `\u26A0 ${message}`;
+    document.body.appendChild(popup);
+    replaceWarningEl = popup;
+    const rect = anchorEl.closest("#editable-toolbar")?.getBoundingClientRect() ?? anchorEl.getBoundingClientRect();
+    popup.style.top = `${rect.bottom + 6}px`;
+    popup.style.left = "50%";
+    popup.style.transform = "translateX(-50%)";
+    const timer = setTimeout(() => {
+      popup.remove();
+      if (replaceWarningEl === popup)
+        replaceWarningEl = null;
+    }, 4e3);
+    popup.addEventListener("click", () => {
+      clearTimeout(timer);
+      popup.remove();
+      if (replaceWarningEl === popup)
+        replaceWarningEl = null;
+    }, { once: true });
+  }
   function setActiveImage(imgEl) {
     if (activeImage && activeImage !== imgEl) {
       exitCropMode();
@@ -830,7 +854,23 @@ var EditableModule = (() => {
         editableEl.state.src = file.name;
       const reader = new FileReader();
       reader.onload = (e) => {
-        activeImage.src = e.target.result;
+        const dataUrl = e.target.result;
+        const tmp = new Image();
+        tmp.onload = () => {
+          const img = activeImage;
+          const el = editableRegistry.get(img);
+          if (!el)
+            return;
+          const currentWidth = el.state.width;
+          const newHeight = Math.round(currentWidth * tmp.naturalHeight / tmp.naturalWidth);
+          el.state.height = newHeight;
+          img.style.height = `${newHeight}px`;
+          if (el.container)
+            el.container.style.height = `${newHeight}px`;
+        };
+        tmp.src = dataUrl;
+        activeImage.src = dataUrl;
+        showReplaceWarning(`Place "${file.name}" next to your QMD file.`, replaceBtn);
       };
       reader.readAsDataURL(file);
       fileInput.value = "";
@@ -869,13 +909,14 @@ var EditableModule = (() => {
     container.appendChild(centerWrap);
     return container;
   }
-  var activeImage, imageControlRefs, cropModeActive, cropHandleListeners;
+  var activeImage, replaceWarningEl, imageControlRefs, cropModeActive, cropHandleListeners;
   var init_images = __esm({
     "src/images.js"() {
       init_undo();
       init_editable_element();
       init_toolbar();
       activeImage = null;
+      replaceWarningEl = null;
       imageControlRefs = {
         opacitySlider: null,
         opacityLabel: null,

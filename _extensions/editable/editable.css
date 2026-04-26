@@ -1372,6 +1372,7 @@ button.arrow-toolbar-smooth.active {
   flex-direction: row;
   align-items: center;
   gap: 4px;
+  position: relative;
 }
 
 /* Base style for all image toolbar buttons and inputs — mirrors arrow-toolbar-btn */
@@ -1503,6 +1504,22 @@ button.arrow-toolbar-smooth.active {
   background: #dc3545;
   border-color: #dc3545;
   color: white;
+}
+
+/* ── Replace warning popup ───────────────────────────────────────────────── */
+
+.image-replace-warning {
+  position: fixed;
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 99999;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* ── Crop mode ───────────────────────────────────────────────────────────── */

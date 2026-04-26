@@ -11,6 +11,41 @@ import { showRightPanel } from './toolbar.js';
 /** @type {HTMLElement|null} The currently active image element */
 export let activeImage = null;
 
+/** @type {HTMLElement|null} Active replace warning popup */
+let replaceWarningEl = null;
+
+/**
+ * Show a temporary warning popup below the toolbar, anchored to anchorEl.
+ * @param {string} message
+ * @param {HTMLElement} anchorEl
+ */
+function showReplaceWarning(message, anchorEl) {
+  if (replaceWarningEl) replaceWarningEl.remove();
+
+  const popup = document.createElement("div");
+  popup.className = "image-replace-warning";
+  popup.textContent = `⚠ ${message}`;
+  document.body.appendChild(popup);
+  replaceWarningEl = popup;
+
+  const rect = anchorEl.closest("#editable-toolbar")?.getBoundingClientRect()
+    ?? anchorEl.getBoundingClientRect();
+  popup.style.top = `${rect.bottom + 6}px`;
+  popup.style.left = "50%";
+  popup.style.transform = "translateX(-50%)";
+
+  const timer = setTimeout(() => {
+    popup.remove();
+    if (replaceWarningEl === popup) replaceWarningEl = null;
+  }, 4000);
+
+  popup.addEventListener("click", () => {
+    clearTimeout(timer);
+    popup.remove();
+    if (replaceWarningEl === popup) replaceWarningEl = null;
+  }, { once: true });
+}
+
 /** Cached references to control inputs for fast sync */
 export const imageControlRefs = {
   opacitySlider: null,
@@ -393,7 +428,23 @@ export function createImageStyleControls() {
     const editableEl = editableRegistry.get(activeImage);
     if (editableEl) editableEl.state.src = file.name;
     const reader = new FileReader();
-    reader.onload = (e) => { activeImage.src = e.target.result; };
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      const tmp = new Image();
+      tmp.onload = () => {
+        const img = activeImage;
+        const el = editableRegistry.get(img);
+        if (!el) return;
+        const currentWidth = el.state.width;
+        const newHeight = Math.round(currentWidth * tmp.naturalHeight / tmp.naturalWidth);
+        el.state.height = newHeight;
+        img.style.height = `${newHeight}px`;
+        if (el.container) el.container.style.height = `${newHeight}px`;
+      };
+      tmp.src = dataUrl;
+      activeImage.src = dataUrl;
+      showReplaceWarning(`Place "${file.name}" next to your QMD file.`, replaceBtn);
+    };
     reader.readAsDataURL(file);
     fileInput.value = "";
   });
