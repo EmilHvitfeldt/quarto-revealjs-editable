@@ -6,6 +6,7 @@
 
 import { pushUndoState } from './undo.js';
 import { editableRegistry } from './editable-element.js';
+import { showRightPanel } from './toolbar.js';
 
 /** @type {HTMLElement|null} The currently active image element */
 export let activeImage = null;
@@ -28,6 +29,9 @@ export function setActiveImage(imgEl) {
   activeImage = imgEl;
   if (imgEl) {
     updateImageStylePanel(imgEl);
+    showRightPanel('image');
+  } else {
+    showRightPanel('default');
   }
 }
 

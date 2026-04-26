@@ -13,6 +13,7 @@ import { ToolbarRegistry, NewElementRegistry } from './registries.js';
 import { Capabilities, getCapabilitiesFor } from './capabilities.js';
 import { createFloatingToolbar } from './toolbar.js';
 import { addNewArrow } from './arrows.js';
+import { setActiveImage } from './images.js';
 import {
   extractEditableEltDimensions,
   formatEditableEltStrings,
@@ -436,6 +437,10 @@ function setupDraggableElt(elt) {
 
   attachGlobalEvents(context, capabilities);
 
+  if (elementType === "img") {
+    container.addEventListener("mousedown", () => setActiveImage(elt));
+  }
+
   function createEltContainer(elt) {
     const container = document.createElement("div");
     container.className = "editable-container";
@@ -670,6 +675,14 @@ window.Revealeditable = function () {
         addSaveMenuButton();
         createFloatingToolbar();
         setupUndoRedoKeyboard();
+
+        // Deselect active image when clicking outside any image container or toolbar
+        document.addEventListener("click", (e) => {
+          if (!e.target.closest(".editable-container:has(img)") &&
+              !e.target.closest(".editable-toolbar")) {
+            setActiveImage(null);
+          }
+        });
       });
     },
   };
