@@ -50,7 +50,10 @@ export class EditableElement {
       // Image-specific properties
       opacity: 100,
       borderRadius: 0,
-      objectFit: null,
+      cropTop: 0,
+      cropRight: 0,
+      cropBottom: 0,
+      cropLeft: 0,
       flipH: false,
       flipV: false,
     };
@@ -106,7 +109,10 @@ export class EditableElement {
     if (this.type === "img") {
       this.element.style.opacity = this.state.opacity !== 100 ? this.state.opacity / 100 : "";
       this.element.style.borderRadius = this.state.borderRadius ? `${this.state.borderRadius}px` : "";
-      this.element.style.objectFit = this.state.objectFit ?? "";
+      const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = this.state;
+      this.element.style.clipPath = (ct || cr || cb || cl)
+        ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)`
+        : "";
       const scaleX = this.state.flipH ? -1 : 1;
       const scaleY = this.state.flipV ? -1 : 1;
       this.element.style.transform = (scaleX !== 1 || scaleY !== 1)
@@ -155,7 +161,17 @@ export class EditableElement {
       this.state.opacity = opacityStr !== "" ? Math.round(parseFloat(opacityStr) * 100) : 100;
       const radiusStr = this.element.style.borderRadius;
       this.state.borderRadius = radiusStr ? parseFloat(radiusStr) : 0;
-      this.state.objectFit = this.element.style.objectFit || null;
+      const clipPath = this.element.style.clipPath || "";
+      const insetMatch = clipPath.match(/inset\(([^)]+)\)/);
+      if (insetMatch) {
+        const parts = insetMatch[1].split(/\s+/).map(parseFloat);
+        this.state.cropTop = parts[0] || 0;
+        this.state.cropRight = parts[1] ?? parts[0] ?? 0;
+        this.state.cropBottom = parts[2] ?? parts[0] ?? 0;
+        this.state.cropLeft = parts[3] ?? parts[1] ?? parts[0] ?? 0;
+      } else {
+        this.state.cropTop = this.state.cropRight = this.state.cropBottom = this.state.cropLeft = 0;
+      }
       const transform = this.element.style.transform || "";
       this.state.flipH = /scaleX\(-1\)/.test(transform);
       this.state.flipV = /scaleY\(-1\)/.test(transform);
@@ -198,8 +214,12 @@ export class EditableElement {
       if (this.state.borderRadius) {
         dims.borderRadius = this.state.borderRadius;
       }
-      if (this.state.objectFit) {
-        dims.objectFit = this.state.objectFit;
+      const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = this.state;
+      if (ct || cr || cb || cl) {
+        dims.cropTop = ct;
+        dims.cropRight = cr;
+        dims.cropBottom = cb;
+        dims.cropLeft = cl;
       }
       if (this.state.flipH || this.state.flipV) {
         dims.flipH = this.state.flipH;

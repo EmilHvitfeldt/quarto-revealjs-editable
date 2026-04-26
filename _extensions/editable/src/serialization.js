@@ -82,9 +82,21 @@ export const PropertySerializers = {
     type: "style",
     serialize: (v) => (v ? `border-radius: ${round(v)}px;` : null),
   },
-  objectFit: {
+  cropTop: {
     type: "style",
-    serialize: (v) => (v ? `object-fit: ${v};` : null),
+    serialize: () => null, // combined into crop serializer below
+  },
+  cropRight: {
+    type: "style",
+    serialize: () => null,
+  },
+  cropBottom: {
+    type: "style",
+    serialize: () => null,
+  },
+  cropLeft: {
+    type: "style",
+    serialize: () => null,
   },
   flipH: {
     type: "style",
@@ -124,7 +136,13 @@ export function serializeToQmd(dimensions) {
     styles.push(`transform: ${transformParts.join(" ")};`);
   }
 
-  const skipKeys = new Set(["rotation", "flipH", "flipV"]);
+  // Compose clip-path from crop insets
+  const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = dimensions;
+  if (ct || cr || cb || cl) {
+    styles.push(`clip-path: inset(${ct || 0}px ${cr || 0}px ${cb || 0}px ${cl || 0}px);`);
+  }
+
+  const skipKeys = new Set(["rotation", "flipH", "flipV", "cropTop", "cropRight", "cropBottom", "cropLeft"]);
 
   for (const [key, value] of Object.entries(dimensions)) {
     if (skipKeys.has(key)) continue;

@@ -9,7 +9,7 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 - **Image context panel** - Selecting an image replaces the default toolbar with image-specific controls:
   - **Opacity** - Slider (0–100%) updates `opacity` in real time
   - **Border radius** - Number input (px) for rounded corners
-  - **Object fit** - Toggle between Cover, Contain, and Fill
+  - **Crop** - Toggle crop mode; in crop mode the corner resize handles adjust `clip-path: inset(...)` instead of resizing
   - **Flip** - Horizontal and vertical flip toggles (compose correctly with rotation)
   - **Replace image** - File picker to swap the image source (data URI)
   - **Reset** - Reverts all image style properties to defaults

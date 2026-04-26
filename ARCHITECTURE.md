@@ -132,7 +132,7 @@ The toolbar has two zones:
 
 #### Image panel (`images.js`)
 
-`createImageStyleControls()` builds the `.toolbar-panel-image` contents — a flex row of labelled control groups: opacity slider, border-radius input, object-fit three-button toggle, flip H/V toggle buttons, replace-image file picker, and a reset button. Cached references are stored in `imageControlRefs` for fast sync.
+`createImageStyleControls()` builds the `.toolbar-panel-image` contents — a two-row grid of labelled control groups: opacity slider, border-radius input, crop toggle button, flip H/V toggle buttons, replace-image file picker, and a reset button. Cached references are stored in `imageControlRefs` for fast sync.
 
 `setActiveImage(imgEl)` is the selection entry point: sets `activeImage`, calls `updateImageStylePanel()` to sync all controls to the element's current state, then calls `showRightPanel('image')`. Passing `null` deselects and calls `showRightPanel('default')`.
 
@@ -142,11 +142,16 @@ The toolbar has two zones:
 |---|---|---|---|
 | `opacity` | number (0–100) | `100` | `opacity: 0.xx;` |
 | `borderRadius` | number (px) | `0` | `border-radius: Xpx;` |
-| `objectFit` | string\|null | `null` | `object-fit: cover;` etc. |
+| `cropTop` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `cropRight` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `cropBottom` | number (px) | `0` | composed into `clip-path: inset(...)` |
+| `cropLeft` | number (px) | `0` | composed into `clip-path: inset(...)` |
 | `flipH` | boolean | `false` | composed into `transform:` |
 | `flipV` | boolean | `false` | composed into `transform:` |
 
-**Transform composition:** `serializeToQmd` composes `rotation`, `flipH`, and `flipV` into a single `transform:` style declaration to avoid duplicate properties: `transform: rotate(Xdeg) scaleX(-1) scaleY(-1);`.
+**Transform composition:** `serializeToQmd` composes `rotation`, `flipH`, and `flipV` into a single `transform:` style declaration to avoid duplicate properties: `transform: rotate(Xdeg) scaleX(-1) scaleY(-1);`. Crop values are similarly composed into a single `clip-path: inset(T R B L)` declaration.
+
+**Crop mode:** toggled by the crop button; when active, the existing corner resize handles are intercepted via capture-phase `mousedown` listeners (using `stopImmediatePropagation`) so dragging adjusts the `cropTop/Right/Bottom/Left` insets instead of resizing the element. The container gets a `crop-mode` CSS class that changes the handle cursor.
 
 ### Brand Color Integration
 

@@ -156,7 +156,16 @@ var EditableModule = (() => {
             rotation: 0,
             // Div-specific properties
             fontSize: null,
-            textAlign: null
+            textAlign: null,
+            // Image-specific properties
+            opacity: 100,
+            borderRadius: 0,
+            cropTop: 0,
+            cropRight: 0,
+            cropBottom: 0,
+            cropLeft: 0,
+            flipH: false,
+            flipV: false
           };
         }
         /**
@@ -199,6 +208,15 @@ var EditableModule = (() => {
           if (this.state.textAlign !== null) {
             this.element.style.textAlign = this.state.textAlign;
           }
+          if (this.type === "img") {
+            this.element.style.opacity = this.state.opacity !== 100 ? this.state.opacity / 100 : "";
+            this.element.style.borderRadius = this.state.borderRadius ? `${this.state.borderRadius}px` : "";
+            const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = this.state;
+            this.element.style.clipPath = ct || cr || cb || cl ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)` : "";
+            const scaleX = this.state.flipH ? -1 : 1;
+            const scaleY = this.state.flipV ? -1 : 1;
+            this.element.style.transform = scaleX !== 1 || scaleY !== 1 ? `scaleX(${scaleX}) scaleY(${scaleY})` : "";
+          }
         }
         /**
          * Read current values from DOM into state.
@@ -221,6 +239,26 @@ var EditableModule = (() => {
             if (this.element.style.textAlign) {
               this.state.textAlign = this.element.style.textAlign;
             }
+          }
+          if (this.type === "img") {
+            const opacityStr = this.element.style.opacity;
+            this.state.opacity = opacityStr !== "" ? Math.round(parseFloat(opacityStr) * 100) : 100;
+            const radiusStr = this.element.style.borderRadius;
+            this.state.borderRadius = radiusStr ? parseFloat(radiusStr) : 0;
+            const clipPath = this.element.style.clipPath || "";
+            const insetMatch = clipPath.match(/inset\(([^)]+)\)/);
+            if (insetMatch) {
+              const parts = insetMatch[1].split(/\s+/).map(parseFloat);
+              this.state.cropTop = parts[0] || 0;
+              this.state.cropRight = parts[1] ?? parts[0] ?? 0;
+              this.state.cropBottom = parts[2] ?? parts[0] ?? 0;
+              this.state.cropLeft = parts[3] ?? parts[1] ?? parts[0] ?? 0;
+            } else {
+              this.state.cropTop = this.state.cropRight = this.state.cropBottom = this.state.cropLeft = 0;
+            }
+            const transform = this.element.style.transform || "";
+            this.state.flipH = /scaleX\(-1\)/.test(transform);
+            this.state.flipV = /scaleY\(-1\)/.test(transform);
           }
         }
         /**
@@ -245,6 +283,25 @@ var EditableModule = (() => {
             }
             if (this.state.textAlign !== null) {
               dims.textAlign = this.state.textAlign;
+            }
+          }
+          if (this.type === "img") {
+            if (this.state.opacity !== 100) {
+              dims.opacity = this.state.opacity;
+            }
+            if (this.state.borderRadius) {
+              dims.borderRadius = this.state.borderRadius;
+            }
+            const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = this.state;
+            if (ct || cr || cb || cl) {
+              dims.cropTop = ct;
+              dims.cropRight = cr;
+              dims.cropBottom = cb;
+              dims.cropLeft = cl;
+            }
+            if (this.state.flipH || this.state.flipV) {
+              dims.flipH = this.state.flipH;
+              dims.flipV = this.state.flipV;
             }
           }
           return dims;
@@ -478,6 +535,353 @@ var EditableModule = (() => {
     }
   });
 
+  // src/images.js
+  function setActiveImage(imgEl) {
+    if (activeImage && activeImage !== imgEl) {
+      exitCropMode();
+    }
+    activeImage = imgEl;
+    if (imgEl) {
+      updateImageStylePanel(imgEl);
+      showRightPanel("image");
+    } else {
+      showRightPanel("default");
+    }
+  }
+  function updateImageStylePanel(imgEl) {
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const s = editableEl.state;
+    if (imageControlRefs.opacitySlider) {
+      imageControlRefs.opacitySlider.value = s.opacity ?? 100;
+      imageControlRefs.opacityLabel.textContent = `${s.opacity ?? 100}%`;
+    }
+    if (imageControlRefs.borderRadiusInput) {
+      imageControlRefs.borderRadiusInput.value = s.borderRadius ?? 0;
+    }
+    if (imageControlRefs.cropBtn) {
+      imageControlRefs.cropBtn.classList.toggle("active", cropModeActive);
+    }
+    if (imageControlRefs.flipHBtn) {
+      imageControlRefs.flipHBtn.classList.toggle("active", !!s.flipH);
+    }
+    if (imageControlRefs.flipVBtn) {
+      imageControlRefs.flipVBtn.classList.toggle("active", !!s.flipV);
+    }
+  }
+  function applyTransform(imgEl) {
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const s = editableEl.state;
+    const scaleX = s.flipH ? -1 : 1;
+    const scaleY = s.flipV ? -1 : 1;
+    imgEl.style.transform = scaleX !== 1 || scaleY !== 1 ? `scaleX(${scaleX}) scaleY(${scaleY})` : "";
+  }
+  function applyCrop(imgEl) {
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = editableEl.state;
+    imgEl.style.clipPath = ct || cr || cb || cl ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)` : "";
+    if (cropModeActive && editableEl.container) {
+      const offset = -6;
+      editableEl.container.querySelectorAll(".resize-handle").forEach((handle) => {
+        const pos = handle.dataset.position;
+        handle.style.top = pos.includes("n") ? `${ct + offset}px` : "";
+        handle.style.bottom = pos.includes("s") ? `${cb + offset}px` : "";
+        handle.style.left = pos.includes("w") ? `${cl + offset}px` : "";
+        handle.style.right = pos.includes("e") ? `${cr + offset}px` : "";
+      });
+    }
+  }
+  function enterCropMode() {
+    if (!activeImage)
+      return;
+    cropModeActive = true;
+    if (imageControlRefs.cropBtn)
+      imageControlRefs.cropBtn.classList.add("active");
+    const editableEl = editableRegistry.get(activeImage);
+    if (!editableEl?.container)
+      return;
+    editableEl.container.classList.add("crop-mode");
+    applyCrop(activeImage);
+    editableEl.container.querySelectorAll(".resize-handle").forEach((handle) => {
+      const listener = (e) => onCropHandleMousedown(e, activeImage);
+      handle.addEventListener("mousedown", listener, true);
+      cropHandleListeners.set(handle, listener);
+    });
+  }
+  function exitCropMode() {
+    cropModeActive = false;
+    if (imageControlRefs.cropBtn)
+      imageControlRefs.cropBtn.classList.remove("active");
+    cropHandleListeners.forEach((listener, handle) => {
+      handle.removeEventListener("mousedown", listener, true);
+    });
+    cropHandleListeners.clear();
+    if (activeImage) {
+      const editableEl = editableRegistry.get(activeImage);
+      if (editableEl?.container) {
+        editableEl.container.classList.remove("crop-mode");
+        editableEl.container.querySelectorAll(".resize-handle").forEach((handle) => {
+          handle.style.top = "";
+          handle.style.bottom = "";
+          handle.style.left = "";
+          handle.style.right = "";
+        });
+      }
+    }
+  }
+  function onCropHandleMousedown(e, imgEl) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    pushUndoState();
+    const pos = e.currentTarget.dataset.position;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const startCrop = {
+      top: editableEl.state.cropTop,
+      right: editableEl.state.cropRight,
+      bottom: editableEl.state.cropBottom,
+      left: editableEl.state.cropLeft
+    };
+    const rect = imgEl.getBoundingClientRect();
+    const slideScale = rect.width > 0 ? rect.width / imgEl.offsetWidth : 1;
+    function onMove(me) {
+      const el = editableRegistry.get(imgEl);
+      if (!el)
+        return;
+      const dx = (me.clientX - startX) / slideScale;
+      const dy = (me.clientY - startY) / slideScale;
+      const maxW = imgEl.offsetWidth / 2;
+      const maxH = imgEl.offsetHeight / 2;
+      if (pos.includes("n"))
+        el.state.cropTop = Math.max(0, Math.min(maxH, startCrop.top + dy));
+      if (pos.includes("s"))
+        el.state.cropBottom = Math.max(0, Math.min(maxH, startCrop.bottom - dy));
+      if (pos.includes("w"))
+        el.state.cropLeft = Math.max(0, Math.min(maxW, startCrop.left + dx));
+      if (pos.includes("e"))
+        el.state.cropRight = Math.max(0, Math.min(maxW, startCrop.right - dx));
+      applyCrop(imgEl);
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+  function createImageStyleControls() {
+    const container = document.createElement("div");
+    container.className = "image-style-controls";
+    const centerWrap = document.createElement("div");
+    centerWrap.className = "image-center-wrap";
+    const controlsWrap = document.createElement("div");
+    controlsWrap.className = "image-controls-wrap";
+    function addCell(labelText) {
+      const label = document.createElement("span");
+      label.className = "image-ctrl-label";
+      label.textContent = labelText;
+      controlsWrap.appendChild(label);
+      const cell = document.createElement("div");
+      cell.className = "image-ctrl-cell";
+      controlsWrap.appendChild(cell);
+      return cell;
+    }
+    const opacityCell = addCell("Opacity");
+    const opacitySlider = document.createElement("input");
+    opacitySlider.type = "range";
+    opacitySlider.min = "0";
+    opacitySlider.max = "100";
+    opacitySlider.step = "1";
+    opacitySlider.value = "100";
+    opacitySlider.className = "image-toolbar-opacity";
+    opacitySlider.title = "Opacity";
+    const opacityLabel = document.createElement("span");
+    opacityLabel.className = "image-opacity-label";
+    opacityLabel.textContent = "100%";
+    opacitySlider.addEventListener("mousedown", () => {
+      if (activeImage)
+        pushUndoState();
+    });
+    opacitySlider.addEventListener("input", () => {
+      if (!activeImage)
+        return;
+      const val = parseInt(opacitySlider.value, 10);
+      opacityLabel.textContent = `${val}%`;
+      const editableEl = editableRegistry.get(activeImage);
+      if (editableEl) {
+        editableEl.state.opacity = val;
+        activeImage.style.opacity = val / 100;
+      }
+    });
+    imageControlRefs.opacitySlider = opacitySlider;
+    imageControlRefs.opacityLabel = opacityLabel;
+    opacityCell.appendChild(opacitySlider);
+    opacityCell.appendChild(opacityLabel);
+    const radiusCell = addCell("Radius");
+    const borderRadiusInput = document.createElement("input");
+    borderRadiusInput.type = "number";
+    borderRadiusInput.min = "0";
+    borderRadiusInput.step = "1";
+    borderRadiusInput.value = "0";
+    borderRadiusInput.className = "image-toolbar-btn image-toolbar-radius";
+    borderRadiusInput.title = "Border radius (px)";
+    borderRadiusInput.addEventListener("focus", () => {
+      if (activeImage)
+        pushUndoState();
+    });
+    borderRadiusInput.addEventListener("input", () => {
+      if (!activeImage)
+        return;
+      const val = Math.max(0, parseInt(borderRadiusInput.value, 10) || 0);
+      const editableEl = editableRegistry.get(activeImage);
+      if (editableEl) {
+        editableEl.state.borderRadius = val;
+        activeImage.style.borderRadius = val ? `${val}px` : "";
+      }
+    });
+    imageControlRefs.borderRadiusInput = borderRadiusInput;
+    radiusCell.appendChild(borderRadiusInput);
+    const cropCell = addCell("Crop");
+    const cropBtn = document.createElement("button");
+    cropBtn.className = "image-toolbar-btn";
+    cropBtn.textContent = "\u2702 Crop";
+    cropBtn.title = "Toggle crop mode \u2014 drag edge handles to crop";
+    cropBtn.addEventListener("click", () => {
+      if (!activeImage)
+        return;
+      if (cropModeActive) {
+        exitCropMode();
+      } else {
+        enterCropMode();
+      }
+    });
+    imageControlRefs.cropBtn = cropBtn;
+    cropCell.appendChild(cropBtn);
+    const flipCell = addCell("Flip");
+    const flipWrap = document.createElement("div");
+    flipWrap.className = "image-btn-group";
+    const flipHBtn = document.createElement("button");
+    flipHBtn.className = "image-toolbar-btn";
+    flipHBtn.textContent = "\u21C6 H";
+    flipHBtn.title = "Flip horizontal";
+    flipHBtn.addEventListener("click", () => {
+      if (!activeImage)
+        return;
+      pushUndoState();
+      const editableEl = editableRegistry.get(activeImage);
+      if (!editableEl)
+        return;
+      editableEl.state.flipH = !editableEl.state.flipH;
+      flipHBtn.classList.toggle("active", editableEl.state.flipH);
+      applyTransform(activeImage);
+    });
+    imageControlRefs.flipHBtn = flipHBtn;
+    const flipVBtn = document.createElement("button");
+    flipVBtn.className = "image-toolbar-btn";
+    flipVBtn.textContent = "\u21C5 V";
+    flipVBtn.title = "Flip vertical";
+    flipVBtn.addEventListener("click", () => {
+      if (!activeImage)
+        return;
+      pushUndoState();
+      const editableEl = editableRegistry.get(activeImage);
+      if (!editableEl)
+        return;
+      editableEl.state.flipV = !editableEl.state.flipV;
+      flipVBtn.classList.toggle("active", editableEl.state.flipV);
+      applyTransform(activeImage);
+    });
+    imageControlRefs.flipVBtn = flipVBtn;
+    flipWrap.appendChild(flipHBtn);
+    flipWrap.appendChild(flipVBtn);
+    flipCell.appendChild(flipWrap);
+    const replaceCell = addCell("Replace");
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none";
+    const replaceBtn = document.createElement("button");
+    replaceBtn.className = "image-toolbar-btn";
+    replaceBtn.textContent = "Replace";
+    replaceBtn.title = "Replace image source";
+    replaceBtn.addEventListener("click", () => {
+      if (activeImage)
+        fileInput.click();
+    });
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file || !activeImage)
+        return;
+      pushUndoState();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        activeImage.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = "";
+    });
+    replaceCell.appendChild(replaceBtn);
+    replaceCell.appendChild(fileInput);
+    const resetCell = addCell("");
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "image-toolbar-btn image-toolbar-reset";
+    resetBtn.textContent = "Reset";
+    resetBtn.title = "Reset image style properties";
+    resetBtn.addEventListener("click", () => {
+      if (!activeImage)
+        return;
+      pushUndoState();
+      const editableEl = editableRegistry.get(activeImage);
+      if (!editableEl)
+        return;
+      editableEl.state.opacity = 100;
+      editableEl.state.borderRadius = 0;
+      editableEl.state.cropTop = 0;
+      editableEl.state.cropRight = 0;
+      editableEl.state.cropBottom = 0;
+      editableEl.state.cropLeft = 0;
+      editableEl.state.flipH = false;
+      editableEl.state.flipV = false;
+      activeImage.style.opacity = "";
+      activeImage.style.borderRadius = "";
+      activeImage.style.clipPath = "";
+      activeImage.style.transform = "";
+      exitCropMode();
+      updateImageStylePanel(activeImage);
+    });
+    resetCell.appendChild(resetBtn);
+    centerWrap.appendChild(controlsWrap);
+    container.appendChild(centerWrap);
+    return container;
+  }
+  var activeImage, imageControlRefs, cropModeActive, cropHandleListeners;
+  var init_images = __esm({
+    "src/images.js"() {
+      init_undo();
+      init_editable_element();
+      init_toolbar();
+      activeImage = null;
+      imageControlRefs = {
+        opacitySlider: null,
+        opacityLabel: null,
+        borderRadiusInput: null,
+        cropBtn: null,
+        flipHBtn: null,
+        flipVBtn: null
+      };
+      cropModeActive = false;
+      cropHandleListeners = /* @__PURE__ */ new Map();
+    }
+  });
+
   // src/toolbar.js
   function showRightPanel(panelName) {
     if (!rightZoneEl)
@@ -535,6 +939,11 @@ var EditableModule = (() => {
     arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
     arrowPanel.style.display = "none";
     rightZone.appendChild(arrowPanel);
+    const imagePanel = document.createElement("div");
+    imagePanel.className = "toolbar-panel toolbar-panel-image";
+    imagePanel.style.display = "none";
+    imagePanel.appendChild(createImageStyleControls());
+    rightZone.appendChild(imagePanel);
     const textPanel = document.createElement("div");
     textPanel.className = "toolbar-panel toolbar-panel-text";
     textPanel.style.display = "none";
@@ -551,6 +960,7 @@ var EditableModule = (() => {
   var init_toolbar = __esm({
     "src/toolbar.js"() {
       init_registries();
+      init_images();
       rightZoneEl = null;
       textPanelEl = null;
       contextHideElements = [];
@@ -2982,6 +3392,7 @@ var EditableModule = (() => {
   // src/main.js
   init_toolbar();
   init_arrows();
+  init_images();
 
   // src/serialization.js
   init_config();
@@ -3031,12 +3442,72 @@ var EditableModule = (() => {
     rotation: {
       type: "style",
       serialize: (v) => v ? `transform: rotate(${round(v)}deg);` : null
+    },
+    // Image-specific properties
+    opacity: {
+      type: "style",
+      serialize: (v) => v !== 100 ? `opacity: ${Math.round(v / 100 * 1e3) / 1e3};` : null
+    },
+    borderRadius: {
+      type: "style",
+      serialize: (v) => v ? `border-radius: ${round(v)}px;` : null
+    },
+    cropTop: {
+      type: "style",
+      serialize: () => null
+      // combined into crop serializer below
+    },
+    cropRight: {
+      type: "style",
+      serialize: () => null
+    },
+    cropBottom: {
+      type: "style",
+      serialize: () => null
+    },
+    cropLeft: {
+      type: "style",
+      serialize: () => null
+    },
+    flipH: {
+      type: "style",
+      serialize: () => null
+      // combined into imageTransform
+    },
+    flipV: {
+      type: "style",
+      serialize: () => null
+      // combined into imageTransform
+    },
+    imageTransform: {
+      type: "style",
+      serialize: (v) => v ? `transform: ${v};` : null
     }
   };
   function serializeToQmd(dimensions) {
     const attrs = [];
     const styles = [];
+    const transformParts = [];
+    if (dimensions.rotation) {
+      transformParts.push(`rotate(${round(dimensions.rotation)}deg)`);
+    }
+    if (dimensions.flipH) {
+      transformParts.push("scaleX(-1)");
+    }
+    if (dimensions.flipV) {
+      transformParts.push("scaleY(-1)");
+    }
+    if (transformParts.length > 0) {
+      styles.push(`transform: ${transformParts.join(" ")};`);
+    }
+    const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = dimensions;
+    if (ct || cr || cb || cl) {
+      styles.push(`clip-path: inset(${ct || 0}px ${cr || 0}px ${cb || 0}px ${cl || 0}px);`);
+    }
+    const skipKeys = /* @__PURE__ */ new Set(["rotation", "flipH", "flipV", "cropTop", "cropRight", "cropBottom", "cropLeft"]);
     for (const [key, value] of Object.entries(dimensions)) {
+      if (skipKeys.has(key))
+        continue;
       const serializer = PropertySerializers[key];
       if (serializer && value != null) {
         const result = serializer.serialize(value);
@@ -3783,6 +4254,9 @@ ${fence}`;
     setupHoverEffects(context, capabilities);
     setupKeyboardNavigation(context, capabilities, editableElt);
     attachGlobalEvents(context, capabilities);
+    if (elementType === "img") {
+      container.addEventListener("mousedown", () => setActiveImage(elt));
+    }
     function createEltContainer(elt2) {
       const container2 = document.createElement("div");
       container2.className = "editable-container";
@@ -3971,6 +4445,11 @@ ${fence}`;
           addSaveMenuButton();
           createFloatingToolbar();
           setupUndoRedoKeyboard();
+          document.addEventListener("click", (e) => {
+            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar")) {
+              setActiveImage(null);
+            }
+          });
         });
       }
     };
@@ -3998,4 +4477,5 @@ ${fence}`;
   window.readIndexQmd = readIndexQmd;
   window.addNewSlide = addNewSlide;
   window.addNewTextElement = addNewTextElement;
+  window.formatEditableEltStrings = formatEditableEltStrings;
 })();

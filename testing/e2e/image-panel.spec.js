@@ -40,7 +40,6 @@ test.describe('Image context panel', () => {
   test('Image panel shows when image container is clicked', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Click the image container
     await page.click('.editable-container:has(img)');
 
     const visibility = await page.evaluate(() => {
@@ -60,10 +59,7 @@ test.describe('Image context panel', () => {
   test('Image panel hides and default panel returns on outside click', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Select image
     await page.click('.editable-container:has(img)');
-
-    // Click somewhere outside any editable container and toolbar
     await page.click('body', { position: { x: 10, y: 10 } });
 
     const visibility = await page.evaluate(() => {
@@ -88,7 +84,7 @@ test.describe('Image context panel', () => {
     await page.click('.editable-container:has(img)');
 
     await page.evaluate(() => {
-      const slider = document.querySelector('.image-opacity-slider');
+      const slider = document.querySelector('.image-toolbar-opacity');
       slider.value = '50';
       slider.dispatchEvent(new Event('input', { bubbles: true }));
     });
@@ -112,7 +108,7 @@ test.describe('Image context panel', () => {
     await page.click('.editable-container:has(img)');
 
     await page.evaluate(() => {
-      const slider = document.querySelector('.image-opacity-slider');
+      const slider = document.querySelector('.image-toolbar-opacity');
       slider.value = '75';
       slider.dispatchEvent(new Event('input', { bubbles: true }));
     });
@@ -133,7 +129,7 @@ test.describe('Image context panel', () => {
     await page.click('.editable-container:has(img)');
 
     await page.evaluate(() => {
-      const input = document.querySelector('.image-border-radius-input');
+      const input = document.querySelector('.image-toolbar-radius');
       input.value = '20';
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
@@ -146,58 +142,47 @@ test.describe('Image context panel', () => {
     expect(result).toBe('20px');
   });
 
-  // ── Object fit ───────────────────────────────────────────────────────────
+  // ── Crop mode ────────────────────────────────────────────────────────────
 
-  test('Object fit Cover button sets object-fit and marks active', async ({ page }) => {
+  test('Crop button toggles crop-mode class on container', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
     await page.click('.editable-container:has(img)');
 
+    const before = await page.evaluate(() => {
+      const container = document.querySelector('.editable-container:has(img)');
+      return container?.classList.contains('crop-mode');
+    });
+    expect(before).toBe(false);
+
+    // Click crop toggle button
     await page.evaluate(() => {
-      const btns = [...document.querySelectorAll('.image-fit-btn')];
-      const cover = btns.find(b => b.textContent === 'Cover');
-      cover?.click();
+      document.querySelector('[title="Toggle crop mode — drag edge handles to crop"]')?.click();
     });
 
-    const result = await page.evaluate(() => {
-      const img = document.querySelector('.editable-container img');
-      const btns = [...document.querySelectorAll('.image-fit-btn')];
-      const cover = btns.find(b => b.textContent === 'Cover');
-      return {
-        objectFit: img?.style.objectFit,
-        coverActive: cover?.classList.contains('active'),
-      };
+    const after = await page.evaluate(() => {
+      const container = document.querySelector('.editable-container:has(img)');
+      return container?.classList.contains('crop-mode');
     });
-
-    expect(result.objectFit).toBe('cover');
-    expect(result.coverActive).toBe(true);
+    expect(after).toBe(true);
   });
 
-  test('Clicking active object fit button clears it', async ({ page }) => {
+  test('Clicking crop button again exits crop mode', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
     await page.click('.editable-container:has(img)');
 
-    // Click Cover twice
     await page.evaluate(() => {
-      const btns = [...document.querySelectorAll('.image-fit-btn')];
-      const cover = btns.find(b => b.textContent === 'Cover');
-      cover?.click();
-      cover?.click();
+      const btn = document.querySelector('[title="Toggle crop mode — drag edge handles to crop"]');
+      btn?.click();
+      btn?.click();
     });
 
-    const result = await page.evaluate(() => {
-      const img = document.querySelector('.editable-container img');
-      const btns = [...document.querySelectorAll('.image-fit-btn')];
-      const cover = btns.find(b => b.textContent === 'Cover');
-      return {
-        objectFit: img?.style.objectFit,
-        coverActive: cover?.classList.contains('active'),
-      };
+    const hasCropMode = await page.evaluate(() => {
+      const container = document.querySelector('.editable-container:has(img)');
+      return container?.classList.contains('crop-mode');
     });
-
-    expect(result.objectFit).toBe('');
-    expect(result.coverActive).toBe(false);
+    expect(hasCropMode).toBe(false);
   });
 
   // ── Flip ─────────────────────────────────────────────────────────────────
@@ -208,14 +193,14 @@ test.describe('Image context panel', () => {
     await page.click('.editable-container:has(img)');
 
     await page.evaluate(() => {
-      document.querySelector('.image-flip-btn[title="Flip horizontal"]')?.click();
+      document.querySelector('[title="Flip horizontal"]')?.click();
     });
 
     const result = await page.evaluate(() => {
       const img = document.querySelector('.editable-container img');
       return {
         transform: img?.style.transform,
-        active: document.querySelector('.image-flip-btn[title="Flip horizontal"]')?.classList.contains('active'),
+        active: document.querySelector('[title="Flip horizontal"]')?.classList.contains('active'),
       };
     });
 
@@ -229,7 +214,7 @@ test.describe('Image context panel', () => {
     await page.click('.editable-container:has(img)');
 
     await page.evaluate(() => {
-      document.querySelector('.image-flip-btn[title="Flip vertical"]')?.click();
+      document.querySelector('[title="Flip vertical"]')?.click();
     });
 
     const result = await page.evaluate(() => {
@@ -246,8 +231,8 @@ test.describe('Image context panel', () => {
     await page.click('.editable-container:has(img)');
 
     await page.evaluate(() => {
-      document.querySelector('.image-flip-btn[title="Flip horizontal"]')?.click();
-      document.querySelector('.image-flip-btn[title="Flip vertical"]')?.click();
+      document.querySelector('[title="Flip horizontal"]')?.click();
+      document.querySelector('[title="Flip vertical"]')?.click();
     });
 
     const transform = await page.evaluate(() => {
@@ -266,22 +251,20 @@ test.describe('Image context panel', () => {
 
     await page.click('.editable-container:has(img)');
 
-    // Apply several changes
     await page.evaluate(() => {
-      const slider = document.querySelector('.image-opacity-slider');
+      const slider = document.querySelector('.image-toolbar-opacity');
       slider.value = '50';
       slider.dispatchEvent(new Event('input', { bubbles: true }));
 
-      const radius = document.querySelector('.image-border-radius-input');
+      const radius = document.querySelector('.image-toolbar-radius');
       radius.value = '10';
       radius.dispatchEvent(new Event('input', { bubbles: true }));
 
-      document.querySelector('.image-flip-btn[title="Flip horizontal"]')?.click();
+      document.querySelector('[title="Flip horizontal"]')?.click();
     });
 
-    // Click Reset
     await page.evaluate(() => {
-      document.querySelector('.image-reset-btn')?.click();
+      document.querySelector('.image-toolbar-reset')?.click();
     });
 
     const result = await page.evaluate(() => {
@@ -291,18 +274,22 @@ test.describe('Image context panel', () => {
         opacity: img?.style.opacity,
         borderRadius: img?.style.borderRadius,
         transform: img?.style.transform,
+        clipPath: img?.style.clipPath,
         stateOpacity: editableEl?.state?.opacity,
         stateRadius: editableEl?.state?.borderRadius,
         stateFlipH: editableEl?.state?.flipH,
+        stateCropTop: editableEl?.state?.cropTop,
       };
     });
 
     expect(result.opacity).toBe('');
     expect(result.borderRadius).toBe('');
     expect(result.transform).toBe('');
+    expect(result.clipPath).toBe('');
     expect(result.stateOpacity).toBe(100);
     expect(result.stateRadius).toBe(0);
     expect(result.stateFlipH).toBe(false);
+    expect(result.stateCropTop).toBe(0);
   });
 
   // ── Undo/redo ────────────────────────────────────────────────────────────
@@ -312,9 +299,8 @@ test.describe('Image context panel', () => {
 
     await page.click('.editable-container:has(img)');
 
-    // Trigger mousedown (which pushes undo state) then change opacity
     await page.evaluate(() => {
-      const slider = document.querySelector('.image-opacity-slider');
+      const slider = document.querySelector('.image-toolbar-opacity');
       slider.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       slider.value = '40';
       slider.dispatchEvent(new Event('input', { bubbles: true }));
@@ -337,7 +323,7 @@ test.describe('Image context panel', () => {
 
   // ── Serialization ────────────────────────────────────────────────────────
 
-  test('Image properties serialize to QMD style string', async ({ page }) => {
+  test('Opacity and border-radius serialize to QMD style string', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
     await page.click('.editable-container:has(img)');
@@ -347,10 +333,8 @@ test.describe('Image context panel', () => {
       const editableEl = window.editableRegistry?.get(img);
       if (!editableEl) return null;
 
-      // Set state directly and apply
       editableEl.state.opacity = 50;
       editableEl.state.borderRadius = 10;
-      editableEl.state.objectFit = 'contain';
       editableEl.syncToDOM();
 
       const dims = editableEl.toDimensions();
@@ -360,7 +344,30 @@ test.describe('Image context panel', () => {
     expect(qmd).not.toBeNull();
     expect(qmd).toContain('opacity: 0.5');
     expect(qmd).toContain('border-radius: 10px');
-    expect(qmd).toContain('object-fit: contain');
+  });
+
+  test('Crop values serialize as clip-path in QMD style string', async ({ page }) => {
+    await setupPage(page, 'basic.html');
+
+    await page.click('.editable-container:has(img)');
+
+    const qmd = await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      const editableEl = window.editableRegistry?.get(img);
+      if (!editableEl) return null;
+
+      editableEl.state.cropTop = 10;
+      editableEl.state.cropRight = 20;
+      editableEl.state.cropBottom = 15;
+      editableEl.state.cropLeft = 5;
+      editableEl.syncToDOM();
+
+      const dims = editableEl.toDimensions();
+      return window.formatEditableEltStrings ? window.formatEditableEltStrings([dims])[0] : null;
+    });
+
+    expect(qmd).not.toBeNull();
+    expect(qmd).toContain('clip-path: inset(10px 20px 15px 5px)');
   });
 
   test('Flip serializes as scaleX/scaleY in transform', async ({ page }) => {
@@ -407,7 +414,6 @@ test.describe('Image context panel', () => {
     expect(qmd).not.toBeNull();
     expect(qmd).toContain('rotate(45deg)');
     expect(qmd).toContain('scaleX(-1)');
-    // Must be a single transform: declaration (not two)
     const transformCount = (qmd.match(/transform:/g) || []).length;
     expect(transformCount).toBe(1);
   });
@@ -417,7 +423,6 @@ test.describe('Image context panel', () => {
   test('Panel controls sync to current image state when image is re-selected', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Set state directly then re-select the image
     await page.evaluate(() => {
       const img = document.querySelector('.editable-container img');
       const editableEl = window.editableRegistry?.get(img);
@@ -427,13 +432,12 @@ test.describe('Image context panel', () => {
       }
     });
 
-    // Click image to trigger panel sync
     await page.click('.editable-container:has(img)');
 
     const result = await page.evaluate(() => {
-      const slider = document.querySelector('.image-opacity-slider');
+      const slider = document.querySelector('.image-toolbar-opacity');
       const label = document.querySelector('.image-opacity-label');
-      const radius = document.querySelector('.image-border-radius-input');
+      const radius = document.querySelector('.image-toolbar-radius');
       return {
         sliderValue: slider?.value,
         labelText: label?.textContent,
