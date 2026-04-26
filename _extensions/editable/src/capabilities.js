@@ -297,10 +297,6 @@ export const Capabilities = {
   fontControls: {
     name: "fontControls",
 
-    init(context) {
-      // No special state needed
-    },
-
     createControls(context) {
       const { container } = context;
 
@@ -311,9 +307,6 @@ export const Capabilities = {
       return fontControls;
     },
 
-    attachEvents(context) {
-      // Events are attached via ControlRegistry.createButton
-    },
   },
 
   /**
@@ -321,10 +314,6 @@ export const Capabilities = {
    */
   editText: {
     name: "editText",
-
-    init(context) {
-      // No special state needed
-    },
 
     createControls(context) {
       const { container, element } = context;
@@ -348,9 +337,6 @@ export const Capabilities = {
       return null;
     },
 
-    attachEvents(context) {
-      // Events are attached via ControlRegistry.createButton
-    },
   },
 
   /**

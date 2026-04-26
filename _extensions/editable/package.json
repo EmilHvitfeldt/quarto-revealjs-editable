@@ -1,6 +1,6 @@
 {
   "name": "quarto-revealjs-editable",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "private": true,
   "description": "Quarto extension for editable reveal.js presentation elements",
   "type": "module",

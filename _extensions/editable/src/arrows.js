@@ -37,78 +37,75 @@ function showArrowExtensionModal() {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "editable-modal-overlay";
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100000;
-    `;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "editable-modal-title");
 
     const modal = document.createElement("div");
     modal.className = "editable-modal";
-    modal.style.cssText = `
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 450px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      font-family: system-ui, -apple-system, sans-serif;
-    `;
 
-    modal.innerHTML = `
-      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
-      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
-        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
-      </p>
-      <p style="margin: 0 0 16px 0; color: #555;">
-        Install with:<br>
-        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
-      </p>
-      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
-        Continue? (Arrows will work in the editor but won't render until the extension is installed)
-      </p>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="editable-modal-cancel" style="
-          padding: 8px 16px;
-          border: 1px solid #ccc;
-          background: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Cancel</button>
-        <button class="editable-modal-confirm" style="
-          padding: 8px 16px;
-          border: none;
-          background: var(--editable-accent-color, #007cba);
-          color: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Continue</button>
-      </div>
-    `;
+    const title = document.createElement("h3");
+    title.id = "editable-modal-title";
+    title.className = "editable-modal-title";
+    title.textContent = "Arrow Extension Required";
 
+    const p1 = document.createElement("p");
+    p1.className = "editable-modal-body";
+    p1.innerHTML = 'Arrows are saved as <code class="editable-modal-code">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" class="editable-modal-link">quarto-arrows</a> extension to render.';
+
+    const p2 = document.createElement("p");
+    p2.className = "editable-modal-body";
+    const installCode = document.createElement("code");
+    installCode.className = "editable-modal-code editable-modal-code-block";
+    installCode.textContent = "quarto add EmilHvitfeldt/quarto-arrows";
+    p2.appendChild(document.createTextNode("Install with:"));
+    p2.appendChild(document.createElement("br"));
+    p2.appendChild(installCode);
+
+    const p3 = document.createElement("p");
+    p3.className = "editable-modal-body editable-modal-body-small";
+    p3.textContent = "Continue? (Arrows will work in the editor but won't render until the extension is installed)";
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "editable-modal-buttons";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "editable-modal-cancel";
+    cancelBtn.textContent = "Cancel";
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.className = "editable-modal-confirm";
+    confirmBtn.textContent = "Continue";
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    modal.appendChild(title);
+    modal.appendChild(p1);
+    modal.appendChild(p2);
+    modal.appendChild(p3);
+    modal.appendChild(btnRow);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    const cleanup = (result) => {
-      overlay.remove();
-      resolve(result);
-    };
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
 
-    modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
-    modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
-    overlay.onclick = (e) => {
-      if (e.target === overlay) cleanup(false);
-    };
+    cancelBtn.onclick = () => cleanup(false);
+    confirmBtn.onclick = () => cleanup(true);
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
 
-    modal.querySelector(".editable-modal-confirm").focus();
+    // Focus trap: keep Tab inside the modal
+    overlay.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { cleanup(false); return; }
+      if (e.key !== "Tab") return;
+      const focusable = [...modal.querySelectorAll("button, a, [tabindex]:not([tabindex='-1'])")];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    confirmBtn.focus();
   });
 }
 
@@ -737,6 +734,12 @@ function updateSmoothToggleInToolbar(arrowData) {
  * Update arrow visual appearance based on its data (color, width, dash, etc.).
  * @param {Object} arrowData - Arrow data object
  */
+function getDashArray(dash, width) {
+  if (dash === "dashed") return `${width * 4},${width * 2}`;
+  if (dash === "dotted") return `${width},${width * 2}`;
+  return "none";
+}
+
 export function updateArrowAppearance(arrowData) {
   if (!arrowData._path) return;
 
@@ -748,12 +751,7 @@ export function updateArrowAppearance(arrowData) {
     arrowData._labelText.setAttribute("fill", arrowData.color);
   }
 
-  const dashPatterns = {
-    solid: "none",
-    dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-    dotted: `${arrowData.width},${arrowData.width * 2}`
-  };
-  const dashArray = dashPatterns[arrowData.dash] || "none";
+  const dashArray = getDashArray(arrowData.dash, arrowData.width);
   if (dashArray === "none") {
     arrowData._path.removeAttribute("stroke-dasharray");
   } else {
@@ -835,12 +833,7 @@ function updateArrowLineStyle(arrowData) {
     extraPath.setAttribute("fill", "none");
     extraPath.style.pointerEvents = "none";
 
-    const dashPatterns = {
-      solid: "none",
-      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-      dotted: `${arrowData.width},${arrowData.width * 2}`
-    };
-    const dashArray = dashPatterns[arrowData.dash] || "none";
+    const dashArray = getDashArray(arrowData.dash, arrowData.width);
     if (dashArray !== "none") {
       extraPath.setAttribute("stroke-dasharray", dashArray);
     }
@@ -986,8 +979,8 @@ export async function addNewArrow() {
 
   pushUndoState();
   const slideIndex = getCurrentSlideIndex();
-  const slideWidth = currentSlide.offsetWidth || 960;
-  const slideHeight = currentSlide.offsetHeight || 700;
+  const slideWidth = currentSlide.offsetWidth || CONFIG.DEFAULT_SLIDE_WIDTH;
+  const slideHeight = currentSlide.offsetHeight || CONFIG.DEFAULT_SLIDE_HEIGHT;
 
   const centerX = slideWidth / 2;
   const centerY = slideHeight / 2;
@@ -1352,11 +1345,10 @@ function setupHandleDrag(handle, controller, onDrag) {
 function createArrowHandle(arrowData, position) {
   const isControlPoint = position === "control1" || position === "control2";
   const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
-  let bgColor;
-  if (position === "start") bgColor = "#007cba";
-  else if (position === "end") bgColor = "#28a745";
-  else if (position === "control1") bgColor = CONFIG.ARROW_CONTROL1_COLOR;
-  else if (position === "control2") bgColor = CONFIG.ARROW_CONTROL2_COLOR;
+  // start/end colors come from CSS vars (--editable-arrow-start-color / --editable-arrow-end-color)
+  const bgColor = position === "control1" ? CONFIG.ARROW_CONTROL1_COLOR
+                : position === "control2" ? CONFIG.ARROW_CONTROL2_COLOR
+                : "";
 
   const { handle, controller } = createHandleElement(
     `editable-arrow-handle editable-arrow-handle-${position}`,

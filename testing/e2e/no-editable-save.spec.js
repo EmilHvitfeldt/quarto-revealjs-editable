@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
-const { TESTING_DIR, clickAddArrow } = require('./test-helpers');
+const { TESTING_DIR, clickAddArrow, navigateToSlide } = require('./test-helpers');
 
 /**
  * Tests for saving documents that have the editable filter active
@@ -53,8 +53,7 @@ test.describe('Save Without Editable Elements', () => {
     await setupNoEditablePage(page);
 
     // Navigate to first content slide
-    await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 1);
 
     await clickAddArrow(page);
 
@@ -69,8 +68,7 @@ test.describe('Save Without Editable Elements', () => {
     await setupNoEditablePage(page);
 
     // Navigate to first content slide
-    await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 1);
 
     await clickAddArrow(page);
 
@@ -92,8 +90,7 @@ test.describe('Save Without Editable Elements', () => {
     await setupNoEditablePage(page);
 
     // Navigate to first content slide (Slide 1)
-    await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 1);
 
     await clickAddArrow(page);
 
@@ -111,8 +108,7 @@ test.describe('Save Without Editable Elements', () => {
     await setupNoEditablePage(page);
 
     // Navigate to first content slide (index 1, which is "## Slide 1")
-    await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 1);
 
     await clickAddArrow(page);
 
@@ -137,17 +133,15 @@ test.describe('Save Without Editable Elements', () => {
     await setupNoEditablePage(page);
 
     // Add arrow to Slide 1
-    await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 1);
     await clickAddArrow(page);
 
     // Deselect arrow
     await page.click('body', { position: { x: 10, y: 10 } });
-    await page.waitForTimeout(100);
+    await page.waitForFunction(() => !document.querySelector('.editable-arrow-container.active'), { timeout: 2000 }).catch(() => {});
 
     // Add arrow to Slide 2
-    await page.evaluate(() => Reveal.slide(2));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 2);
     await clickAddArrow(page);
 
     const result = await page.evaluate(() => {
@@ -163,8 +157,7 @@ test.describe('Save Without Editable Elements', () => {
   test('Original content is preserved when saving', async ({ page }) => {
     await setupNoEditablePage(page);
 
-    await page.evaluate(() => Reveal.slide(1));
-    await page.waitForTimeout(200);
+    await navigateToSlide(page, 1);
     await clickAddArrow(page);
 
     const result = await page.evaluate(() => {

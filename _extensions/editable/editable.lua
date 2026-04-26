@@ -1,26 +1,6 @@
--- Standard base64 encoder (RFC 4648), pure Lua
+-- Use Quarto's built-in base64 encoder (available since Quarto 1.4)
 local function b64encode(data)
-  local chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  local result = {}
-  local pad = 0
-
-  for i = 1, #data, 3 do
-    local b1 = data:byte(i) or 0
-    local b2 = data:byte(i+1) or 0
-    local b3 = data:byte(i+2) or 0
-
-    if i+1 > #data then pad = 2
-    elseif i+2 > #data then pad = 1 end
-
-    local n = b1 * 65536 + b2 * 256 + b3
-
-    table.insert(result, chars:sub(math.floor(n / 262144) % 64 + 1, math.floor(n / 262144) % 64 + 1))
-    table.insert(result, chars:sub(math.floor(n / 4096)   % 64 + 1, math.floor(n / 4096)   % 64 + 1))
-    table.insert(result, pad == 2 and '=' or chars:sub(math.floor(n / 64) % 64 + 1, math.floor(n / 64) % 64 + 1))
-    table.insert(result, pad >= 1 and '=' or chars:sub(n % 64 + 1, n % 64 + 1))
-  end
-
-  return table.concat(result)
+  return quarto.base64.encode(data)
 end
 
 -- Check if a Pandoc element has the class "editable"
@@ -142,43 +122,40 @@ function Pandoc(doc)
   -- Escape backslashes and single quotes in filename for safe JS string
   local escaped_filename = filename:gsub("\\", "\\\\"):gsub("'", "\\'")
 
-  local script = "<script>\n"
+  -- Build script parts using table.insert + table.concat (O(n) vs O(n²) for repeated ..)
+  local parts = { "<script>\n" }
   -- Use TextDecoder to properly handle UTF-8 encoded characters (accents, etc.)
   -- atob() alone returns a binary Latin-1 string and corrupts non-ASCII chars.
-  script = script .. "window._input_file = new TextDecoder('utf-8').decode(\n"
-  script = script .. "  Uint8Array.from(atob('" .. encoded .. "'), function(c) { return c.charCodeAt(0); })\n"
-  script = script .. ");\n"
-  script = script .. "window._input_filename = '" .. escaped_filename .. "';\n"
+  table.insert(parts, "window._input_file = new TextDecoder('utf-8').decode(\n")
+  table.insert(parts, "  Uint8Array.from(atob('" .. encoded .. "'), function(c) { return c.charCodeAt(0); })\n")
+  table.insert(parts, ");\n")
+  table.insert(parts, "window._input_filename = '" .. escaped_filename .. "';\n")
 
   -- Inject brand palette colors if available
   local brand_colors, color_names = get_brand_palette_colors()
   if #brand_colors > 0 then
-    script = script .. "window._quarto_brand_palette = ["
-    for i, color in ipairs(brand_colors) do
-      if i > 1 then script = script .. "," end
-      script = script .. "'" .. color .. "'"
+    local palette_parts = {}
+    for _, color in ipairs(brand_colors) do
+      table.insert(palette_parts, "'" .. color .. "'")
     end
-    script = script .. "];\n"
+    table.insert(parts, "window._quarto_brand_palette = [" .. table.concat(palette_parts, ",") .. "];\n")
 
     -- Also inject the color name mapping (hex -> name)
-    script = script .. "window._quarto_brand_color_names = {"
-    local first = true
+    local name_parts = {}
     for hex, name in pairs(color_names) do
-      if not first then script = script .. "," end
-      first = false
-      script = script .. "'" .. hex .. "':'" .. name .. "'"
+      table.insert(name_parts, "'" .. hex .. "':'" .. name .. "'")
     end
-    script = script .. "};\n"
+    table.insert(parts, "window._quarto_brand_color_names = {" .. table.concat(name_parts, ",") .. "};\n")
   end
 
   -- Inject arrow extension detection flag
   if has_arrow_extension() then
-    script = script .. "window._quarto_arrow_extension = true;\n"
+    table.insert(parts, "window._quarto_arrow_extension = true;\n")
   end
 
-  script = script .. "</script>"
+  table.insert(parts, "</script>")
 
-  quarto.doc.include_text("in-header", script)
+  quarto.doc.include_text("in-header", table.concat(parts))
 
   return doc
 end

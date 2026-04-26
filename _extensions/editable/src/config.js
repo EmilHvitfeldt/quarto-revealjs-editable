@@ -4,9 +4,6 @@
  * @type {Object}
  */
 export const CONFIG = {
-  // Debug mode - set window.EDITABLE_DEBUG = true to enable
-  DEBUG: typeof window !== 'undefined' && window.EDITABLE_DEBUG,
-
   // Sizing constraints
   MIN_ELEMENT_SIZE: 50,
   KEYBOARD_MOVE_STEP: 10,
@@ -60,4 +57,8 @@ export const CONFIG = {
 
   // New fence default
   NEW_FENCE_LENGTH: 3,
+
+  // Default slide dimensions (fallback when offsetWidth/Height is unavailable)
+  DEFAULT_SLIDE_WIDTH: 960,
+  DEFAULT_SLIDE_HEIGHT: 700,
 };

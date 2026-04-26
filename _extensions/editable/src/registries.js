@@ -63,6 +63,7 @@ export const ControlRegistry = {
     const btn = createButton(config.icon, config.className || "");
     btn.setAttribute("aria-label", config.ariaLabel);
     btn.title = config.title;
+    if (config.toggle) btn.setAttribute("aria-pressed", "false");
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       config.onClick(element, btn, e);
@@ -96,50 +97,31 @@ ControlRegistry.register("increaseFont", {
   },
 });
 
-ControlRegistry.register("alignLeft", {
-  icon: "⇤",
-  ariaLabel: "Align text left",
-  title: "Align Left",
-  className: "editable-button-align",
-  appliesTo: ["div"],
-  onClick: (element) => {
-    pushUndoState();
-    const editableElt = editableRegistry.get(element);
-    if (editableElt) { editableElt.setState({ textAlign: "left" }); editableElt.syncToDOM(); }
-  },
-});
-
-ControlRegistry.register("alignCenter", {
-  icon: "⇔",
-  ariaLabel: "Align text center",
-  title: "Align Center",
-  className: "editable-button-align",
-  appliesTo: ["div"],
-  onClick: (element) => {
-    pushUndoState();
-    const editableElt = editableRegistry.get(element);
-    if (editableElt) { editableElt.setState({ textAlign: "center" }); editableElt.syncToDOM(); }
-  },
-});
-
-ControlRegistry.register("alignRight", {
-  icon: "⇥",
-  ariaLabel: "Align text right",
-  title: "Align Right",
-  className: "editable-button-align",
-  appliesTo: ["div"],
-  onClick: (element) => {
-    pushUndoState();
-    const editableElt = editableRegistry.get(element);
-    if (editableElt) { editableElt.setState({ textAlign: "right" }); editableElt.syncToDOM(); }
-  },
-});
+for (const [name, icon, label, value] of [
+  ["alignLeft",   "⇤", "Left",   "left"],
+  ["alignCenter", "⇔", "Center", "center"],
+  ["alignRight",  "⇥", "Right",  "right"],
+]) {
+  ControlRegistry.register(`align${label}`, {
+    icon,
+    ariaLabel: `Align text ${value}`,
+    title: `Align ${label}`,
+    className: "editable-button-align",
+    appliesTo: ["div"],
+    onClick: (element) => {
+      pushUndoState();
+      const editableElt = editableRegistry.get(element);
+      if (editableElt) { editableElt.setState({ textAlign: value }); editableElt.syncToDOM(); }
+    },
+  });
+}
 
 ControlRegistry.register("editMode", {
   icon: "✎",
   ariaLabel: "Toggle edit mode",
   title: "Edit Text",
   className: "editable-button-edit",
+  toggle: true,
   appliesTo: ["div"],
   onClick: (element, btn) => {
     // Use button's active class as the source of truth for edit state
@@ -163,6 +145,7 @@ ControlRegistry.register("editMode", {
       }
       showRightPanel("text");
       btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
       btn.title = "Exit Edit Mode";
     } else {
       // Exiting edit mode — move toolbar back into its element
@@ -175,6 +158,7 @@ ControlRegistry.register("editMode", {
       }
       showRightPanel("default");
       btn.classList.remove("active");
+      btn.setAttribute("aria-pressed", "false");
       btn.title = "Edit Text";
 
       // Deselect any selected text
@@ -267,6 +251,30 @@ export const NewElementRegistry = {
   },
 };
 
+// Single delegated listener that closes any open toolbar submenu when clicking outside
+if (typeof document !== 'undefined') {
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".editable-toolbar-submenu-wrapper")) {
+      document.querySelectorAll(".editable-toolbar-submenu.open").forEach((menu) => {
+        menu.classList.remove("open");
+        const btn = menu.previousElementSibling;
+        if (btn) btn.setAttribute("aria-expanded", "false");
+      });
+    }
+  });
+}
+
+function setButtonContent(btn, icon, label) {
+  const iconSpan = document.createElement("span");
+  iconSpan.className = "toolbar-icon";
+  iconSpan.textContent = icon;
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "toolbar-label";
+  labelSpan.textContent = label;
+  btn.appendChild(iconSpan);
+  btn.appendChild(labelSpan);
+}
+
 /**
  * Registry for floating toolbar actions (save, copy, add elements).
  * @example
@@ -324,7 +332,7 @@ export const ToolbarRegistry = {
     btn.className = "editable-toolbar-button " + (config.className || "");
     btn.setAttribute("aria-label", config.label);
     btn.title = config.title;
-    btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+    setButtonContent(btn, config.icon, config.label);
     if (config.disabled) {
       btn.disabled = true;
       btn.classList.add("toolbar-button-disabled");
@@ -353,7 +361,7 @@ export const ToolbarRegistry = {
     btn.setAttribute("aria-haspopup", "true");
     btn.setAttribute("aria-expanded", "false");
     btn.title = config.title;
-    btn.innerHTML = `<span class="toolbar-icon">${config.icon}</span><span class="toolbar-label">${config.label}</span>`;
+    setButtonContent(btn, config.icon, config.label);
 
     // Create submenu container
     const submenu = document.createElement("div");
@@ -366,7 +374,7 @@ export const ToolbarRegistry = {
       item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
       item.setAttribute("role", "menuitem");
       item.title = itemConfig.title;
-      item.innerHTML = `<span class="toolbar-icon">${itemConfig.icon}</span><span class="toolbar-label">${itemConfig.label}</span>`;
+      setButtonContent(item, itemConfig.icon, itemConfig.label);
       item.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -384,14 +392,6 @@ export const ToolbarRegistry = {
       e.stopPropagation();
       const isOpen = submenu.classList.toggle("open");
       btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    });
-
-    // Close submenu when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!wrapper.contains(e.target)) {
-        submenu.classList.remove("open");
-        btn.setAttribute("aria-expanded", "false");
-      }
     });
 
     wrapper.appendChild(btn);

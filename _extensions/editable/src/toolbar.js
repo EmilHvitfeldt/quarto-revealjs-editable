@@ -118,6 +118,7 @@ export function createFloatingToolbar() {
 
   toolbar.appendChild(rightZone);
   document.body.appendChild(toolbar);
+  document.documentElement.classList.add("has-editable-toolbar");
 
   // Trigger reveal.js relayout to account for the 100px top bar
   requestAnimationFrame(() => {

@@ -45,8 +45,8 @@ export function getTransformedQmd() {
 
   const { text: contentWithSlides, slideLinePositions } = insertNewSlides(content);
   content = contentWithSlides;
-  content = insertNewDivs(content, slideLinePositions);
-  content = insertNewArrows(content, slideLinePositions);
+  content = insertNewDivs(content);
+  content = insertNewArrows(content);
 
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);

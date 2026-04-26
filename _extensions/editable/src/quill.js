@@ -44,17 +44,17 @@ export function initializeQuillForElement(element) {
     const toolbarContainer = document.createElement("div");
     toolbarContainer.id = "toolbar-" + Math.random().toString(36).substring(2, 11);
     toolbarContainer.innerHTML = `
-      <button class="ql-bold">B</button>
-      <button class="ql-italic">I</button>
-      <button class="ql-underline">U</button>
-      <button class="ql-strike">S</button>
+      <button class="ql-bold" aria-label="Bold">B</button>
+      <button class="ql-italic" aria-label="Italic">I</button>
+      <button class="ql-underline" aria-label="Underline">U</button>
+      <button class="ql-strike" aria-label="Strikethrough">S</button>
       <span class="quill-toolbar-separator"></span>
-      <select class="ql-color">${colorOptionsWithExtras}</select>
-      <select class="ql-background">${colorOptionsWithExtras}</select>
+      <select class="ql-color" aria-label="Text color">${colorOptionsWithExtras}</select>
+      <select class="ql-background" aria-label="Background color">${colorOptionsWithExtras}</select>
       <span class="quill-toolbar-separator"></span>
-      <button class="ql-align" value=""></button>
-      <button class="ql-align" value="center"></button>
-      <button class="ql-align" value="right"></button>
+      <button class="ql-align" value="" aria-label="Align left"></button>
+      <button class="ql-align" value="center" aria-label="Align center"></button>
+      <button class="ql-align" value="right" aria-label="Align right"></button>
     `;
     element.appendChild(toolbarContainer);
 

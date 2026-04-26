@@ -625,7 +625,7 @@ function insertContentBySlide(text, items, buildContent) {
  * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
  * @returns {string} Updated QMD content
  */
-export function insertNewDivs(text, slideLinePositions = new Map()) {
+export function insertNewDivs(text) {
   const items = NewElementRegistry.newDivs.filter((div) => !div.newSlideRef);
   return insertContentBySlide(text, items, (divsForSlide) => {
     const newContent = [];
@@ -649,7 +649,7 @@ export function insertNewDivs(text, slideLinePositions = new Map()) {
  * @param {Map} [slideLinePositions=new Map()] - Position map from insertNewSlides
  * @returns {string} Updated QMD content
  */
-export function insertNewArrows(text, slideLinePositions = new Map()) {
+export function insertNewArrows(text) {
   const items = NewElementRegistry.newArrows.filter((arrow) => !arrow.newSlideRef);
   return insertContentBySlide(text, items, (arrowsForSlide) => {
     const newContent = [];

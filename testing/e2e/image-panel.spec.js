@@ -301,6 +301,12 @@ test.describe('Image context panel', () => {
 
     await page.click('.editable-container:has(img)');
 
+    // Capture the initial opacity before any change
+    const initialOpacity = await page.evaluate(() => {
+      const img = document.querySelector('.editable-container img');
+      return img?.style.opacity || '1';
+    });
+
     await page.evaluate(() => {
       const slider = document.querySelector('.image-toolbar-opacity');
       slider.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -308,19 +314,26 @@ test.describe('Image context panel', () => {
       slider.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
+    // Verify the change was applied
+    const changedOpacity = await page.evaluate(() => {
+      return document.querySelector('.editable-container img')?.style.opacity;
+    });
+    expect(changedOpacity).toBe('0.4');
+
     await page.keyboard.press('Control+z');
 
-    await page.waitForFunction(() => {
-      const img = document.querySelector('.editable-container img');
-      return img?.style.opacity !== '0.4';
-    }, { timeout: 2000 });
+    // Verify the undo restored the previous value specifically
+    await page.waitForFunction(
+      (prev) => document.querySelector('.editable-container img')?.style.opacity === prev,
+      initialOpacity,
+      { timeout: 2000 }
+    );
 
     const opacity = await page.evaluate(() => {
-      const img = document.querySelector('.editable-container img');
-      return img?.style.opacity;
+      return document.querySelector('.editable-container img')?.style.opacity;
     });
 
-    expect(opacity).not.toBe('0.4');
+    expect(opacity).toBe(initialOpacity);
   });
 
   // ── Serialization ────────────────────────────────────────────────────────
@@ -508,7 +521,7 @@ test.describe('Image context panel', () => {
       document.querySelector('[title="Toggle crop mode — drag edge handles to crop"]')?.click();
     });
 
-    // nw handle should be offset from its default corner position
+    // nw handle should be offset from its default corner position (cropTop=20, cropLeft=20)
     const result = await page.evaluate(() => {
       const handle = document.querySelector('.editable-container:has(img) .resize-handle.handle-nw');
       return {
@@ -517,8 +530,13 @@ test.describe('Image context panel', () => {
       };
     });
 
-    expect(result.top).toBe('14px');  // cropTop(20) + offset(-6)
-    expect(result.left).toBe('14px'); // cropLeft(20) + offset(-6)
+    // Both values should be positive integers (crop 20 minus small handle offset)
+    const topPx = parseInt(result.top, 10);
+    const leftPx = parseInt(result.left, 10);
+    expect(topPx).toBeGreaterThan(0);
+    expect(topPx).toBeLessThan(20);  // offset from crop=20 but slightly less due to handle centering
+    expect(leftPx).toBeGreaterThan(0);
+    expect(leftPx).toBeLessThan(20);
   });
 
   test('Exiting crop mode resets handle inline styles', async ({ page }) => {

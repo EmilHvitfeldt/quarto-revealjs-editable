@@ -27,33 +27,39 @@ test.describe('UI Controls', () => {
     expect(fontControls.buttonCount).toBe(1); // Only edit button (font/align now in Quill toolbar)
   });
 
-  test('changeFontSize function works', async ({ page }) => {
+  test('changeFontSize function works via increase button', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Test the changeFontSize function directly
-    const result = await page.evaluate(() => {
+    // Hover the container to reveal controls, then click the increase-font button
+    const container = page.locator('.editable-container').first();
+    await container.hover();
+
+    const initial = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
-      const initial = parseFloat(window.getComputedStyle(div).fontSize);
-
-      // Call the internal function via the button's click handler
-      // Or set font size directly to test
-      div.style.fontSize = (initial + 4) + 'px';
-      const after = parseFloat(div.style.fontSize);
-
-      return { initial, after, increased: after > initial };
+      return parseFloat(window.getComputedStyle(div).fontSize);
     });
 
-    expect(result.increased).toBe(true);
+    await container.locator('.editable-button-increase').click();
+
+    const after = await page.evaluate(() => {
+      const div = document.querySelector('div.editable');
+      return parseFloat(window.getComputedStyle(div).fontSize);
+    });
+
+    expect(after).toBeGreaterThan(initial);
   });
 
-  test('Text alignment can be set', async ({ page }) => {
+  test('Text alignment can be set via align button', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Test alignment by setting style directly
+    const container = page.locator('.editable-container').first();
+    await container.hover();
+
+    await container.locator('.editable-button-align').nth(1).click(); // center
+
     const result = await page.evaluate(() => {
       const div = document.querySelector('div.editable');
-      div.style.textAlign = 'center';
-      return div.style.textAlign;
+      return window.getComputedStyle(div).textAlign;
     });
 
     expect(result).toBe('center');
@@ -783,34 +789,18 @@ test.describe('Code Quality', () => {
     await setupPage(page, 'basic.html');
 
     // Call save functions and verify no globals are leaked
-    const globalsCheck = await page.evaluate(() => {
+    const newGlobals = await page.evaluate(() => {
       // Record initial window properties
       const initialProps = new Set(Object.keys(window));
 
-      // Trigger save logic
-      const index = window._input_file;
-      const Elt_dim = extractEditableEltDimensions();
-      const result = updateTextDivs(index);
-      const Elt_attr = formatEditableEltStrings(Elt_dim);
-      replaceEditableOccurrences(result, Elt_attr);
+      // Trigger save logic via public API
+      getTransformedQmd();
 
-      // Check for new global variables (excluding expected ones)
-      const afterProps = Object.keys(window);
-      const newGlobals = afterProps.filter(p => !initialProps.has(p));
-
-      // These should not exist as globals
-      const badGlobals = ['Elt_dim', 'Elt_attr', 'divs', 'replacements', 'text', 'filename'];
-      const leakedGlobals = badGlobals.filter(g => g in window);
-
-      return {
-        newGlobals,
-        leakedGlobals,
-        hasLeaks: leakedGlobals.length > 0
-      };
+      // Any new keys on window after the call are unexpected leaks
+      return Object.keys(window).filter(p => !initialProps.has(p));
     });
 
-    expect(globalsCheck.hasLeaks).toBe(false);
-    expect(globalsCheck.leakedGlobals).toEqual([]);
+    expect(newGlobals).toEqual([]);
   });
 });
 

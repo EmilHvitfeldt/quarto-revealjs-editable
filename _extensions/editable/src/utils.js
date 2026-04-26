@@ -19,8 +19,8 @@ export function round(n) {
  * @param {...any} args - Arguments to log
  */
 export function debug(...args) {
-  if (CONFIG.DEBUG) {
-    console.log('[editable]', ...args);
+  if (typeof window !== 'undefined' && window.EDITABLE_DEBUG) {
+    console.debug('[editable]', ...args);
   }
 }
 
@@ -142,8 +142,12 @@ export function getCurrentSlideIndex() {
  * @returns {HTMLElement|null} The current slide section element
  */
 export function getCurrentSlide() {
-  return document.querySelector("section.present:not(.stack)") ||
-         document.querySelector("section.present");
+  // Prefer a leaf .present section (not a stack wrapper which contains child sections)
+  const nonStack = document.querySelector("section.present:not(.stack)");
+  if (nonStack) return nonStack;
+  // Fallback: find the deepest .present section to avoid matching a stack container
+  const allPresent = Array.from(document.querySelectorAll("section.present"));
+  return allPresent.find(s => !s.querySelector("section")) || allPresent[0] || null;
 }
 
 /**
@@ -155,9 +159,8 @@ export function hasTitleSlide() {
   if (typeof Reveal === 'undefined') return false;
   const firstSlide = Reveal.getSlide(0);
   if (!firstSlide) return false;
-  // Title slides typically have an h1 with the title, not an h2
-  const h2 = firstSlide.querySelector("h2");
-  return !h2;
+  // Quarto title slides carry id="title-slide" or class="quarto-title-block"
+  return firstSlide.id === 'title-slide' || firstSlide.classList.contains('quarto-title-block');
 }
 
 /**

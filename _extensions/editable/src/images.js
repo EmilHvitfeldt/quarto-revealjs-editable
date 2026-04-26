@@ -25,6 +25,8 @@ function showReplaceWarning(message, anchorEl) {
 
   const popup = document.createElement("div");
   popup.className = "image-replace-warning";
+  popup.setAttribute("role", "alert");
+  popup.setAttribute("aria-live", "assertive");
   popup.textContent = `⚠ ${message}`;
   document.body.appendChild(popup);
   replaceWarningEl = popup;
@@ -59,6 +61,17 @@ export const imageControlRefs = {
 
 /** @type {boolean} Whether crop mode is currently active */
 let cropModeActive = false;
+
+/**
+ * Run fn only when there is an active image and it has an editableElt.
+ * @param {Function} fn - (editableEl) => void
+ */
+function withActiveImage(fn) {
+  if (!activeImage) return;
+  const el = editableRegistry.get(activeImage);
+  if (!el) return;
+  fn(el);
+}
 
 /** @type {Map<HTMLElement, Function>} Capture-phase listeners attached to resize handles in crop mode */
 const cropHandleListeners = new Map();
@@ -144,7 +157,7 @@ function applyCrop(imgEl) {
 
   if (cropModeActive && editableEl.container) {
     const offset = -6; // matches --editable-handle-offset
-    editableEl.container.querySelectorAll(".resize-handle").forEach(handle => {
+    editableEl.getResizeHandles().forEach(handle => {
       const pos = handle.dataset.position;
       handle.style.top    = pos.includes("n") ? `${ct + offset}px` : "";
       handle.style.bottom = pos.includes("s") ? `${cb + offset}px` : "";
@@ -169,7 +182,7 @@ function enterCropMode() {
 
   applyCrop(activeImage); // position handles to match any existing crop
 
-  editableEl.container.querySelectorAll(".resize-handle").forEach(handle => {
+  editableEl.getResizeHandles().forEach(handle => {
     const listener = (e) => onCropHandleMousedown(e, activeImage);
     handle.addEventListener("mousedown", listener, true); // capture — fires before resize
     cropHandleListeners.set(handle, listener);
@@ -192,7 +205,7 @@ function exitCropMode() {
     const editableEl = editableRegistry.get(activeImage);
     if (editableEl?.container) {
       editableEl.container.classList.remove("crop-mode");
-      editableEl.container.querySelectorAll(".resize-handle").forEach(handle => {
+      editableEl.getResizeHandles().forEach(handle => {
         handle.style.top = "";
         handle.style.bottom = "";
         handle.style.left = "";
@@ -317,11 +330,9 @@ function buildOpacityControl(addCell) {
 
   slider.addEventListener("mousedown", () => { if (activeImage) pushUndoState(); });
   slider.addEventListener("input", () => {
-    if (!activeImage) return;
     const val = parseInt(slider.value, 10);
     label.textContent = `${val}%`;
-    const el = editableRegistry.get(activeImage);
-    if (el) { el.state.opacity = val; activeImage.style.opacity = val / 100; }
+    withActiveImage((el) => el.setState({ opacity: val }));
   });
 
   imageControlRefs.opacitySlider = slider;
@@ -342,10 +353,8 @@ function buildBorderRadiusControl(addCell) {
 
   input.addEventListener("focus", () => { if (activeImage) pushUndoState(); });
   input.addEventListener("input", () => {
-    if (!activeImage) return;
     const val = Math.max(0, parseInt(input.value, 10) || 0);
-    const el = editableRegistry.get(activeImage);
-    if (el) { el.state.borderRadius = val; activeImage.style.borderRadius = val ? `${val}px` : ""; }
+    withActiveImage((el) => el.setState({ borderRadius: val }));
   });
 
   imageControlRefs.borderRadiusInput = input;
@@ -376,13 +385,12 @@ function buildFlipControl(addCell) {
   flipHBtn.textContent = "⇆";
   flipHBtn.title = "Flip horizontal";
   flipHBtn.addEventListener("click", () => {
-    if (!activeImage) return;
     pushUndoState();
-    const el = editableRegistry.get(activeImage);
-    if (!el) return;
-    el.state.flipH = !el.state.flipH;
-    flipHBtn.classList.toggle("active", el.state.flipH);
-    applyTransform(activeImage);
+    withActiveImage((el) => {
+      el.state.flipH = !el.state.flipH;
+      flipHBtn.classList.toggle("active", el.state.flipH);
+      applyTransform(activeImage);
+    });
   });
   imageControlRefs.flipHBtn = flipHBtn;
 
@@ -391,13 +399,12 @@ function buildFlipControl(addCell) {
   flipVBtn.textContent = "⇅";
   flipVBtn.title = "Flip vertical";
   flipVBtn.addEventListener("click", () => {
-    if (!activeImage) return;
     pushUndoState();
-    const el = editableRegistry.get(activeImage);
-    if (!el) return;
-    el.state.flipV = !el.state.flipV;
-    flipVBtn.classList.toggle("active", el.state.flipV);
-    applyTransform(activeImage);
+    withActiveImage((el) => {
+      el.state.flipV = !el.state.flipV;
+      flipVBtn.classList.toggle("active", el.state.flipV);
+      applyTransform(activeImage);
+    });
   });
   imageControlRefs.flipVBtn = flipVBtn;
 

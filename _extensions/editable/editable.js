@@ -2938,8 +2938,6 @@ var EditableModule = (() => {
 
   // src/config.js
   var CONFIG = {
-    // Debug mode - set window.EDITABLE_DEBUG = true to enable
-    DEBUG: typeof window !== "undefined" && window.EDITABLE_DEBUG,
     // Sizing constraints
     MIN_ELEMENT_SIZE: 50,
     KEYBOARD_MOVE_STEP: 10,
@@ -2987,7 +2985,10 @@ var EditableModule = (() => {
     POLL_MAX_ATTEMPTS: 50,
     POLL_INTERVAL_MS: 100,
     // New fence default
-    NEW_FENCE_LENGTH: 3
+    NEW_FENCE_LENGTH: 3,
+    // Default slide dimensions (fallback when offsetWidth/Height is unavailable)
+    DEFAULT_SLIDE_WIDTH: 960,
+    DEFAULT_SLIDE_HEIGHT: 700
   };
 
   // src/utils.js
@@ -2995,8 +2996,8 @@ var EditableModule = (() => {
     return Math.round(n * 10) / 10;
   }
   function debug(...args) {
-    if (CONFIG.DEBUG) {
-      console.log("[editable]", ...args);
+    if (typeof window !== "undefined" && window.EDITABLE_DEBUG) {
+      console.debug("[editable]", ...args);
     }
   }
   function getSlideScale() {
@@ -3048,7 +3049,11 @@ var EditableModule = (() => {
     return indices.h;
   }
   function getCurrentSlide() {
-    return document.querySelector("section.present:not(.stack)") || document.querySelector("section.present");
+    const nonStack = document.querySelector("section.present:not(.stack)");
+    if (nonStack)
+      return nonStack;
+    const allPresent = Array.from(document.querySelectorAll("section.present"));
+    return allPresent.find((s) => !s.querySelector("section")) || allPresent[0] || null;
   }
   function hasTitleSlide() {
     if (typeof Reveal === "undefined")
@@ -3056,8 +3061,7 @@ var EditableModule = (() => {
     const firstSlide = Reveal.getSlide(0);
     if (!firstSlide)
       return false;
-    const h2 = firstSlide.querySelector("h2");
-    return !h2;
+    return firstSlide.id === "title-slide" || firstSlide.classList.contains("quarto-title-block");
   }
   function getQmdHeadingIndex(revealIndex) {
     if (hasTitleSlide()) {
@@ -3201,6 +3205,15 @@ var EditableModule = (() => {
      * Syncs from DOM first to capture current values.
      * @returns {Object} Dimensions formatted for PropertySerializers
      */
+    /**
+     * Return all resize handle elements in this element's container.
+     * @returns {HTMLElement[]}
+     */
+    getResizeHandles() {
+      if (!this.container)
+        return [];
+      return Array.from(this.container.querySelectorAll(".resize-handle"));
+    }
     toDimensions() {
       this.syncFromDOM();
       const dims = {
@@ -12171,8 +12184,29 @@ ${escapeText(this.code(index, length))}
       if (hex)
         return hex.toLowerCase();
     }
-    if (normalized === "black")
-      return "#000000";
+    const namedColors = {
+      black: "#000000",
+      white: "#ffffff",
+      red: "#ff0000",
+      lime: "#00ff00",
+      blue: "#0000ff",
+      yellow: "#ffff00",
+      cyan: "#00ffff",
+      magenta: "#ff00ff",
+      silver: "#c0c0c0",
+      gray: "#808080",
+      grey: "#808080",
+      maroon: "#800000",
+      olive: "#808000",
+      green: "#008000",
+      purple: "#800080",
+      teal: "#008080",
+      navy: "#000080",
+      orange: "#ffa500",
+      transparent: "#00000000"
+    };
+    if (namedColors[normalized])
+      return namedColors[normalized];
     if (normalized.match(/^#[0-9a-f]{3}$/i)) {
       return "#" + normalized[1] + normalized[1] + normalized[2] + normalized[2] + normalized[3] + normalized[3];
     }
@@ -12230,17 +12264,17 @@ ${escapeText(this.code(index, length))}
       const toolbarContainer = document.createElement("div");
       toolbarContainer.id = "toolbar-" + Math.random().toString(36).substring(2, 11);
       toolbarContainer.innerHTML = `
-      <button class="ql-bold">B</button>
-      <button class="ql-italic">I</button>
-      <button class="ql-underline">U</button>
-      <button class="ql-strike">S</button>
+      <button class="ql-bold" aria-label="Bold">B</button>
+      <button class="ql-italic" aria-label="Italic">I</button>
+      <button class="ql-underline" aria-label="Underline">U</button>
+      <button class="ql-strike" aria-label="Strikethrough">S</button>
       <span class="quill-toolbar-separator"></span>
-      <select class="ql-color">${colorOptionsWithExtras}</select>
-      <select class="ql-background">${colorOptionsWithExtras}</select>
+      <select class="ql-color" aria-label="Text color">${colorOptionsWithExtras}</select>
+      <select class="ql-background" aria-label="Background color">${colorOptionsWithExtras}</select>
       <span class="quill-toolbar-separator"></span>
-      <button class="ql-align" value=""></button>
-      <button class="ql-align" value="center"></button>
-      <button class="ql-align" value="right"></button>
+      <button class="ql-align" value="" aria-label="Align left"></button>
+      <button class="ql-align" value="center" aria-label="Align center"></button>
+      <button class="ql-align" value="right" aria-label="Align right"></button>
     `;
       element.appendChild(toolbarContainer);
       const textColorPicker = document.createElement("input");
@@ -12321,6 +12355,8 @@ ${escapeText(this.code(index, length))}
       replaceWarningEl.remove();
     const popup = document.createElement("div");
     popup.className = "image-replace-warning";
+    popup.setAttribute("role", "alert");
+    popup.setAttribute("aria-live", "assertive");
     popup.textContent = `\u26A0 ${message}`;
     document.body.appendChild(popup);
     replaceWarningEl = popup;
@@ -12349,6 +12385,14 @@ ${escapeText(this.code(index, length))}
     flipVBtn: null
   };
   var cropModeActive = false;
+  function withActiveImage(fn) {
+    if (!activeImage)
+      return;
+    const el = editableRegistry.get(activeImage);
+    if (!el)
+      return;
+    fn(el);
+  }
   var cropHandleListeners = /* @__PURE__ */ new Map();
   registerDeselectImage(() => setActiveImage(null));
   function setActiveImage(imgEl) {
@@ -12405,7 +12449,7 @@ ${escapeText(this.code(index, length))}
     imgEl.style.clipPath = ct || cr || cb || cl ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)` : "";
     if (cropModeActive && editableEl.container) {
       const offset = -6;
-      editableEl.container.querySelectorAll(".resize-handle").forEach((handle) => {
+      editableEl.getResizeHandles().forEach((handle) => {
         const pos = handle.dataset.position;
         handle.style.top = pos.includes("n") ? `${ct + offset}px` : "";
         handle.style.bottom = pos.includes("s") ? `${cb + offset}px` : "";
@@ -12425,7 +12469,7 @@ ${escapeText(this.code(index, length))}
       return;
     editableEl.container.classList.add("crop-mode");
     applyCrop(activeImage);
-    editableEl.container.querySelectorAll(".resize-handle").forEach((handle) => {
+    editableEl.getResizeHandles().forEach((handle) => {
       const listener = (e) => onCropHandleMousedown(e, activeImage);
       handle.addEventListener("mousedown", listener, true);
       cropHandleListeners.set(handle, listener);
@@ -12443,7 +12487,7 @@ ${escapeText(this.code(index, length))}
       const editableEl = editableRegistry.get(activeImage);
       if (editableEl?.container) {
         editableEl.container.classList.remove("crop-mode");
-        editableEl.container.querySelectorAll(".resize-handle").forEach((handle) => {
+        editableEl.getResizeHandles().forEach((handle) => {
           handle.style.top = "";
           handle.style.bottom = "";
           handle.style.left = "";
@@ -12540,15 +12584,9 @@ ${escapeText(this.code(index, length))}
         pushUndoState();
     });
     slider.addEventListener("input", () => {
-      if (!activeImage)
-        return;
       const val = parseInt(slider.value, 10);
       label.textContent = `${val}%`;
-      const el = editableRegistry.get(activeImage);
-      if (el) {
-        el.state.opacity = val;
-        activeImage.style.opacity = val / 100;
-      }
+      withActiveImage((el) => el.setState({ opacity: val }));
     });
     imageControlRefs.opacitySlider = slider;
     imageControlRefs.opacityLabel = label;
@@ -12569,14 +12607,8 @@ ${escapeText(this.code(index, length))}
         pushUndoState();
     });
     input.addEventListener("input", () => {
-      if (!activeImage)
-        return;
       const val = Math.max(0, parseInt(input.value, 10) || 0);
-      const el = editableRegistry.get(activeImage);
-      if (el) {
-        el.state.borderRadius = val;
-        activeImage.style.borderRadius = val ? `${val}px` : "";
-      }
+      withActiveImage((el) => el.setState({ borderRadius: val }));
     });
     imageControlRefs.borderRadiusInput = input;
     cell.appendChild(input);
@@ -12607,15 +12639,12 @@ ${escapeText(this.code(index, length))}
     flipHBtn.textContent = "\u21C6";
     flipHBtn.title = "Flip horizontal";
     flipHBtn.addEventListener("click", () => {
-      if (!activeImage)
-        return;
       pushUndoState();
-      const el = editableRegistry.get(activeImage);
-      if (!el)
-        return;
-      el.state.flipH = !el.state.flipH;
-      flipHBtn.classList.toggle("active", el.state.flipH);
-      applyTransform(activeImage);
+      withActiveImage((el) => {
+        el.state.flipH = !el.state.flipH;
+        flipHBtn.classList.toggle("active", el.state.flipH);
+        applyTransform(activeImage);
+      });
     });
     imageControlRefs.flipHBtn = flipHBtn;
     const flipVBtn = document.createElement("button");
@@ -12623,15 +12652,12 @@ ${escapeText(this.code(index, length))}
     flipVBtn.textContent = "\u21C5";
     flipVBtn.title = "Flip vertical";
     flipVBtn.addEventListener("click", () => {
-      if (!activeImage)
-        return;
       pushUndoState();
-      const el = editableRegistry.get(activeImage);
-      if (!el)
-        return;
-      el.state.flipV = !el.state.flipV;
-      flipVBtn.classList.toggle("active", el.state.flipV);
-      applyTransform(activeImage);
+      withActiveImage((el) => {
+        el.state.flipV = !el.state.flipV;
+        flipVBtn.classList.toggle("active", el.state.flipV);
+        applyTransform(activeImage);
+      });
     });
     imageControlRefs.flipVBtn = flipVBtn;
     wrap.appendChild(flipHBtn);
@@ -12790,6 +12816,7 @@ ${escapeText(this.code(index, length))}
     textPanelEl = textPanel;
     toolbar.appendChild(rightZone);
     document.body.appendChild(toolbar);
+    document.documentElement.classList.add("has-editable-toolbar");
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event("resize"));
     });
@@ -12834,6 +12861,8 @@ ${escapeText(this.code(index, length))}
       const btn = createButton(config4.icon, config4.className || "");
       btn.setAttribute("aria-label", config4.ariaLabel);
       btn.title = config4.title;
+      if (config4.toggle)
+        btn.setAttribute("aria-pressed", "false");
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         config4.onClick(element, btn, e);
@@ -12863,56 +12892,33 @@ ${escapeText(this.code(index, length))}
       changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
     }
   });
-  ControlRegistry.register("alignLeft", {
-    icon: "\u21E4",
-    ariaLabel: "Align text left",
-    title: "Align Left",
-    className: "editable-button-align",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      const editableElt = editableRegistry.get(element);
-      if (editableElt) {
-        editableElt.setState({ textAlign: "left" });
-        editableElt.syncToDOM();
+  for (const [name, icon, label, value] of [
+    ["alignLeft", "\u21E4", "Left", "left"],
+    ["alignCenter", "\u21D4", "Center", "center"],
+    ["alignRight", "\u21E5", "Right", "right"]
+  ]) {
+    ControlRegistry.register(`align${label}`, {
+      icon,
+      ariaLabel: `Align text ${value}`,
+      title: `Align ${label}`,
+      className: "editable-button-align",
+      appliesTo: ["div"],
+      onClick: (element) => {
+        pushUndoState();
+        const editableElt = editableRegistry.get(element);
+        if (editableElt) {
+          editableElt.setState({ textAlign: value });
+          editableElt.syncToDOM();
+        }
       }
-    }
-  });
-  ControlRegistry.register("alignCenter", {
-    icon: "\u21D4",
-    ariaLabel: "Align text center",
-    title: "Align Center",
-    className: "editable-button-align",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      const editableElt = editableRegistry.get(element);
-      if (editableElt) {
-        editableElt.setState({ textAlign: "center" });
-        editableElt.syncToDOM();
-      }
-    }
-  });
-  ControlRegistry.register("alignRight", {
-    icon: "\u21E5",
-    ariaLabel: "Align text right",
-    title: "Align Right",
-    className: "editable-button-align",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      const editableElt = editableRegistry.get(element);
-      if (editableElt) {
-        editableElt.setState({ textAlign: "right" });
-        editableElt.syncToDOM();
-      }
-    }
-  });
+    });
+  }
   ControlRegistry.register("editMode", {
     icon: "\u270E",
     ariaLabel: "Toggle edit mode",
     title: "Edit Text",
     className: "editable-button-edit",
+    toggle: true,
     appliesTo: ["div"],
     onClick: (element, btn) => {
       const isEditing = btn.classList.contains("active");
@@ -12929,6 +12935,7 @@ ${escapeText(this.code(index, length))}
         }
         showRightPanel("text");
         btn.classList.add("active");
+        btn.setAttribute("aria-pressed", "true");
         btn.title = "Exit Edit Mode";
       } else {
         if (quillData) {
@@ -12940,6 +12947,7 @@ ${escapeText(this.code(index, length))}
         }
         showRightPanel("default");
         btn.classList.remove("active");
+        btn.setAttribute("aria-pressed", "false");
         btn.title = "Edit Text";
         window.getSelection().removeAllRanges();
       }
@@ -13016,6 +13024,28 @@ ${escapeText(this.code(index, length))}
       return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
     }
   };
+  if (typeof document !== "undefined") {
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".editable-toolbar-submenu-wrapper")) {
+        document.querySelectorAll(".editable-toolbar-submenu.open").forEach((menu) => {
+          menu.classList.remove("open");
+          const btn = menu.previousElementSibling;
+          if (btn)
+            btn.setAttribute("aria-expanded", "false");
+        });
+      }
+    });
+  }
+  function setButtonContent(btn, icon, label) {
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "toolbar-icon";
+    iconSpan.textContent = icon;
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "toolbar-label";
+    labelSpan.textContent = label;
+    btn.appendChild(iconSpan);
+    btn.appendChild(labelSpan);
+  }
   var ToolbarRegistry = {
     /** @type {Map<string, Object>} Registered actions by name */
     actions: /* @__PURE__ */ new Map(),
@@ -13058,7 +13088,7 @@ ${escapeText(this.code(index, length))}
       btn.className = "editable-toolbar-button " + (config4.className || "");
       btn.setAttribute("aria-label", config4.label);
       btn.title = config4.title;
-      btn.innerHTML = `<span class="toolbar-icon">${config4.icon}</span><span class="toolbar-label">${config4.label}</span>`;
+      setButtonContent(btn, config4.icon, config4.label);
       if (config4.disabled) {
         btn.disabled = true;
         btn.classList.add("toolbar-button-disabled");
@@ -13085,7 +13115,7 @@ ${escapeText(this.code(index, length))}
       btn.setAttribute("aria-haspopup", "true");
       btn.setAttribute("aria-expanded", "false");
       btn.title = config4.title;
-      btn.innerHTML = `<span class="toolbar-icon">${config4.icon}</span><span class="toolbar-label">${config4.label}</span>`;
+      setButtonContent(btn, config4.icon, config4.label);
       const submenu = document.createElement("div");
       submenu.className = "editable-toolbar-submenu";
       submenu.setAttribute("role", "menu");
@@ -13094,7 +13124,7 @@ ${escapeText(this.code(index, length))}
         item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
         item.setAttribute("role", "menuitem");
         item.title = itemConfig.title;
-        item.innerHTML = `<span class="toolbar-icon">${itemConfig.icon}</span><span class="toolbar-label">${itemConfig.label}</span>`;
+        setButtonContent(item, itemConfig.icon, itemConfig.label);
         item.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -13109,12 +13139,6 @@ ${escapeText(this.code(index, length))}
         e.stopPropagation();
         const isOpen = submenu.classList.toggle("open");
         btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      });
-      document.addEventListener("click", (e) => {
-        if (!wrapper.contains(e.target)) {
-          submenu.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
-        }
       });
       wrapper.appendChild(btn);
       wrapper.appendChild(submenu);
@@ -13272,73 +13296,77 @@ ${escapeText(this.code(index, length))}
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.className = "editable-modal-overlay";
-      overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100000;
-    `;
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("aria-labelledby", "editable-modal-title");
       const modal = document.createElement("div");
       modal.className = "editable-modal";
-      modal.style.cssText = `
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      max-width: 450px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      font-family: system-ui, -apple-system, sans-serif;
-    `;
-      modal.innerHTML = `
-      <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">Arrow Extension Required</h3>
-      <p style="margin: 0 0 12px 0; color: #555; line-height: 1.5;">
-        Arrows are saved as <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" style="color: var(--editable-accent-color, #007cba);">quarto-arrows</a> extension to render.
-      </p>
-      <p style="margin: 0 0 16px 0; color: #555;">
-        Install with:<br>
-        <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">quarto add EmilHvitfeldt/quarto-arrows</code>
-      </p>
-      <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
-        Continue? (Arrows will work in the editor but won't render until the extension is installed)
-      </p>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="editable-modal-cancel" style="
-          padding: 8px 16px;
-          border: 1px solid #ccc;
-          background: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Cancel</button>
-        <button class="editable-modal-confirm" style="
-          padding: 8px 16px;
-          border: none;
-          background: var(--editable-accent-color, #007cba);
-          color: white;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        ">Continue</button>
-      </div>
-    `;
+      const title = document.createElement("h3");
+      title.id = "editable-modal-title";
+      title.className = "editable-modal-title";
+      title.textContent = "Arrow Extension Required";
+      const p1 = document.createElement("p");
+      p1.className = "editable-modal-body";
+      p1.innerHTML = 'Arrows are saved as <code class="editable-modal-code">{{&lt; arrow &gt;}}</code> shortcodes which require the <a href="https://github.com/EmilHvitfeldt/quarto-arrows" target="_blank" class="editable-modal-link">quarto-arrows</a> extension to render.';
+      const p2 = document.createElement("p");
+      p2.className = "editable-modal-body";
+      const installCode = document.createElement("code");
+      installCode.className = "editable-modal-code editable-modal-code-block";
+      installCode.textContent = "quarto add EmilHvitfeldt/quarto-arrows";
+      p2.appendChild(document.createTextNode("Install with:"));
+      p2.appendChild(document.createElement("br"));
+      p2.appendChild(installCode);
+      const p3 = document.createElement("p");
+      p3.className = "editable-modal-body editable-modal-body-small";
+      p3.textContent = "Continue? (Arrows will work in the editor but won't render until the extension is installed)";
+      const btnRow = document.createElement("div");
+      btnRow.className = "editable-modal-buttons";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "editable-modal-cancel";
+      cancelBtn.textContent = "Cancel";
+      const confirmBtn = document.createElement("button");
+      confirmBtn.className = "editable-modal-confirm";
+      confirmBtn.textContent = "Continue";
+      btnRow.appendChild(cancelBtn);
+      btnRow.appendChild(confirmBtn);
+      modal.appendChild(title);
+      modal.appendChild(p1);
+      modal.appendChild(p2);
+      modal.appendChild(p3);
+      modal.appendChild(btnRow);
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
       const cleanup = (result) => {
         overlay.remove();
         resolve(result);
       };
-      modal.querySelector(".editable-modal-cancel").onclick = () => cleanup(false);
-      modal.querySelector(".editable-modal-confirm").onclick = () => cleanup(true);
+      cancelBtn.onclick = () => cleanup(false);
+      confirmBtn.onclick = () => cleanup(true);
       overlay.onclick = (e) => {
         if (e.target === overlay)
           cleanup(false);
       };
-      modal.querySelector(".editable-modal-confirm").focus();
+      overlay.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          cleanup(false);
+          return;
+        }
+        if (e.key !== "Tab")
+          return;
+        const focusable = [...modal.querySelectorAll("button, a, [tabindex]:not([tabindex='-1'])")];
+        if (!focusable.length)
+          return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      });
+      confirmBtn.focus();
     });
   }
   async function showArrowExtensionWarning() {
@@ -13830,6 +13858,13 @@ ${escapeText(this.code(index, length))}
     waypointBadge.textContent = hasWaypoints ? `${arrowData.waypoints.length} wp` : "0 wp";
     smoothToggle.classList.toggle("active", !!(arrowData && arrowData.smooth && hasWaypoints));
   }
+  function getDashArray(dash, width) {
+    if (dash === "dashed")
+      return `${width * 4},${width * 2}`;
+    if (dash === "dotted")
+      return `${width},${width * 2}`;
+    return "none";
+  }
   function updateArrowAppearance(arrowData) {
     if (!arrowData._path)
       return;
@@ -13838,12 +13873,7 @@ ${escapeText(this.code(index, length))}
     if (arrowData._labelText) {
       arrowData._labelText.setAttribute("fill", arrowData.color);
     }
-    const dashPatterns = {
-      solid: "none",
-      dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-      dotted: `${arrowData.width},${arrowData.width * 2}`
-    };
-    const dashArray = dashPatterns[arrowData.dash] || "none";
+    const dashArray = getDashArray(arrowData.dash, arrowData.width);
     if (dashArray === "none") {
       arrowData._path.removeAttribute("stroke-dasharray");
     } else {
@@ -13911,12 +13941,7 @@ ${escapeText(this.code(index, length))}
       extraPath.setAttribute("stroke-width", arrowData.width);
       extraPath.setAttribute("fill", "none");
       extraPath.style.pointerEvents = "none";
-      const dashPatterns = {
-        solid: "none",
-        dashed: `${arrowData.width * 4},${arrowData.width * 2}`,
-        dotted: `${arrowData.width},${arrowData.width * 2}`
-      };
-      const dashArray = dashPatterns[arrowData.dash] || "none";
+      const dashArray = getDashArray(arrowData.dash, arrowData.width);
       if (dashArray !== "none") {
         extraPath.setAttribute("stroke-dasharray", dashArray);
       }
@@ -14035,8 +14060,8 @@ ${escapeText(this.code(index, length))}
     }
     pushUndoState();
     const slideIndex = getCurrentSlideIndex();
-    const slideWidth = currentSlide.offsetWidth || 960;
-    const slideHeight = currentSlide.offsetHeight || 700;
+    const slideWidth = currentSlide.offsetWidth || CONFIG.DEFAULT_SLIDE_WIDTH;
+    const slideHeight = currentSlide.offsetHeight || CONFIG.DEFAULT_SLIDE_HEIGHT;
     const centerX = slideWidth / 2;
     const centerY = slideHeight / 2;
     const halfLength = CONFIG.NEW_ARROW_LENGTH / 2;
@@ -14311,15 +14336,7 @@ ${escapeText(this.code(index, length))}
   function createArrowHandle(arrowData, position) {
     const isControlPoint = position === "control1" || position === "control2";
     const handleSize = isControlPoint ? CONFIG.ARROW_CONTROL_HANDLE_SIZE : CONFIG.ARROW_HANDLE_SIZE;
-    let bgColor;
-    if (position === "start")
-      bgColor = "#007cba";
-    else if (position === "end")
-      bgColor = "#28a745";
-    else if (position === "control1")
-      bgColor = CONFIG.ARROW_CONTROL1_COLOR;
-    else if (position === "control2")
-      bgColor = CONFIG.ARROW_CONTROL2_COLOR;
+    const bgColor = position === "control1" ? CONFIG.ARROW_CONTROL1_COLOR : position === "control2" ? CONFIG.ARROW_CONTROL2_COLOR : "";
     const { handle, controller } = createHandleElement(
       `editable-arrow-handle editable-arrow-handle-${position}`,
       `Arrow ${position} point`,
@@ -14950,16 +14967,12 @@ ${escapeText(this.code(index, length))}
      */
     fontControls: {
       name: "fontControls",
-      init(context) {
-      },
       createControls(context) {
         const { container } = context;
         const fontControls = document.createElement("div");
         fontControls.className = "editable-font-controls";
         container.appendChild(fontControls);
         return fontControls;
-      },
-      attachEvents(context) {
       }
     },
     /**
@@ -14967,8 +14980,6 @@ ${escapeText(this.code(index, length))}
      */
     editText: {
       name: "editText",
-      init(context) {
-      },
       createControls(context) {
         const { container, element } = context;
         const elementType = element.tagName.toLowerCase();
@@ -14985,8 +14996,6 @@ ${escapeText(this.code(index, length))}
           return btn;
         }
         return null;
-      },
-      attachEvents(context) {
       }
     },
     /**
@@ -15118,8 +15127,8 @@ ${escapeText(this.code(index, length))}
     }
     const editableElt = editableRegistry.get(newDiv);
     if (editableElt) {
-      const slideWidth = currentSlide.offsetWidth || 960;
-      const slideHeight = currentSlide.offsetHeight || 700;
+      const slideWidth = currentSlide.offsetWidth || CONFIG.DEFAULT_SLIDE_WIDTH;
+      const slideHeight = currentSlide.offsetHeight || CONFIG.DEFAULT_SLIDE_HEIGHT;
       editableElt.setState({
         x: (slideWidth - CONFIG.NEW_TEXT_WIDTH) / 2,
         y: (slideHeight - CONFIG.NEW_TEXT_HEIGHT) / 2
@@ -15222,7 +15231,7 @@ ${escapeText(this.code(index, length))}
   }
   function setupContainerAccessibility(container) {
     container.setAttribute("tabindex", "0");
-    container.setAttribute("role", "application");
+    container.setAttribute("role", "group");
     container.setAttribute("aria-label", "Editable element. Use arrow keys to move, Shift+arrows to resize.");
   }
   function setupHoverEffects(context, capabilities) {
@@ -15788,7 +15797,7 @@ ${innerFence}`;
     }
     return lines.join("\n");
   }
-  function insertNewDivs(text, slideLinePositions = /* @__PURE__ */ new Map()) {
+  function insertNewDivs(text) {
     const items = NewElementRegistry.newDivs.filter((div) => !div.newSlideRef);
     return insertContentBySlide(text, items, (divsForSlide) => {
       const newContent = [];
@@ -15805,7 +15814,7 @@ ${innerFence}`;
       return newContent;
     });
   }
-  function insertNewArrows(text, slideLinePositions = /* @__PURE__ */ new Map()) {
+  function insertNewArrows(text) {
     const items = NewElementRegistry.newArrows.filter((arrow) => !arrow.newSlideRef);
     return insertContentBySlide(text, items, (arrowsForSlide) => {
       const newContent = [];
@@ -15882,8 +15891,8 @@ ${fence}`;
       return "";
     const { text: contentWithSlides, slideLinePositions } = insertNewSlides(content);
     content = contentWithSlides;
-    content = insertNewDivs(content, slideLinePositions);
-    content = insertNewArrows(content, slideLinePositions);
+    content = insertNewDivs(content);
+    content = insertNewArrows(content);
     const dimensions = extractEditableEltDimensions();
     content = updateTextDivs(content);
     const attributes = formatEditableEltStrings(dimensions);
@@ -16054,30 +16063,33 @@ ${fence}`;
       }
     };
   };
-  window.getTransformedQmd = getTransformedQmd;
-  window.quillInstances = quillInstances;
-  window.editableRegistry = editableRegistry;
-  window.ToolbarRegistry = ToolbarRegistry;
-  window.NewElementRegistry = NewElementRegistry;
-  window.extractEditableEltDimensions = extractEditableEltDimensions;
-  window.formatEditableEltStrings = formatEditableEltStrings;
-  window.replaceEditableOccurrences = replaceEditableOccurrences;
-  window.updateTextDivs = updateTextDivs;
-  window.serializeToQmd = serializeToQmd;
-  window.copyQmdToClipboard = copyQmdToClipboard;
-  window.canUndo = canUndo;
-  window.canRedo = canRedo;
-  window.pushUndoState = pushUndoState;
-  window.undo = undo;
-  window.redo = redo;
-  window.getEditableElements = getEditableElements;
-  window.getOriginalEditableElements = getOriginalEditableElements;
-  window.hasTitleSlide = hasTitleSlide;
-  window.htmlToQuarto = htmlToQuarto;
-  window.readIndexQmd = readIndexQmd;
-  window.addNewSlide = addNewSlide;
-  window.addNewTextElement = addNewTextElement;
-  window.setActiveImage = setActiveImage;
+  window.editable = {
+    getTransformedQmd,
+    quillInstances,
+    editableRegistry,
+    ToolbarRegistry,
+    NewElementRegistry,
+    extractEditableEltDimensions,
+    formatEditableEltStrings,
+    replaceEditableOccurrences,
+    updateTextDivs,
+    serializeToQmd,
+    copyQmdToClipboard,
+    canUndo,
+    canRedo,
+    pushUndoState,
+    undo,
+    redo,
+    getEditableElements,
+    getOriginalEditableElements,
+    hasTitleSlide,
+    htmlToQuarto,
+    readIndexQmd,
+    addNewSlide,
+    addNewTextElement,
+    setActiveImage
+  };
+  Object.assign(window, window.editable);
 })();
 /*! Bundled license information:
 

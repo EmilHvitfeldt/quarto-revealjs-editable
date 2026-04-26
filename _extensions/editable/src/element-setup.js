@@ -46,8 +46,8 @@ export async function addNewTextElement() {
 
   const editableElt = editableRegistry.get(newDiv);
   if (editableElt) {
-    const slideWidth = currentSlide.offsetWidth || 960;
-    const slideHeight = currentSlide.offsetHeight || 700;
+    const slideWidth = currentSlide.offsetWidth || CONFIG.DEFAULT_SLIDE_WIDTH;
+    const slideHeight = currentSlide.offsetHeight || CONFIG.DEFAULT_SLIDE_HEIGHT;
     editableElt.setState({
       x: (slideWidth - CONFIG.NEW_TEXT_WIDTH) / 2,
       y: (slideHeight - CONFIG.NEW_TEXT_HEIGHT) / 2,
@@ -174,7 +174,7 @@ function setupEltStyles(elt) {
 
 function setupContainerAccessibility(container) {
   container.setAttribute("tabindex", "0");
-  container.setAttribute("role", "application");
+  container.setAttribute("role", "group");
   container.setAttribute("aria-label", "Editable element. Use arrow keys to move, Shift+arrows to resize.");
 }
 

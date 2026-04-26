@@ -108,28 +108,32 @@ window.Revealeditable = function () {
   };
 };
 
-// Expose internals for testing
-window.getTransformedQmd = getTransformedQmd;
-window.quillInstances = quillInstances;
-window.editableRegistry = editableRegistry;
-window.ToolbarRegistry = ToolbarRegistry;
-window.NewElementRegistry = NewElementRegistry;
-window.extractEditableEltDimensions = extractEditableEltDimensions;
-window.formatEditableEltStrings = formatEditableEltStrings;
-window.replaceEditableOccurrences = replaceEditableOccurrences;
-window.updateTextDivs = updateTextDivs;
-window.serializeToQmd = serializeToQmd;
-window.copyQmdToClipboard = copyQmdToClipboard;
-window.canUndo = canUndo;
-window.canRedo = canRedo;
-window.pushUndoState = pushUndoState;
-window.undo = undo;
-window.redo = redo;
-window.getEditableElements = getEditableElements;
-window.getOriginalEditableElements = getOriginalEditableElements;
-window.hasTitleSlide = hasTitleSlide;
-window.htmlToQuarto = htmlToQuarto;
-window.readIndexQmd = readIndexQmd;
-window.addNewSlide = addNewSlide;
-window.addNewTextElement = addNewTextElement;
-window.setActiveImage = setActiveImage;
+// Expose internals for e2e testing under a single namespace to avoid global pollution
+window.editable = {
+  getTransformedQmd,
+  quillInstances,
+  editableRegistry,
+  ToolbarRegistry,
+  NewElementRegistry,
+  extractEditableEltDimensions,
+  formatEditableEltStrings,
+  replaceEditableOccurrences,
+  updateTextDivs,
+  serializeToQmd,
+  copyQmdToClipboard,
+  canUndo,
+  canRedo,
+  pushUndoState,
+  undo,
+  redo,
+  getEditableElements,
+  getOriginalEditableElements,
+  hasTitleSlide,
+  htmlToQuarto,
+  readIndexQmd,
+  addNewSlide,
+  addNewTextElement,
+  setActiveImage,
+};
+// Legacy flat exports — kept for backward compatibility with existing e2e tests
+Object.assign(window, window.editable);

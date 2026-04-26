@@ -38,10 +38,17 @@ describe('normalizeColor', () => {
     expect(normalizeColor(undefined)).toBeUndefined();
   });
 
-  it('normalizes "black" to #000000', () => {
+  it('normalizes CSS named colors to hex', () => {
     expect(normalizeColor('black')).toBe('#000000');
     expect(normalizeColor('BLACK')).toBe('#000000');
     expect(normalizeColor(' black ')).toBe('#000000');
+    expect(normalizeColor('white')).toBe('#ffffff');
+    expect(normalizeColor('red')).toBe('#ff0000');
+    expect(normalizeColor('blue')).toBe('#0000ff');
+    expect(normalizeColor('green')).toBe('#008000');
+    expect(normalizeColor('gray')).toBe('#808080');
+    expect(normalizeColor('grey')).toBe('#808080');
+    expect(normalizeColor('orange')).toBe('#ffa500');
   });
 
   it('expands short hex to full hex', () => {

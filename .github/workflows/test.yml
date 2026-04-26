@@ -47,6 +47,23 @@ jobs:
           chmod +x run-tests.sh
           ./run-tests.sh
 
+  # Verify the committed editable.js matches what npm run build produces
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: cd _extensions/editable && npm install
+      - name: Rebuild and diff
+        run: |
+          cp _extensions/editable/editable.js _extensions/editable/editable.js.committed
+          cd _extensions/editable && npm run build
+          diff _extensions/editable/editable.js.committed _extensions/editable/editable.js \
+            || (echo "::error::Committed editable.js is out of date. Run npm run build and commit the result." && exit 1)
+
   # Playwright E2E tests run only on Ubuntu (JS behavior is cross-platform)
   e2e:
     runs-on: ubuntu-latest
@@ -88,7 +105,7 @@ jobs:
         run: |
           cd testing
           npm install
-          npx playwright install chromium
+          npx playwright install chromium firefox
 
       - name: Run Playwright tests
         run: |
