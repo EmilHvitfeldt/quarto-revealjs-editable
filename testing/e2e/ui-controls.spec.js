@@ -28,7 +28,7 @@ test.describe('UI Controls', () => {
   });
 
   test('changeFontSize function works via increase button', async ({ page }) => {
-    await setupPage(page, 'basic.html');
+    await setupPage(page, 'multiple-elements.html');
 
     // Hover the div container to reveal controls, then click the increase-font button
     const container = page.locator('.editable-container:has(div.editable)').first();
@@ -50,7 +50,7 @@ test.describe('UI Controls', () => {
   });
 
   test('Text alignment can be set via align button', async ({ page }) => {
-    await setupPage(page, 'basic.html');
+    await setupPage(page, 'multiple-elements.html');
 
     const container = page.locator('.editable-container:has(div.editable)').first();
     await container.hover();

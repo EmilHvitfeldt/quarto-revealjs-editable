@@ -79,7 +79,8 @@ test.describe('Save Edits Feature', () => {
     }
   });
 
-  test('Copy to clipboard contains transformed content', async ({ page, context }) => {
+  test('Copy to clipboard contains transformed content', async ({ page, context, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox does not support clipboard-read permission via Playwright');
     // Grant clipboard permissions
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 

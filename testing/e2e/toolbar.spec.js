@@ -1650,7 +1650,8 @@ test.describe('New Elements in Save Flow', () => {
     expect(textPos).toBeLessThan(slide2Pos);
   });
 
-  test('Copy to clipboard includes new elements', async ({ page, context }) => {
+  test('Copy to clipboard includes new elements', async ({ page, context, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox does not support clipboard-read permission via Playwright');
     await setupPage(page, 'basic.html');
 
     // Grant clipboard permissions
