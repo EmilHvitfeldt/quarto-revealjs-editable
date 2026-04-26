@@ -45,9 +45,4 @@ export const CONFIG = {
   POLL_MAX_ATTEMPTS: 50,
   POLL_INTERVAL_MS: 100,
 
-  // Quill Editor CDN
-  QUILL_CSS:
-    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css",
-  QUILL_JS:
-    "https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js",
 };

@@ -1,52 +1,11 @@
 /**
  * Quill rich text editor integration.
- * Handles dynamic loading, initialization, and management of Quill editors.
+ * Handles initialization and management of Quill editors.
  * @module quill
  */
 
-import { CONFIG } from './config.js';
+import Quill from 'quill';
 import { getColorPalette } from './colors.js';
-
-/** @type {boolean} Whether Quill has been loaded */
-let quillLoaded = false;
-/** @type {Promise|null} Loading promise to prevent duplicate loads */
-let quillLoading = null;
-
-/**
- * Load Quill CSS and JS from CDN.
- * Returns immediately if already loaded, or returns existing promise if loading.
- * @returns {Promise<void>} Resolves when Quill is ready
- */
-export function loadQuill() {
-  if (quillLoaded) {
-    return Promise.resolve();
-  }
-  if (quillLoading) {
-    return quillLoading;
-  }
-
-  quillLoading = new Promise((resolve, reject) => {
-    // Load CSS
-    const cssLink = document.createElement("link");
-    cssLink.rel = "stylesheet";
-    cssLink.href = CONFIG.QUILL_CSS;
-    document.head.appendChild(cssLink);
-
-    // Load JS
-    const script = document.createElement("script");
-    script.src = CONFIG.QUILL_JS;
-    script.onload = () => {
-      quillLoaded = true;
-      resolve();
-    };
-    script.onerror = () => {
-      reject(new Error("Failed to load Quill"));
-    };
-    document.head.appendChild(script);
-  });
-
-  return quillLoading;
-}
 
 /**
  * Map of DOM elements to their Quill instance data.
@@ -54,39 +13,20 @@ export function loadQuill() {
  */
 export const quillInstances = new Map();
 
-/** @type {Set<HTMLElement>} Elements currently being initialized (race condition guard) */
-const initializingElements = new Set();
-
 /**
  * Initialize Quill editor for an editable div element.
  * Called at page load to prevent text shifting when entering edit mode.
  * @param {HTMLElement} element - The div element to initialize
- * @returns {Promise<Object|null>} Quill data object or null if failed
+ * @returns {Object|null} Quill data object or null if failed
  */
-export async function initializeQuillForElement(element) {
+export function initializeQuillForElement(element) {
   // Only for div elements
   if (element.tagName.toLowerCase() !== "div") return null;
 
   // Skip if already initialized
   if (quillInstances.has(element)) return quillInstances.get(element);
 
-  // Guard against race conditions - wait for existing initialization
-  if (initializingElements.has(element)) {
-    await new Promise(resolve => {
-      const check = () => {
-        if (quillInstances.has(element)) resolve();
-        else setTimeout(check, 10);
-      };
-      check();
-    });
-    return quillInstances.get(element);
-  }
-
-  initializingElements.add(element);
-
   try {
-    await loadQuill();
-
     // Store original content before any DOM changes
     const originalContent = element.innerHTML;
 
@@ -201,12 +141,10 @@ export async function initializeQuillForElement(element) {
     });
 
     quillInstances.set(element, quillData);
-    initializingElements.delete(element);
 
     return quillData;
   } catch (err) {
     console.error("Failed to initialize Quill for element:", err);
-    initializingElements.delete(element);
     return null;
   }
 }

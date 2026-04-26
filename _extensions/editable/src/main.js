@@ -111,7 +111,7 @@ async function addNewTextElement() {
 
   currentSlide.appendChild(newDiv);
 
-  await initializeQuillForElement(newDiv);
+  initializeQuillForElement(newDiv);
 
   setupDraggableElt(newDiv);
 
@@ -661,7 +661,7 @@ window.Revealeditable = function () {
         const editableDivs = Array.from(editableElements).filter(
           (el) => el.tagName.toLowerCase() === "div"
         );
-        await Promise.all(editableDivs.map(initializeQuillForElement));
+        editableDivs.forEach(initializeQuillForElement);
 
         editableElements.forEach((elt) => {
           const tagName = elt.tagName.toLowerCase();

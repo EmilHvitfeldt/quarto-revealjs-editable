@@ -10,4 +10,5 @@ contributes:
       script:
         - editable.js
       stylesheet:
+        - quill.css
         - editable.css
