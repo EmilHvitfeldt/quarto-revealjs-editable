@@ -158,6 +158,7 @@ var EditableModule = (() => {
             fontSize: null,
             textAlign: null,
             // Image-specific properties
+            src: null,
             opacity: 100,
             borderRadius: 0,
             cropTop: 0,
@@ -286,6 +287,9 @@ var EditableModule = (() => {
             }
           }
           if (this.type === "img") {
+            if (this.state.src !== null) {
+              dims.src = this.state.src;
+            }
             if (this.state.opacity !== 100) {
               dims.opacity = this.state.opacity;
             }
@@ -821,6 +825,9 @@ var EditableModule = (() => {
       if (!file || !activeImage)
         return;
       pushUndoState();
+      const editableEl = editableRegistry.get(activeImage);
+      if (editableEl)
+        editableEl.state.src = file.name;
       const reader = new FileReader();
       reader.onload = (e) => {
         activeImage.src = e.target.result;
@@ -3928,13 +3935,19 @@ ${contentFence}`;
 ` + text.trim() + `
 ${fence}`;
   }
-  function replaceEditableOccurrences(text, replacements) {
-    const regex = /(?:^(:{3,}) |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
+  function replaceEditableOccurrences(text, replacements, srcReplacements = []) {
+    const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable[^}]*\}/gm;
     let index = 0;
-    return text.replace(regex, (match, fenceColons) => {
+    return text.replace(regex, (match, fenceColons, originalSrc) => {
       const isDiv = fenceColons !== void 0;
-      const prefix = isDiv ? fenceColons + " " : "";
-      return prefix + (replacements[index++] || "");
+      const attrs = replacements[index] || "";
+      const newSrc = srcReplacements[index] || null;
+      index++;
+      if (isDiv) {
+        return fenceColons + " " + attrs;
+      } else {
+        return `](${newSrc ?? originalSrc})${attrs}`;
+      }
     });
   }
   function formatEditableEltStrings(dimensions) {
@@ -4094,7 +4107,8 @@ ${fence}`;
     const dimensions = extractEditableEltDimensions();
     content = updateTextDivs(content);
     const attributes = formatEditableEltStrings(dimensions);
-    content = replaceEditableOccurrences(content, attributes);
+    const srcReplacements = dimensions.map((d) => d.src || null);
+    content = replaceEditableOccurrences(content, attributes, srcReplacements);
     return content;
   }
   function saveMovedElts() {

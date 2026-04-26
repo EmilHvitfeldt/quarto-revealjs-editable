@@ -224,7 +224,8 @@ function getTransformedQmd() {
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);
   const attributes = formatEditableEltStrings(dimensions);
-  content = replaceEditableOccurrences(content, attributes);
+  const srcReplacements = dimensions.map(d => d.src || null);
+  content = replaceEditableOccurrences(content, attributes, srcReplacements);
 
   return content;
 }

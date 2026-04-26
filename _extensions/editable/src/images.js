@@ -390,10 +390,10 @@ export function createImageStyleControls() {
     const file = fileInput.files[0];
     if (!file || !activeImage) return;
     pushUndoState();
+    const editableEl = editableRegistry.get(activeImage);
+    if (editableEl) editableEl.state.src = file.name;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      activeImage.src = e.target.result;
-    };
+    reader.onload = (e) => { activeImage.src = e.target.result; };
     reader.readAsDataURL(file);
     fileInput.value = "";
   });

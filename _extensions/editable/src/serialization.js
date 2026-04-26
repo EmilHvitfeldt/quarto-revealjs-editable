@@ -739,18 +739,27 @@ export function htmlToQuarto(div) {
 
 /**
  * Replace {.editable} attribute strings with {.absolute ...} in QMD.
+ * Also replaces image src when srcReplacements[i] is non-null.
  * @param {string} text - QMD content
  * @param {string[]} replacements - Array of replacement attribute strings
+ * @param {Array<string|null>} srcReplacements - Per-element new src (null = no change)
  * @returns {string} Updated QMD content
  */
-export function replaceEditableOccurrences(text, replacements) {
-  const regex = /(?:^(:{3,}) |(?<=\]\([^)]*\)))\{\.editable[^}]*\}/gm;
+export function replaceEditableOccurrences(text, replacements, srcReplacements = []) {
+  // For images: consume ](src) so we can replace src too
+  const regex = /(?:^(:{3,}) |\]\(([^)]*)\))\{\.editable[^}]*\}/gm;
 
   let index = 0;
-  return text.replace(regex, (match, fenceColons) => {
+  return text.replace(regex, (match, fenceColons, originalSrc) => {
     const isDiv = fenceColons !== undefined;
-    const prefix = isDiv ? fenceColons + ' ' : '';
-    return prefix + (replacements[index++] || "");
+    const attrs = replacements[index] || "";
+    const newSrc = srcReplacements[index] || null;
+    index++;
+    if (isDiv) {
+      return fenceColons + ' ' + attrs;
+    } else {
+      return `](${newSrc ?? originalSrc})${attrs}`;
+    }
   });
 }
 

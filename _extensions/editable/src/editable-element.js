@@ -48,6 +48,7 @@ export class EditableElement {
       fontSize: null,
       textAlign: null,
       // Image-specific properties
+      src: null,
       opacity: 100,
       borderRadius: 0,
       cropTop: 0,
@@ -208,6 +209,9 @@ export class EditableElement {
     }
 
     if (this.type === "img") {
+      if (this.state.src !== null) {
+        dims.src = this.state.src;
+      }
       if (this.state.opacity !== 100) {
         dims.opacity = this.state.opacity;
       }
