@@ -49,6 +49,7 @@ _extensions/editable/
     ├── quill.js        # Rich text editor integration
     ├── arrows.js       # Arrow system and arrow context panel
     ├── images.js       # Image context panel (opacity, radius, fit, flip, replace, reset)
+    ├── modify-mode.js  # Modify mode: click-to-make-editable for plain images
     ├── toolbar.js      # Top bar toolbar
     └── main.js         # Plugin entry point
 ```
@@ -114,6 +115,13 @@ The serialization system converts element state to QMD format:
    - Insert new arrows
    - Update text content (HTML → Quarto markdown)
    - Replace `{.editable}` with `{.absolute ...}` attributes
+   - Replace plain images made editable via modify mode (`replaceModifiedImages`)
+
+3. **`splitIntoSlideChunks(text)`** - Splits QMD source into per-slide chunks for
+   slide-scoped replacement. Strips YAML front matter first (to avoid splitting on
+   its `---` delimiters), then splits on `^## ` headers. Returns
+   `[preamble, slide0, slide1, ...]` where `chunks[slideIndex + 1]` is the content
+   for Reveal slide `indexh === slideIndex`.
 
 ### Toolbar (`toolbar.js`)
 
@@ -197,7 +205,8 @@ When saving, brand colors are converted to `{{< brand color name >}}` shortcodes
    ├─▶ Insert new arrows on original slides
    ├─▶ Update text div content
    ├─▶ Extract dimensions and serialize to QMD
-   └─▶ Replace {.editable} with {.absolute ...}
+   ├─▶ Replace {.editable} with {.absolute ...}
+   └─▶ Replace plain images activated via modify mode (replaceModifiedImages)
    │
 3. Download file or copy to clipboard
 ```
@@ -253,6 +262,44 @@ Styles use CSS custom properties for theming. Key properties:
 # E2E tests (browser behavior)
 cd testing && npm run test:e2e
 ```
+
+## Modify Mode
+
+Modify mode (`modify-mode.js`) lets users make any plain `![](image.png)` image editable at runtime, without requiring `{.editable}` in the source document.
+
+### Activation
+
+The toolbar "Modify" button toggles modify mode. On activation:
+1. All `<img>` elements on the current slide are classified:
+   - **Valid**: not already in `editableRegistry`, and `src`/`data-src` appears literally in `window._input_file`
+   - **Invalid**: already editable, or src not found in source (chunk-generated figures)
+2. Valid images receive the `modify-mode-valid` CSS class (green ring); invalid images receive `modify-mode-invalid` (no ring)
+3. Click listeners (via `AbortController`) are attached to valid images
+
+### Image Selection
+
+Clicking a valid image:
+1. Stamps `data-editable-modified="true"`, `data-editable-modified-src` (original src), and `data-editable-modified-slide` (current `Reveal.getState().indexh`) on the element
+2. Calls `setupImageWhenReady()` to register it as a full `EditableElement`
+3. Exits modify mode automatically
+
+### Source Note on `data-src`
+
+Reveal.js lazy-loads images using `data-src` instead of `src`. `getImgSrc()` checks both attributes so the src lookup works regardless of lazy-load state.
+
+### Write-back
+
+Modified images are not in the positional `.editable` index used by `replaceEditableOccurrences`, so they have their own serialization path: `replaceModifiedImages()` in `serialization.js`.
+
+It uses `splitIntoSlideChunks()` to scope each replacement to the correct slide chunk (keyed by `data-editable-modified-slide`), avoiding false matches when the same image appears on multiple slides.
+
+**After saving**, the image's markdown gains `{.absolute ...}` attributes. On the next render it will be a regular absolute-positioned image (not re-editable without `{.editable}`).
+
+### Current Limitations
+
+- Only `![](image.png)` images are supported (not divs or chunk-generated figures)
+- Vertical slides (`indexv`) are not yet supported
+- `---` slide separators are not yet supported as slide boundaries (only `##` headers)
 
 ## Arrow System
 

@@ -29,6 +29,7 @@
   --editable-toolbar-modify-color: #fd7e14;
   --editable-modify-valid-shadow: 0 0 0 3px #28a745, 0 0 8px rgba(40, 167, 69, 0.5);
   --editable-modify-valid-hover-shadow: 0 0 0 4px #28a745, 0 0 16px rgba(40, 167, 69, 0.7);
+  --editable-modify-warn-shadow: 0 0 0 3px #fd7e14, 0 0 8px rgba(253, 126, 20, 0.5);
 
   /* Arrow theming */
   --editable-arrow-start-color: #007cba;
@@ -391,6 +392,13 @@
 
 .modify-mode img.modify-mode-valid:hover {
   box-shadow: var(--editable-modify-valid-hover-shadow);
+}
+
+/* Modify mode: multi-figure chunk images get an amber warning ring (not clickable) */
+.modify-mode img.modify-mode-warn {
+  box-shadow: var(--editable-modify-warn-shadow);
+  cursor: not-allowed;
+  transition: box-shadow var(--editable-transition);
 }
 
 /* Submenu wrapper */

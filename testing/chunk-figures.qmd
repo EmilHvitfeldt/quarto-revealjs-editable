@@ -1,0 +1,28 @@
+---
+---
+
+## One figure per chunk (unnamed)
+
+```{r}
+plot(1:10)
+```
+
+## Multiple figures from one chunk (unnamed)
+
+```{r}
+plot(1:10)
+plot(10:1)
+```
+
+## One figure per chunk (named)
+
+```{r named-single}
+plot(1:10)
+```
+
+## Multiple figures from one named chunk
+
+```{r named-multi}
+plot(1:10)
+plot(10:1)
+```

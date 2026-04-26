@@ -15995,7 +15995,7 @@ ${fence}`;
 
   // src/modify-mode.js
   var VALID_CLASS = "modify-mode-valid";
-  var INVALID_CLASS = "modify-mode-invalid";
+  var WARN_CLASS = "modify-mode-warn";
   var ROOT_CLASS = "modify-mode";
   var abortController = null;
   function getImgSrc(img) {
@@ -16007,40 +16007,62 @@ ${fence}`;
     const src = getImgSrc(img);
     return !!src && window._input_file.includes(src);
   }
+  function getChunkPrefix(src) {
+    const match2 = src.match(/figure-revealjs\/(.+)-\d+\.png$/);
+    return match2 ? match2[1] : null;
+  }
+  function buildChunkPrefixCounts(imgs) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const img of imgs) {
+      const src = getImgSrc(img);
+      if (!src)
+        continue;
+      const prefix = getChunkPrefix(src);
+      if (prefix)
+        counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+    }
+    return counts;
+  }
   function classifyImages() {
     const reveal = document.querySelector(".reveal");
     const currentSlide = reveal?.querySelector(".slides .present");
     const imgs = currentSlide ? Array.from(currentSlide.querySelectorAll("img")) : Array.from(document.querySelectorAll(".reveal .slides img"));
+    const prefixCounts = buildChunkPrefixCounts(imgs);
     const valid = [];
-    const invalid = [];
+    const warn = [];
     for (const img of imgs) {
       if (editableRegistry.has(img))
         continue;
-      if (srcInQmdSource(img)) {
+      const src = getImgSrc(img);
+      if (!src)
+        continue;
+      const prefix = getChunkPrefix(src);
+      if (prefix) {
+        if (prefixCounts.get(prefix) > 1)
+          warn.push(img);
+      } else if (srcInQmdSource(img)) {
         valid.push(img);
-      } else {
-        invalid.push(img);
       }
     }
-    return { valid, invalid };
+    return { valid, warn };
   }
   function enterModifyMode() {
     document.querySelector(".reveal")?.classList.add(ROOT_CLASS);
     abortController = new AbortController();
     const { signal } = abortController;
-    const { valid, invalid } = classifyImages();
+    const { valid, warn } = classifyImages();
     valid.forEach((img) => {
       img.classList.add(VALID_CLASS);
       img.addEventListener("click", onValidImageClick, { signal, once: true });
     });
-    invalid.forEach((img) => img.classList.add(INVALID_CLASS));
+    warn.forEach((img) => img.classList.add(WARN_CLASS));
   }
   function exitModifyMode() {
     document.querySelector(".reveal")?.classList.remove(ROOT_CLASS);
     abortController?.abort();
     abortController = null;
-    document.querySelectorAll(`.${VALID_CLASS}, .${INVALID_CLASS}`).forEach((img) => {
-      img.classList.remove(VALID_CLASS, INVALID_CLASS);
+    document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((img) => {
+      img.classList.remove(VALID_CLASS, WARN_CLASS);
     });
   }
   function onValidImageClick(e) {
