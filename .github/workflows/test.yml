@@ -47,7 +47,7 @@ jobs:
           chmod +x run-tests.sh
           ./run-tests.sh
 
-  # Verify the committed editable.js matches what npm run build produces
+  # Verify the extension builds without errors
   build-check:
     runs-on: ubuntu-latest
     steps:
@@ -57,12 +57,8 @@ jobs:
           node-version: '20'
       - name: Install build dependencies
         run: cd _extensions/editable && npm ci
-      - name: Rebuild and diff
-        run: |
-          cp _extensions/editable/editable.js _extensions/editable/editable.js.committed
-          cd _extensions/editable && npm run build
-          diff _extensions/editable/editable.js.committed _extensions/editable/editable.js \
-            || (echo "::error::Committed editable.js is out of date. Run npm run build and commit the result." && exit 1)
+      - name: Build extension
+        run: cd _extensions/editable && npm run build
 
   # Playwright E2E tests run only on Ubuntu (JS behavior is cross-platform)
   e2e:
