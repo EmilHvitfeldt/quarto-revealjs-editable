@@ -1311,7 +1311,8 @@ test.describe('Arrow Feature', () => {
 
   test.describe('Edge Cases - Copy Functionality', () => {
 
-    test('Copy to clipboard includes new arrows', async ({ page, context }) => {
+    test('Copy to clipboard includes new arrows', async ({ page, context, browserName }) => {
+      test.skip(browserName === 'firefox', 'Firefox does not support clipboard-read permission via Playwright');
       await setupPage(page, 'arrows.html');
 
       // Grant clipboard permissions

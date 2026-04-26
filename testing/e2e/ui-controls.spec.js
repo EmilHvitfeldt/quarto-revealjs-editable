@@ -30,8 +30,8 @@ test.describe('UI Controls', () => {
   test('changeFontSize function works via increase button', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    // Hover the container to reveal controls, then click the increase-font button
-    const container = page.locator('.editable-container').first();
+    // Hover the div container to reveal controls, then click the increase-font button
+    const container = page.locator('.editable-container:has(div.editable)').first();
     await container.hover();
 
     const initial = await page.evaluate(() => {
@@ -52,7 +52,7 @@ test.describe('UI Controls', () => {
   test('Text alignment can be set via align button', async ({ page }) => {
     await setupPage(page, 'basic.html');
 
-    const container = page.locator('.editable-container').first();
+    const container = page.locator('.editable-container:has(div.editable)').first();
     await container.hover();
 
     await container.locator('.editable-button-align').nth(1).click(); // center
@@ -852,7 +852,7 @@ test.describe('Accessibility', () => {
     });
 
     expect(result.tabindex).toBe('0');
-    expect(result.role).toBe('application');
+    expect(result.role).toBe('group');
     expect(result.ariaLabel).toContain('arrow keys');
     expect(result.isFocusable).toBe(true);
   });

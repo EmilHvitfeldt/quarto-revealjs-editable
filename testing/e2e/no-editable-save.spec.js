@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
-const { TESTING_DIR, clickAddArrow, navigateToSlide } = require('./test-helpers');
+const { TESTING_DIR, clickAddArrow, navigateToSlide, deselectArrow } = require('./test-helpers');
 
 /**
  * Tests for saving documents that have the editable filter active
@@ -136,9 +136,8 @@ test.describe('Save Without Editable Elements', () => {
     await navigateToSlide(page, 1);
     await clickAddArrow(page);
 
-    // Deselect arrow
-    await page.click('body', { position: { x: 10, y: 10 } });
-    await page.waitForFunction(() => !document.querySelector('.editable-arrow-container.active'), { timeout: 2000 }).catch(() => {});
+    // Deselect arrow by clicking below the toolbar
+    await deselectArrow(page);
 
     // Add arrow to Slide 2
     await navigateToSlide(page, 2);

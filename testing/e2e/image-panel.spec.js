@@ -304,7 +304,7 @@ test.describe('Image context panel', () => {
     // Capture the initial opacity before any change
     const initialOpacity = await page.evaluate(() => {
       const img = document.querySelector('.editable-container img');
-      return img?.style.opacity || '1';
+      return img?.style.opacity ?? '';
     });
 
     await page.evaluate(() => {
