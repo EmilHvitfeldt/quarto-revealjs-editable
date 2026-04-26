@@ -47,7 +47,8 @@ _extensions/editable/
     ├── capabilities.js # Capability system (move, resize, rotate, etc.)
     ├── serialization.js # QMD transformation and property serializers
     ├── quill.js        # Rich text editor integration
-    ├── arrows.js       # Arrow system
+    ├── arrows.js       # Arrow system and arrow context panel
+    ├── images.js       # Image context panel (opacity, radius, fit, flip, replace, reset)
     ├── toolbar.js      # Top bar toolbar
     └── main.js         # Plugin entry point
 ```
@@ -124,8 +125,28 @@ The toolbar has two zones:
 - **Right zone** - Swappable context panels:
   - `default` panel: Add + Modify actions (shown when nothing is selected)
   - `arrow` panel: Arrow style controls (shown when an arrow is selected; centered, horizontally scrollable)
+  - `image` panel: Image style controls (shown when an image element is selected)
+  - `text` panel: Quill formatting toolbar (shown when a div is in edit mode)
 
-`showRightPanel(panelName)` switches which panel is visible. Arrow controls live inside `.arrow-center-wrap` (holds color section + `.arrow-controls-wrap` grid as one unit) so they center together in the right zone.
+`showRightPanel(panelName)` switches which panel is visible by toggling `display: none` on all `.toolbar-panel` children of the right zone.
+
+#### Image panel (`images.js`)
+
+`createImageStyleControls()` builds the `.toolbar-panel-image` contents — a flex row of labelled control groups: opacity slider, border-radius input, object-fit three-button toggle, flip H/V toggle buttons, replace-image file picker, and a reset button. Cached references are stored in `imageControlRefs` for fast sync.
+
+`setActiveImage(imgEl)` is the selection entry point: sets `activeImage`, calls `updateImageStylePanel()` to sync all controls to the element's current state, then calls `showRightPanel('image')`. Passing `null` deselects and calls `showRightPanel('default')`.
+
+**State properties added to `EditableElement` for images:**
+
+| Property | Type | Default | Serializes as |
+|---|---|---|---|
+| `opacity` | number (0–100) | `100` | `opacity: 0.xx;` |
+| `borderRadius` | number (px) | `0` | `border-radius: Xpx;` |
+| `objectFit` | string\|null | `null` | `object-fit: cover;` etc. |
+| `flipH` | boolean | `false` | composed into `transform:` |
+| `flipV` | boolean | `false` | composed into `transform:` |
+
+**Transform composition:** `serializeToQmd` composes `rotation`, `flipH`, and `flipV` into a single `transform:` style declaration to avoid duplicate properties: `transform: rotate(Xdeg) scaleX(-1) scaleY(-1);`.
 
 ### Brand Color Integration
 

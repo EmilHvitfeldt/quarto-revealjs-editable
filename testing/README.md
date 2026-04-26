@@ -73,7 +73,29 @@ npm run test:e2e
 
 ### E2E Test Files
 
-**Total: 227 E2E tests across 5 spec files**
+**Total: 241 E2E tests across 6 spec files**
+
+**`e2e/image-panel.spec.js`** - Image context panel (14 tests):
+
+| Test | What it verifies |
+|---|---|
+| Panel exists in DOM on load (hidden) | `.toolbar-panel-image` present with `.image-style-controls`, hidden by default |
+| Panel shows on image click | Image panel visible, default panel hidden |
+| Panel hides on outside click | Default panel returns after clicking outside |
+| Opacity slider updates image | `img.style.opacity` set correctly |
+| Opacity slider syncs to state | `editableRegistry` state reflects slider value |
+| Border radius input updates image | `img.style.borderRadius` set to `Xpx` |
+| Object fit Cover sets object-fit | `img.style.objectFit === 'cover'`, button marked active |
+| Clicking active fit button clears it | `objectFit` cleared, button no longer active |
+| Flip H applies scaleX(-1) | `img.style.transform` contains `scaleX(-1)` |
+| Flip V applies scaleY(-1) | `img.style.transform` contains `scaleY(-1)` |
+| Flip H and V together | Both scale transforms present |
+| Reset reverts all style properties | opacity, borderRadius, transform cleared in DOM and state |
+| Ctrl+Z undoes opacity change | Opacity reverts after keyboard undo |
+| Image properties serialize to QMD | `opacity:`, `border-radius:`, `object-fit:` in style string |
+| Flip serializes as scaleX/scaleY | Flips produce correct `transform:` in QMD |
+| Rotation and flip compose | Single `transform:` declaration for both; correct values |
+| Panel controls sync on re-select | Slider/input values match state when image re-selected |
 
 **`e2e/save-edits.spec.js`** - Core save functionality (8 tests):
 
@@ -376,4 +398,5 @@ On GitHub Actions:
 | #15   | Shortcodes resolved incorrectly      | `shortcode.qmd`, `round-trip.qmd`, E2E    |
 | #16   | Backslashes removed (LaTeX)          | `special-chars.qmd`, `latex.qmd`, E2E     |
 | #21   | Content leaks with include-in-header | `include-header.qmd`                      |
+| #102  | Image context panel                  | `e2e/image-panel.spec.js`                 |
 | #26   | Undo/redo support                    | E2E (Undo/Redo section)                   |

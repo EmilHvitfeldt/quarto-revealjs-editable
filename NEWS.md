@@ -4,6 +4,17 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ## [Unreleased]
 
+### Added
+
+- **Image context panel** - Selecting an image replaces the default toolbar with image-specific controls:
+  - **Opacity** - Slider (0–100%) updates `opacity` in real time
+  - **Border radius** - Number input (px) for rounded corners
+  - **Object fit** - Toggle between Cover, Contain, and Fill
+  - **Flip** - Horizontal and vertical flip toggles (compose correctly with rotation)
+  - **Replace image** - File picker to swap the image source (data URI)
+  - **Reset** - Reverts all image style properties to defaults
+  - All controls serialize to the saved QMD `style=` attribute; flips and rotation compose into a single `transform:` declaration
+
 ### Changed
 
 - **Toolbar redesign** - Replaced the floating vertical toolbar with a fixed 100px top bar spanning the full viewport width
