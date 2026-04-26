@@ -56,7 +56,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install build dependencies
-        run: cd _extensions/editable && npm install
+        run: cd _extensions/editable && npm ci
       - name: Rebuild and diff
         run: |
           cp _extensions/editable/editable.js _extensions/editable/editable.js.committed
