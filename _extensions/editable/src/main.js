@@ -712,3 +712,4 @@ window.htmlToQuarto = htmlToQuarto;
 window.readIndexQmd = readIndexQmd;
 window.addNewSlide = addNewSlide;
 window.addNewTextElement = addNewTextElement;
+window.formatEditableEltStrings = formatEditableEltStrings;
