@@ -31,7 +31,7 @@ You can customize the appearance of editable controls using CSS custom propertie
 }
 ```
 
-## Floating Toolbar
+## Menu Bar
 
 ```scss
 :root {

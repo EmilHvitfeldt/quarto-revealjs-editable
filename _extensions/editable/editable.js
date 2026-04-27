@@ -12406,7 +12406,7 @@ ${escapeText(this.code(index, length))}
     if (imgEl) {
       updateImageStylePanel(imgEl);
       showRightPanel("image");
-    } else {
+    } else if (!activeArrow) {
       showRightPanel("default");
     }
   }
@@ -16261,7 +16261,7 @@ ${fence}`;
           createFloatingToolbar();
           setupUndoRedoKeyboard();
           document.addEventListener("click", (e) => {
-            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar") && !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])")) {
+            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar") && !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])") && !e.target.closest(".editable-arrow-container")) {
               setActiveImage(null);
             }
           });

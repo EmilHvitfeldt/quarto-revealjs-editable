@@ -44,7 +44,7 @@ Once rendered, editable elements can be:
 
 ## Features
 
-- Floating toolbar for quick actions (save, copy, add text, add slide, add arrow)
+- Menu bar for quick actions (save, copy, add text, add slide, add arrow)
 - Rich text editing with formatting (bold, italic, colors, alignment)
 - Image controls panel: opacity, border radius, crop, flip H/V, replace image, reset
 - Arrow support with straight and curved (Bezier) arrows (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows))

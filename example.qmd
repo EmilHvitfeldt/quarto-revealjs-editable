@@ -10,32 +10,12 @@ filters:
 
 ## In the morning
 
-![](image.png)
+![](image.png){.absolute width=519.9px height=575px left=0px top=89px}
 
-::: {.editable}
-I think that I shall never see
+::: {.absolute width=490px height=156px left=572px top=128px}
+I think that I shall never **see**
 
-A poem lovely as a tree.
+A poem lovely as a [tree]{style='color: rgb(0, 138, 0)'}.
 
-From "Trees" by Joyce Kilmer
+From “Trees” by Joyce Kilmer
 :::
-
-## text
-
-::: editable
-Lorem ipsum dolor sit amet, `lm(mpg ~ disp, mtcars)` consectetur adipiscing elit. Praesent sed diam rutrum, porta nulla vitae, elementum lacus.
-
-**Donec** et congue sapien. *Praesent* quis dui nulla. ***Donec*** convallis, risus a sodales ~~luctus~~, diam eros dapibus ante, ac pharetra nulla odio at lorem.
-:::
-
-## Tests - backslashes are preserved
-
-Explicit spaces\ \ 
-
-```r
-"\\d"
-```
-
-```r
-rename_all(\(x))
-```

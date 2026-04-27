@@ -99,7 +99,8 @@ window.Revealeditable = function () {
         document.addEventListener("click", (e) => {
           if (!e.target.closest(".editable-container:has(img)") &&
               !e.target.closest(".editable-toolbar") &&
-              !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])")) {
+              !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])") &&
+              !e.target.closest(".editable-arrow-container")) {
             setActiveImage(null);
           }
         });
