@@ -22,8 +22,6 @@ Click the **Add** button to open a submenu with options:
 
 New elements are marked with a dashed border to distinguish them from original content.
 
-![](media/insert-text-and-slide.mp4)
-
 ## Rich Text Editing
 
 Click the edit button on any editable text element to open the Quill rich text editor with a formatting toolbar:
