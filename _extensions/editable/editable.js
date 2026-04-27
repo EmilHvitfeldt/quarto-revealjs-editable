@@ -12814,6 +12814,10 @@ ${escapeText(this.code(index, length))}
     textPanel.style.display = "none";
     rightZone.appendChild(textPanel);
     textPanelEl = textPanel;
+    const modifyPanel = document.createElement("div");
+    modifyPanel.className = "toolbar-panel toolbar-panel-modify";
+    modifyPanel.style.display = "none";
+    rightZone.appendChild(modifyPanel);
     toolbar.appendChild(rightZone);
     document.body.appendChild(toolbar);
     document.documentElement.classList.add("has-editable-toolbar");
@@ -15917,6 +15921,9 @@ ${fence}`;
         }
       }
       return text;
+    },
+    getLabels() {
+      return _classifiers.map((c) => c.label).filter(Boolean);
     }
   };
   function getImgSrc(img) {
@@ -15945,6 +15952,7 @@ ${fence}`;
     return counts;
   }
   ModifyModeClassifier.register({
+    label: "Images",
     classify(slideEl) {
       const imgs = Array.from(slideEl.querySelectorAll("img"));
       const prefixCounts = buildChunkPrefixCounts(imgs);
@@ -16060,6 +16068,7 @@ ${fence}`;
     }
   }
   ModifyModeClassifier.register({
+    label: "Positioned divs",
     classify(slideEl) {
       const slideIndex = Reveal.getState().indexh;
       const divs = Array.from(slideEl.querySelectorAll("div.absolute"));
@@ -16170,9 +16179,28 @@ ${fence}`;
     });
     warn.forEach((el) => el.classList.add(WARN_CLASS));
   }
+  function buildModifyPanel() {
+    const panel = document.querySelector(".toolbar-panel-modify");
+    if (!panel) return;
+    panel.innerHTML = "";
+    const label = document.createElement("span");
+    label.className = "modify-panel-label";
+    label.textContent = "Click to edit:";
+    panel.appendChild(label);
+    const list = document.createElement("ul");
+    list.className = "modify-panel-list";
+    ModifyModeClassifier.getLabels().forEach((text) => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      list.appendChild(item);
+    });
+    panel.appendChild(list);
+  }
   function enterModifyMode() {
     _active = true;
     document.querySelector(".reveal")?.classList.add(ROOT_CLASS);
+    buildModifyPanel();
+    showRightPanel("modify");
     applyClassification();
     Reveal.on("slidechanged", applyClassification);
   }
@@ -16186,6 +16214,7 @@ ${fence}`;
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
     document.querySelector(".toolbar-modify")?.classList.remove("active");
+    showRightPanel("default");
   }
   function toggleModifyMode() {
     if (_active) {
@@ -16360,7 +16389,8 @@ ${fence}`;
     label: "Modify",
     title: "Click an image to make it editable",
     className: "toolbar-modify",
-    zone: "right",
+    zone: "left",
+    stacked: false,
     onClick: () => toggleModifyMode()
   });
   window.Revealeditable = function() {
