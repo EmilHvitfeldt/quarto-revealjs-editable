@@ -28,7 +28,7 @@ test.describe('Modify Mode', () => {
     expect(validImgs).toBeGreaterThan(0);
   });
 
-  test('clicking valid image makes it editable and stays in modify mode', async ({ page }) => {
+  test('clicking valid image makes it editable and exits modify mode', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
     await page.click('.toolbar-modify');
 
@@ -37,8 +37,9 @@ test.describe('Modify Mode', () => {
     // Image should now be inside an editable container
     await page.waitForSelector('.editable-container img', { timeout: 3000 });
 
-    // Modify mode should still be active (toolbar button stays highlighted)
-    expect(await page.locator('.toolbar-modify.active').count()).toBe(1);
+    // Modify mode should be inactive after clicking an element
+    expect(await page.locator('.toolbar-modify.active').count()).toBe(0);
+    expect(await page.locator('img.modify-mode-valid').count()).toBe(0);
   });
 
   test('clicking Modify button again exits modify mode', async ({ page }) => {

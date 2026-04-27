@@ -96,12 +96,11 @@ test.describe('Modify Mode — {.absolute} divs', () => {
     await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
 
-    // Activate first div
+    // Activate first div (exits modify mode automatically)
     await page.locator('div.absolute.modify-mode-valid').first().click();
     await page.waitForSelector('.editable-container div.absolute', { timeout: 3000 });
 
     // Re-enter modify mode to activate second div
-    await page.click('.toolbar-modify');
     await page.click('.toolbar-modify');
     await page.locator('div.absolute.modify-mode-valid').first().click();
     await page.waitForFunction(

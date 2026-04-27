@@ -15953,6 +15953,8 @@ ${fence}`;
       for (const img of imgs) {
         if (editableRegistry.has(img))
           continue;
+        if (img.closest("div.absolute"))
+          continue;
         const src = getImgSrc(img);
         if (!src)
           continue;
@@ -16196,8 +16198,8 @@ ${fence}`;
   function onValidElementClick(e, classifier) {
     e.stopPropagation();
     const el = e.currentTarget;
-    el.classList.remove(VALID_CLASS);
     classifier.activate(el);
+    exitModifyMode();
   }
 
   // src/io.js
