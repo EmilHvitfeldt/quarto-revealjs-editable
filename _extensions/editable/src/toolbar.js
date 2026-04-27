@@ -116,6 +116,12 @@ export function createFloatingToolbar() {
   rightZone.appendChild(textPanel);
   textPanelEl = textPanel;
 
+  // Modify panel: shown when modify mode is active; lists activatable element types
+  const modifyPanel = document.createElement("div");
+  modifyPanel.className = "toolbar-panel toolbar-panel-modify";
+  modifyPanel.style.display = "none";
+  rightZone.appendChild(modifyPanel);
+
   toolbar.appendChild(rightZone);
   document.body.appendChild(toolbar);
   document.documentElement.classList.add("has-editable-toolbar");
