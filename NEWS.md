@@ -6,26 +6,11 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Added
 
-- **Image context panel** - Selecting an image replaces the default toolbar with image-specific controls:
-  - **Opacity** - Slider (0–100%) updates `opacity` in real time
-  - **Border radius** - Number input (px) for rounded corners
-  - **Crop** - Toggle crop mode; in crop mode the corner resize handles adjust `clip-path: inset(...)` instead of resizing
-  - **Flip** - Horizontal and vertical flip toggles (compose correctly with rotation)
-  - **Replace image** - File picker to swap the image source; height auto-adjusts to match the new image's aspect ratio; filename is written to QMD (a popup reminds you to place the file next to the QMD)
-  - **Reset** - Reverts all image style properties to defaults
-  - All controls serialize to the saved QMD `style=` attribute; flips and rotation compose into a single `transform:` declaration; crop composes into a single `clip-path:` declaration
+- **Image context panel** - Selecting an image switches the menu bar to image-specific controls: opacity slider, border radius, crop mode, horizontal/vertical flip, replace image, and reset. All serialize to the QMD `style=` attribute; flips and rotation compose into a single `transform:` declaration.
 
 ### Changed
 
-- **Toolbar redesign** - Replaced the floating vertical toolbar with a fixed 100px top bar spanning the full viewport width
-  - Slides automatically shift down and resize to fill the remaining viewport area
-  - Button labels are always visible (no hover-to-expand)
-  - Add submenu now opens downward
-  - Arrow style controls appear centered in the top bar when an arrow is selected, keeping Save/Copy/Add always visible; controls scroll horizontally if the window is too narrow
-  - Arrow style controls use native HTML elements styled with CSS for consistent sizing and no external dependencies
-  - Two-row grid layout for arrow controls fits more options without wrapping
-  - Removed drag handle; toolbar is no longer draggable
-  - Quill text formatting toolbar moved into the top bar as a context panel (`toolbar-panel-text`), replacing the floating toolbar above the element; the panel appears when entering edit mode and restores the default panel on exit
+- **Menu bar** - Replaced the floating draggable toolbar with a fixed top bar spanning the full viewport width. Slides resize to fill the remaining area. Context panels (arrow styling, image controls, Quill formatting) appear in the right zone when an element is selected.
 
 ## [7.0.0] - 2025-03-25
 
