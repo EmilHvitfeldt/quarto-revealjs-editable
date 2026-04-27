@@ -16090,6 +16090,11 @@ ${fence}`;
       el.dataset.editableModifiedAbsTop = String(Math.round(pos.top));
       el.dataset.editableModifiedAbsWidth = String(Math.round(pos.width));
       el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
+      // Clear left/top before setup: setupEltStyles sets position:relative, so
+      // any remaining left/top inline styles would act as relative offsets and
+      // double-count the position when the container is placed.
+      el.style.left = "";
+      el.style.top = "";
       setupDivWhenReady(el);
       waitForRegistryThenFixPosition(el, pos.left, pos.top);
     },
