@@ -11,6 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
+| Modify | Click any plain image on the slide to make it editable |
 
 ## Adding New Elements
 
@@ -21,6 +22,18 @@ Click the **Add** button to open a submenu with options:
 - **Arrow**: Adds an arrow to the current slide (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension). See [Arrow Support](#arrow-support) below.
 
 New elements are marked with a dashed border to distinguish them from original content.
+
+## Modify Mode
+
+Not every image needs to be marked with `{.editable}` in advance. Click the **Modify** button in the menu bar to enter modify mode, then click any plain image on the slide to make it editable on the fly.
+
+Images that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Images that cannot be modified (such as figures generated from code chunks) show no highlight. Click a highlighted image to activate it — it becomes a fully editable element with the same drag, resize, rotate, and image controls as any other editable image.
+
+After saving, the image's position and size are written back to your `.qmd` file.
+
+::: {.callout-note}
+Modify mode currently supports images inserted with `![](image.png)` syntax. Code-generated figures (e.g., plots from R or Python chunks) are excluded.
+:::
 
 ## Rich Text Editing
 

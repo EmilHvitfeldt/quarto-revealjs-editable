@@ -14,6 +14,7 @@ import { addNewArrow } from './arrows.js';
 import { setActiveImage } from './images.js';
 import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
+import { toggleModifyMode, ModifyModeClassifier } from './modify-mode.js';
 import { addSaveMenuButton } from './menu.js';
 import {
   extractEditableEltDimensions,
@@ -59,15 +60,13 @@ ToolbarRegistry.register("add", {
   ],
 });
 
-// TODO: #48 — implement click-to-edit mode
 ToolbarRegistry.register("modify", {
   icon: "✏️",
   label: "Modify",
-  title: "Select any element to edit (coming soon)",
+  title: "Click an image to make it editable",
   className: "toolbar-modify",
   zone: "right",
-  disabled: true,
-  onClick: () => {},
+  onClick: () => toggleModifyMode(),
 });
 
 /**
@@ -136,6 +135,7 @@ window.editable = {
   addNewSlide,
   addNewTextElement,
   setActiveImage,
+  ModifyModeClassifier,
 };
 // Legacy flat exports — kept for backward compatibility with existing e2e tests
 Object.assign(window, window.editable);

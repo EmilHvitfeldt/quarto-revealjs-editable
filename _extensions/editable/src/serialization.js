@@ -739,3 +739,57 @@ export function replaceEditableOccurrences(text, replacements, srcReplacements =
 export function formatEditableEltStrings(dimensions) {
   return dimensions.map((dim) => serializeToQmd(dim));
 }
+
+/**
+ * Replace plain image markdown with positioned attributes for images
+ * that were made editable via modify mode (data-editable-modified).
+ * These are not in the positional .editable index, so they need their
+ * own write-back path that matches by src.
+ * @param {string} text - QMD content
+ * @returns {string} Updated QMD content
+ */
+/**
+ * Split QMD source into per-slide chunks using ## headers as boundaries.
+ * Returns [preamble, slide0, slide1, ...] where preamble is everything before
+ * the first ## header (including YAML front matter). Rejoining the array
+ * with '' recovers the original text.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function splitIntoSlideChunks(text) {
+  // Strip YAML front matter so its --- delimiters are not treated as boundaries
+  let preamble = '';
+  let body = text;
+  if (text.startsWith('---\n')) {
+    const closingIdx = text.indexOf('\n---\n', 4);
+    if (closingIdx !== -1) {
+      const end = closingIdx + 5; // include the closing ---\n
+      preamble = text.slice(0, end);
+      body = text.slice(end);
+    }
+  }
+
+  // Split body on ## slide headers
+  const parts = body.split(/(?=^## )/m);
+
+  // parts[0] may be pre-slide content (blank lines, etc.) or a ## slide itself
+  const firstIsSlide = parts[0].startsWith('## ');
+  const preslide = firstIsSlide ? '' : parts[0];
+  const slideChunks = firstIsSlide ? parts : parts.slice(1);
+
+  return [preamble + preslide, ...slideChunks];
+}
+
+/**
+ * Apply every registered classifier's serialize() to the QMD source.
+ * This is the single write-back entry point for all element types activated
+ * via modify mode; each classifier owns its own serialization logic.
+ * Imported lazily to avoid a circular dependency (modify-mode → serialization
+ * → modify-mode). The ModifyModeClassifier object is passed in by io.js.
+ * @param {string} text
+ * @param {{ applySerializers: function(string): string }} classifierRegistry
+ * @returns {string}
+ */
+export function applyModifiedSerializers(text, classifierRegistry) {
+  return classifierRegistry.applySerializers(text);
+}

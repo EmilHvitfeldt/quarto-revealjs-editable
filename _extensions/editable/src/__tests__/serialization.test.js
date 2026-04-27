@@ -48,7 +48,7 @@ vi.mock('../quill.js', () => ({
   quillInstances: new Map(),
 }));
 
-import { serializeToQmd, getFenceForContent, serializeArrowToShortcode } from '../serialization.js';
+import { serializeToQmd, getFenceForContent, serializeArrowToShortcode, splitIntoSlideChunks } from '../serialization.js';
 
 describe('serializeToQmd', () => {
   it('serializes basic dimensions', () => {
@@ -309,5 +309,56 @@ describe('serializeArrowToShortcode', () => {
     };
     const result = serializeArrowToShortcode(arrow);
     expect(result).not.toContain('label-offset=');
+  });
+});
+
+describe('splitIntoSlideChunks', () => {
+  // chunks[0] is always the preamble (front matter + pre-slide content)
+  // chunks[i+1] corresponds to Reveal slide index i (indexh = i)
+
+  it('returns single chunk when no ## headers', () => {
+    const qmd = '---\ntitle: Test\n---\n\nSome content\n';
+    const chunks = splitIntoSlideChunks(qmd);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toBe(qmd);
+  });
+
+  it('does not split on --- inside YAML front matter', () => {
+    const qmd = '---\ntitle: Test\n---\n\n## Slide 1\n\ncontent\n';
+    const chunks = splitIntoSlideChunks(qmd);
+    // Should be preamble + 1 slide, not more from front matter ---
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toContain('title: Test');
+    expect(chunks[1]).toContain('## Slide 1');
+  });
+
+  it('splits on ## headers; chunk 0 is preamble, slides start at chunk 1', () => {
+    const qmd = '---\ntitle: Test\n---\n\n## Slide 1\n\ncontent 1\n\n## Slide 2\n\ncontent 2\n';
+    const chunks = splitIntoSlideChunks(qmd);
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0]).toContain('title: Test');
+    expect(chunks[1]).toContain('## Slide 1');
+    expect(chunks[1]).toContain('content 1');
+    expect(chunks[2]).toContain('## Slide 2');
+    expect(chunks[2]).toContain('content 2');
+  });
+
+  it('rejoining chunks returns the original text', () => {
+    const qmd = '---\ntitle: Test\n---\n\n## Slide 1\n\n![](a.png)\n\n## Slide 2\n\n![](a.png)\n';
+    const chunks = splitIntoSlideChunks(qmd);
+    expect(chunks.join('')).toBe(qmd);
+  });
+
+  it('same image on multiple slides ends up in separate chunks', () => {
+    const qmd = '## Slide 1\n\n![](photo.png)\n\n## Slide 2\n\n![](photo.png)\n';
+    const chunks = splitIntoSlideChunks(qmd);
+    // chunks[0] = empty preamble, chunks[1] = slide 0, chunks[2] = slide 1
+    expect(chunks).toHaveLength(3);
+    expect(chunks[1]).toContain('![](photo.png)');
+    expect(chunks[2]).toContain('![](photo.png)');
+    // Modifying one chunk doesn't affect the other
+    const modified = chunks[1].replace('![](photo.png)', '![](photo.png){.absolute}');
+    expect(modified).toContain('{.absolute}');
+    expect(chunks[2]).not.toContain('{.absolute}');
   });
 });
