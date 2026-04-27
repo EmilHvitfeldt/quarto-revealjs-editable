@@ -2,19 +2,15 @@
 title: "Features"
 ---
 
-## Floating Toolbar
+## Menu Bar
 
-A floating toolbar appears on the right side of the slides with quick access to common actions:
+A fixed menu bar appears at the top of the presentation with quick access to common actions:
 
 | Button | Action                                              |
 |--------|-----------------------------------------------------|
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-
-The toolbar is draggable—grab the handle at the top to reposition it.
-
-![](media/move-menu.mp4)
 
 ## Adding New Elements
 
@@ -64,7 +60,7 @@ The color picker provides three ways to select colors:
 2. **Preset Colors** - A palette of 18 commonly used colors
 3. **Custom...** - Opens the system color picker for any color
 
-The preset palette appears when you click the color or background color button in the toolbar.
+The preset palette appears when you click the color or background color button in the menu bar.
 
 ![](media/color-support.mp4)
 
@@ -126,7 +122,7 @@ Sometimes you might find that images don't stay the size that you dragged them t
 
 ## Image Controls
 
-When you click an image element, the toolbar switches to an image-specific context panel with controls for styling the selected image.
+When you click an image element, the menu bar switches to an image-specific context panel with controls for styling the selected image.
 
 ### Opacity
 
@@ -199,7 +195,7 @@ Click **Add → Arrow** to create an arrow on the current slide. The arrow appea
 
 ### Curved Arrows
 
-Toggle **Curve** in the toolbar (when arrow is selected) to enable Bezier curve mode. Two additional control point handles appear:
+Toggle **Curve** in the menu bar (when arrow is selected) to enable Bezier curve mode. Two additional control point handles appear:
 
 - **Orange handle**: First control point (influences curve near start)
 - **Purple handle**: Second control point (influences curve near end)
@@ -212,7 +208,7 @@ Only the currently selected arrow shows its handles and controls. Click on an ar
 
 ### Arrow Styling
 
-When an arrow is selected, the toolbar switches to show styling controls:
+When an arrow is selected, the menu bar switches to show styling controls:
 
 - **Curve**: Toggle between straight and curved arrows
 - **Color**: Color presets (including brand colors) plus custom color picker
@@ -230,7 +226,7 @@ When an arrow is selected, the toolbar switches to show styling controls:
 
 Labels automatically rotate to follow the arrow direction and update color to match the arrow.
 
-Click anywhere outside the arrow to deselect it and return to the normal toolbar. Style changes are applied immediately and saved with the arrow.
+Click anywhere outside the arrow to deselect it and return to the normal menu bar. Style changes are applied immediately and saved with the arrow.
 
 ### Saved Format
 
