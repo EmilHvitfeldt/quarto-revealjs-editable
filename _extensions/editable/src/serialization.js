@@ -789,26 +789,39 @@ export function replaceModifiedImages(text) {
   const chunks = splitIntoSlideChunks(text);
   // chunks[0] is preamble; chunks[slideIndex + 1] is the slide content
 
+  // Group images by (chunkIndex, originalSrc) to handle duplicate srcs on the same slide.
+  // Within each group, DOM order determines which QMD occurrence gets which replacement.
+  const groups = new Map();
   for (const img of imgs) {
     const originalSrc = img.dataset.editableModifiedSrc;
     if (!originalSrc) continue;
-
-    const editableElt = editableRegistry.get(img);
-    if (!editableElt) continue;
-
+    if (!editableRegistry.has(img)) continue;
     const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
     const chunkIndex = slideIndex + 1;
+    if (chunkIndex >= chunks.length) continue;
+    const key = `${chunkIndex}::${originalSrc}`;
+    if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, imgs: [] });
+    groups.get(key).imgs.push(img);
+  }
 
-    const dims = editableElt.toDimensions();
-    const attrs = serializeToQmd(dims);
-    const newSrc = dims.src || originalSrc;
+  for (const { chunkIndex, originalSrc, imgs: groupImgs } of groups.values()) {
+    // Sort by DOM order so the 1st occurrence in source maps to the 1st DOM element
+    groupImgs.sort((a, b) =>
+      a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+    );
+
+    const replacements = groupImgs.map(img => {
+      const dims = editableRegistry.get(img).toDimensions();
+      return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+    });
 
     const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`);
+    const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
 
-    if (chunkIndex < chunks.length) {
-      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, `](${newSrc})${attrs}`);
-    }
+    let occurrence = 0;
+    chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
+      occurrence < replacements.length ? replacements[occurrence++] : match
+    );
   }
 
   return chunks.join('');

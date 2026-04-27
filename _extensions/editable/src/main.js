@@ -14,7 +14,7 @@ import { addNewArrow } from './arrows.js';
 import { setActiveImage } from './images.js';
 import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
-import { enterModifyMode, exitModifyMode } from './modify-mode.js';
+import { toggleModifyMode, ModifyModeClassifier } from './modify-mode.js';
 import { addSaveMenuButton } from './menu.js';
 import {
   extractEditableEltDimensions,
@@ -60,25 +60,13 @@ ToolbarRegistry.register("add", {
   ],
 });
 
-let modifyModeActive = false;
-
 ToolbarRegistry.register("modify", {
   icon: "✏️",
   label: "Modify",
   title: "Click an image to make it editable",
   className: "toolbar-modify",
   zone: "right",
-  onClick: () => {
-    modifyModeActive = !modifyModeActive;
-    const btn = document.querySelector(".toolbar-modify");
-    if (modifyModeActive) {
-      enterModifyMode();
-      btn?.classList.add("active");
-    } else {
-      exitModifyMode();
-      btn?.classList.remove("active");
-    }
-  },
+  onClick: () => toggleModifyMode(),
 });
 
 /**
@@ -146,6 +134,7 @@ window.editable = {
   addNewSlide,
   addNewTextElement,
   setActiveImage,
+  ModifyModeClassifier,
 };
 // Legacy flat exports — kept for backward compatibility with existing e2e tests
 Object.assign(window, window.editable);

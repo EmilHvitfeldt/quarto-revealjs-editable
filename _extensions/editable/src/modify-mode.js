@@ -2,12 +2,12 @@
  * Modify mode: click any plain image to make it editable.
  * Activated via the toolbar "Modify" button.
  *
- * Images are classified into three buckets:
- *   valid        — plain image whose src is in the QMD source; green ring
- *   warn         — chunk figure from a multi-figure chunk; amber ring, not clickable
- *   (ignored)    — already editable, or chunk figure that is safe to target
- *                  (single-figure chunk figures are currently treated as invalid
- *                   until chunk write-back is implemented)
+ * Elements are classified into three buckets:
+ *   valid        — element a classifier says can be modified; green ring
+ *   warn         — element a classifier says to warn about; amber ring, not clickable
+ *   (ignored)    — already editable or not recognised by any classifier
+ *
+ * New element types can be supported by calling ModifyModeClassifier.register().
  * @module modify-mode
  */
 
@@ -21,6 +21,40 @@ const ROOT_CLASS  = 'modify-mode';
 /** @type {AbortController|null} Cleans up click listeners on exit */
 let abortController = null;
 
+/** Single source of truth for whether modify mode is active */
+let _active = false;
+
+export function isModifyModeActive() { return _active; }
+
+// ---------------------------------------------------------------------------
+// Classifier registry
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {Object} Classifier
+ * @property {string}   selector       - CSS selector for elements this classifier handles
+ * @property {function(Element): boolean}             canModify  - true → valid (green ring)
+ * @property {function(Element): string|null}         warnReason - non-null → warn (amber ring)
+ * @property {function(Element): void}                activate   - called when element is clicked
+ */
+
+const _classifiers = [];
+
+/**
+ * Register a classifier for a new element type.
+ * Classifiers are evaluated in registration order; the first match wins.
+ * @param {Classifier} classifier
+ */
+export const ModifyModeClassifier = {
+  register(classifier) {
+    _classifiers.push(classifier);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Image classifier (built-in)
+// ---------------------------------------------------------------------------
+
 /**
  * Get the effective src of an image, checking both src and data-src
  * (Reveal.js uses data-src for lazy loading).
@@ -31,36 +65,17 @@ export function getImgSrc(img) {
   return img.getAttribute('src') || img.getAttribute('data-src') || null;
 }
 
-/**
- * Check whether an img src appears literally in the QMD source.
- * @param {HTMLImageElement} img
- * @returns {boolean}
- */
 function srcInQmdSource(img) {
   if (!window._input_file) return false;
   const src = getImgSrc(img);
   return !!src && window._input_file.includes(src);
 }
 
-/**
- * Extract the chunk prefix from a computed figure path.
- * e.g. "files/figure-revealjs/named-multi-2.png" → "named-multi"
- *      "files/figure-revealjs/unnamed-chunk-2-1.png" → "unnamed-chunk-2"
- * Returns null if the src doesn't look like a chunk figure path.
- * @param {string} src
- * @returns {string|null}
- */
 function getChunkPrefix(src) {
   const match = src.match(/figure-revealjs\/(.+)-\d+\.png$/);
   return match ? match[1] : null;
 }
 
-/**
- * Build a map of chunk prefix → count of figures with that prefix
- * across all imgs on the slide.
- * @param {HTMLImageElement[]} imgs
- * @returns {Map<string, number>}
- */
 function buildChunkPrefixCounts(imgs) {
   const counts = new Map();
   for (const img of imgs) {
@@ -73,33 +88,26 @@ function buildChunkPrefixCounts(imgs) {
 }
 
 /**
- * Classify all <img> elements on the current slide into three buckets:
- *   valid — plain image whose src is in the QMD source
- *   warn  — chunk figure from a multi-figure chunk
- * Already-editable images and single-figure chunk images are skipped.
+ * The prefixCounts map must be computed across all slide images before
+ * individual elements are classified, so the image classifier uses a
+ * slide-scoped classify() instead of per-element predicates.
+ *
+ * @param {Element} slideEl - The current slide element
  * @returns {{ valid: HTMLImageElement[], warn: HTMLImageElement[] }}
  */
-function classifyImages() {
-  const reveal = document.querySelector('.reveal');
-  const currentSlide = reveal?.querySelector('.slides .present');
-  const imgs = currentSlide
-    ? Array.from(currentSlide.querySelectorAll('img'))
-    : Array.from(document.querySelectorAll('.reveal .slides img'));
-
+function classifySlideImages(slideEl) {
+  const imgs = Array.from(slideEl.querySelectorAll('img'));
   const prefixCounts = buildChunkPrefixCounts(imgs);
 
   const valid = [];
   const warn  = [];
 
   for (const img of imgs) {
-    if (editableRegistry.has(img)) continue; // already editable
-
+    if (editableRegistry.has(img)) continue;
     const src = getImgSrc(img);
     if (!src) continue;
-
     const prefix = getChunkPrefix(src);
     if (prefix) {
-      // Chunk figure: warn if multi-figure, skip if single-figure (not yet supported)
       if (prefixCounts.get(prefix) > 1) warn.push(img);
     } else if (srcInQmdSource(img)) {
       valid.push(img);
@@ -109,57 +117,133 @@ function classifyImages() {
   return { valid, warn };
 }
 
-/**
- * Enter modify mode: classify images and attach click handlers.
- */
-export function enterModifyMode() {
-  document.querySelector('.reveal')?.classList.add(ROOT_CLASS);
+ModifyModeClassifier.register({
+  selector: 'img',
 
+  classify: classifySlideImages,
+
+  activate(img) {
+    // Ensure lazy-loaded images (data-src only) are fetched before setup polls
+    // for naturalWidth/offsetWidth — without this, setupImageWhenReady can time
+    // out before Reveal.js swaps data-src → src on its own schedule.
+    if (!img.getAttribute('src') && img.getAttribute('data-src')) {
+      img.src = img.getAttribute('data-src');
+    }
+
+    img.dataset.editableModifiedSrc = getImgSrc(img);
+    img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+    img.dataset.editableModified = 'true';
+
+    setupImageWhenReady(img);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Classification and lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Run all registered classifiers against the current slide and return the
+ * combined valid/warn lists paired with their classifier (for activate()).
+ * @returns {{ valid: Array<{el: Element, classifier: Classifier}>, warn: Element[] }}
+ */
+function classifyElements() {
+  const reveal = document.querySelector('.reveal');
+  const currentSlide = reveal?.querySelector('.slides .present') ?? reveal;
+
+  const valid = [];
+  const warn  = [];
+
+  for (const classifier of _classifiers) {
+    if (typeof classifier.classify === 'function') {
+      // Slide-scoped classify (e.g. image classifier needs cross-element context)
+      const result = classifier.classify(currentSlide);
+      result.valid.forEach(el => valid.push({ el, classifier }));
+      result.warn.forEach(el => warn.push(el));
+    } else {
+      // Per-element predicates
+      Array.from(currentSlide.querySelectorAll(classifier.selector)).forEach(el => {
+        if (classifier.canModify(el))        valid.push({ el, classifier });
+        else if (classifier.warnReason?.(el)) warn.push(el);
+      });
+    }
+  }
+
+  return { valid, warn };
+}
+
+/**
+ * (Re-)classify elements and attach click handlers.
+ * Called on entry and on every slide change.
+ */
+function applyClassification() {
+  document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
+    el.classList.remove(VALID_CLASS, WARN_CLASS);
+  });
+  abortController?.abort();
   abortController = new AbortController();
   const { signal } = abortController;
 
-  const { valid, warn } = classifyImages();
+  const { valid, warn } = classifyElements();
 
-  valid.forEach(img => {
-    img.classList.add(VALID_CLASS);
-    img.addEventListener('click', onValidImageClick, { signal, once: true });
+  valid.forEach(({ el, classifier }) => {
+    el.classList.add(VALID_CLASS);
+    el.addEventListener('click', (e) => onValidElementClick(e, classifier), { signal });
   });
-  warn.forEach(img => img.classList.add(WARN_CLASS));
+  warn.forEach(el => el.classList.add(WARN_CLASS));
 }
 
 /**
- * Exit modify mode: remove all classification classes and listeners.
+ * Enter modify mode: classify elements, attach click handlers, and listen for
+ * slide changes so classification stays current as the user navigates.
+ */
+export function enterModifyMode() {
+  _active = true;
+  document.querySelector('.reveal')?.classList.add(ROOT_CLASS);
+  applyClassification();
+  Reveal.on('slidechanged', applyClassification);
+}
+
+/**
+ * Exit modify mode: remove all classification classes, listeners, and the
+ * toolbar active state.
  */
 export function exitModifyMode() {
+  _active = false;
   document.querySelector('.reveal')?.classList.remove(ROOT_CLASS);
+  Reveal.off('slidechanged', applyClassification);
   abortController?.abort();
   abortController = null;
 
-  document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(img => {
-    img.classList.remove(VALID_CLASS, WARN_CLASS);
+  document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
+    el.classList.remove(VALID_CLASS, WARN_CLASS);
   });
+
+  document.querySelector('.toolbar-modify')?.classList.remove('active');
 }
 
 /**
- * Handle click on a valid image in modify mode.
- * @param {MouseEvent} e
+ * Toggle modify mode on/off and sync the toolbar button.
  */
-function onValidImageClick(e) {
+export function toggleModifyMode() {
+  if (_active) {
+    exitModifyMode();
+  } else {
+    enterModifyMode();
+    document.querySelector('.toolbar-modify')?.classList.add('active');
+  }
+}
+
+/**
+ * Handle click on a valid element in modify mode.
+ * Stays in modify mode so the user can activate more elements.
+ * @param {MouseEvent}  e
+ * @param {Classifier}  classifier
+ */
+function onValidElementClick(e, classifier) {
   e.stopPropagation();
-  const img = e.currentTarget;
-
-  // Store original src and current slide index before setup mutates the element
-  img.dataset.editableModifiedSrc = getImgSrc(img);
-  img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
-  img.dataset.editableModified = 'true';
-
-  img.classList.remove(VALID_CLASS);
-  setupImageWhenReady(img);
-
-  // Exit modify mode after picking one image
-  exitModifyMode();
-
-  // Sync toolbar button state
-  const btn = document.querySelector('.toolbar-modify');
-  btn?.classList.remove('active');
+  const el = e.currentTarget;
+  el.classList.remove(VALID_CLASS);
+  classifier.activate(el);
+  // Mode stays active — user can click more elements or dismiss via toolbar button
 }
