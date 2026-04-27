@@ -115,7 +115,7 @@ The serialization system converts element state to QMD format:
    - Insert new arrows
    - Update text content (HTML → Quarto markdown)
    - Replace `{.editable}` with `{.absolute ...}` attributes
-   - Replace plain images made editable via modify mode (`replaceModifiedImages`)
+   - Replace plain images made editable via modify mode (`applyModifiedSerializers`)
 
 3. **`splitIntoSlideChunks(text)`** - Splits QMD source into per-slide chunks for
    slide-scoped replacement. Strips YAML front matter first (to avoid splitting on
@@ -206,7 +206,7 @@ When saving, brand colors are converted to `{{< brand color name >}}` shortcodes
    ├─▶ Update text div content
    ├─▶ Extract dimensions and serialize to QMD
    ├─▶ Replace {.editable} with {.absolute ...}
-   └─▶ Replace plain images activated via modify mode (replaceModifiedImages)
+   └─▶ Replace plain images activated via modify mode (applyModifiedSerializers)
    │
 3. Download file or copy to clipboard
 ```
@@ -265,35 +265,57 @@ cd testing && npm run test:e2e
 
 ## Modify Mode
 
-Modify mode (`modify-mode.js`) lets users make any plain `![](image.png)` image editable at runtime, without requiring `{.editable}` in the source document.
+Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Currently images are supported; additional element types can be added via the classifier registry.
 
-### Activation
+### Lifecycle
 
-The toolbar "Modify" button toggles modify mode. On activation:
-1. All `<img>` elements on the current slide are classified:
-   - **Valid**: not already in `editableRegistry`, and `src`/`data-src` appears literally in `window._input_file`
-   - **Invalid**: already editable, or src not found in source (chunk-generated figures)
-2. Valid images receive the `modify-mode-valid` CSS class (green ring); invalid images receive `modify-mode-invalid` (no ring)
-3. Click listeners (via `AbortController`) are attached to valid images
+The toolbar "Modify" button calls `toggleModifyMode()`. When entering modify mode:
+1. All registered classifiers run against the current slide (`classify(slideEl)`)
+2. **Valid** elements receive the `modify-mode-valid` CSS class (green ring) and a click listener
+3. **Warn** elements receive `modify-mode-warn` (amber ring, not clickable); their reason string is stored in `_warnReasons` and readable via `getWarnReason(el)`
+4. A `slidechanged` listener re-runs classification on every slide navigation so rings stay current
 
-### Image Selection
+Mode stays active after each element is clicked. The user dismisses it by clicking the toolbar button again.
 
-Clicking a valid image:
-1. Stamps `data-editable-modified="true"`, `data-editable-modified-src` (original src), and `data-editable-modified-slide` (current `Reveal.getState().indexh`) on the element
-2. Calls `setupImageWhenReady()` to register it as a full `EditableElement`
-3. Exits modify mode automatically
+### Classifier Registry
 
-### Source Note on `data-src`
+New element types are added by calling `ModifyModeClassifier.register(classifier)`. Each classifier implements:
 
-Reveal.js lazy-loads images using `data-src` instead of `src`. `getImgSrc()` checks both attributes so the src lookup works regardless of lazy-load state.
+```javascript
+{
+  // Required — inspect the current slide and return which elements to highlight
+  classify(slideEl) {
+    return {
+      valid: [el, ...],                            // green ring, clickable
+      warn:  [{ el, reason: "why not" }, ...]      // amber ring, tooltip text
+    };
+  },
+
+  // Required — called when the user clicks a valid element
+  activate(el) {
+    // stamp data-attributes, call setupImageWhenReady / setupDivWhenReady, etc.
+  },
+
+  // Optional — called during save to write this element type back to QMD
+  serialize(text) {
+    return updatedText;
+  },
+}
+```
+
+`classify(slideEl)` receives the current slide `<section>` element; cross-element context (e.g. counting sibling figures to detect multi-figure chunks) belongs here.
 
 ### Write-back
 
-Modified images are not in the positional `.editable` index used by `replaceEditableOccurrences`, so they have their own serialization path: `replaceModifiedImages()` in `serialization.js`.
+`applyModifiedSerializers(text, ModifyModeClassifier)` in `serialization.js` iterates every registered classifier and pipes the QMD text through each classifier's `serialize()`. This is called from `io.js` during save. Each classifier owns its own write-back logic — no central function needs to know about individual element types.
 
-It uses `splitIntoSlideChunks()` to scope each replacement to the correct slide chunk (keyed by `data-editable-modified-slide`), avoiding false matches when the same image appears on multiple slides.
+The built-in image classifier's `serialize()` uses `splitIntoSlideChunks()` to scope replacements per slide (keyed by `data-editable-modified-slide`), and replaces occurrences by DOM order within a chunk to handle duplicate image srcs correctly.
 
 **After saving**, the image's markdown gains `{.absolute ...}` attributes. On the next render it will be a regular absolute-positioned image (not re-editable without `{.editable}`).
+
+### Source Note on `data-src`
+
+Reveal.js lazy-loads images using `data-src` instead of `src`. `getImgSrc()` checks both attributes. When `activate()` is called on a lazy-loaded image, it sets `img.src` immediately so `setupImageWhenReady`'s load event fires before the poll times out.
 
 ### Current Limitations
 

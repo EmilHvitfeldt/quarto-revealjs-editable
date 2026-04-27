@@ -8,12 +8,13 @@ import {
   extractEditableEltDimensions,
   formatEditableEltStrings,
   replaceEditableOccurrences,
-  replaceModifiedImages,
+  applyModifiedSerializers,
   updateTextDivs,
   insertNewSlides,
   insertNewDivs,
   insertNewArrows,
 } from './serialization.js';
+import { ModifyModeClassifier } from './modify-mode.js';
 
 /**
  * Read the original QMD content from the injected global variable.
@@ -54,7 +55,7 @@ export function getTransformedQmd() {
   const attributes = formatEditableEltStrings(dimensions);
   const srcReplacements = dimensions.map(d => d.src || null);
   content = replaceEditableOccurrences(content, attributes, srcReplacements);
-  content = replaceModifiedImages(content);
+  content = applyModifiedSerializers(content, ModifyModeClassifier);
 
   return content;
 }

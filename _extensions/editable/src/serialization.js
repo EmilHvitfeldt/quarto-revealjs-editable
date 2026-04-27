@@ -780,49 +780,16 @@ export function splitIntoSlideChunks(text) {
   return [preamble + preslide, ...slideChunks];
 }
 
-export function replaceModifiedImages(text) {
-  const imgs = Array.from(
-    document.querySelectorAll('img[data-editable-modified="true"]')
-  );
-  if (imgs.length === 0) return text;
-
-  const chunks = splitIntoSlideChunks(text);
-  // chunks[0] is preamble; chunks[slideIndex + 1] is the slide content
-
-  // Group images by (chunkIndex, originalSrc) to handle duplicate srcs on the same slide.
-  // Within each group, DOM order determines which QMD occurrence gets which replacement.
-  const groups = new Map();
-  for (const img of imgs) {
-    const originalSrc = img.dataset.editableModifiedSrc;
-    if (!originalSrc) continue;
-    if (!editableRegistry.has(img)) continue;
-    const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
-    const chunkIndex = slideIndex + 1;
-    if (chunkIndex >= chunks.length) continue;
-    const key = `${chunkIndex}::${originalSrc}`;
-    if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, imgs: [] });
-    groups.get(key).imgs.push(img);
-  }
-
-  for (const { chunkIndex, originalSrc, imgs: groupImgs } of groups.values()) {
-    // Sort by DOM order so the 1st occurrence in source maps to the 1st DOM element
-    groupImgs.sort((a, b) =>
-      a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
-    );
-
-    const replacements = groupImgs.map(img => {
-      const dims = editableRegistry.get(img).toDimensions();
-      return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
-    });
-
-    const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
-
-    let occurrence = 0;
-    chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
-      occurrence < replacements.length ? replacements[occurrence++] : match
-    );
-  }
-
-  return chunks.join('');
+/**
+ * Apply every registered classifier's serialize() to the QMD source.
+ * This is the single write-back entry point for all element types activated
+ * via modify mode; each classifier owns its own serialization logic.
+ * Imported lazily to avoid a circular dependency (modify-mode → serialization
+ * → modify-mode). The ModifyModeClassifier object is passed in by io.js.
+ * @param {string} text
+ * @param {{ applySerializers: function(string): string }} classifierRegistry
+ * @returns {string}
+ */
+export function applyModifiedSerializers(text, classifierRegistry) {
+  return classifierRegistry.applySerializers(text);
 }

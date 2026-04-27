@@ -15888,46 +15888,195 @@ ${fence}`;
     const slideChunks = firstIsSlide ? parts : parts.slice(1);
     return [preamble + preslide, ...slideChunks];
   }
-  function replaceModifiedImages(text) {
-    const imgs = Array.from(
-      document.querySelectorAll('img[data-editable-modified="true"]')
-    );
-    if (imgs.length === 0)
+  function applyModifiedSerializers(text, classifierRegistry) {
+    return classifierRegistry.applySerializers(text);
+  }
+
+  // src/modify-mode.js
+  var VALID_CLASS = "modify-mode-valid";
+  var WARN_CLASS = "modify-mode-warn";
+  var ROOT_CLASS = "modify-mode";
+  var abortController = null;
+  var _active = false;
+  var _warnReasons = /* @__PURE__ */ new WeakMap();
+  var _classifiers = [];
+  var ModifyModeClassifier = {
+    register(classifier) {
+      _classifiers.push(classifier);
+    },
+    /**
+     * Apply every registered classifier's serialize() to the QMD text.
+     * This is the single write-back entry point for all modified element types.
+     * @param {string} text - Full QMD source
+     * @returns {string}
+     */
+    applySerializers(text) {
+      for (const classifier of _classifiers) {
+        if (typeof classifier.serialize === "function") {
+          text = classifier.serialize(text);
+        }
+      }
       return text;
-    const chunks = splitIntoSlideChunks(text);
-    const groups = /* @__PURE__ */ new Map();
+    }
+  };
+  function getImgSrc(img) {
+    return img.getAttribute("src") || img.getAttribute("data-src") || null;
+  }
+  function srcInQmdSource(img) {
+    if (!window._input_file)
+      return false;
+    const src = getImgSrc(img);
+    return !!src && window._input_file.includes(src);
+  }
+  function getChunkPrefix(src) {
+    const match2 = src.match(/figure-revealjs\/(.+)-\d+\.png$/);
+    return match2 ? match2[1] : null;
+  }
+  function buildChunkPrefixCounts(imgs) {
+    const counts = /* @__PURE__ */ new Map();
     for (const img of imgs) {
-      const originalSrc = img.dataset.editableModifiedSrc;
-      if (!originalSrc)
+      const src = getImgSrc(img);
+      if (!src)
         continue;
-      if (!editableRegistry.has(img))
-        continue;
-      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
-      const chunkIndex = slideIndex + 1;
-      if (chunkIndex >= chunks.length)
-        continue;
-      const key = `${chunkIndex}::${originalSrc}`;
-      if (!groups.has(key))
-        groups.set(key, { chunkIndex, originalSrc, imgs: [] });
-      groups.get(key).imgs.push(img);
+      const prefix = getChunkPrefix(src);
+      if (prefix)
+        counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
     }
-    for (const { chunkIndex, originalSrc, imgs: groupImgs } of groups.values()) {
-      groupImgs.sort(
-        (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+    return counts;
+  }
+  ModifyModeClassifier.register({
+    classify(slideEl) {
+      const imgs = Array.from(slideEl.querySelectorAll("img"));
+      const prefixCounts = buildChunkPrefixCounts(imgs);
+      const valid = [];
+      const warn = [];
+      for (const img of imgs) {
+        if (editableRegistry.has(img))
+          continue;
+        const src = getImgSrc(img);
+        if (!src)
+          continue;
+        const prefix = getChunkPrefix(src);
+        if (prefix) {
+          if (prefixCounts.get(prefix) > 1) {
+            warn.push({ el: img, reason: "Multi-figure chunk \u2014 cannot target individual figures" });
+          }
+        } else if (srcInQmdSource(img)) {
+          valid.push(img);
+        }
+      }
+      return { valid, warn };
+    },
+    activate(img) {
+      if (!img.getAttribute("src") && img.getAttribute("data-src")) {
+        img.src = img.getAttribute("data-src");
+      }
+      img.dataset.editableModifiedSrc = getImgSrc(img);
+      img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      img.dataset.editableModified = "true";
+      setupImageWhenReady(img);
+    },
+    serialize(text) {
+      const imgs = Array.from(
+        document.querySelectorAll('img[data-editable-modified="true"]')
       );
-      const replacements = groupImgs.map((img) => {
-        const dims = editableRegistry.get(img).toDimensions();
-        return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+      if (imgs.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const groups = /* @__PURE__ */ new Map();
+      for (const img of imgs) {
+        const originalSrc = img.dataset.editableModifiedSrc;
+        if (!originalSrc)
+          continue;
+        if (!editableRegistry.has(img))
+          continue;
+        const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = slideIndex + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        const key = `${chunkIndex}::${originalSrc}`;
+        if (!groups.has(key))
+          groups.set(key, { chunkIndex, originalSrc, imgs: [] });
+        groups.get(key).imgs.push(img);
+      }
+      for (const { chunkIndex, originalSrc, imgs: groupImgs } of groups.values()) {
+        groupImgs.sort(
+          (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+        );
+        const replacements = groupImgs.map((img) => {
+          const dims = editableRegistry.get(img).toDimensions();
+          return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+        });
+        const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, "g");
+        let occurrence = 0;
+        chunks[chunkIndex] = chunks[chunkIndex].replace(
+          regex,
+          (match2) => occurrence < replacements.length ? replacements[occurrence++] : match2
+        );
+      }
+      return chunks.join("");
+    }
+  });
+  function classifyElements() {
+    const reveal = document.querySelector(".reveal");
+    const currentSlide = reveal?.querySelector(".slides .present") ?? reveal;
+    const valid = [];
+    const warn = [];
+    for (const classifier of _classifiers) {
+      const result = classifier.classify(currentSlide);
+      result.valid.forEach((el) => valid.push({ el, classifier }));
+      result.warn.forEach(({ el, reason }) => {
+        warn.push(el);
+        _warnReasons.set(el, reason);
       });
-      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, "g");
-      let occurrence = 0;
-      chunks[chunkIndex] = chunks[chunkIndex].replace(
-        regex,
-        (match2) => occurrence < replacements.length ? replacements[occurrence++] : match2
-      );
     }
-    return chunks.join("");
+    return { valid, warn };
+  }
+  function applyClassification() {
+    document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
+      el.classList.remove(VALID_CLASS, WARN_CLASS);
+    });
+    abortController?.abort();
+    abortController = new AbortController();
+    const { signal } = abortController;
+    const { valid, warn } = classifyElements();
+    valid.forEach(({ el, classifier }) => {
+      el.classList.add(VALID_CLASS);
+      el.addEventListener("click", (e) => onValidElementClick(e, classifier), { signal });
+    });
+    warn.forEach((el) => el.classList.add(WARN_CLASS));
+  }
+  function enterModifyMode() {
+    _active = true;
+    document.querySelector(".reveal")?.classList.add(ROOT_CLASS);
+    applyClassification();
+    Reveal.on("slidechanged", applyClassification);
+  }
+  function exitModifyMode() {
+    _active = false;
+    document.querySelector(".reveal")?.classList.remove(ROOT_CLASS);
+    Reveal.off("slidechanged", applyClassification);
+    abortController?.abort();
+    abortController = null;
+    document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
+      el.classList.remove(VALID_CLASS, WARN_CLASS);
+    });
+    document.querySelector(".toolbar-modify")?.classList.remove("active");
+  }
+  function toggleModifyMode() {
+    if (_active) {
+      exitModifyMode();
+    } else {
+      enterModifyMode();
+      document.querySelector(".toolbar-modify")?.classList.add("active");
+    }
+  }
+  function onValidElementClick(e, classifier) {
+    e.stopPropagation();
+    const el = e.currentTarget;
+    el.classList.remove(VALID_CLASS);
+    classifier.activate(el);
   }
 
   // src/io.js
@@ -15956,7 +16105,7 @@ ${fence}`;
     const attributes = formatEditableEltStrings(dimensions);
     const srcReplacements = dimensions.map((d) => d.src || null);
     content = replaceEditableOccurrences(content, attributes, srcReplacements);
-    content = replaceModifiedImages(content);
+    content = applyModifiedSerializers(content, ModifyModeClassifier);
     return content;
   }
   async function downloadString(content, mimeType = "text/plain") {
@@ -16005,144 +16154,6 @@ ${fence}`;
     }).catch((err) => {
       console.error("Failed to copy to clipboard:", err);
     });
-  }
-
-  // src/modify-mode.js
-  var VALID_CLASS = "modify-mode-valid";
-  var WARN_CLASS = "modify-mode-warn";
-  var ROOT_CLASS = "modify-mode";
-  var abortController = null;
-  var _active = false;
-  var _classifiers = [];
-  var ModifyModeClassifier = {
-    register(classifier) {
-      _classifiers.push(classifier);
-    }
-  };
-  function getImgSrc(img) {
-    return img.getAttribute("src") || img.getAttribute("data-src") || null;
-  }
-  function srcInQmdSource(img) {
-    if (!window._input_file)
-      return false;
-    const src = getImgSrc(img);
-    return !!src && window._input_file.includes(src);
-  }
-  function getChunkPrefix(src) {
-    const match2 = src.match(/figure-revealjs\/(.+)-\d+\.png$/);
-    return match2 ? match2[1] : null;
-  }
-  function buildChunkPrefixCounts(imgs) {
-    const counts = /* @__PURE__ */ new Map();
-    for (const img of imgs) {
-      const src = getImgSrc(img);
-      if (!src)
-        continue;
-      const prefix = getChunkPrefix(src);
-      if (prefix)
-        counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
-    }
-    return counts;
-  }
-  function classifySlideImages(slideEl) {
-    const imgs = Array.from(slideEl.querySelectorAll("img"));
-    const prefixCounts = buildChunkPrefixCounts(imgs);
-    const valid = [];
-    const warn = [];
-    for (const img of imgs) {
-      if (editableRegistry.has(img))
-        continue;
-      const src = getImgSrc(img);
-      if (!src)
-        continue;
-      const prefix = getChunkPrefix(src);
-      if (prefix) {
-        if (prefixCounts.get(prefix) > 1)
-          warn.push(img);
-      } else if (srcInQmdSource(img)) {
-        valid.push(img);
-      }
-    }
-    return { valid, warn };
-  }
-  ModifyModeClassifier.register({
-    selector: "img",
-    classify: classifySlideImages,
-    activate(img) {
-      if (!img.getAttribute("src") && img.getAttribute("data-src")) {
-        img.src = img.getAttribute("data-src");
-      }
-      img.dataset.editableModifiedSrc = getImgSrc(img);
-      img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
-      img.dataset.editableModified = "true";
-      setupImageWhenReady(img);
-    }
-  });
-  function classifyElements() {
-    const reveal = document.querySelector(".reveal");
-    const currentSlide = reveal?.querySelector(".slides .present") ?? reveal;
-    const valid = [];
-    const warn = [];
-    for (const classifier of _classifiers) {
-      if (typeof classifier.classify === "function") {
-        const result = classifier.classify(currentSlide);
-        result.valid.forEach((el) => valid.push({ el, classifier }));
-        result.warn.forEach((el) => warn.push(el));
-      } else {
-        Array.from(currentSlide.querySelectorAll(classifier.selector)).forEach((el) => {
-          if (classifier.canModify(el))
-            valid.push({ el, classifier });
-          else if (classifier.warnReason?.(el))
-            warn.push(el);
-        });
-      }
-    }
-    return { valid, warn };
-  }
-  function applyClassification() {
-    document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
-      el.classList.remove(VALID_CLASS, WARN_CLASS);
-    });
-    abortController?.abort();
-    abortController = new AbortController();
-    const { signal } = abortController;
-    const { valid, warn } = classifyElements();
-    valid.forEach(({ el, classifier }) => {
-      el.classList.add(VALID_CLASS);
-      el.addEventListener("click", (e) => onValidElementClick(e, classifier), { signal });
-    });
-    warn.forEach((el) => el.classList.add(WARN_CLASS));
-  }
-  function enterModifyMode() {
-    _active = true;
-    document.querySelector(".reveal")?.classList.add(ROOT_CLASS);
-    applyClassification();
-    Reveal.on("slidechanged", applyClassification);
-  }
-  function exitModifyMode() {
-    _active = false;
-    document.querySelector(".reveal")?.classList.remove(ROOT_CLASS);
-    Reveal.off("slidechanged", applyClassification);
-    abortController?.abort();
-    abortController = null;
-    document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
-      el.classList.remove(VALID_CLASS, WARN_CLASS);
-    });
-    document.querySelector(".toolbar-modify")?.classList.remove("active");
-  }
-  function toggleModifyMode() {
-    if (_active) {
-      exitModifyMode();
-    } else {
-      enterModifyMode();
-      document.querySelector(".toolbar-modify")?.classList.add("active");
-    }
-  }
-  function onValidElementClick(e, classifier) {
-    e.stopPropagation();
-    const el = e.currentTarget;
-    el.classList.remove(VALID_CLASS);
-    classifier.activate(el);
   }
 
   // src/menu.js

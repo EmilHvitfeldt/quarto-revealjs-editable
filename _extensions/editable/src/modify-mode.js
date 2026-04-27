@@ -7,12 +7,35 @@
  *   warn         — element a classifier says to warn about; amber ring, not clickable
  *   (ignored)    — already editable or not recognised by any classifier
  *
- * New element types can be supported by calling ModifyModeClassifier.register().
+ * ## Adding a new element type
+ *
+ * Call `ModifyModeClassifier.register()` with an object that implements:
+ *
+ *   classify(slideEl)  → { valid: Element[], warn: Array<{el, reason}> }
+ *     Inspect `slideEl` (current slide) and return which elements can be
+ *     activated and which should show a warning.  Cross-element context
+ *     (e.g. counting sibling figures) belongs here.
+ *
+ *   activate(el)
+ *     Called when the user clicks a valid element.  Stamp whatever
+ *     data-attributes your serialize() needs, then call the appropriate
+ *     setup helper (setupImageWhenReady, setupDivWhenReady, …).
+ *
+ *   serialize(text)  → string          [optional]
+ *     Called during save to write modified elements of this type back to
+ *     the QMD source.  Receives the full QMD string and must return the
+ *     updated string.  Omit if your element type reuses an existing
+ *     serialization path.
+ *
  * @module modify-mode
  */
 
 import { editableRegistry } from './editable-element.js';
 import { setupImageWhenReady } from './element-setup.js';
+import {
+  splitIntoSlideChunks,
+  serializeToQmd,
+} from './serialization.js';
 
 const VALID_CLASS = 'modify-mode-valid';
 const WARN_CLASS  = 'modify-mode-warn';
@@ -26,28 +49,75 @@ let _active = false;
 
 export function isModifyModeActive() { return _active; }
 
+/**
+ * Maps warn elements → the human-readable reason string returned by the
+ * classifier.  Populated by applyClassification(), cleared on exit.
+ * Use getWarnReason(el) to read.
+ * @type {WeakMap<Element, string>}
+ */
+const _warnReasons = new WeakMap();
+
+/**
+ * Return the warning reason for an element that was classified as warn,
+ * or null if the element is not a warned element.
+ * @param {Element} el
+ * @returns {string|null}
+ */
+export function getWarnReason(el) {
+  return _warnReasons.get(el) ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Classifier registry
 // ---------------------------------------------------------------------------
 
 /**
+ * @typedef {Object} WarnEntry
+ * @property {Element} el
+ * @property {string}  reason  - Human-readable explanation shown on hover
+ */
+
+/**
+ * @typedef {Object} ClassifyResult
+ * @property {Element[]}    valid
+ * @property {WarnEntry[]}  warn
+ */
+
+/**
  * @typedef {Object} Classifier
- * @property {string}   selector       - CSS selector for elements this classifier handles
- * @property {function(Element): boolean}             canModify  - true → valid (green ring)
- * @property {function(Element): string|null}         warnReason - non-null → warn (amber ring)
- * @property {function(Element): void}                activate   - called when element is clicked
+ * @property {function(Element): ClassifyResult} classify
+ *   Inspect the current slide element and return valid/warn lists.
+ * @property {function(Element): void} activate
+ *   Called when the user clicks a valid element.
+ * @property {function(string): string} [serialize]
+ *   Optional. Called during save; receives and returns the full QMD string.
  */
 
 const _classifiers = [];
 
 /**
  * Register a classifier for a new element type.
- * Classifiers are evaluated in registration order; the first match wins.
+ * Classifiers are evaluated in registration order.
  * @param {Classifier} classifier
  */
 export const ModifyModeClassifier = {
   register(classifier) {
     _classifiers.push(classifier);
+  },
+
+  /**
+   * Apply every registered classifier's serialize() to the QMD text.
+   * This is the single write-back entry point for all modified element types.
+   * @param {string} text - Full QMD source
+   * @returns {string}
+   */
+  applySerializers(text) {
+    for (const classifier of _classifiers) {
+      if (typeof classifier.serialize === 'function') {
+        text = classifier.serialize(text);
+      }
+    }
+    return text;
   },
 };
 
@@ -87,40 +157,30 @@ function buildChunkPrefixCounts(imgs) {
   return counts;
 }
 
-/**
- * The prefixCounts map must be computed across all slide images before
- * individual elements are classified, so the image classifier uses a
- * slide-scoped classify() instead of per-element predicates.
- *
- * @param {Element} slideEl - The current slide element
- * @returns {{ valid: HTMLImageElement[], warn: HTMLImageElement[] }}
- */
-function classifySlideImages(slideEl) {
-  const imgs = Array.from(slideEl.querySelectorAll('img'));
-  const prefixCounts = buildChunkPrefixCounts(imgs);
-
-  const valid = [];
-  const warn  = [];
-
-  for (const img of imgs) {
-    if (editableRegistry.has(img)) continue;
-    const src = getImgSrc(img);
-    if (!src) continue;
-    const prefix = getChunkPrefix(src);
-    if (prefix) {
-      if (prefixCounts.get(prefix) > 1) warn.push(img);
-    } else if (srcInQmdSource(img)) {
-      valid.push(img);
-    }
-  }
-
-  return { valid, warn };
-}
-
 ModifyModeClassifier.register({
-  selector: 'img',
+  classify(slideEl) {
+    const imgs = Array.from(slideEl.querySelectorAll('img'));
+    const prefixCounts = buildChunkPrefixCounts(imgs);
 
-  classify: classifySlideImages,
+    const valid = [];
+    const warn  = [];
+
+    for (const img of imgs) {
+      if (editableRegistry.has(img)) continue;
+      const src = getImgSrc(img);
+      if (!src) continue;
+      const prefix = getChunkPrefix(src);
+      if (prefix) {
+        if (prefixCounts.get(prefix) > 1) {
+          warn.push({ el: img, reason: 'Multi-figure chunk — cannot target individual figures' });
+        }
+      } else if (srcInQmdSource(img)) {
+        valid.push(img);
+      }
+    }
+
+    return { valid, warn };
+  },
 
   activate(img) {
     // Ensure lazy-loaded images (data-src only) are fetched before setup polls
@@ -130,11 +190,56 @@ ModifyModeClassifier.register({
       img.src = img.getAttribute('data-src');
     }
 
-    img.dataset.editableModifiedSrc = getImgSrc(img);
+    img.dataset.editableModifiedSrc   = getImgSrc(img);
     img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
-    img.dataset.editableModified = 'true';
+    img.dataset.editableModified      = 'true';
 
     setupImageWhenReady(img);
+  },
+
+  serialize(text) {
+    const imgs = Array.from(
+      document.querySelectorAll('img[data-editable-modified="true"]')
+    );
+    if (imgs.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+
+    // Group by (chunkIndex, originalSrc) to handle duplicate srcs on the same slide.
+    // DOM order within each group maps to QMD occurrence order.
+    const groups = new Map();
+    for (const img of imgs) {
+      const originalSrc = img.dataset.editableModifiedSrc;
+      if (!originalSrc) continue;
+      if (!editableRegistry.has(img)) continue;
+      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = slideIndex + 1;
+      if (chunkIndex >= chunks.length) continue;
+      const key = `${chunkIndex}::${originalSrc}`;
+      if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, imgs: [] });
+      groups.get(key).imgs.push(img);
+    }
+
+    for (const { chunkIndex, originalSrc, imgs: groupImgs } of groups.values()) {
+      groupImgs.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+
+      const replacements = groupImgs.map(img => {
+        const dims = editableRegistry.get(img).toDimensions();
+        return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+      });
+
+      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
+
+      let occurrence = 0;
+      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
+        occurrence < replacements.length ? replacements[occurrence++] : match
+      );
+    }
+
+    return chunks.join('');
   },
 });
 
@@ -144,7 +249,7 @@ ModifyModeClassifier.register({
 
 /**
  * Run all registered classifiers against the current slide and return the
- * combined valid/warn lists paired with their classifier (for activate()).
+ * combined valid/warn lists.
  * @returns {{ valid: Array<{el: Element, classifier: Classifier}>, warn: Element[] }}
  */
 function classifyElements() {
@@ -155,18 +260,12 @@ function classifyElements() {
   const warn  = [];
 
   for (const classifier of _classifiers) {
-    if (typeof classifier.classify === 'function') {
-      // Slide-scoped classify (e.g. image classifier needs cross-element context)
-      const result = classifier.classify(currentSlide);
-      result.valid.forEach(el => valid.push({ el, classifier }));
-      result.warn.forEach(el => warn.push(el));
-    } else {
-      // Per-element predicates
-      Array.from(currentSlide.querySelectorAll(classifier.selector)).forEach(el => {
-        if (classifier.canModify(el))        valid.push({ el, classifier });
-        else if (classifier.warnReason?.(el)) warn.push(el);
-      });
-    }
+    const result = classifier.classify(currentSlide);
+    result.valid.forEach(el => valid.push({ el, classifier }));
+    result.warn.forEach(({ el, reason }) => {
+      warn.push(el);
+      _warnReasons.set(el, reason);
+    });
   }
 
   return { valid, warn };
