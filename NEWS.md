@@ -7,6 +7,9 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 ### Added
 
 - **Modify mode: `{.absolute}` divs** - Divs previously saved with `{.absolute}` attributes (but without `{.editable}`) are now activatable in modify mode. Click a highlighted div to enable drag, resize, and rotate. On save the existing `{.absolute ...}` attribute block is updated in-place; no wrapper is added.
+- **Modify mode: element list panel** - Entering modify mode now switches the toolbar right zone to a panel listing the element types that can be activated (e.g. "Images", "Positioned divs").
+- **Modify mode: auto-exit on activation** - Clicking a valid element now automatically exits modify mode after activating it.
+- **Modify mode: button always visible** - The Modify button is no longer hidden when context panels (image, arrow, text) are shown.
 
 ## [8.0.0] - 2026-04-27
 
