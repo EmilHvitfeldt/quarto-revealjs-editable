@@ -37,6 +37,7 @@ import {
   splitIntoSlideChunks,
   serializeToQmd,
 } from './serialization.js';
+import { getQmdHeadingIndex } from './utils.js';
 
 const VALID_CLASS = 'modify-mode-valid';
 const WARN_CLASS  = 'modify-mode-warn';
@@ -191,6 +192,10 @@ ModifyModeClassifier.register({
   },
 
   activate(img) {
+    // Capture src before setting img.src, which resolves it to an absolute URL
+    // and would break QMD source matching in serialize().
+    const originalSrc = getImgSrc(img);
+
     // Ensure lazy-loaded images (data-src only) are fetched before setup polls
     // for naturalWidth/offsetWidth — without this, setupImageWhenReady can time
     // out before Reveal.js swaps data-src → src on its own schedule.
@@ -198,7 +203,7 @@ ModifyModeClassifier.register({
       img.src = img.getAttribute('data-src');
     }
 
-    img.dataset.editableModifiedSrc   = getImgSrc(img);
+    img.dataset.editableModifiedSrc   = originalSrc;
     img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
     img.dataset.editableModified      = 'true';
 
@@ -221,7 +226,7 @@ ModifyModeClassifier.register({
       if (!originalSrc) continue;
       if (!editableRegistry.has(img)) continue;
       const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = slideIndex + 1;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       if (chunkIndex >= chunks.length) continue;
       const key = `${chunkIndex}::${originalSrc}`;
       if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, imgs: [] });
@@ -294,7 +299,7 @@ function absoluteDivInQmdSource(div, slideIndex) {
   const pos = getAbsolutePosition(div);
   if (!pos) return false;
   const chunks = splitIntoSlideChunks(window._input_file);
-  const chunk = chunks[slideIndex + 1];
+  const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
   if (!chunk) return false;
   return makeAbsoluteBlockRegex(pos.left, pos.top, pos.width, pos.height).test(chunk);
 }
@@ -368,7 +373,7 @@ ModifyModeClassifier.register({
     for (const div of divs) {
       if (!editableRegistry.has(div)) continue;
       const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = slideIndex + 1;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       if (chunkIndex >= chunks.length) continue;
       if (!groups.has(chunkIndex)) groups.set(chunkIndex, []);
       groups.get(chunkIndex).push(div);

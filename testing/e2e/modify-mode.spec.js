@@ -21,6 +21,7 @@ test.describe('Modify Mode', () => {
 
   test('clicking Modify highlights valid images with green ring', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
 
     // Image on current slide should get modify-mode-valid class
@@ -30,6 +31,7 @@ test.describe('Modify Mode', () => {
 
   test('clicking valid image makes it editable and exits modify mode', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
 
     await page.locator('img.modify-mode-valid').first().click();
@@ -55,8 +57,8 @@ test.describe('Modify Mode', () => {
   test('modified image serializes to correct slide chunk', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
 
-    // Navigate to slide 2 (index 1) and activate the image there
-    await navigateToSlide(page, 1);
+    // Navigate to Slide 2 (index 2: title slide at 0, Slide 1 at 1, Slide 2 at 2)
+    await navigateToSlide(page, 2);
     await page.click('.toolbar-modify');
     await page.locator('img.modify-mode-valid').first().click();
     await page.waitForSelector('.editable-container img', { timeout: 3000 });
@@ -76,7 +78,8 @@ test.describe('Modify Mode', () => {
   test('same image on two slides: modifying slide 1 does not affect slide 2', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
 
-    // Stay on slide 1 (index 0) and activate the image there
+    // Navigate to Slide 1 (index 1: title slide is at index 0)
+    await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
     await page.locator('img.modify-mode-valid').first().click();
     await page.waitForSelector('.editable-container img', { timeout: 3000 });

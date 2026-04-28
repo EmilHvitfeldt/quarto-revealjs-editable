@@ -12347,942 +12347,6 @@ ${escapeText(this.code(index, length))}
       deselectArrowFn();
   }
 
-  // src/images.js
-  var activeImage = null;
-  var replaceWarningEl = null;
-  function showReplaceWarning(message, anchorEl) {
-    if (replaceWarningEl)
-      replaceWarningEl.remove();
-    const popup = document.createElement("div");
-    popup.className = "image-replace-warning";
-    popup.setAttribute("role", "alert");
-    popup.setAttribute("aria-live", "assertive");
-    popup.textContent = `\u26A0 ${message}`;
-    document.body.appendChild(popup);
-    replaceWarningEl = popup;
-    const rect = anchorEl.closest("#editable-toolbar")?.getBoundingClientRect() ?? anchorEl.getBoundingClientRect();
-    popup.style.top = `${rect.bottom + 6}px`;
-    popup.style.left = "50%";
-    popup.style.transform = "translateX(-50%)";
-    const timer = setTimeout(() => {
-      popup.remove();
-      if (replaceWarningEl === popup)
-        replaceWarningEl = null;
-    }, 4e3);
-    popup.addEventListener("click", () => {
-      clearTimeout(timer);
-      popup.remove();
-      if (replaceWarningEl === popup)
-        replaceWarningEl = null;
-    }, { once: true });
-  }
-  var imageControlRefs = {
-    opacitySlider: null,
-    opacityLabel: null,
-    borderRadiusInput: null,
-    cropBtn: null,
-    flipHBtn: null,
-    flipVBtn: null
-  };
-  var cropModeActive = false;
-  function withActiveImage(fn) {
-    if (!activeImage)
-      return;
-    const el = editableRegistry.get(activeImage);
-    if (!el)
-      return;
-    fn(el);
-  }
-  var cropHandleListeners = /* @__PURE__ */ new Map();
-  registerDeselectImage(() => setActiveImage(null));
-  function setActiveImage(imgEl) {
-    if (activeImage && activeImage !== imgEl) {
-      exitCropMode();
-    }
-    if (imgEl && imgEl !== activeImage) {
-      deselectArrow();
-    }
-    activeImage = imgEl;
-    if (imgEl) {
-      updateImageStylePanel(imgEl);
-      showRightPanel("image");
-    } else if (!activeArrow) {
-      showRightPanel("default");
-    }
-  }
-  function updateImageStylePanel(imgEl) {
-    const editableEl = editableRegistry.get(imgEl);
-    if (!editableEl)
-      return;
-    const s = editableEl.state;
-    if (imageControlRefs.opacitySlider) {
-      imageControlRefs.opacitySlider.value = s.opacity ?? 100;
-      imageControlRefs.opacityLabel.textContent = `${s.opacity ?? 100}%`;
-    }
-    if (imageControlRefs.borderRadiusInput) {
-      imageControlRefs.borderRadiusInput.value = s.borderRadius ?? 0;
-    }
-    if (imageControlRefs.cropBtn) {
-      imageControlRefs.cropBtn.classList.toggle("active", cropModeActive);
-    }
-    if (imageControlRefs.flipHBtn) {
-      imageControlRefs.flipHBtn.classList.toggle("active", !!s.flipH);
-    }
-    if (imageControlRefs.flipVBtn) {
-      imageControlRefs.flipVBtn.classList.toggle("active", !!s.flipV);
-    }
-  }
-  function applyTransform(imgEl) {
-    const editableEl = editableRegistry.get(imgEl);
-    if (!editableEl)
-      return;
-    const s = editableEl.state;
-    const scaleX = s.flipH ? -1 : 1;
-    const scaleY = s.flipV ? -1 : 1;
-    imgEl.style.transform = scaleX !== 1 || scaleY !== 1 ? `scaleX(${scaleX}) scaleY(${scaleY})` : "";
-  }
-  function applyCrop(imgEl) {
-    const editableEl = editableRegistry.get(imgEl);
-    if (!editableEl)
-      return;
-    const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = editableEl.state;
-    imgEl.style.clipPath = ct || cr || cb || cl ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)` : "";
-    if (cropModeActive && editableEl.container) {
-      const offset = -6;
-      editableEl.getResizeHandles().forEach((handle) => {
-        const pos = handle.dataset.position;
-        handle.style.top = pos.includes("n") ? `${ct + offset}px` : "";
-        handle.style.bottom = pos.includes("s") ? `${cb + offset}px` : "";
-        handle.style.left = pos.includes("w") ? `${cl + offset}px` : "";
-        handle.style.right = pos.includes("e") ? `${cr + offset}px` : "";
-      });
-    }
-  }
-  function enterCropMode() {
-    if (!activeImage)
-      return;
-    cropModeActive = true;
-    if (imageControlRefs.cropBtn)
-      imageControlRefs.cropBtn.classList.add("active");
-    const editableEl = editableRegistry.get(activeImage);
-    if (!editableEl?.container)
-      return;
-    editableEl.container.classList.add("crop-mode");
-    applyCrop(activeImage);
-    editableEl.getResizeHandles().forEach((handle) => {
-      const listener = (e) => onCropHandleMousedown(e, activeImage);
-      handle.addEventListener("mousedown", listener, true);
-      cropHandleListeners.set(handle, listener);
-    });
-  }
-  function exitCropMode() {
-    cropModeActive = false;
-    if (imageControlRefs.cropBtn)
-      imageControlRefs.cropBtn.classList.remove("active");
-    cropHandleListeners.forEach((listener, handle) => {
-      handle.removeEventListener("mousedown", listener, true);
-    });
-    cropHandleListeners.clear();
-    if (activeImage) {
-      const editableEl = editableRegistry.get(activeImage);
-      if (editableEl?.container) {
-        editableEl.container.classList.remove("crop-mode");
-        editableEl.getResizeHandles().forEach((handle) => {
-          handle.style.top = "";
-          handle.style.bottom = "";
-          handle.style.left = "";
-          handle.style.right = "";
-        });
-      }
-    }
-  }
-  function onCropHandleMousedown(e, imgEl) {
-    e.stopImmediatePropagation();
-    e.preventDefault();
-    pushUndoState();
-    const pos = e.currentTarget.dataset.position;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const editableEl = editableRegistry.get(imgEl);
-    if (!editableEl)
-      return;
-    const startCrop = {
-      top: editableEl.state.cropTop,
-      right: editableEl.state.cropRight,
-      bottom: editableEl.state.cropBottom,
-      left: editableEl.state.cropLeft
-    };
-    const rect = imgEl.getBoundingClientRect();
-    const slideScale = rect.width > 0 ? rect.width / imgEl.offsetWidth : 1;
-    function onMove(me) {
-      const el = editableRegistry.get(imgEl);
-      if (!el)
-        return;
-      const dx = (me.clientX - startX) / slideScale;
-      const dy = (me.clientY - startY) / slideScale;
-      const maxW = imgEl.offsetWidth / 2;
-      const maxH = imgEl.offsetHeight / 2;
-      if (pos.includes("n"))
-        el.state.cropTop = Math.max(0, Math.min(maxH, startCrop.top + dy));
-      if (pos.includes("s"))
-        el.state.cropBottom = Math.max(0, Math.min(maxH, startCrop.bottom - dy));
-      if (pos.includes("w"))
-        el.state.cropLeft = Math.max(0, Math.min(maxW, startCrop.left + dx));
-      if (pos.includes("e"))
-        el.state.cropRight = Math.max(0, Math.min(maxW, startCrop.right - dx));
-      applyCrop(imgEl);
-    }
-    function onUp() {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    }
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }
-  function createImageStyleControls() {
-    const container = document.createElement("div");
-    container.className = "image-style-controls";
-    const centerWrap = document.createElement("div");
-    centerWrap.className = "image-center-wrap";
-    const controlsWrap = document.createElement("div");
-    controlsWrap.className = "image-controls-wrap";
-    function addCell(labelText) {
-      const label = document.createElement("span");
-      label.className = "image-ctrl-label";
-      label.textContent = labelText;
-      controlsWrap.appendChild(label);
-      const cell = document.createElement("div");
-      cell.className = "image-ctrl-cell";
-      controlsWrap.appendChild(cell);
-      return cell;
-    }
-    buildOpacityControl(addCell);
-    buildBorderRadiusControl(addCell);
-    buildCropControl(addCell);
-    buildFlipControl(addCell);
-    buildReplaceControl(addCell);
-    buildResetControl(addCell);
-    centerWrap.appendChild(controlsWrap);
-    container.appendChild(centerWrap);
-    return container;
-  }
-  function buildOpacityControl(addCell) {
-    const cell = addCell("Opacity");
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = "0";
-    slider.max = "100";
-    slider.step = "1";
-    slider.value = "100";
-    slider.className = "image-toolbar-opacity";
-    slider.title = "Opacity";
-    const label = document.createElement("span");
-    label.className = "image-opacity-label";
-    label.style.display = "none";
-    slider.addEventListener("mousedown", () => {
-      if (activeImage)
-        pushUndoState();
-    });
-    slider.addEventListener("input", () => {
-      const val = parseInt(slider.value, 10);
-      label.textContent = `${val}%`;
-      withActiveImage((el) => el.setState({ opacity: val }));
-    });
-    imageControlRefs.opacitySlider = slider;
-    imageControlRefs.opacityLabel = label;
-    cell.appendChild(slider);
-    cell.appendChild(label);
-  }
-  function buildBorderRadiusControl(addCell) {
-    const cell = addCell("Radius");
-    const input = document.createElement("input");
-    input.type = "number";
-    input.min = "0";
-    input.step = "1";
-    input.value = "0";
-    input.className = "image-toolbar-btn image-toolbar-radius";
-    input.title = "Border radius (px)";
-    input.addEventListener("focus", () => {
-      if (activeImage)
-        pushUndoState();
-    });
-    input.addEventListener("input", () => {
-      const val = Math.max(0, parseInt(input.value, 10) || 0);
-      withActiveImage((el) => el.setState({ borderRadius: val }));
-    });
-    imageControlRefs.borderRadiusInput = input;
-    cell.appendChild(input);
-  }
-  function buildCropControl(addCell) {
-    const cell = addCell("Crop");
-    const btn = document.createElement("button");
-    btn.className = "image-toolbar-btn";
-    btn.textContent = "\u2702";
-    btn.title = "Toggle crop mode \u2014 drag edge handles to crop";
-    btn.addEventListener("click", () => {
-      if (!activeImage)
-        return;
-      if (cropModeActive)
-        exitCropMode();
-      else
-        enterCropMode();
-    });
-    imageControlRefs.cropBtn = btn;
-    cell.appendChild(btn);
-  }
-  function buildFlipControl(addCell) {
-    const cell = addCell("Flip");
-    const wrap = document.createElement("div");
-    wrap.className = "image-btn-group";
-    const flipHBtn = document.createElement("button");
-    flipHBtn.className = "image-toolbar-btn";
-    flipHBtn.textContent = "\u21C6";
-    flipHBtn.title = "Flip horizontal";
-    flipHBtn.addEventListener("click", () => {
-      pushUndoState();
-      withActiveImage((el) => {
-        el.state.flipH = !el.state.flipH;
-        flipHBtn.classList.toggle("active", el.state.flipH);
-        applyTransform(activeImage);
-      });
-    });
-    imageControlRefs.flipHBtn = flipHBtn;
-    const flipVBtn = document.createElement("button");
-    flipVBtn.className = "image-toolbar-btn";
-    flipVBtn.textContent = "\u21C5";
-    flipVBtn.title = "Flip vertical";
-    flipVBtn.addEventListener("click", () => {
-      pushUndoState();
-      withActiveImage((el) => {
-        el.state.flipV = !el.state.flipV;
-        flipVBtn.classList.toggle("active", el.state.flipV);
-        applyTransform(activeImage);
-      });
-    });
-    imageControlRefs.flipVBtn = flipVBtn;
-    wrap.appendChild(flipHBtn);
-    wrap.appendChild(flipVBtn);
-    cell.appendChild(wrap);
-  }
-  function buildReplaceControl(addCell) {
-    const cell = addCell("Replace");
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = "image/*";
-    fileInput.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none";
-    const btn = document.createElement("button");
-    btn.className = "image-toolbar-btn";
-    btn.textContent = "Replace";
-    btn.title = "Replace image source";
-    btn.addEventListener("click", () => {
-      if (activeImage)
-        fileInput.click();
-    });
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files[0];
-      if (!file || !activeImage)
-        return;
-      pushUndoState();
-      const el = editableRegistry.get(activeImage);
-      if (el)
-        el.state.src = file.name;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target.result;
-        const tmp = new Image();
-        tmp.onload = () => {
-          const img = activeImage;
-          const imgEl = editableRegistry.get(img);
-          if (!imgEl)
-            return;
-          const newHeight = Math.round(imgEl.state.width * tmp.naturalHeight / tmp.naturalWidth);
-          imgEl.state.height = newHeight;
-          img.style.height = `${newHeight}px`;
-          if (imgEl.container)
-            imgEl.container.style.height = `${newHeight}px`;
-        };
-        tmp.src = dataUrl;
-        activeImage.src = dataUrl;
-        showReplaceWarning(`Place "${file.name}" next to your QMD file.`, btn);
-      };
-      reader.readAsDataURL(file);
-      fileInput.value = "";
-    });
-    cell.appendChild(btn);
-    cell.appendChild(fileInput);
-  }
-  function buildResetControl(addCell) {
-    const cell = addCell("");
-    const btn = document.createElement("button");
-    btn.className = "image-toolbar-btn image-toolbar-reset";
-    btn.textContent = "Reset";
-    btn.title = "Reset image style properties";
-    btn.addEventListener("click", () => {
-      if (!activeImage)
-        return;
-      pushUndoState();
-      const el = editableRegistry.get(activeImage);
-      if (!el)
-        return;
-      Object.assign(el.state, {
-        opacity: 100,
-        borderRadius: 0,
-        cropTop: 0,
-        cropRight: 0,
-        cropBottom: 0,
-        cropLeft: 0,
-        flipH: false,
-        flipV: false
-      });
-      activeImage.style.opacity = "";
-      activeImage.style.borderRadius = "";
-      activeImage.style.clipPath = "";
-      activeImage.style.transform = "";
-      exitCropMode();
-      updateImageStylePanel(activeImage);
-    });
-    cell.appendChild(btn);
-  }
-
-  // src/toolbar.js
-  var rightZoneEl = null;
-  var textPanelEl = null;
-  var contextHideElements = [];
-  function showRightPanel(panelName) {
-    if (!rightZoneEl)
-      return;
-    rightZoneEl.querySelectorAll(".toolbar-panel").forEach((panel) => {
-      panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? "" : "none";
-    });
-    const isContext = panelName !== "default";
-    contextHideElements.forEach((el) => {
-      el.style.display = isContext ? "none" : "";
-    });
-  }
-  function createFloatingToolbar() {
-    if (document.getElementById("editable-toolbar")) {
-      return document.getElementById("editable-toolbar");
-    }
-    const toolbar = document.createElement("div");
-    toolbar.id = "editable-toolbar";
-    toolbar.className = "editable-toolbar";
-    toolbar.setAttribute("role", "toolbar");
-    toolbar.setAttribute("aria-label", "Editable tools");
-    const leftZone = document.createElement("div");
-    leftZone.className = "editable-toolbar-left";
-    const leftButtonStack = document.createElement("div");
-    leftButtonStack.className = "editable-toolbar-button-stack";
-    const unstackedButtons = [];
-    ToolbarRegistry.getActionsForZone("left").forEach((action) => {
-      const btn = action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action);
-      if (action.stacked === false) {
-        unstackedButtons.push({ btn, action });
-      } else {
-        leftButtonStack.appendChild(btn);
-      }
-    });
-    contextHideElements.push(leftButtonStack);
-    leftZone.appendChild(leftButtonStack);
-    unstackedButtons.forEach(({ btn, action }) => {
-      leftZone.appendChild(btn);
-      if (action.hideOnContext)
-        contextHideElements.push(btn);
-    });
-    toolbar.appendChild(leftZone);
-    const rightZone = document.createElement("div");
-    rightZone.className = "editable-toolbar-right";
-    rightZoneEl = rightZone;
-    const defaultPanel = document.createElement("div");
-    defaultPanel.className = "toolbar-panel toolbar-panel-default";
-    ToolbarRegistry.getActionsForZone("right").forEach((action) => {
-      defaultPanel.appendChild(
-        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
-      );
-    });
-    rightZone.appendChild(defaultPanel);
-    const arrowPanel = document.createElement("div");
-    arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
-    arrowPanel.style.display = "none";
-    rightZone.appendChild(arrowPanel);
-    const imagePanel = document.createElement("div");
-    imagePanel.className = "toolbar-panel toolbar-panel-image";
-    imagePanel.style.display = "none";
-    imagePanel.appendChild(createImageStyleControls());
-    rightZone.appendChild(imagePanel);
-    const textPanel = document.createElement("div");
-    textPanel.className = "toolbar-panel toolbar-panel-text";
-    textPanel.style.display = "none";
-    rightZone.appendChild(textPanel);
-    textPanelEl = textPanel;
-    const modifyPanel = document.createElement("div");
-    modifyPanel.className = "toolbar-panel toolbar-panel-modify";
-    modifyPanel.style.display = "none";
-    rightZone.appendChild(modifyPanel);
-    toolbar.appendChild(rightZone);
-    document.body.appendChild(toolbar);
-    document.documentElement.classList.add("has-editable-toolbar");
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event("resize"));
-    });
-    return toolbar;
-  }
-
-  // src/registries.js
-  var ControlRegistry = {
-    /** @type {Map<string, Object>} Registered controls by name */
-    controls: /* @__PURE__ */ new Map(),
-    /**
-     * Register a new control.
-     * @param {string} name - Unique control name
-     * @param {Object} config - Control configuration
-     * @param {string} config.icon - Button text/icon
-     * @param {string} config.ariaLabel - Accessibility label
-     * @param {string} config.title - Tooltip text
-     * @param {string} [config.className] - Additional CSS class
-     * @param {string[]} config.appliesTo - Element types this control applies to
-     * @param {Function} config.onClick - Click handler (element, btn, event)
-     */
-    register(name, config4) {
-      this.controls.set(name, { name, ...config4 });
-    },
-    /**
-     * Get controls applicable to an element type.
-     * @param {string} elementType - Element type ("img" or "div")
-     * @returns {Object[]} Array of control configs
-     */
-    getControlsFor(elementType) {
-      return [...this.controls.values()].filter(
-        (c) => c.appliesTo.includes(elementType)
-      );
-    },
-    /**
-     * Create a button element from a control config.
-     * @param {Object} config - Control configuration
-     * @param {HTMLElement} element - The editable element
-     * @returns {HTMLButtonElement} The created button
-     */
-    createButton(config4, element) {
-      const btn = createButton(config4.icon, config4.className || "");
-      btn.setAttribute("aria-label", config4.ariaLabel);
-      btn.title = config4.title;
-      if (config4.toggle)
-        btn.setAttribute("aria-pressed", "false");
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        config4.onClick(element, btn, e);
-      });
-      return btn;
-    }
-  };
-  ControlRegistry.register("decreaseFont", {
-    icon: "A-",
-    ariaLabel: "Decrease font size",
-    title: "Decrease font size",
-    className: "editable-button-font editable-button-decrease",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      changeFontSize(element, -CONFIG.FONT_SIZE_STEP, editableRegistry);
-    }
-  });
-  ControlRegistry.register("increaseFont", {
-    icon: "A+",
-    ariaLabel: "Increase font size",
-    title: "Increase font size",
-    className: "editable-button-font editable-button-increase",
-    appliesTo: ["div"],
-    onClick: (element) => {
-      pushUndoState();
-      changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
-    }
-  });
-  for (const [name, icon, label, value] of [
-    ["alignLeft", "\u21E4", "Left", "left"],
-    ["alignCenter", "\u21D4", "Center", "center"],
-    ["alignRight", "\u21E5", "Right", "right"]
-  ]) {
-    ControlRegistry.register(`align${label}`, {
-      icon,
-      ariaLabel: `Align text ${value}`,
-      title: `Align ${label}`,
-      className: "editable-button-align",
-      appliesTo: ["div"],
-      onClick: (element) => {
-        pushUndoState();
-        const editableElt = editableRegistry.get(element);
-        if (editableElt) {
-          editableElt.setState({ textAlign: value });
-          editableElt.syncToDOM();
-        }
-      }
-    });
-  }
-  ControlRegistry.register("editMode", {
-    icon: "\u270E",
-    ariaLabel: "Toggle edit mode",
-    title: "Edit Text",
-    className: "editable-button-edit",
-    toggle: true,
-    appliesTo: ["div"],
-    onClick: (element, btn) => {
-      const isEditing = btn.classList.contains("active");
-      const quillData = quillInstances.get(element);
-      const textPanel = document.querySelector(".toolbar-panel-text");
-      if (!isEditing) {
-        if (quillData) {
-          if (quillData.toolbarContainer && textPanel) {
-            textPanel.appendChild(quillData.toolbarContainer);
-          }
-          quillData.isEditing = true;
-          quillData.quill.enable(true);
-          quillData.quill.focus();
-        }
-        showRightPanel("text");
-        btn.classList.add("active");
-        btn.setAttribute("aria-pressed", "true");
-        btn.title = "Exit Edit Mode";
-      } else {
-        if (quillData) {
-          if (quillData.toolbarContainer) {
-            element.insertBefore(quillData.toolbarContainer, element.firstChild);
-          }
-          quillData.isEditing = false;
-          quillData.quill.enable(false);
-        }
-        showRightPanel("default");
-        btn.classList.remove("active");
-        btn.setAttribute("aria-pressed", "false");
-        btn.title = "Edit Text";
-        window.getSelection().removeAllRanges();
-      }
-    }
-  });
-  var NewElementRegistry = {
-    /** @type {Array<{element: HTMLElement, slideIndex: number, content: string, newSlideRef: Object|null}>} */
-    newDivs: [],
-    /** @type {Array<{element: HTMLElement, afterSlideIndex: number, insertAfterNewSlide: Object|null, insertionOrder: number}>} */
-    newSlides: [],
-    /** @type {Array<Object>} Arrow data objects */
-    newArrows: [],
-    /**
-     * Add a new text div to tracking.
-     * @param {HTMLElement} div - The div element
-     * @param {number} slideIndex - Index of the slide containing the div
-     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
-     */
-    addDiv(div, slideIndex, newSlideRef = null) {
-      this.newDivs.push({
-        element: div,
-        slideIndex,
-        content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
-        newSlideRef
-      });
-    },
-    /**
-     * Add a new slide to tracking.
-     * @param {HTMLElement} slide - The slide section element
-     * @param {number} afterSlideIndex - Original slide index to insert after
-     * @param {Object|null} [insertAfterNewSlide=null] - Parent new slide for chained insertions
-     */
-    addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
-      this.newSlides.push({
-        element: slide,
-        afterSlideIndex,
-        insertAfterNewSlide,
-        insertionOrder: this.newSlides.length
-      });
-    },
-    /**
-     * Add a new arrow to tracking.
-     * Stores reference directly so drag updates are reflected.
-     * @param {Object} arrowData - Arrow data object
-     * @param {number} slideIndex - Index of the slide containing the arrow
-     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
-     */
-    addArrow(arrowData, slideIndex, newSlideRef = null) {
-      arrowData.slideIndex = slideIndex;
-      arrowData.newSlideRef = newSlideRef;
-      this.newArrows.push(arrowData);
-    },
-    /**
-     * Count new slides inserted before a given index (for offset calculation).
-     * @param {number} index - The slide index
-     * @returns {number} Count of new slides before this index
-     */
-    countNewSlidesBefore(index) {
-      return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
-    },
-    /**
-     * Clear all tracked elements (e.g., after save).
-     */
-    clear() {
-      this.newDivs = [];
-      this.newSlides = [];
-      this.newArrows = [];
-    },
-    /**
-     * Check if there are any new elements tracked.
-     * @returns {boolean} True if any new elements exist
-     */
-    hasNewElements() {
-      return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
-    }
-  };
-  if (typeof document !== "undefined") {
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest(".editable-toolbar-submenu-wrapper")) {
-        document.querySelectorAll(".editable-toolbar-submenu.open").forEach((menu) => {
-          menu.classList.remove("open");
-          const btn = menu.previousElementSibling;
-          if (btn)
-            btn.setAttribute("aria-expanded", "false");
-        });
-      }
-    });
-  }
-  function setButtonContent(btn, icon, label) {
-    const iconSpan = document.createElement("span");
-    iconSpan.className = "toolbar-icon";
-    iconSpan.textContent = icon;
-    const labelSpan = document.createElement("span");
-    labelSpan.className = "toolbar-label";
-    labelSpan.textContent = label;
-    btn.appendChild(iconSpan);
-    btn.appendChild(labelSpan);
-  }
-  var ToolbarRegistry = {
-    /** @type {Map<string, Object>} Registered actions by name */
-    actions: /* @__PURE__ */ new Map(),
-    /**
-     * Register a toolbar action.
-     * @param {string} name - Unique action name
-     * @param {Object} config - Action configuration
-     * @param {string} config.icon - Button icon
-     * @param {string} config.label - Button label
-     * @param {string} config.title - Tooltip text
-     * @param {string} [config.className] - Additional CSS class
-     * @param {Function} [config.onClick] - Click handler
-     * @param {Array} [config.submenu] - Submenu items for dropdown
-     */
-    register(name, config4) {
-      this.actions.set(name, { name, ...config4 });
-    },
-    /**
-     * Get all registered actions.
-     * @returns {Object[]} Array of action configs
-     */
-    getActions() {
-      return [...this.actions.values()];
-    },
-    /**
-     * Get registered actions for a specific zone.
-     * @param {string} zone - Zone name ('left' or 'right')
-     * @returns {Object[]} Array of action configs for that zone
-     */
-    getActionsForZone(zone) {
-      return [...this.actions.values()].filter((a) => a.zone === zone);
-    },
-    /**
-     * Create a button element from an action config.
-     * @param {Object} config - Action configuration
-     * @returns {HTMLButtonElement} The created button
-     */
-    createButton(config4) {
-      const btn = document.createElement("button");
-      btn.className = "editable-toolbar-button " + (config4.className || "");
-      btn.setAttribute("aria-label", config4.label);
-      btn.title = config4.title;
-      setButtonContent(btn, config4.icon, config4.label);
-      if (config4.disabled) {
-        btn.disabled = true;
-        btn.classList.add("toolbar-button-disabled");
-      }
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!config4.disabled)
-          config4.onClick(e);
-      });
-      return btn;
-    },
-    /**
-     * Create a button with dropdown submenu.
-     * @param {Object} config - Action configuration with submenu array
-     * @returns {HTMLDivElement} Wrapper containing button and submenu
-     */
-    createSubmenuButton(config4) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "editable-toolbar-submenu-wrapper";
-      const btn = document.createElement("button");
-      btn.className = "editable-toolbar-button " + (config4.className || "");
-      btn.setAttribute("aria-label", config4.label);
-      btn.setAttribute("aria-haspopup", "true");
-      btn.setAttribute("aria-expanded", "false");
-      btn.title = config4.title;
-      setButtonContent(btn, config4.icon, config4.label);
-      const submenu = document.createElement("div");
-      submenu.className = "editable-toolbar-submenu";
-      submenu.setAttribute("role", "menu");
-      config4.submenu.forEach((itemConfig) => {
-        const item = document.createElement("button");
-        item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
-        item.setAttribute("role", "menuitem");
-        item.title = itemConfig.title;
-        setButtonContent(item, itemConfig.icon, itemConfig.label);
-        item.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          itemConfig.onClick(e);
-          submenu.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
-        });
-        submenu.appendChild(item);
-      });
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const isOpen = submenu.classList.toggle("open");
-        btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      });
-      wrapper.appendChild(btn);
-      wrapper.appendChild(submenu);
-      return wrapper;
-    }
-  };
-
-  // src/undo.js
-  var undoStack = [];
-  var redoStack = [];
-  var restoreArrowDOMFn = null;
-  function registerRestoreArrowDOM(fn) {
-    restoreArrowDOMFn = fn;
-  }
-  function captureAllState() {
-    const snapshots = [];
-    for (const [element, editableElt] of editableRegistry) {
-      editableElt.syncFromDOM();
-      snapshots.push({
-        element,
-        state: { ...editableElt.state }
-      });
-    }
-    return snapshots;
-  }
-  var ARROW_STATE_KEYS = [
-    "fromX",
-    "fromY",
-    "toX",
-    "toY",
-    "control1X",
-    "control1Y",
-    "control2X",
-    "control2Y",
-    "curveMode",
-    "color",
-    "width",
-    "head",
-    "dash",
-    "line",
-    "opacity"
-  ];
-  function captureArrowState() {
-    const snapshots = [];
-    for (const arrowData of NewElementRegistry.newArrows) {
-      const state = {};
-      for (const key of ARROW_STATE_KEYS) {
-        state[key] = arrowData[key];
-      }
-      snapshots.push({
-        arrowData,
-        state
-      });
-    }
-    return snapshots;
-  }
-  function restoreArrowState(snapshots) {
-    for (const snapshot of snapshots) {
-      const arrowData = snapshot.arrowData;
-      for (const key of ARROW_STATE_KEYS) {
-        arrowData[key] = snapshot.state[key];
-      }
-    }
-    if (restoreArrowDOMFn)
-      restoreArrowDOMFn(snapshots);
-  }
-  function restoreState(snapshots) {
-    for (const snapshot of snapshots) {
-      const editableElt = editableRegistry.get(snapshot.element);
-      if (editableElt) {
-        editableElt.setState(snapshot.state);
-      }
-    }
-  }
-  function pushUndoState() {
-    const state = {
-      elements: captureAllState(),
-      arrows: captureArrowState()
-    };
-    undoStack.push(state);
-    if (undoStack.length > CONFIG.MAX_UNDO_STACK_SIZE) {
-      undoStack.shift();
-    }
-    redoStack.length = 0;
-  }
-  function undo() {
-    if (undoStack.length === 0)
-      return false;
-    const currentState = {
-      elements: captureAllState(),
-      arrows: captureArrowState()
-    };
-    redoStack.push(currentState);
-    const previousState = undoStack.pop();
-    restoreState(previousState.elements);
-    restoreArrowState(previousState.arrows);
-    return true;
-  }
-  function redo() {
-    if (redoStack.length === 0)
-      return false;
-    const currentState = {
-      elements: captureAllState(),
-      arrows: captureArrowState()
-    };
-    undoStack.push(currentState);
-    const redoState = redoStack.pop();
-    restoreState(redoState.elements);
-    restoreArrowState(redoState.arrows);
-    return true;
-  }
-  function canUndo() {
-    return undoStack.length > 0;
-  }
-  function canRedo() {
-    return redoStack.length > 0;
-  }
-  function setupUndoRedoKeyboard() {
-    document.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        if (document.activeElement.contentEditable === "true")
-          return;
-        e.preventDefault();
-        if (undo()) {
-          debug("Undo performed");
-        }
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "z" && e.shiftKey)) {
-        if (document.activeElement.contentEditable === "true")
-          return;
-        e.preventDefault();
-        if (redo()) {
-          debug("Redo performed");
-        }
-        return;
-      }
-    });
-  }
-
   // src/arrows.js
   var arrowExtensionWarningShown = false;
   function hasArrowExtension() {
@@ -13432,6 +12496,9 @@ ${escapeText(this.code(index, length))}
       updateArrowActiveState(arrowData);
     }
     updateArrowStylePanel(arrowData);
+  }
+  function getActiveArrow() {
+    return activeArrow;
   }
   function createArrowStyleControls() {
     const container = document.createElement("div");
@@ -14740,6 +13807,942 @@ ${escapeText(this.code(index, length))}
     updateSmoothToggleInToolbar(arrowData);
   }
 
+  // src/images.js
+  var activeImage = null;
+  var replaceWarningEl = null;
+  function showReplaceWarning(message, anchorEl) {
+    if (replaceWarningEl)
+      replaceWarningEl.remove();
+    const popup = document.createElement("div");
+    popup.className = "image-replace-warning";
+    popup.setAttribute("role", "alert");
+    popup.setAttribute("aria-live", "assertive");
+    popup.textContent = `\u26A0 ${message}`;
+    document.body.appendChild(popup);
+    replaceWarningEl = popup;
+    const rect = anchorEl.closest("#editable-toolbar")?.getBoundingClientRect() ?? anchorEl.getBoundingClientRect();
+    popup.style.top = `${rect.bottom + 6}px`;
+    popup.style.left = "50%";
+    popup.style.transform = "translateX(-50%)";
+    const timer = setTimeout(() => {
+      popup.remove();
+      if (replaceWarningEl === popup)
+        replaceWarningEl = null;
+    }, 4e3);
+    popup.addEventListener("click", () => {
+      clearTimeout(timer);
+      popup.remove();
+      if (replaceWarningEl === popup)
+        replaceWarningEl = null;
+    }, { once: true });
+  }
+  var imageControlRefs = {
+    opacitySlider: null,
+    opacityLabel: null,
+    borderRadiusInput: null,
+    cropBtn: null,
+    flipHBtn: null,
+    flipVBtn: null
+  };
+  var cropModeActive = false;
+  function withActiveImage(fn) {
+    if (!activeImage)
+      return;
+    const el = editableRegistry.get(activeImage);
+    if (!el)
+      return;
+    fn(el);
+  }
+  var cropHandleListeners = /* @__PURE__ */ new Map();
+  registerDeselectImage(() => setActiveImage(null));
+  function setActiveImage(imgEl) {
+    if (activeImage && activeImage !== imgEl) {
+      exitCropMode();
+    }
+    if (imgEl && imgEl !== activeImage) {
+      deselectArrow();
+    }
+    activeImage = imgEl;
+    if (imgEl) {
+      updateImageStylePanel(imgEl);
+      showRightPanel("image");
+    } else if (!getActiveArrow()) {
+      showRightPanel("default");
+    }
+  }
+  function updateImageStylePanel(imgEl) {
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const s = editableEl.state;
+    if (imageControlRefs.opacitySlider) {
+      imageControlRefs.opacitySlider.value = s.opacity ?? 100;
+      imageControlRefs.opacityLabel.textContent = `${s.opacity ?? 100}%`;
+    }
+    if (imageControlRefs.borderRadiusInput) {
+      imageControlRefs.borderRadiusInput.value = s.borderRadius ?? 0;
+    }
+    if (imageControlRefs.cropBtn) {
+      imageControlRefs.cropBtn.classList.toggle("active", cropModeActive);
+    }
+    if (imageControlRefs.flipHBtn) {
+      imageControlRefs.flipHBtn.classList.toggle("active", !!s.flipH);
+    }
+    if (imageControlRefs.flipVBtn) {
+      imageControlRefs.flipVBtn.classList.toggle("active", !!s.flipV);
+    }
+  }
+  function applyTransform(imgEl) {
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const s = editableEl.state;
+    const scaleX = s.flipH ? -1 : 1;
+    const scaleY = s.flipV ? -1 : 1;
+    imgEl.style.transform = scaleX !== 1 || scaleY !== 1 ? `scaleX(${scaleX}) scaleY(${scaleY})` : "";
+  }
+  function applyCrop(imgEl) {
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const { cropTop: ct, cropRight: cr, cropBottom: cb, cropLeft: cl } = editableEl.state;
+    imgEl.style.clipPath = ct || cr || cb || cl ? `inset(${ct}px ${cr}px ${cb}px ${cl}px)` : "";
+    if (cropModeActive && editableEl.container) {
+      const offset = -6;
+      editableEl.getResizeHandles().forEach((handle) => {
+        const pos = handle.dataset.position;
+        handle.style.top = pos.includes("n") ? `${ct + offset}px` : "";
+        handle.style.bottom = pos.includes("s") ? `${cb + offset}px` : "";
+        handle.style.left = pos.includes("w") ? `${cl + offset}px` : "";
+        handle.style.right = pos.includes("e") ? `${cr + offset}px` : "";
+      });
+    }
+  }
+  function enterCropMode() {
+    if (!activeImage)
+      return;
+    cropModeActive = true;
+    if (imageControlRefs.cropBtn)
+      imageControlRefs.cropBtn.classList.add("active");
+    const editableEl = editableRegistry.get(activeImage);
+    if (!editableEl?.container)
+      return;
+    editableEl.container.classList.add("crop-mode");
+    applyCrop(activeImage);
+    editableEl.getResizeHandles().forEach((handle) => {
+      const listener = (e) => onCropHandleMousedown(e, activeImage);
+      handle.addEventListener("mousedown", listener, true);
+      cropHandleListeners.set(handle, listener);
+    });
+  }
+  function exitCropMode() {
+    cropModeActive = false;
+    if (imageControlRefs.cropBtn)
+      imageControlRefs.cropBtn.classList.remove("active");
+    cropHandleListeners.forEach((listener, handle) => {
+      handle.removeEventListener("mousedown", listener, true);
+    });
+    cropHandleListeners.clear();
+    if (activeImage) {
+      const editableEl = editableRegistry.get(activeImage);
+      if (editableEl?.container) {
+        editableEl.container.classList.remove("crop-mode");
+        editableEl.getResizeHandles().forEach((handle) => {
+          handle.style.top = "";
+          handle.style.bottom = "";
+          handle.style.left = "";
+          handle.style.right = "";
+        });
+      }
+    }
+  }
+  function onCropHandleMousedown(e, imgEl) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    pushUndoState();
+    const pos = e.currentTarget.dataset.position;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const editableEl = editableRegistry.get(imgEl);
+    if (!editableEl)
+      return;
+    const startCrop = {
+      top: editableEl.state.cropTop,
+      right: editableEl.state.cropRight,
+      bottom: editableEl.state.cropBottom,
+      left: editableEl.state.cropLeft
+    };
+    const rect = imgEl.getBoundingClientRect();
+    const slideScale = rect.width > 0 ? rect.width / imgEl.offsetWidth : 1;
+    function onMove(me) {
+      const el = editableRegistry.get(imgEl);
+      if (!el)
+        return;
+      const dx = (me.clientX - startX) / slideScale;
+      const dy = (me.clientY - startY) / slideScale;
+      const maxW = imgEl.offsetWidth / 2;
+      const maxH = imgEl.offsetHeight / 2;
+      if (pos.includes("n"))
+        el.state.cropTop = Math.max(0, Math.min(maxH, startCrop.top + dy));
+      if (pos.includes("s"))
+        el.state.cropBottom = Math.max(0, Math.min(maxH, startCrop.bottom - dy));
+      if (pos.includes("w"))
+        el.state.cropLeft = Math.max(0, Math.min(maxW, startCrop.left + dx));
+      if (pos.includes("e"))
+        el.state.cropRight = Math.max(0, Math.min(maxW, startCrop.right - dx));
+      applyCrop(imgEl);
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+  function createImageStyleControls() {
+    const container = document.createElement("div");
+    container.className = "image-style-controls";
+    const centerWrap = document.createElement("div");
+    centerWrap.className = "image-center-wrap";
+    const controlsWrap = document.createElement("div");
+    controlsWrap.className = "image-controls-wrap";
+    function addCell(labelText) {
+      const label = document.createElement("span");
+      label.className = "image-ctrl-label";
+      label.textContent = labelText;
+      controlsWrap.appendChild(label);
+      const cell = document.createElement("div");
+      cell.className = "image-ctrl-cell";
+      controlsWrap.appendChild(cell);
+      return cell;
+    }
+    buildOpacityControl(addCell);
+    buildBorderRadiusControl(addCell);
+    buildCropControl(addCell);
+    buildFlipControl(addCell);
+    buildReplaceControl(addCell);
+    buildResetControl(addCell);
+    centerWrap.appendChild(controlsWrap);
+    container.appendChild(centerWrap);
+    return container;
+  }
+  function buildOpacityControl(addCell) {
+    const cell = addCell("Opacity");
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "0";
+    slider.max = "100";
+    slider.step = "1";
+    slider.value = "100";
+    slider.className = "image-toolbar-opacity";
+    slider.title = "Opacity";
+    const label = document.createElement("span");
+    label.className = "image-opacity-label";
+    label.style.display = "none";
+    slider.addEventListener("mousedown", () => {
+      if (activeImage)
+        pushUndoState();
+    });
+    slider.addEventListener("input", () => {
+      const val = parseInt(slider.value, 10);
+      label.textContent = `${val}%`;
+      withActiveImage((el) => el.setState({ opacity: val }));
+    });
+    imageControlRefs.opacitySlider = slider;
+    imageControlRefs.opacityLabel = label;
+    cell.appendChild(slider);
+    cell.appendChild(label);
+  }
+  function buildBorderRadiusControl(addCell) {
+    const cell = addCell("Radius");
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.step = "1";
+    input.value = "0";
+    input.className = "image-toolbar-btn image-toolbar-radius";
+    input.title = "Border radius (px)";
+    input.addEventListener("focus", () => {
+      if (activeImage)
+        pushUndoState();
+    });
+    input.addEventListener("input", () => {
+      const val = Math.max(0, parseInt(input.value, 10) || 0);
+      withActiveImage((el) => el.setState({ borderRadius: val }));
+    });
+    imageControlRefs.borderRadiusInput = input;
+    cell.appendChild(input);
+  }
+  function buildCropControl(addCell) {
+    const cell = addCell("Crop");
+    const btn = document.createElement("button");
+    btn.className = "image-toolbar-btn";
+    btn.textContent = "\u2702";
+    btn.title = "Toggle crop mode \u2014 drag edge handles to crop";
+    btn.addEventListener("click", () => {
+      if (!activeImage)
+        return;
+      if (cropModeActive)
+        exitCropMode();
+      else
+        enterCropMode();
+    });
+    imageControlRefs.cropBtn = btn;
+    cell.appendChild(btn);
+  }
+  function buildFlipControl(addCell) {
+    const cell = addCell("Flip");
+    const wrap = document.createElement("div");
+    wrap.className = "image-btn-group";
+    const flipHBtn = document.createElement("button");
+    flipHBtn.className = "image-toolbar-btn";
+    flipHBtn.textContent = "\u21C6";
+    flipHBtn.title = "Flip horizontal";
+    flipHBtn.addEventListener("click", () => {
+      pushUndoState();
+      withActiveImage((el) => {
+        el.state.flipH = !el.state.flipH;
+        flipHBtn.classList.toggle("active", el.state.flipH);
+        applyTransform(activeImage);
+      });
+    });
+    imageControlRefs.flipHBtn = flipHBtn;
+    const flipVBtn = document.createElement("button");
+    flipVBtn.className = "image-toolbar-btn";
+    flipVBtn.textContent = "\u21C5";
+    flipVBtn.title = "Flip vertical";
+    flipVBtn.addEventListener("click", () => {
+      pushUndoState();
+      withActiveImage((el) => {
+        el.state.flipV = !el.state.flipV;
+        flipVBtn.classList.toggle("active", el.state.flipV);
+        applyTransform(activeImage);
+      });
+    });
+    imageControlRefs.flipVBtn = flipVBtn;
+    wrap.appendChild(flipHBtn);
+    wrap.appendChild(flipVBtn);
+    cell.appendChild(wrap);
+  }
+  function buildReplaceControl(addCell) {
+    const cell = addCell("Replace");
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none";
+    const btn = document.createElement("button");
+    btn.className = "image-toolbar-btn";
+    btn.textContent = "Replace";
+    btn.title = "Replace image source";
+    btn.addEventListener("click", () => {
+      if (activeImage)
+        fileInput.click();
+    });
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file || !activeImage)
+        return;
+      pushUndoState();
+      const el = editableRegistry.get(activeImage);
+      if (el)
+        el.state.src = file.name;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        const tmp = new Image();
+        tmp.onload = () => {
+          const img = activeImage;
+          const imgEl = editableRegistry.get(img);
+          if (!imgEl)
+            return;
+          const newHeight = Math.round(imgEl.state.width * tmp.naturalHeight / tmp.naturalWidth);
+          imgEl.state.height = newHeight;
+          img.style.height = `${newHeight}px`;
+          if (imgEl.container)
+            imgEl.container.style.height = `${newHeight}px`;
+        };
+        tmp.src = dataUrl;
+        activeImage.src = dataUrl;
+        showReplaceWarning(`Place "${file.name}" next to your QMD file.`, btn);
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = "";
+    });
+    cell.appendChild(btn);
+    cell.appendChild(fileInput);
+  }
+  function buildResetControl(addCell) {
+    const cell = addCell("");
+    const btn = document.createElement("button");
+    btn.className = "image-toolbar-btn image-toolbar-reset";
+    btn.textContent = "Reset";
+    btn.title = "Reset image style properties";
+    btn.addEventListener("click", () => {
+      if (!activeImage)
+        return;
+      pushUndoState();
+      const el = editableRegistry.get(activeImage);
+      if (!el)
+        return;
+      Object.assign(el.state, {
+        opacity: 100,
+        borderRadius: 0,
+        cropTop: 0,
+        cropRight: 0,
+        cropBottom: 0,
+        cropLeft: 0,
+        flipH: false,
+        flipV: false
+      });
+      activeImage.style.opacity = "";
+      activeImage.style.borderRadius = "";
+      activeImage.style.clipPath = "";
+      activeImage.style.transform = "";
+      exitCropMode();
+      updateImageStylePanel(activeImage);
+    });
+    cell.appendChild(btn);
+  }
+
+  // src/toolbar.js
+  var rightZoneEl = null;
+  var textPanelEl = null;
+  var contextHideElements = [];
+  function showRightPanel(panelName) {
+    if (!rightZoneEl)
+      return;
+    rightZoneEl.querySelectorAll(".toolbar-panel").forEach((panel) => {
+      panel.style.display = panel.classList.contains(`toolbar-panel-${panelName}`) ? "" : "none";
+    });
+    const isContext = panelName !== "default";
+    contextHideElements.forEach((el) => {
+      el.style.display = isContext ? "none" : "";
+    });
+  }
+  function createFloatingToolbar() {
+    if (document.getElementById("editable-toolbar")) {
+      return document.getElementById("editable-toolbar");
+    }
+    const toolbar = document.createElement("div");
+    toolbar.id = "editable-toolbar";
+    toolbar.className = "editable-toolbar";
+    toolbar.setAttribute("role", "toolbar");
+    toolbar.setAttribute("aria-label", "Editable tools");
+    const leftZone = document.createElement("div");
+    leftZone.className = "editable-toolbar-left";
+    const leftButtonStack = document.createElement("div");
+    leftButtonStack.className = "editable-toolbar-button-stack";
+    const unstackedButtons = [];
+    ToolbarRegistry.getActionsForZone("left").forEach((action) => {
+      const btn = action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action);
+      if (action.stacked === false) {
+        unstackedButtons.push({ btn, action });
+      } else {
+        leftButtonStack.appendChild(btn);
+      }
+    });
+    contextHideElements.push(leftButtonStack);
+    leftZone.appendChild(leftButtonStack);
+    unstackedButtons.forEach(({ btn, action }) => {
+      leftZone.appendChild(btn);
+      if (action.hideOnContext)
+        contextHideElements.push(btn);
+    });
+    toolbar.appendChild(leftZone);
+    const rightZone = document.createElement("div");
+    rightZone.className = "editable-toolbar-right";
+    rightZoneEl = rightZone;
+    const defaultPanel = document.createElement("div");
+    defaultPanel.className = "toolbar-panel toolbar-panel-default";
+    ToolbarRegistry.getActionsForZone("right").forEach((action) => {
+      defaultPanel.appendChild(
+        action.submenu ? ToolbarRegistry.createSubmenuButton(action) : ToolbarRegistry.createButton(action)
+      );
+    });
+    rightZone.appendChild(defaultPanel);
+    const arrowPanel = document.createElement("div");
+    arrowPanel.className = "toolbar-panel toolbar-panel-arrow";
+    arrowPanel.style.display = "none";
+    rightZone.appendChild(arrowPanel);
+    const imagePanel = document.createElement("div");
+    imagePanel.className = "toolbar-panel toolbar-panel-image";
+    imagePanel.style.display = "none";
+    imagePanel.appendChild(createImageStyleControls());
+    rightZone.appendChild(imagePanel);
+    const textPanel = document.createElement("div");
+    textPanel.className = "toolbar-panel toolbar-panel-text";
+    textPanel.style.display = "none";
+    rightZone.appendChild(textPanel);
+    textPanelEl = textPanel;
+    const modifyPanel = document.createElement("div");
+    modifyPanel.className = "toolbar-panel toolbar-panel-modify";
+    modifyPanel.style.display = "none";
+    rightZone.appendChild(modifyPanel);
+    toolbar.appendChild(rightZone);
+    document.body.appendChild(toolbar);
+    document.documentElement.classList.add("has-editable-toolbar");
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    return toolbar;
+  }
+
+  // src/registries.js
+  var ControlRegistry = {
+    /** @type {Map<string, Object>} Registered controls by name */
+    controls: /* @__PURE__ */ new Map(),
+    /**
+     * Register a new control.
+     * @param {string} name - Unique control name
+     * @param {Object} config - Control configuration
+     * @param {string} config.icon - Button text/icon
+     * @param {string} config.ariaLabel - Accessibility label
+     * @param {string} config.title - Tooltip text
+     * @param {string} [config.className] - Additional CSS class
+     * @param {string[]} config.appliesTo - Element types this control applies to
+     * @param {Function} config.onClick - Click handler (element, btn, event)
+     */
+    register(name, config4) {
+      this.controls.set(name, { name, ...config4 });
+    },
+    /**
+     * Get controls applicable to an element type.
+     * @param {string} elementType - Element type ("img" or "div")
+     * @returns {Object[]} Array of control configs
+     */
+    getControlsFor(elementType) {
+      return [...this.controls.values()].filter(
+        (c) => c.appliesTo.includes(elementType)
+      );
+    },
+    /**
+     * Create a button element from a control config.
+     * @param {Object} config - Control configuration
+     * @param {HTMLElement} element - The editable element
+     * @returns {HTMLButtonElement} The created button
+     */
+    createButton(config4, element) {
+      const btn = createButton(config4.icon, config4.className || "");
+      btn.setAttribute("aria-label", config4.ariaLabel);
+      btn.title = config4.title;
+      if (config4.toggle)
+        btn.setAttribute("aria-pressed", "false");
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        config4.onClick(element, btn, e);
+      });
+      return btn;
+    }
+  };
+  ControlRegistry.register("decreaseFont", {
+    icon: "A-",
+    ariaLabel: "Decrease font size",
+    title: "Decrease font size",
+    className: "editable-button-font editable-button-decrease",
+    appliesTo: ["div"],
+    onClick: (element) => {
+      pushUndoState();
+      changeFontSize(element, -CONFIG.FONT_SIZE_STEP, editableRegistry);
+    }
+  });
+  ControlRegistry.register("increaseFont", {
+    icon: "A+",
+    ariaLabel: "Increase font size",
+    title: "Increase font size",
+    className: "editable-button-font editable-button-increase",
+    appliesTo: ["div"],
+    onClick: (element) => {
+      pushUndoState();
+      changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
+    }
+  });
+  for (const [name, icon, label, value] of [
+    ["alignLeft", "\u21E4", "Left", "left"],
+    ["alignCenter", "\u21D4", "Center", "center"],
+    ["alignRight", "\u21E5", "Right", "right"]
+  ]) {
+    ControlRegistry.register(`align${label}`, {
+      icon,
+      ariaLabel: `Align text ${value}`,
+      title: `Align ${label}`,
+      className: "editable-button-align",
+      appliesTo: ["div"],
+      onClick: (element) => {
+        pushUndoState();
+        const editableElt = editableRegistry.get(element);
+        if (editableElt) {
+          editableElt.setState({ textAlign: value });
+          editableElt.syncToDOM();
+        }
+      }
+    });
+  }
+  ControlRegistry.register("editMode", {
+    icon: "\u270E",
+    ariaLabel: "Toggle edit mode",
+    title: "Edit Text",
+    className: "editable-button-edit",
+    toggle: true,
+    appliesTo: ["div"],
+    onClick: (element, btn) => {
+      const isEditing = btn.classList.contains("active");
+      const quillData = quillInstances.get(element);
+      const textPanel = document.querySelector(".toolbar-panel-text");
+      if (!isEditing) {
+        if (quillData) {
+          if (quillData.toolbarContainer && textPanel) {
+            textPanel.appendChild(quillData.toolbarContainer);
+          }
+          quillData.isEditing = true;
+          quillData.quill.enable(true);
+          quillData.quill.focus();
+        }
+        showRightPanel("text");
+        btn.classList.add("active");
+        btn.setAttribute("aria-pressed", "true");
+        btn.title = "Exit Edit Mode";
+      } else {
+        if (quillData) {
+          if (quillData.toolbarContainer) {
+            element.insertBefore(quillData.toolbarContainer, element.firstChild);
+          }
+          quillData.isEditing = false;
+          quillData.quill.enable(false);
+        }
+        showRightPanel("default");
+        btn.classList.remove("active");
+        btn.setAttribute("aria-pressed", "false");
+        btn.title = "Edit Text";
+        window.getSelection().removeAllRanges();
+      }
+    }
+  });
+  var NewElementRegistry = {
+    /** @type {Array<{element: HTMLElement, slideIndex: number, content: string, newSlideRef: Object|null}>} */
+    newDivs: [],
+    /** @type {Array<{element: HTMLElement, afterSlideIndex: number, insertAfterNewSlide: Object|null, insertionOrder: number}>} */
+    newSlides: [],
+    /** @type {Array<Object>} Arrow data objects */
+    newArrows: [],
+    /**
+     * Add a new text div to tracking.
+     * @param {HTMLElement} div - The div element
+     * @param {number} slideIndex - Index of the slide containing the div
+     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+     */
+    addDiv(div, slideIndex, newSlideRef = null) {
+      this.newDivs.push({
+        element: div,
+        slideIndex,
+        content: div.textContent || CONFIG.NEW_TEXT_CONTENT,
+        newSlideRef
+      });
+    },
+    /**
+     * Add a new slide to tracking.
+     * @param {HTMLElement} slide - The slide section element
+     * @param {number} afterSlideIndex - Original slide index to insert after
+     * @param {Object|null} [insertAfterNewSlide=null] - Parent new slide for chained insertions
+     */
+    addSlide(slide, afterSlideIndex, insertAfterNewSlide = null) {
+      this.newSlides.push({
+        element: slide,
+        afterSlideIndex,
+        insertAfterNewSlide,
+        insertionOrder: this.newSlides.length
+      });
+    },
+    /**
+     * Add a new arrow to tracking.
+     * Stores reference directly so drag updates are reflected.
+     * @param {Object} arrowData - Arrow data object
+     * @param {number} slideIndex - Index of the slide containing the arrow
+     * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+     */
+    addArrow(arrowData, slideIndex, newSlideRef = null) {
+      arrowData.slideIndex = slideIndex;
+      arrowData.newSlideRef = newSlideRef;
+      this.newArrows.push(arrowData);
+    },
+    /**
+     * Count new slides inserted before a given index (for offset calculation).
+     * @param {number} index - The slide index
+     * @returns {number} Count of new slides before this index
+     */
+    countNewSlidesBefore(index) {
+      return this.newSlides.filter((s) => s.afterSlideIndex < index).length;
+    },
+    /**
+     * Clear all tracked elements (e.g., after save).
+     */
+    clear() {
+      this.newDivs = [];
+      this.newSlides = [];
+      this.newArrows = [];
+    },
+    /**
+     * Check if there are any new elements tracked.
+     * @returns {boolean} True if any new elements exist
+     */
+    hasNewElements() {
+      return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
+    }
+  };
+  if (typeof document !== "undefined") {
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".editable-toolbar-submenu-wrapper")) {
+        document.querySelectorAll(".editable-toolbar-submenu.open").forEach((menu) => {
+          menu.classList.remove("open");
+          const btn = menu.previousElementSibling;
+          if (btn)
+            btn.setAttribute("aria-expanded", "false");
+        });
+      }
+    });
+  }
+  function setButtonContent(btn, icon, label) {
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "toolbar-icon";
+    iconSpan.textContent = icon;
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "toolbar-label";
+    labelSpan.textContent = label;
+    btn.appendChild(iconSpan);
+    btn.appendChild(labelSpan);
+  }
+  var ToolbarRegistry = {
+    /** @type {Map<string, Object>} Registered actions by name */
+    actions: /* @__PURE__ */ new Map(),
+    /**
+     * Register a toolbar action.
+     * @param {string} name - Unique action name
+     * @param {Object} config - Action configuration
+     * @param {string} config.icon - Button icon
+     * @param {string} config.label - Button label
+     * @param {string} config.title - Tooltip text
+     * @param {string} [config.className] - Additional CSS class
+     * @param {Function} [config.onClick] - Click handler
+     * @param {Array} [config.submenu] - Submenu items for dropdown
+     */
+    register(name, config4) {
+      this.actions.set(name, { name, ...config4 });
+    },
+    /**
+     * Get all registered actions.
+     * @returns {Object[]} Array of action configs
+     */
+    getActions() {
+      return [...this.actions.values()];
+    },
+    /**
+     * Get registered actions for a specific zone.
+     * @param {string} zone - Zone name ('left' or 'right')
+     * @returns {Object[]} Array of action configs for that zone
+     */
+    getActionsForZone(zone) {
+      return [...this.actions.values()].filter((a) => a.zone === zone);
+    },
+    /**
+     * Create a button element from an action config.
+     * @param {Object} config - Action configuration
+     * @returns {HTMLButtonElement} The created button
+     */
+    createButton(config4) {
+      const btn = document.createElement("button");
+      btn.className = "editable-toolbar-button " + (config4.className || "");
+      btn.setAttribute("aria-label", config4.label);
+      btn.title = config4.title;
+      setButtonContent(btn, config4.icon, config4.label);
+      if (config4.disabled) {
+        btn.disabled = true;
+        btn.classList.add("toolbar-button-disabled");
+      }
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!config4.disabled)
+          config4.onClick(e);
+      });
+      return btn;
+    },
+    /**
+     * Create a button with dropdown submenu.
+     * @param {Object} config - Action configuration with submenu array
+     * @returns {HTMLDivElement} Wrapper containing button and submenu
+     */
+    createSubmenuButton(config4) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "editable-toolbar-submenu-wrapper";
+      const btn = document.createElement("button");
+      btn.className = "editable-toolbar-button " + (config4.className || "");
+      btn.setAttribute("aria-label", config4.label);
+      btn.setAttribute("aria-haspopup", "true");
+      btn.setAttribute("aria-expanded", "false");
+      btn.title = config4.title;
+      setButtonContent(btn, config4.icon, config4.label);
+      const submenu = document.createElement("div");
+      submenu.className = "editable-toolbar-submenu";
+      submenu.setAttribute("role", "menu");
+      config4.submenu.forEach((itemConfig) => {
+        const item = document.createElement("button");
+        item.className = "editable-toolbar-submenu-item " + (itemConfig.className || "");
+        item.setAttribute("role", "menuitem");
+        item.title = itemConfig.title;
+        setButtonContent(item, itemConfig.icon, itemConfig.label);
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          itemConfig.onClick(e);
+          submenu.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+        });
+        submenu.appendChild(item);
+      });
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const isOpen = submenu.classList.toggle("open");
+        btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      });
+      wrapper.appendChild(btn);
+      wrapper.appendChild(submenu);
+      return wrapper;
+    }
+  };
+
+  // src/undo.js
+  var undoStack = [];
+  var redoStack = [];
+  var restoreArrowDOMFn = null;
+  function registerRestoreArrowDOM(fn) {
+    restoreArrowDOMFn = fn;
+  }
+  function captureAllState() {
+    const snapshots = [];
+    for (const [element, editableElt] of editableRegistry) {
+      editableElt.syncFromDOM();
+      snapshots.push({
+        element,
+        state: { ...editableElt.state }
+      });
+    }
+    return snapshots;
+  }
+  var ARROW_STATE_KEYS = [
+    "fromX",
+    "fromY",
+    "toX",
+    "toY",
+    "control1X",
+    "control1Y",
+    "control2X",
+    "control2Y",
+    "curveMode",
+    "color",
+    "width",
+    "head",
+    "dash",
+    "line",
+    "opacity"
+  ];
+  function captureArrowState() {
+    const snapshots = [];
+    for (const arrowData of NewElementRegistry.newArrows) {
+      const state = {};
+      for (const key of ARROW_STATE_KEYS) {
+        state[key] = arrowData[key];
+      }
+      snapshots.push({
+        arrowData,
+        state
+      });
+    }
+    return snapshots;
+  }
+  function restoreArrowState(snapshots) {
+    for (const snapshot of snapshots) {
+      const arrowData = snapshot.arrowData;
+      for (const key of ARROW_STATE_KEYS) {
+        arrowData[key] = snapshot.state[key];
+      }
+    }
+    if (restoreArrowDOMFn)
+      restoreArrowDOMFn(snapshots);
+  }
+  function restoreState(snapshots) {
+    for (const snapshot of snapshots) {
+      const editableElt = editableRegistry.get(snapshot.element);
+      if (editableElt) {
+        editableElt.setState(snapshot.state);
+      }
+    }
+  }
+  function pushUndoState() {
+    const state = {
+      elements: captureAllState(),
+      arrows: captureArrowState()
+    };
+    undoStack.push(state);
+    if (undoStack.length > CONFIG.MAX_UNDO_STACK_SIZE) {
+      undoStack.shift();
+    }
+    redoStack.length = 0;
+  }
+  function undo() {
+    if (undoStack.length === 0)
+      return false;
+    const currentState = {
+      elements: captureAllState(),
+      arrows: captureArrowState()
+    };
+    redoStack.push(currentState);
+    const previousState = undoStack.pop();
+    restoreState(previousState.elements);
+    restoreArrowState(previousState.arrows);
+    return true;
+  }
+  function redo() {
+    if (redoStack.length === 0)
+      return false;
+    const currentState = {
+      elements: captureAllState(),
+      arrows: captureArrowState()
+    };
+    undoStack.push(currentState);
+    const redoState = redoStack.pop();
+    restoreState(redoState.elements);
+    restoreArrowState(redoState.arrows);
+    return true;
+  }
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+  function canRedo() {
+    return redoStack.length > 0;
+  }
+  function setupUndoRedoKeyboard() {
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        if (document.activeElement.contentEditable === "true")
+          return;
+        e.preventDefault();
+        if (undo()) {
+          debug("Undo performed");
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "z" && e.shiftKey)) {
+        if (document.activeElement.contentEditable === "true")
+          return;
+        e.preventDefault();
+        if (redo()) {
+          debug("Redo performed");
+        }
+        return;
+      }
+    });
+  }
+
   // src/capabilities.js
   var Capabilities = {
     /**
@@ -15922,6 +15925,7 @@ ${fence}`;
       }
       return text;
     },
+    /** Return the label strings from all registered classifiers that have one. */
     getLabels() {
       return _classifiers.map((c) => c.label).filter(Boolean);
     }
@@ -15978,10 +15982,11 @@ ${fence}`;
       return { valid, warn };
     },
     activate(img) {
+      const originalSrc = getImgSrc(img);
       if (!img.getAttribute("src") && img.getAttribute("data-src")) {
         img.src = img.getAttribute("data-src");
       }
-      img.dataset.editableModifiedSrc = getImgSrc(img);
+      img.dataset.editableModifiedSrc = originalSrc;
       img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
       img.dataset.editableModified = "true";
       setupImageWhenReady(img);
@@ -16001,7 +16006,7 @@ ${fence}`;
         if (!editableRegistry.has(img))
           continue;
         const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = slideIndex + 1;
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
         if (chunkIndex >= chunks.length)
           continue;
         const key = `${chunkIndex}::${originalSrc}`;
@@ -16037,7 +16042,8 @@ ${fence}`;
     const top = s.top ? parseFloat(s.top) : null;
     const width = s.width ? parseFloat(s.width) : null;
     const height = s.height ? parseFloat(s.height) : null;
-    if (left === null || top === null || width === null || height === null) return null;
+    if (left === null || top === null || width === null || height === null)
+      return null;
     return { left, top, width, height };
   }
   function makeAbsoluteBlockRegex(left, top, width, height) {
@@ -16051,14 +16057,16 @@ ${fence}`;
     return new RegExp(`\\{${lookaheads}\\.absolute[^}]*\\}`, "g");
   }
   function absoluteDivInQmdSource(div, slideIndex) {
-    if (!window._input_file) return false;
+    if (!window._input_file)
+      return false;
     const pos = getAbsolutePosition(div);
-    if (!pos) return false;
+    if (!pos)
+      return false;
     const chunks = splitIntoSlideChunks(window._input_file);
-    const chunk = chunks[slideIndex + 1];
-    if (!chunk) return false;
-    const re = makeAbsoluteBlockRegex(pos.left, pos.top, pos.width, pos.height);
-    return re.test(chunk);
+    const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
+    if (!chunk)
+      return false;
+    return makeAbsoluteBlockRegex(pos.left, pos.top, pos.width, pos.height).test(chunk);
   }
   function waitForRegistryThenFixPosition(el, origLeft, origTop) {
     if (editableRegistry.has(el)) {
@@ -16075,13 +16083,17 @@ ${fence}`;
       const valid = [];
       const warn = [];
       for (const div of divs) {
-        if (editableRegistry.has(div)) continue;
-        if (div.classList.contains("editable-container")) continue;
-        if (div.classList.contains("editable-new")) continue;
-        if (div.classList.contains("editable")) continue;
+        if (editableRegistry.has(div))
+          continue;
+        if (div.classList.contains("editable-container"))
+          continue;
+        if (div.classList.contains("editable-new"))
+          continue;
+        if (div.classList.contains("editable"))
+          continue;
         const pos = getAbsolutePosition(div);
         if (!pos) {
-          warn.push({ el: div, reason: "No inline position — cannot match to source" });
+          warn.push({ el: div, reason: "No inline position \u2014 cannot match to source" });
           continue;
         }
         if (!absoluteDivInQmdSource(div, slideIndex)) {
@@ -16094,16 +16106,14 @@ ${fence}`;
     },
     activate(el) {
       const pos = getAbsolutePosition(el);
-      if (!pos) return;
+      if (!pos)
+        return;
       el.dataset.editableModified = "true";
       el.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
       el.dataset.editableModifiedAbsLeft = String(Math.round(pos.left));
       el.dataset.editableModifiedAbsTop = String(Math.round(pos.top));
       el.dataset.editableModifiedAbsWidth = String(Math.round(pos.width));
       el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
-      // Clear left/top before setup: setupEltStyles sets position:relative, so
-      // any remaining left/top inline styles would act as relative offsets and
-      // double-count the position when the container is placed.
       el.style.left = "";
       el.style.top = "";
       setupDivWhenReady(el);
@@ -16113,15 +16123,19 @@ ${fence}`;
       const divs = Array.from(
         document.querySelectorAll("div[data-editable-modified-abs-left]")
       );
-      if (divs.length === 0) return text;
+      if (divs.length === 0)
+        return text;
       const chunks = splitIntoSlideChunks(text);
       const groups = /* @__PURE__ */ new Map();
       for (const div of divs) {
-        if (!editableRegistry.has(div)) continue;
+        if (!editableRegistry.has(div))
+          continue;
         const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = slideIndex + 1;
-        if (chunkIndex >= chunks.length) continue;
-        if (!groups.has(chunkIndex)) groups.set(chunkIndex, []);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!groups.has(chunkIndex))
+          groups.set(chunkIndex, []);
         groups.get(chunkIndex).push(div);
       }
       for (const [chunkIndex, groupDivs] of groups) {
@@ -16141,9 +16155,10 @@ ${fence}`;
           const dims = editableRegistry.get(div).toDimensions();
           const replacement = serializeToQmd(dims);
           let occurrence = 0;
-          chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) => {
-            if (occurrence++ === targetOccurrence) return replacement;
-            return match;
+          chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match2) => {
+            if (occurrence++ === targetOccurrence)
+              return replacement;
+            return match2;
           });
         }
       }
@@ -16181,7 +16196,8 @@ ${fence}`;
   }
   function buildModifyPanel() {
     const panel = document.querySelector(".toolbar-panel-modify");
-    if (!panel) return;
+    if (!panel)
+      return;
     panel.innerHTML = "";
     const label = document.createElement("span");
     label.className = "modify-panel-label";
