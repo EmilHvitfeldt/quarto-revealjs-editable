@@ -199,7 +199,7 @@
   left: 0;
   right: 0;
   height: 100px;
-  z-index: 9999;
+  z-index: 1000001;
   background: var(--editable-toolbar-bg);
   box-shadow: var(--editable-toolbar-shadow);
   display: flex;
@@ -1597,7 +1597,7 @@ button.arrow-toolbar-smooth.active {
   font-size: 12px;
   padding: 6px 10px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  z-index: 99999;
+  z-index: 1000002;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1622,7 +1622,7 @@ button.arrow-toolbar-smooth.active {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100000;
+  z-index: 1000003;
 }
 
 .editable-modal {

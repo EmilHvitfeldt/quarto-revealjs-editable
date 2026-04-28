@@ -117,4 +117,22 @@ test.describe('Modify Mode — {.absolute} divs', () => {
     expect(matches).not.toBeNull();
     expect(matches.length).toBe(2);
   });
+
+  test('classify ignores .slide-background.present injected into .slides (quarto preview regression)', async ({ page }) => {
+    await setupPage(page, 'modify-mode-absolute.html');
+
+    // Simulate what quarto preview injects: a .slide-background div with .present
+    // inside .slides. Before the fix, querySelector('.slides .present') matched
+    // this element instead of the real slide, so no elements were classified.
+    await page.evaluate(() => {
+      const slides = document.querySelector('.reveal .slides');
+      const bg = document.createElement('div');
+      bg.className = 'slide-background present';
+      slides.prepend(bg);
+    });
+
+    await page.click('.toolbar-modify');
+    const validDivs = await page.locator('div.absolute.modify-mode-valid').count();
+    expect(validDivs).toBeGreaterThan(0);
+  });
 });
