@@ -457,6 +457,7 @@ run_render_test "Test 22: Arrows rendering" "arrows.qmd" "inject"
 echo ""
 echo "--- Modify Mode Tests ---"
 run_render_test "Test 23: Modify mode rendering" "modify-mode.qmd" "inject"
+run_render_test "Test 24: Modify mode absolute divs rendering" "modify-mode-absolute.qmd" "inject"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

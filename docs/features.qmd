@@ -25,14 +25,23 @@ New elements are marked with a dashed border to distinguish them from original c
 
 ## Modify Mode
 
-Not every image needs to be marked with `{.editable}` in advance. Click the **Modify** button in the menu bar to enter modify mode, then click any plain image on the slide to make it editable on the fly.
+Not every element needs to be marked with `{.editable}` in advance. Click the **Modify** button in the menu bar to enter modify mode, then click any highlighted element to make it editable on the fly.
 
-Images that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Images that cannot be modified (such as figures generated from code chunks) show no highlight. Click a highlighted image to activate it — it becomes a fully editable element with the same drag, resize, rotate, and image controls as any other editable image.
+Elements that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Click a highlighted element to activate it — it becomes a fully editable element supporting drag, resize, and rotate. Modify mode exits automatically after you activate an element.
 
-After saving, the image's position and size are written back to your `.qmd` file.
+After saving, the element's position and size are written back to your `.qmd` file.
+
+Currently supported element types:
+
+| Element | Source syntax | Operations |
+|---|---|---|
+| Plain image | `![](image.png)` | Move, resize, rotate |
+| `{.absolute}` div | `::: {.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate, text editing |
+
+Plain images are any image inserted directly in a slide without positional attributes. `{.absolute}` divs are elements that have already been positioned by a prior save — they carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
 
 ::: {.callout-note}
-Modify mode currently supports images inserted with `![](image.png)` syntax. Code-generated figures (e.g., plots from R or Python chunks) are excluded.
+Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode.
 :::
 
 ## Rich Text Editing

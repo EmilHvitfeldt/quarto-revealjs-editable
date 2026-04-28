@@ -14,7 +14,7 @@ import { addNewArrow } from './arrows.js';
 import { setActiveImage } from './images.js';
 import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
-import { toggleModifyMode, ModifyModeClassifier } from './modify-mode.js';
+import { toggleModifyMode, ModifyModeClassifier, enterModifyMode, exitModifyMode } from './modify-mode.js';
 import { addSaveMenuButton } from './menu.js';
 import {
   extractEditableEltDimensions,
@@ -65,7 +65,8 @@ ToolbarRegistry.register("modify", {
   label: "Modify",
   title: "Click an image to make it editable",
   className: "toolbar-modify",
-  zone: "right",
+  zone: "left",
+  stacked: false,
   onClick: () => toggleModifyMode(),
 });
 

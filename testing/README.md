@@ -47,6 +47,7 @@ npm run test:e2e
 | `colons-in-content.qmd`  | Content with colons (regex fix)           | -             |
 | `bare-syntax.qmd`        | Both `::: editable` and `::: {.editable}` | -             |
 | `space in name.qmd`      | Filenames with spaces handled correctly   | -             |
+| `modify-mode-absolute.qmd` | `{.absolute}` divs detectable in modify mode | #119       |
 
 ### What the shell tests check
 
@@ -73,7 +74,7 @@ npm run test:e2e
 
 ### E2E Test Files
 
-**Total: 241 E2E tests across 6 spec files**
+**Total: 247 E2E tests across 8 spec files**
 
 **`e2e/image-panel.spec.js`** - Image context panel (14 tests):
 
@@ -278,6 +279,27 @@ npm run test:e2e
 | Multi-line text preserved        | Newlines in content preserved                    |
 | New slide between middle slides  | Correct position in multi-slide document         |
 | Multiple text on different slides| Each text on correct corresponding slide         |
+
+**`e2e/modify-mode.spec.js`** - Modify Mode — images (5 tests):
+
+| Test | What it verifies |
+|---|---|
+| Modify button exists and is enabled | `.toolbar-modify` visible and not disabled |
+| Clicking Modify highlights valid images | `img.modify-mode-valid` count > 0 on current slide |
+| Clicking valid image makes it editable | `.editable-container img` appears; toolbar stays active |
+| Clicking Modify again exits modify mode | `modify-mode-valid` and `active` classes removed |
+| Modified image serializes to correct slide chunk | `{.absolute` only in activated slide's chunk |
+
+**`e2e/modify-mode-absolute.spec.js`** - Modify Mode — `{.absolute}` divs (6 tests):
+
+| Test | What it verifies |
+|---|---|
+| `div.absolute` elements get `modify-mode-valid` class | Count > 0 when modify mode entered |
+| Clicking valid `div.absolute` wraps it in editable-container | `.editable-container div.absolute` appears |
+| Container left/top matches original inline style | `container.style.left/top` ≈ original values after position fix |
+| Serialize updates the correct `{.absolute}` block | Slide 1 updated; slide 2 original values intact |
+| Two `div.absolute` on same slide both get `modify-mode-valid` | Count = 2 on slide 2 |
+| Both divs on slide 2 serialize independently | Two `{.absolute` blocks in slide 2 chunk after activating both |
 
 **`e2e/arrows.spec.js`** - Arrow Feature (92 tests):
 

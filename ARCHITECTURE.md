@@ -313,13 +313,16 @@ The built-in image classifier's `serialize()` uses `splitIntoSlideChunks()` to s
 
 **After saving**, the image's markdown gains `{.absolute ...}` attributes. On the next render it will be a regular absolute-positioned image (not re-editable without `{.editable}`).
 
+The `{.absolute}` div classifier works similarly but matches the source block by its original position values. At `activate()` time it captures the element's inline `left`/`top`/`width`/`height` into `data-editable-modified-abs-*` attributes before `setupDivWhenReady` overwrites the element's `position` style. `waitForRegistryThenFixPosition()` polls until the element appears in `editableRegistry`, then calls `setState({x, y})` to move the container to the correct position. During `serialize()`, `makeAbsoluteBlockRegex()` builds a regex with four lookaheads (one per original dimension value) to locate the matching `{.absolute ...}` block in the slide chunk regardless of attribute order. Occurrence counters handle the edge case of two divs with identical original positions on the same slide.
+
 ### Source Note on `data-src`
 
 Reveal.js lazy-loads images using `data-src` instead of `src`. `getImgSrc()` checks both attributes. When `activate()` is called on a lazy-loaded image, it sets `img.src` immediately so `setupImageWhenReady`'s load event fires before the poll times out.
 
 ### Current Limitations
 
-- Only `![](image.png)` images are supported (not divs or chunk-generated figures)
+- `{.absolute}` divs without inline `left`/`top`/`width`/`height` styles cannot be matched and show an amber warning ring
+- Chunk-generated figures, code outputs, and other element types are not yet supported
 - Vertical slides (`indexv`) are not yet supported
 - `---` slide separators are not yet supported as slide boundaries (only `##` headers)
 

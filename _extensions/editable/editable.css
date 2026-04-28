@@ -384,27 +384,62 @@
   opacity: 0.85;
 }
 
-/* Modify mode: valid images get a persistent green ring */
-.modify-mode img.modify-mode-valid {
+/* Modify mode: valid elements get a persistent green ring */
+.modify-mode img.modify-mode-valid,
+.modify-mode div.absolute.modify-mode-valid {
   box-shadow: var(--editable-modify-valid-shadow);
   cursor: pointer;
   transition: box-shadow var(--editable-transition);
 }
 
-.modify-mode img.modify-mode-valid:hover {
+.modify-mode img.modify-mode-valid:hover,
+.modify-mode div.absolute.modify-mode-valid:hover {
   box-shadow: var(--editable-modify-valid-hover-shadow);
 }
 
-/* Modify mode: multi-figure chunk images get an amber warning ring (not clickable) */
-.modify-mode img.modify-mode-warn {
+/* Modify mode: elements that cannot be targeted get an amber warning ring (not clickable) */
+.modify-mode img.modify-mode-warn,
+.modify-mode div.absolute.modify-mode-warn {
   box-shadow: var(--editable-modify-warn-shadow);
   cursor: not-allowed;
   transition: box-shadow var(--editable-transition);
 }
 
-/* Post-activation: images added via modify mode keep a subtle amber outline */
-.editable-container img[data-editable-modified="true"] {
+/* Post-activation: elements added via modify mode keep a subtle amber outline */
+.editable-container img[data-editable-modified="true"],
+.editable-container div.absolute[data-editable-modified="true"] {
   box-shadow: var(--editable-modify-activated-shadow);
+}
+
+/* Modify mode panel */
+.toolbar-panel-modify {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+}
+
+.modify-panel-label {
+  font-size: 12px;
+  color: var(--editable-toolbar-muted, rgba(255,255,255,0.6));
+  white-space: nowrap;
+}
+
+.modify-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.modify-panel-list li {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--editable-modify-valid-bg, rgba(40, 167, 69, 0.2));
+  color: var(--editable-modify-valid-text, #6fcf8a);
+  white-space: nowrap;
 }
 
 /* Submenu wrapper */

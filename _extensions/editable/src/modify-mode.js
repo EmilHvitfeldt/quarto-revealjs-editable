@@ -31,7 +31,8 @@
  */
 
 import { editableRegistry } from './editable-element.js';
-import { setupImageWhenReady } from './element-setup.js';
+import { setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
+import { showRightPanel } from './toolbar.js';
 import {
   splitIntoSlideChunks,
   serializeToQmd,
@@ -119,6 +120,11 @@ export const ModifyModeClassifier = {
     }
     return text;
   },
+
+  /** Return the label strings from all registered classifiers that have one. */
+  getLabels() {
+    return _classifiers.map(c => c.label).filter(Boolean);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -158,6 +164,7 @@ function buildChunkPrefixCounts(imgs) {
 }
 
 ModifyModeClassifier.register({
+  label: 'Images',
   classify(slideEl) {
     const imgs = Array.from(slideEl.querySelectorAll('img'));
     const prefixCounts = buildChunkPrefixCounts(imgs);
@@ -167,6 +174,7 @@ ModifyModeClassifier.register({
 
     for (const img of imgs) {
       if (editableRegistry.has(img)) continue;
+      if (img.closest('div.absolute')) continue;
       const src = getImgSrc(img);
       if (!src) continue;
       const prefix = getChunkPrefix(src);
@@ -244,6 +252,155 @@ ModifyModeClassifier.register({
 });
 
 // ---------------------------------------------------------------------------
+// {.absolute} div classifier helpers
+// ---------------------------------------------------------------------------
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Read left/top/width/height from a div.absolute's inline styles.
+ * Returns null if any value is missing (element can't be matched to source).
+ */
+function getAbsolutePosition(el) {
+  const s = el.style;
+  const left   = s.left   ? parseFloat(s.left)   : null;
+  const top    = s.top    ? parseFloat(s.top)     : null;
+  const width  = s.width  ? parseFloat(s.width)  : null;
+  const height = s.height ? parseFloat(s.height) : null;
+  if (left === null || top === null || width === null || height === null) return null;
+  return { left, top, width, height };
+}
+
+/**
+ * Build a regex that matches a {.absolute ...} attribute block containing
+ * all four original position values in any order.
+ */
+function makeAbsoluteBlockRegex(left, top, width, height) {
+  const vals = [
+    `left=${Math.round(left)}px`,
+    `top=${Math.round(top)}px`,
+    `width=${Math.round(width)}px`,
+    `height=${Math.round(height)}px`,
+  ];
+  const lookaheads = vals.map(v => `(?=[^}]*${escapeRegex(v)})`).join('');
+  return new RegExp(`\\{${lookaheads}\\.absolute[^}]*\\}`, 'g');
+}
+
+/** Return true if the div's position can be matched to a {.absolute} block in source. */
+function absoluteDivInQmdSource(div, slideIndex) {
+  if (!window._input_file) return false;
+  const pos = getAbsolutePosition(div);
+  if (!pos) return false;
+  const chunks = splitIntoSlideChunks(window._input_file);
+  const chunk = chunks[slideIndex + 1];
+  if (!chunk) return false;
+  return makeAbsoluteBlockRegex(pos.left, pos.top, pos.width, pos.height).test(chunk);
+}
+
+/**
+ * Poll until the element appears in editableRegistry, then set its container
+ * position to the original left/top values captured before setup ran.
+ * Needed because setupEltStyles sets position:relative on the element, clearing
+ * the effective absolute position; the container must receive it instead.
+ */
+function waitForRegistryThenFixPosition(el, origLeft, origTop) {
+  if (editableRegistry.has(el)) {
+    editableRegistry.get(el).setState({ x: origLeft, y: origTop });
+  } else {
+    requestAnimationFrame(() => waitForRegistryThenFixPosition(el, origLeft, origTop));
+  }
+}
+
+// {.absolute} div classifier
+ModifyModeClassifier.register({
+  label: 'Positioned divs',
+  classify(slideEl) {
+    const slideIndex = Reveal.getState().indexh;
+    const divs = Array.from(slideEl.querySelectorAll('div.absolute'));
+    const valid = [];
+    const warn  = [];
+    for (const div of divs) {
+      if (editableRegistry.has(div)) continue;
+      if (div.classList.contains('editable-container')) continue;
+      if (div.classList.contains('editable-new')) continue;
+      if (div.classList.contains('editable')) continue;
+      const pos = getAbsolutePosition(div);
+      if (!pos) {
+        warn.push({ el: div, reason: 'No inline position — cannot match to source' });
+        continue;
+      }
+      if (!absoluteDivInQmdSource(div, slideIndex)) {
+        warn.push({ el: div, reason: 'Cannot locate matching {.absolute} block in source' });
+        continue;
+      }
+      valid.push(div);
+    }
+    return { valid, warn };
+  },
+
+  activate(el) {
+    const pos = getAbsolutePosition(el);
+    if (!pos) return;
+    el.dataset.editableModified          = 'true';
+    el.dataset.editableModifiedSlide     = String(Reveal.getState().indexh);
+    el.dataset.editableModifiedAbsLeft   = String(Math.round(pos.left));
+    el.dataset.editableModifiedAbsTop    = String(Math.round(pos.top));
+    el.dataset.editableModifiedAbsWidth  = String(Math.round(pos.width));
+    el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
+    // Clear left/top before setup: setupEltStyles sets position:relative, so
+    // any remaining left/top inline styles would act as relative offsets and
+    // double-count the position when the container is placed.
+    el.style.left = '';
+    el.style.top  = '';
+    setupDivWhenReady(el);
+    waitForRegistryThenFixPosition(el, pos.left, pos.top);
+  },
+
+  serialize(text) {
+    const divs = Array.from(
+      document.querySelectorAll('div[data-editable-modified-abs-left]')
+    );
+    if (divs.length === 0) return text;
+    const chunks = splitIntoSlideChunks(text);
+    const groups = new Map();
+    for (const div of divs) {
+      if (!editableRegistry.has(div)) continue;
+      const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = slideIndex + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!groups.has(chunkIndex)) groups.set(chunkIndex, []);
+      groups.get(chunkIndex).push(div);
+    }
+    for (const [chunkIndex, groupDivs] of groups) {
+      groupDivs.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+      const occurrenceCounters = new Map();
+      for (const div of groupDivs) {
+        const origLeft   = parseInt(div.dataset.editableModifiedAbsLeft,   10);
+        const origTop    = parseInt(div.dataset.editableModifiedAbsTop,    10);
+        const origWidth  = parseInt(div.dataset.editableModifiedAbsWidth,  10);
+        const origHeight = parseInt(div.dataset.editableModifiedAbsHeight, 10);
+        const sig = `${origLeft},${origTop},${origWidth},${origHeight}`;
+        const targetOccurrence = occurrenceCounters.get(sig) ?? 0;
+        occurrenceCounters.set(sig, targetOccurrence + 1);
+        const regex = makeAbsoluteBlockRegex(origLeft, origTop, origWidth, origHeight);
+        const dims  = editableRegistry.get(div).toDimensions();
+        const replacement = serializeToQmd(dims);
+        let occurrence = 0;
+        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) => {
+          if (occurrence++ === targetOccurrence) return replacement;
+          return match;
+        });
+      }
+    }
+    return chunks.join('');
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Classification and lifecycle
 // ---------------------------------------------------------------------------
 
@@ -293,12 +450,36 @@ function applyClassification() {
 }
 
 /**
+ * Populate the modify panel with the list of activatable element types.
+ * Called each time modify mode is entered so the list reflects current classifiers.
+ */
+function buildModifyPanel() {
+  const panel = document.querySelector('.toolbar-panel-modify');
+  if (!panel) return;
+  panel.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'modify-panel-label';
+  label.textContent = 'Click to edit:';
+  panel.appendChild(label);
+  const list = document.createElement('ul');
+  list.className = 'modify-panel-list';
+  ModifyModeClassifier.getLabels().forEach(text => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    list.appendChild(item);
+  });
+  panel.appendChild(list);
+}
+
+/**
  * Enter modify mode: classify elements, attach click handlers, and listen for
  * slide changes so classification stays current as the user navigates.
  */
 export function enterModifyMode() {
   _active = true;
   document.querySelector('.reveal')?.classList.add(ROOT_CLASS);
+  buildModifyPanel();
+  showRightPanel('modify');
   applyClassification();
   Reveal.on('slidechanged', applyClassification);
 }
@@ -319,6 +500,7 @@ export function exitModifyMode() {
   });
 
   document.querySelector('.toolbar-modify')?.classList.remove('active');
+  showRightPanel('default');
 }
 
 /**
@@ -335,14 +517,13 @@ export function toggleModifyMode() {
 
 /**
  * Handle click on a valid element in modify mode.
- * Stays in modify mode so the user can activate more elements.
+ * Activates the element and exits modify mode.
  * @param {MouseEvent}  e
  * @param {Classifier}  classifier
  */
 function onValidElementClick(e, classifier) {
   e.stopPropagation();
   const el = e.currentTarget;
-  el.classList.remove(VALID_CLASS);
   classifier.activate(el);
-  // Mode stays active — user can click more elements or dismiss via toolbar button
+  exitModifyMode();
 }
