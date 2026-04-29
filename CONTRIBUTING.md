@@ -120,6 +120,9 @@ quarto render basic.qmd
   - [ ] Test undo/redo integration (if applicable)
   - [ ] Test CSS custom properties (if applicable)
 
+- [ ] **If adding a new `.spec.js` with its own `.qmd` fixture**:
+  - [ ] Add `quarto render` for the new `.qmd` to `testing/run-tests.sh` (under `--- Modify Mode Tests ---` or a relevant section). CI runs `run-tests.sh` before Playwright, so any spec that calls `throw new Error('Run quarto render ... first')` will fail in CI if this step is missing. This has caused repeated CI failures — don't skip it.
+
 - [ ] **Rebuild test HTML** after JavaScript changes:
   ```bash
   cd testing && quarto render basic.qmd
