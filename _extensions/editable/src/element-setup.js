@@ -166,6 +166,10 @@ function setupEltStyles(elt) {
     width = elt.naturalWidth || width;
     height = elt.naturalHeight || height;
   }
+  if (elt.tagName.toLowerCase() === "video" && (width === 0 || height === 0)) {
+    width = elt.videoWidth || width || 300;
+    height = elt.videoHeight || height || 150;
+  }
 
   elt.style.width = width + "px";
   elt.style.height = height + "px";
@@ -302,28 +306,7 @@ export function setupDivWhenReady(div) {
  * @param {HTMLVideoElement} video - Video element
  */
 export function setupVideoWhenReady(video) {
-  if (video.offsetWidth > 0 && video.offsetHeight > 0) {
-    setupDraggableElt(video);
-    return;
-  }
-
-  let setupDone = false;
-  const doSetup = () => {
-    if (setupDone) return;
-    if (video.offsetWidth > 0 && video.offsetHeight > 0) {
-      setupDone = true;
-      setupDraggableElt(video);
-    }
-  };
-
-  video.addEventListener("loadedmetadata", doSetup, { once: true });
-
-  let attempts = 0;
-  const poll = () => {
-    if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS) return;
-    attempts++;
-    if (video.offsetWidth > 0 && video.offsetHeight > 0) doSetup();
-    else setTimeout(poll, CONFIG.POLL_INTERVAL_MS);
-  };
-  poll();
+  // Unlike images, videos may have zero dimensions in some browsers before
+  // metadata loads. setupEltStyles handles the fallback, so call immediately.
+  setupDraggableElt(video);
 }
