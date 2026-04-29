@@ -12474,14 +12474,16 @@ ${escapeText(this.code(index, length))}
       el.style.setProperty("--arrow-opacity-color", color);
   }
   registerDeselectArrow(() => setActiveArrow(null));
-  registerRestoreArrowDOM((snapshots) => {
-    for (const snapshot of snapshots) {
-      updateArrowPath(snapshot.arrowData);
-      updateArrowHandles(snapshot.arrowData);
-      updateArrowAppearance(snapshot.arrowData);
-      updateArrowActiveState(snapshot.arrowData);
-    }
-  });
+  function initArrows() {
+    registerRestoreArrowDOM((snapshots) => {
+      for (const snapshot of snapshots) {
+        updateArrowPath(snapshot.arrowData);
+        updateArrowHandles(snapshot.arrowData);
+        updateArrowAppearance(snapshot.arrowData);
+        updateArrowActiveState(snapshot.arrowData);
+      }
+    });
+  }
   function setActiveArrow(arrowData) {
     if (activeArrow && activeArrow !== arrowData) {
       activeArrow.isActive = false;
@@ -12520,9 +12522,16 @@ ${escapeText(this.code(index, length))}
         input.max = max;
       input.value = defaultValue.toString();
       input.title = title;
+      let _undoPushed = false;
       input.addEventListener("focus", () => {
-        if (activeArrow && onUndo)
+        _undoPushed = false;
+        if (activeArrow && onUndo) {
           onUndo();
+          _undoPushed = true;
+        }
+      });
+      input.addEventListener("blur", () => {
+        _undoPushed = false;
       });
       input.addEventListener("wheel", (e) => {
         e.preventDefault();
@@ -12539,6 +12548,10 @@ ${escapeText(this.code(index, length))}
       }, { passive: false });
       input.addEventListener("input", (e) => {
         if (activeArrow) {
+          if (!_undoPushed && onUndo) {
+            onUndo();
+            _undoPushed = true;
+          }
           const val = parseInt(e.target.value);
           if (!isNaN(val)) {
             const clamped = min !== void 0 || max !== void 0 ? Math.max(min ?? -Infinity, Math.min(max ?? Infinity, val)) : val;
@@ -12562,12 +12575,23 @@ ${escapeText(this.code(index, length))}
     colorPicker.value = "#000000";
     colorPickerBtn.appendChild(colorPicker);
     colorPickerBtn.addEventListener("click", () => colorPicker.click());
+    let _colorUndoPushed = false;
     colorPicker.addEventListener("focus", () => {
-      if (activeArrow)
+      _colorUndoPushed = false;
+      if (activeArrow) {
         pushUndoState();
+        _colorUndoPushed = true;
+      }
+    });
+    colorPicker.addEventListener("blur", () => {
+      _colorUndoPushed = false;
     });
     colorPicker.addEventListener("input", (e) => {
       if (activeArrow) {
+        if (!_colorUndoPushed) {
+          pushUndoState();
+          _colorUndoPushed = true;
+        }
         activeArrow.color = e.target.value;
         updateArrowAppearance(activeArrow);
         colorPickerBtn.style.backgroundColor = e.target.value;
@@ -15965,6 +15989,8 @@ ${fence}`;
       for (const img of imgs) {
         if (editableRegistry.has(img))
           continue;
+        if (img.classList.contains("absolute"))
+          continue;
         if (img.closest("div.absolute"))
           continue;
         const src = getImgSrc(img);
@@ -16165,9 +16191,116 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function makeAbsoluteImageRegex(src, left, top, width, height) {
+    const escapedSrc = escapeRegex(src);
+    const vals = [
+      `left=${Math.round(left)}px`,
+      `top=${Math.round(top)}px`,
+      `width=${Math.round(width)}px`,
+      `height=${Math.round(height)}px`
+    ];
+    const lookaheads = vals.map((v) => `(?=[^}]*${escapeRegex(v)})`).join("");
+    return new RegExp(`\\]\\(${escapedSrc}\\)\\{${lookaheads}\\.absolute[^}]*\\}`, "g");
+  }
+  function absoluteImgInQmdSource(img, slideIndex) {
+    if (!window._input_file)
+      return false;
+    const pos = getAbsolutePosition(img);
+    if (!pos)
+      return false;
+    const src = getImgSrc(img);
+    if (!src)
+      return false;
+    const chunks = splitIntoSlideChunks(window._input_file);
+    const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
+    if (!chunk)
+      return false;
+    return makeAbsoluteImageRegex(src, pos.left, pos.top, pos.width, pos.height).test(chunk);
+  }
+  ModifyModeClassifier.register({
+    label: "Positioned images",
+    classify(slideEl) {
+      const slideIndex = Reveal.getState().indexh;
+      const imgs = Array.from(slideEl.querySelectorAll("img.absolute"));
+      const valid = [];
+      const warn = [];
+      for (const img of imgs) {
+        if (editableRegistry.has(img))
+          continue;
+        const pos = getAbsolutePosition(img);
+        if (!pos) {
+          warn.push({ el: img, reason: "No inline position \u2014 cannot match to source" });
+          continue;
+        }
+        if (!absoluteImgInQmdSource(img, slideIndex)) {
+          warn.push({ el: img, reason: "Cannot locate matching {.absolute} block in source" });
+          continue;
+        }
+        valid.push(img);
+      }
+      return { valid, warn };
+    },
+    activate(el) {
+      const pos = getAbsolutePosition(el);
+      if (!pos)
+        return;
+      el.dataset.editableModifiedAbsLeft = String(Math.round(pos.left));
+      el.dataset.editableModifiedAbsTop = String(Math.round(pos.top));
+      el.dataset.editableModifiedAbsWidth = String(Math.round(pos.width));
+      el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
+      el.dataset.editableModifiedAbsSrc = getImgSrc(el) ?? "";
+      el.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      if (!el.getAttribute("src") && el.getAttribute("data-src")) {
+        el.src = el.getAttribute("data-src");
+      }
+      el.style.left = "";
+      el.style.top = "";
+      el.style.maxWidth = "none";
+      el.style.maxHeight = "none";
+      setupImageWhenReady(el);
+      waitForRegistryThenFixPosition(el, pos.left, pos.top);
+    },
+    serialize(text) {
+      const imgs = Array.from(
+        document.querySelectorAll("img[data-editable-modified-abs-src]")
+      );
+      if (imgs.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const groups = /* @__PURE__ */ new Map();
+      for (const img of imgs) {
+        if (!editableRegistry.has(img))
+          continue;
+        const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!groups.has(chunkIndex))
+          groups.set(chunkIndex, []);
+        groups.get(chunkIndex).push(img);
+      }
+      for (const [chunkIndex, groupImgs] of groups) {
+        groupImgs.sort(
+          (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+        );
+        for (const img of groupImgs) {
+          const src = img.dataset.editableModifiedAbsSrc;
+          const origLeft = parseInt(img.dataset.editableModifiedAbsLeft, 10);
+          const origTop = parseInt(img.dataset.editableModifiedAbsTop, 10);
+          const origWidth = parseInt(img.dataset.editableModifiedAbsWidth, 10);
+          const origHeight = parseInt(img.dataset.editableModifiedAbsHeight, 10);
+          const regex = makeAbsoluteImageRegex(src, origLeft, origTop, origWidth, origHeight);
+          const dims = editableRegistry.get(img).toDimensions();
+          const replacement = `](${src}){.absolute left=${dims.left}px top=${dims.top}px width=${dims.width}px height=${dims.height}px}`;
+          chunks[chunkIndex] = chunks[chunkIndex].replace(regex, replacement);
+        }
+      }
+      return chunks.join("");
+    }
+  });
   function classifyElements() {
     const reveal = document.querySelector(".reveal");
-    const currentSlide = reveal?.querySelector(".slides .present") ?? reveal;
+    const currentSlide = reveal?.querySelector(".slides section.present:not(.slide-background)") ?? reveal;
     const valid = [];
     const warn = [];
     for (const classifier of _classifiers) {
@@ -16414,6 +16547,7 @@ ${fence}`;
       id: "Revealeditable",
       init: function(deck) {
         deck.on("ready", async function() {
+          initArrows();
           const editableElements = getEditableElements();
           const editableDivs = Array.from(editableElements).filter(
             (el) => el.tagName.toLowerCase() === "div"

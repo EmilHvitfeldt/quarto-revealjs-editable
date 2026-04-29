@@ -11,7 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-| Modify | Click any plain image on the slide to make it editable |
+| Modify | Activate plain images, `{.absolute}` images, or `{.absolute}` divs for editing |
 
 ## Adding New Elements
 
@@ -36,9 +36,10 @@ Currently supported element types:
 | Element | Source syntax | Operations |
 |---|---|---|
 | Plain image | `![](image.png)` | Move, resize, rotate |
+| `{.absolute}` image | `![](image.png){.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate |
 | `{.absolute}` div | `::: {.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate, text editing |
 
-Plain images are any image inserted directly in a slide without positional attributes. `{.absolute}` divs are elements that have already been positioned by a prior save — they carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
+Plain images are any image inserted directly in a slide without positional attributes. `{.absolute}` images and divs are elements that have already been positioned by a prior save — they carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
 
 ::: {.callout-note}
 Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode.

@@ -175,6 +175,7 @@ ModifyModeClassifier.register({
 
     for (const img of imgs) {
       if (editableRegistry.has(img)) continue;
+      if (img.classList.contains('absolute')) continue;
       if (img.closest('div.absolute')) continue;
       const src = getImgSrc(img);
       if (!src) continue;
@@ -405,6 +406,112 @@ ModifyModeClassifier.register({
   },
 });
 
+// {.absolute} image classifier
+function makeAbsoluteImageRegex(src, left, top, width, height) {
+  const escapedSrc = escapeRegex(src);
+  const vals = [
+    `left=${Math.round(left)}px`,
+    `top=${Math.round(top)}px`,
+    `width=${Math.round(width)}px`,
+    `height=${Math.round(height)}px`,
+  ];
+  const lookaheads = vals.map(v => `(?=[^}]*${escapeRegex(v)})`).join('');
+  return new RegExp(`\\]\\(${escapedSrc}\\)\\{${lookaheads}\\.absolute[^}]*\\}`, 'g');
+}
+
+function absoluteImgInQmdSource(img, slideIndex) {
+  if (!window._input_file) return false;
+  const pos = getAbsolutePosition(img);
+  if (!pos) return false;
+  const src = getImgSrc(img);
+  if (!src) return false;
+  const chunks = splitIntoSlideChunks(window._input_file);
+  const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
+  if (!chunk) return false;
+  return makeAbsoluteImageRegex(src, pos.left, pos.top, pos.width, pos.height).test(chunk);
+}
+
+ModifyModeClassifier.register({
+  label: 'Positioned images',
+  classify(slideEl) {
+    const slideIndex = Reveal.getState().indexh;
+    const imgs = Array.from(slideEl.querySelectorAll('img.absolute'));
+    const valid = [];
+    const warn  = [];
+    for (const img of imgs) {
+      if (editableRegistry.has(img)) continue;
+      const pos = getAbsolutePosition(img);
+      if (!pos) {
+        warn.push({ el: img, reason: 'No inline position — cannot match to source' });
+        continue;
+      }
+      if (!absoluteImgInQmdSource(img, slideIndex)) {
+        warn.push({ el: img, reason: 'Cannot locate matching {.absolute} block in source' });
+        continue;
+      }
+      valid.push(img);
+    }
+    return { valid, warn };
+  },
+
+  activate(el) {
+    const pos = getAbsolutePosition(el);
+    if (!pos) return;
+    el.dataset.editableModifiedAbsLeft   = String(Math.round(pos.left));
+    el.dataset.editableModifiedAbsTop    = String(Math.round(pos.top));
+    el.dataset.editableModifiedAbsWidth  = String(Math.round(pos.width));
+    el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
+    el.dataset.editableModifiedAbsSrc    = getImgSrc(el) ?? '';
+    el.dataset.editableModifiedSlide     = String(Reveal.getState().indexh);
+    if (!el.getAttribute('src') && el.getAttribute('data-src')) {
+      el.src = el.getAttribute('data-src');
+    }
+    el.style.left = '';
+    el.style.top  = '';
+    // Remove percentage-based max-width/max-height (Reveal.js sets max-width:95%).
+    // Once inside the inline-block editable-container, those % values would resolve
+    // against the container width, shrinking the image.
+    el.style.maxWidth  = 'none';
+    el.style.maxHeight = 'none';
+    setupImageWhenReady(el);
+    waitForRegistryThenFixPosition(el, pos.left, pos.top);
+  },
+
+  serialize(text) {
+    const imgs = Array.from(
+      document.querySelectorAll('img[data-editable-modified-abs-src]')
+    );
+    if (imgs.length === 0) return text;
+    const chunks = splitIntoSlideChunks(text);
+    const groups = new Map();
+    for (const img of imgs) {
+      if (!editableRegistry.has(img)) continue;
+      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!groups.has(chunkIndex)) groups.set(chunkIndex, []);
+      groups.get(chunkIndex).push(img);
+    }
+    for (const [chunkIndex, groupImgs] of groups) {
+      groupImgs.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+      for (const img of groupImgs) {
+        const src        = img.dataset.editableModifiedAbsSrc;
+        const origLeft   = parseInt(img.dataset.editableModifiedAbsLeft,   10);
+        const origTop    = parseInt(img.dataset.editableModifiedAbsTop,    10);
+        const origWidth  = parseInt(img.dataset.editableModifiedAbsWidth,  10);
+        const origHeight = parseInt(img.dataset.editableModifiedAbsHeight, 10);
+        const regex = makeAbsoluteImageRegex(src, origLeft, origTop, origWidth, origHeight);
+        const dims  = editableRegistry.get(img).toDimensions();
+        const replacement = `](${src}){.absolute left=${dims.left}px top=${dims.top}px width=${dims.width}px height=${dims.height}px}`;
+        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, replacement);
+      }
+    }
+    return chunks.join('');
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Classification and lifecycle
 // ---------------------------------------------------------------------------
@@ -416,7 +523,7 @@ ModifyModeClassifier.register({
  */
 function classifyElements() {
   const reveal = document.querySelector('.reveal');
-  const currentSlide = reveal?.querySelector('.slides .present') ?? reveal;
+  const currentSlide = reveal?.querySelector('.slides section.present:not(.slide-background)') ?? reveal;
 
   const valid = [];
   const warn  = [];
