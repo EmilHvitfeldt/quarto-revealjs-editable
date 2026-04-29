@@ -31,6 +31,21 @@ async function selectIconOption(page, selectId, value) {
   }, value);
 }
 
+// Dispatch Ctrl+Z / Ctrl+Y directly on document to bypass Playwright focus issues
+async function pressUndo(page) {
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(200);
+}
+
+async function pressRedo(page) {
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(200);
+}
+
 // Helper to open color presets popover then click a swatch
 async function clickColorSwatch(page, nth) {
   await page.click('.arrow-color-presets-toggle');
@@ -2409,6 +2424,7 @@ test.describe('Arrow Feature', () => {
 
     test('Undo reverts arrow position after drag', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2443,8 +2459,7 @@ test.describe('Arrow Feature', () => {
       expect(afterDragPos.left).not.toBe(initialPos.left);
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Get position after undo
       const afterUndoPos = await page.evaluate(() => {
@@ -2462,6 +2477,7 @@ test.describe('Arrow Feature', () => {
 
     test('Undo reverts arrow color change', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2485,8 +2501,7 @@ test.describe('Arrow Feature', () => {
       expect(afterChangeColor).toBe('#ff0000');
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Get color after undo
       const afterUndoColor = await page.evaluate(() => {
@@ -2500,6 +2515,7 @@ test.describe('Arrow Feature', () => {
 
     test('Undo reverts curve mode toggle', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2522,8 +2538,7 @@ test.describe('Arrow Feature', () => {
       expect(afterTogglePath).toMatch(/C/);
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Verify back to straight line
       const afterUndoPath = await page.evaluate(() => {
@@ -2535,6 +2550,7 @@ test.describe('Arrow Feature', () => {
 
     test('Redo restores arrow position after undo', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2566,8 +2582,7 @@ test.describe('Arrow Feature', () => {
       });
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Verify undone
       const afterUndoPos = await page.evaluate(() => {
@@ -2580,8 +2595,7 @@ test.describe('Arrow Feature', () => {
       expect(Math.abs(afterUndoPos.left - initialPos.left)).toBeLessThan(1);
 
       // Redo
-      await page.keyboard.press('Control+y');
-      await page.waitForTimeout(100);
+      await pressRedo(page);
 
       // Get position after redo
       const afterRedoPos = await page.evaluate(() => {
@@ -2599,6 +2613,7 @@ test.describe('Arrow Feature', () => {
 
     test('Undo reverts arrow width change', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2622,8 +2637,7 @@ test.describe('Arrow Feature', () => {
       expect(afterChangeWidth).toBe('8');
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Get width after undo
       const afterUndoWidth = await page.evaluate(() => {
@@ -2637,6 +2651,7 @@ test.describe('Arrow Feature', () => {
 
     test('Undo reverts arrow head style change', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2660,8 +2675,7 @@ test.describe('Arrow Feature', () => {
       expect(afterChangeMarkerPath).not.toBe(initialMarkerPath);
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Get marker after undo
       const afterUndoMarkerPath = await page.evaluate(() => {
@@ -2675,6 +2689,7 @@ test.describe('Arrow Feature', () => {
 
     test('Undo reverts arrow body drag', async ({ page }) => {
       await setupPage(page, 'arrows.html');
+      await page.bringToFront();
 
       await clickAddArrow(page);
 
@@ -2732,8 +2747,7 @@ test.describe('Arrow Feature', () => {
       expect(afterDragPositions.startLeft).not.toBe(initialPositions.startLeft);
 
       // Undo
-      await page.keyboard.press('Control+z');
-      await page.waitForTimeout(100);
+      await pressUndo(page);
 
       // Get positions after undo
       const afterUndoPositions = await page.evaluate(() => {

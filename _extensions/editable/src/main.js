@@ -10,7 +10,7 @@ import { setupUndoRedoKeyboard, canUndo, canRedo, pushUndoState, undo, redo } fr
 import { initializeQuillForElement, quillInstances } from './quill.js';
 import { ToolbarRegistry, NewElementRegistry } from './registries.js';
 import { createFloatingToolbar } from './toolbar.js';
-import { addNewArrow } from './arrows.js';
+import { addNewArrow, initArrows } from './arrows.js';
 import { setActiveImage } from './images.js';
 import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
@@ -80,6 +80,7 @@ window.Revealeditable = function () {
     id: "Revealeditable",
     init: function (deck) {
       deck.on("ready", async function () {
+        initArrows();
         const editableElements = getEditableElements();
 
         const editableDivs = Array.from(editableElements).filter(

@@ -167,14 +167,22 @@ export const ARROW_HEAD_STYLES = ["arrow", "stealth", "diamond", "circle", "squa
  * @param {Object|null} arrowData - Arrow to select, or null to deselect
  */
 registerDeselectArrow(() => setActiveArrow(null));
-registerRestoreArrowDOM((snapshots) => {
-  for (const snapshot of snapshots) {
-    updateArrowPath(snapshot.arrowData);
-    updateArrowHandles(snapshot.arrowData);
-    updateArrowAppearance(snapshot.arrowData);
-    updateArrowActiveState(snapshot.arrowData);
-  }
-});
+
+/**
+ * Initialize the arrow system. Must be called at runtime (not module-level) to avoid
+ * esbuild bundle ordering issues where registerRestoreArrowDOM runs before undo.js
+ * initializes restoreArrowDOMFn, causing it to be overwritten with null.
+ */
+export function initArrows() {
+  registerRestoreArrowDOM((snapshots) => {
+    for (const snapshot of snapshots) {
+      updateArrowPath(snapshot.arrowData);
+      updateArrowHandles(snapshot.arrowData);
+      updateArrowAppearance(snapshot.arrowData);
+      updateArrowActiveState(snapshot.arrowData);
+    }
+  });
+}
 
 export function setActiveArrow(arrowData) {
   if (activeArrow && activeArrow !== arrowData) {
@@ -266,7 +274,9 @@ export function createArrowStyleControls() {
     if (max !== undefined) input.max = max;
     input.value = defaultValue.toString();
     input.title = title;
-    input.addEventListener("focus", () => { if (activeArrow && onUndo) onUndo(); });
+    let _undoPushed = false;
+    input.addEventListener("focus", () => { _undoPushed = false; if (activeArrow && onUndo) { onUndo(); _undoPushed = true; } });
+    input.addEventListener("blur", () => { _undoPushed = false; });
     input.addEventListener("wheel", (e) => {
       e.preventDefault();
       if (activeArrow) {
@@ -283,6 +293,7 @@ export function createArrowStyleControls() {
     }, { passive: false });
     input.addEventListener("input", (e) => {
       if (activeArrow) {
+        if (!_undoPushed && onUndo) { onUndo(); _undoPushed = true; }
         const val = parseInt(e.target.value);
         if (!isNaN(val)) {
           const clamped = min !== undefined || max !== undefined
@@ -313,11 +324,15 @@ export function createArrowStyleControls() {
   colorPicker.value = "#000000";
   colorPickerBtn.appendChild(colorPicker);
   colorPickerBtn.addEventListener("click", () => colorPicker.click());
+  let _colorUndoPushed = false;
   colorPicker.addEventListener("focus", () => {
-    if (activeArrow) pushUndoState();
+    _colorUndoPushed = false;
+    if (activeArrow) { pushUndoState(); _colorUndoPushed = true; }
   });
+  colorPicker.addEventListener("blur", () => { _colorUndoPushed = false; });
   colorPicker.addEventListener("input", (e) => {
     if (activeArrow) {
+      if (!_colorUndoPushed) { pushUndoState(); _colorUndoPushed = true; }
       activeArrow.color = e.target.value;
       updateArrowAppearance(activeArrow);
       colorPickerBtn.style.backgroundColor = e.target.value;

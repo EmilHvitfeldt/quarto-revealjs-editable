@@ -12474,14 +12474,16 @@ ${escapeText(this.code(index, length))}
       el.style.setProperty("--arrow-opacity-color", color);
   }
   registerDeselectArrow(() => setActiveArrow(null));
-  registerRestoreArrowDOM((snapshots) => {
-    for (const snapshot of snapshots) {
-      updateArrowPath(snapshot.arrowData);
-      updateArrowHandles(snapshot.arrowData);
-      updateArrowAppearance(snapshot.arrowData);
-      updateArrowActiveState(snapshot.arrowData);
-    }
-  });
+  function initArrows() {
+    registerRestoreArrowDOM((snapshots) => {
+      for (const snapshot of snapshots) {
+        updateArrowPath(snapshot.arrowData);
+        updateArrowHandles(snapshot.arrowData);
+        updateArrowAppearance(snapshot.arrowData);
+        updateArrowActiveState(snapshot.arrowData);
+      }
+    });
+  }
   function setActiveArrow(arrowData) {
     if (activeArrow && activeArrow !== arrowData) {
       activeArrow.isActive = false;
@@ -12520,9 +12522,16 @@ ${escapeText(this.code(index, length))}
         input.max = max;
       input.value = defaultValue.toString();
       input.title = title;
+      let _undoPushed = false;
       input.addEventListener("focus", () => {
-        if (activeArrow && onUndo)
+        _undoPushed = false;
+        if (activeArrow && onUndo) {
           onUndo();
+          _undoPushed = true;
+        }
+      });
+      input.addEventListener("blur", () => {
+        _undoPushed = false;
       });
       input.addEventListener("wheel", (e) => {
         e.preventDefault();
@@ -12539,6 +12548,10 @@ ${escapeText(this.code(index, length))}
       }, { passive: false });
       input.addEventListener("input", (e) => {
         if (activeArrow) {
+          if (!_undoPushed && onUndo) {
+            onUndo();
+            _undoPushed = true;
+          }
           const val = parseInt(e.target.value);
           if (!isNaN(val)) {
             const clamped = min !== void 0 || max !== void 0 ? Math.max(min ?? -Infinity, Math.min(max ?? Infinity, val)) : val;
@@ -12562,12 +12575,23 @@ ${escapeText(this.code(index, length))}
     colorPicker.value = "#000000";
     colorPickerBtn.appendChild(colorPicker);
     colorPickerBtn.addEventListener("click", () => colorPicker.click());
+    let _colorUndoPushed = false;
     colorPicker.addEventListener("focus", () => {
-      if (activeArrow)
+      _colorUndoPushed = false;
+      if (activeArrow) {
         pushUndoState();
+        _colorUndoPushed = true;
+      }
+    });
+    colorPicker.addEventListener("blur", () => {
+      _colorUndoPushed = false;
     });
     colorPicker.addEventListener("input", (e) => {
       if (activeArrow) {
+        if (!_colorUndoPushed) {
+          pushUndoState();
+          _colorUndoPushed = true;
+        }
         activeArrow.color = e.target.value;
         updateArrowAppearance(activeArrow);
         colorPickerBtn.style.backgroundColor = e.target.value;
@@ -16523,6 +16547,7 @@ ${fence}`;
       id: "Revealeditable",
       init: function(deck) {
         deck.on("ready", async function() {
+          initArrows();
           const editableElements = getEditableElements();
           const editableDivs = Array.from(editableElements).filter(
             (el) => el.tagName.toLowerCase() === "div"
