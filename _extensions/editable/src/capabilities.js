@@ -475,6 +475,7 @@ export const Capabilities = {
  */
 export const ELEMENT_CAPABILITIES = {
   img: ["move", "resize", "rotate"],
+  video: ["move", "resize", "rotate"],
   div: ["move", "resize", "rotate", "fontControls", "editText"],
 };
 

@@ -31,7 +31,7 @@
  */
 
 import { editableRegistry } from './editable-element.js';
-import { setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
+import { setupImageWhenReady, setupDivWhenReady, setupVideoWhenReady } from './element-setup.js';
 import { showRightPanel } from './toolbar.js';
 import {
   splitIntoSlideChunks,
@@ -241,6 +241,113 @@ ModifyModeClassifier.register({
 
       const replacements = groupImgs.map(img => {
         const dims = editableRegistry.get(img).toDimensions();
+        return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+      });
+
+      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
+
+      let occurrence = 0;
+      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
+        occurrence < replacements.length ? replacements[occurrence++] : match
+      );
+    }
+
+    return chunks.join('');
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Video classifier (built-in)
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the effective src of a video element.
+ * Checks the src attribute directly on the element first, then falls back to
+ * the first <source> child (Quarto may render either form).
+ * @param {HTMLVideoElement} video
+ * @returns {string|null}
+ */
+export function getVideoSrc(video) {
+  return video.getAttribute('src') || video.getAttribute('data-src') ||
+    video.querySelector('source')?.getAttribute('src') || null;
+}
+
+function videoSrcInQmdSource(video) {
+  if (!window._input_file) return false;
+  const src = getVideoSrc(video);
+  return !!src && window._input_file.includes(src);
+}
+
+ModifyModeClassifier.register({
+  label: 'Videos',
+  classify(slideEl) {
+    const videos = Array.from(slideEl.querySelectorAll('video'));
+    const valid = [];
+    const warn  = [];
+
+    for (const video of videos) {
+      if (editableRegistry.has(video)) continue;
+      if (video.classList.contains('absolute')) continue;
+      if (video.closest('div.absolute')) continue;
+      const src = getVideoSrc(video);
+      if (!src) continue;
+      if (videoSrcInQmdSource(video)) {
+        valid.push(video);
+      }
+    }
+
+    return { valid, warn };
+  },
+
+  activate(video) {
+    const originalSrc = getVideoSrc(video);
+
+    if (!video.getAttribute('src') && video.getAttribute('data-src')) {
+      video.src = video.getAttribute('data-src');
+    }
+
+    video.dataset.editableModifiedSrc   = originalSrc;
+    video.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+    video.dataset.editableModified      = 'true';
+
+    // Reveal.js sets max-width: 95% on media elements. Once inside the
+    // inline-block editable-container, that percentage resolves against the
+    // explicit style.width, shrinking the element further. Clear it first.
+    video.style.maxWidth  = 'none';
+    video.style.maxHeight = 'none';
+
+    setupVideoWhenReady(video);
+  },
+
+  serialize(text) {
+    const videos = Array.from(
+      document.querySelectorAll('video[data-editable-modified="true"]')
+    );
+    if (videos.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+
+    const groups = new Map();
+    for (const video of videos) {
+      const originalSrc = video.dataset.editableModifiedSrc;
+      if (!originalSrc) continue;
+      if (!editableRegistry.has(video)) continue;
+      const slideIndex = parseInt(video.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      const key = `${chunkIndex}::${originalSrc}`;
+      if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, videos: [] });
+      groups.get(key).videos.push(video);
+    }
+
+    for (const { chunkIndex, originalSrc, videos: groupVideos } of groups.values()) {
+      groupVideos.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+
+      const replacements = groupVideos.map(video => {
+        const dims = editableRegistry.get(video).toDimensions();
         return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
       });
 

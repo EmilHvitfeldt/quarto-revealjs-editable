@@ -296,3 +296,34 @@ export function setupDivWhenReady(div) {
 
   requestAnimationFrame(checkAndSetup);
 }
+
+/**
+ * Set up a video element once it has valid dimensions.
+ * @param {HTMLVideoElement} video - Video element
+ */
+export function setupVideoWhenReady(video) {
+  if (video.offsetWidth > 0 && video.offsetHeight > 0) {
+    setupDraggableElt(video);
+    return;
+  }
+
+  let setupDone = false;
+  const doSetup = () => {
+    if (setupDone) return;
+    if (video.offsetWidth > 0 && video.offsetHeight > 0) {
+      setupDone = true;
+      setupDraggableElt(video);
+    }
+  };
+
+  video.addEventListener("loadedmetadata", doSetup, { once: true });
+
+  let attempts = 0;
+  const poll = () => {
+    if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS) return;
+    attempts++;
+    if (video.offsetWidth > 0 && video.offsetHeight > 0) doSetup();
+    else setTimeout(poll, CONFIG.POLL_INTERVAL_MS);
+  };
+  poll();
+}

@@ -15124,6 +15124,7 @@ ${escapeText(this.code(index, length))}
   };
   var ELEMENT_CAPABILITIES = {
     img: ["move", "resize", "rotate"],
+    video: ["move", "resize", "rotate"],
     div: ["move", "resize", "rotate", "fontControls", "editText"]
   };
   function getCapabilitiesFor(elementType) {
@@ -15387,6 +15388,33 @@ ${escapeText(this.code(index, length))}
       }
     };
     requestAnimationFrame(checkAndSetup);
+  }
+  function setupVideoWhenReady(video) {
+    if (video.offsetWidth > 0 && video.offsetHeight > 0) {
+      setupDraggableElt(video);
+      return;
+    }
+    let setupDone = false;
+    const doSetup = () => {
+      if (setupDone)
+        return;
+      if (video.offsetWidth > 0 && video.offsetHeight > 0) {
+        setupDone = true;
+        setupDraggableElt(video);
+      }
+    };
+    video.addEventListener("loadedmetadata", doSetup, { once: true });
+    let attempts = 0;
+    const poll = () => {
+      if (setupDone || attempts >= CONFIG.POLL_MAX_ATTEMPTS)
+        return;
+      attempts++;
+      if (video.offsetWidth > 0 && video.offsetHeight > 0)
+        doSetup();
+      else
+        setTimeout(poll, CONFIG.POLL_INTERVAL_MS);
+    };
+    poll();
   }
 
   // src/serialization.js
@@ -16046,6 +16074,91 @@ ${fence}`;
         );
         const replacements = groupImgs.map((img) => {
           const dims = editableRegistry.get(img).toDimensions();
+          return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+        });
+        const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, "g");
+        let occurrence = 0;
+        chunks[chunkIndex] = chunks[chunkIndex].replace(
+          regex,
+          (match2) => occurrence < replacements.length ? replacements[occurrence++] : match2
+        );
+      }
+      return chunks.join("");
+    }
+  });
+  function getVideoSrc(video) {
+    return video.getAttribute("src") || video.getAttribute("data-src") || video.querySelector("source")?.getAttribute("src") || null;
+  }
+  function videoSrcInQmdSource(video) {
+    if (!window._input_file)
+      return false;
+    const src = getVideoSrc(video);
+    return !!src && window._input_file.includes(src);
+  }
+  ModifyModeClassifier.register({
+    label: "Videos",
+    classify(slideEl) {
+      const videos = Array.from(slideEl.querySelectorAll("video"));
+      const valid = [];
+      const warn = [];
+      for (const video of videos) {
+        if (editableRegistry.has(video))
+          continue;
+        if (video.classList.contains("absolute"))
+          continue;
+        if (video.closest("div.absolute"))
+          continue;
+        const src = getVideoSrc(video);
+        if (!src)
+          continue;
+        if (videoSrcInQmdSource(video)) {
+          valid.push(video);
+        }
+      }
+      return { valid, warn };
+    },
+    activate(video) {
+      const originalSrc = getVideoSrc(video);
+      if (!video.getAttribute("src") && video.getAttribute("data-src")) {
+        video.src = video.getAttribute("data-src");
+      }
+      video.dataset.editableModifiedSrc = originalSrc;
+      video.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      video.dataset.editableModified = "true";
+      video.style.maxWidth = "none";
+      video.style.maxHeight = "none";
+      setupVideoWhenReady(video);
+    },
+    serialize(text) {
+      const videos = Array.from(
+        document.querySelectorAll('video[data-editable-modified="true"]')
+      );
+      if (videos.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const groups = /* @__PURE__ */ new Map();
+      for (const video of videos) {
+        const originalSrc = video.dataset.editableModifiedSrc;
+        if (!originalSrc)
+          continue;
+        if (!editableRegistry.has(video))
+          continue;
+        const slideIndex = parseInt(video.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        const key = `${chunkIndex}::${originalSrc}`;
+        if (!groups.has(key))
+          groups.set(key, { chunkIndex, originalSrc, videos: [] });
+        groups.get(key).videos.push(video);
+      }
+      for (const { chunkIndex, originalSrc, videos: groupVideos } of groups.values()) {
+        groupVideos.sort(
+          (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+        );
+        const replacements = groupVideos.map((video) => {
+          const dims = editableRegistry.get(video).toDimensions();
           return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
         });
         const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
