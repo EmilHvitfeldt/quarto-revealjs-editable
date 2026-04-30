@@ -93,6 +93,8 @@ export function getWarnReason(el) {
  *   Called when the user clicks a valid element.
  * @property {function(string): string} [serialize]
  *   Optional. Called during save; receives and returns the full QMD string.
+ * @property {function(): void} [cleanup]
+ *   Optional. Called when modify mode exits; restore any DOM changes made in classify().
  */
 
 const _classifiers = [];
@@ -279,9 +281,20 @@ function videoSrcInQmdSource(video) {
   return !!src && window._input_file.includes(src);
 }
 
+// Tracks videos whose `controls` attribute was removed during classification
+// so it can be restored when modify mode exits without activating them.
+const _videosWithControlsRemoved = new Set();
+
 ModifyModeClassifier.register({
   label: 'Videos',
   classify(slideEl) {
+    // Restore controls on any videos from a previous classification pass
+    // (e.g. the user navigated slides without clicking).
+    for (const video of _videosWithControlsRemoved) {
+      video.setAttribute('controls', '');
+    }
+    _videosWithControlsRemoved.clear();
+
     const videos = Array.from(slideEl.querySelectorAll('video'));
     const valid = [];
     const warn  = [];
@@ -297,10 +310,27 @@ ModifyModeClassifier.register({
       }
     }
 
+    // Remove native controls from valid videos so browser-native control UI
+    // doesn't intercept the click before our listener fires (Firefox issue).
+    for (const video of valid) {
+      video.removeAttribute('controls');
+      _videosWithControlsRemoved.add(video);
+    }
+
     return { valid, warn };
   },
 
+  cleanup() {
+    for (const video of _videosWithControlsRemoved) {
+      video.setAttribute('controls', '');
+    }
+    _videosWithControlsRemoved.clear();
+  },
+
   activate(video) {
+    // Don't restore controls on this video — it's now an editable element.
+    _videosWithControlsRemoved.delete(video);
+
     const originalSrc = getVideoSrc(video);
 
     if (!video.getAttribute('src') && video.getAttribute('data-src')) {
@@ -713,6 +743,10 @@ export function exitModifyMode() {
   Reveal.off('slidechanged', applyClassification);
   abortController?.abort();
   abortController = null;
+
+  for (const classifier of _classifiers) {
+    if (typeof classifier.cleanup === 'function') classifier.cleanup();
+  }
 
   document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
     el.classList.remove(VALID_CLASS, WARN_CLASS);

@@ -16076,9 +16076,14 @@ ${fence}`;
     const src = getVideoSrc(video);
     return !!src && window._input_file.includes(src);
   }
+  var _videosWithControlsRemoved = /* @__PURE__ */ new Set();
   ModifyModeClassifier.register({
     label: "Videos",
     classify(slideEl) {
+      for (const video of _videosWithControlsRemoved) {
+        video.setAttribute("controls", "");
+      }
+      _videosWithControlsRemoved.clear();
       const videos = Array.from(slideEl.querySelectorAll("video"));
       const valid = [];
       const warn = [];
@@ -16096,9 +16101,20 @@ ${fence}`;
           valid.push(video);
         }
       }
+      for (const video of valid) {
+        video.removeAttribute("controls");
+        _videosWithControlsRemoved.add(video);
+      }
       return { valid, warn };
     },
+    cleanup() {
+      for (const video of _videosWithControlsRemoved) {
+        video.setAttribute("controls", "");
+      }
+      _videosWithControlsRemoved.clear();
+    },
     activate(video) {
+      _videosWithControlsRemoved.delete(video);
       const originalSrc = getVideoSrc(video);
       if (!video.getAttribute("src") && video.getAttribute("data-src")) {
         video.src = video.getAttribute("data-src");
@@ -16452,6 +16468,10 @@ ${fence}`;
     Reveal.off("slidechanged", applyClassification);
     abortController?.abort();
     abortController = null;
+    for (const classifier of _classifiers) {
+      if (typeof classifier.cleanup === "function")
+        classifier.cleanup();
+    }
     document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
