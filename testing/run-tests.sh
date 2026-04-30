@@ -459,6 +459,7 @@ echo "--- Modify Mode Tests ---"
 run_render_test "Test 23: Modify mode rendering" "modify-mode.qmd" "inject"
 run_render_test "Test 24: Modify mode absolute divs rendering" "modify-mode-absolute.qmd" "inject"
 run_render_test "Test 25: Modify mode absolute images rendering" "modify-mode-absolute-img.qmd" "inject"
+run_render_test "Test 26: Modify mode video rendering" "modify-mode-video.qmd" "inject"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

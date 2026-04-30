@@ -166,6 +166,10 @@ function setupEltStyles(elt) {
     width = elt.naturalWidth || width;
     height = elt.naturalHeight || height;
   }
+  if (elt.tagName.toLowerCase() === "video" && (width === 0 || height === 0)) {
+    width = elt.videoWidth || width || 300;
+    height = elt.videoHeight || height || 150;
+  }
 
   elt.style.width = width + "px";
   elt.style.height = height + "px";
@@ -295,4 +299,14 @@ export function setupDivWhenReady(div) {
   };
 
   requestAnimationFrame(checkAndSetup);
+}
+
+/**
+ * Set up a video element once it has valid dimensions.
+ * @param {HTMLVideoElement} video - Video element
+ */
+export function setupVideoWhenReady(video) {
+  // Unlike images, videos may have zero dimensions in some browsers before
+  // metadata loads. setupEltStyles handles the fallback, so call immediately.
+  setupDraggableElt(video);
 }

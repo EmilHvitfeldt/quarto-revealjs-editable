@@ -386,6 +386,7 @@
 
 /* Modify mode: valid elements get a persistent green ring */
 .modify-mode img.modify-mode-valid,
+.modify-mode video.modify-mode-valid,
 .modify-mode div.absolute.modify-mode-valid {
   box-shadow: var(--editable-modify-valid-shadow);
   cursor: pointer;
@@ -393,12 +394,14 @@
 }
 
 .modify-mode img.modify-mode-valid:hover,
+.modify-mode video.modify-mode-valid:hover,
 .modify-mode div.absolute.modify-mode-valid:hover {
   box-shadow: var(--editable-modify-valid-hover-shadow);
 }
 
 /* Modify mode: elements that cannot be targeted get an amber warning ring (not clickable) */
 .modify-mode img.modify-mode-warn,
+.modify-mode video.modify-mode-warn,
 .modify-mode div.absolute.modify-mode-warn {
   box-shadow: var(--editable-modify-warn-shadow);
   cursor: not-allowed;

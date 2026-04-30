@@ -31,7 +31,7 @@
  */
 
 import { editableRegistry } from './editable-element.js';
-import { setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
+import { setupImageWhenReady, setupDivWhenReady, setupVideoWhenReady } from './element-setup.js';
 import { showRightPanel } from './toolbar.js';
 import {
   splitIntoSlideChunks,
@@ -93,6 +93,8 @@ export function getWarnReason(el) {
  *   Called when the user clicks a valid element.
  * @property {function(string): string} [serialize]
  *   Optional. Called during save; receives and returns the full QMD string.
+ * @property {function(): void} [cleanup]
+ *   Optional. Called when modify mode exits; restore any DOM changes made in classify().
  */
 
 const _classifiers = [];
@@ -241,6 +243,141 @@ ModifyModeClassifier.register({
 
       const replacements = groupImgs.map(img => {
         const dims = editableRegistry.get(img).toDimensions();
+        return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+      });
+
+      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
+
+      let occurrence = 0;
+      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
+        occurrence < replacements.length ? replacements[occurrence++] : match
+      );
+    }
+
+    return chunks.join('');
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Video classifier (built-in)
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the effective src of a video element.
+ * Checks the src attribute directly on the element first, then falls back to
+ * the first <source> child (Quarto may render either form).
+ * @param {HTMLVideoElement} video
+ * @returns {string|null}
+ */
+export function getVideoSrc(video) {
+  return video.getAttribute('src') || video.getAttribute('data-src') ||
+    video.querySelector('source')?.getAttribute('src') || null;
+}
+
+function videoSrcInQmdSource(video) {
+  if (!window._input_file) return false;
+  const src = getVideoSrc(video);
+  return !!src && window._input_file.includes(src);
+}
+
+// Tracks videos whose `controls` attribute was removed during classification
+// so it can be restored when modify mode exits without activating them.
+const _videosWithControlsRemoved = new Set();
+
+ModifyModeClassifier.register({
+  label: 'Videos',
+  classify(slideEl) {
+    // Restore controls on any videos from a previous classification pass
+    // (e.g. the user navigated slides without clicking).
+    for (const video of _videosWithControlsRemoved) {
+      video.setAttribute('controls', '');
+    }
+    _videosWithControlsRemoved.clear();
+
+    const videos = Array.from(slideEl.querySelectorAll('video'));
+    const valid = [];
+    const warn  = [];
+
+    for (const video of videos) {
+      if (editableRegistry.has(video)) continue;
+      if (video.classList.contains('absolute')) continue;
+      if (video.closest('div.absolute')) continue;
+      const src = getVideoSrc(video);
+      if (!src) continue;
+      if (videoSrcInQmdSource(video)) {
+        valid.push(video);
+      }
+    }
+
+    // Remove native controls from valid videos so browser-native control UI
+    // doesn't intercept the click before our listener fires (Firefox issue).
+    for (const video of valid) {
+      video.removeAttribute('controls');
+      _videosWithControlsRemoved.add(video);
+    }
+
+    return { valid, warn };
+  },
+
+  cleanup() {
+    for (const video of _videosWithControlsRemoved) {
+      video.setAttribute('controls', '');
+    }
+    _videosWithControlsRemoved.clear();
+  },
+
+  activate(video) {
+    // Don't restore controls on this video — it's now an editable element.
+    _videosWithControlsRemoved.delete(video);
+
+    const originalSrc = getVideoSrc(video);
+
+    if (!video.getAttribute('src') && video.getAttribute('data-src')) {
+      video.src = video.getAttribute('data-src');
+    }
+
+    video.dataset.editableModifiedSrc   = originalSrc;
+    video.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+    video.dataset.editableModified      = 'true';
+
+    // Reveal.js sets max-width: 95% on media elements. Once inside the
+    // inline-block editable-container, that percentage resolves against the
+    // explicit style.width, shrinking the element further. Clear it first.
+    video.style.maxWidth  = 'none';
+    video.style.maxHeight = 'none';
+
+    setupVideoWhenReady(video);
+  },
+
+  serialize(text) {
+    const videos = Array.from(
+      document.querySelectorAll('video[data-editable-modified="true"]')
+    );
+    if (videos.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+
+    const groups = new Map();
+    for (const video of videos) {
+      const originalSrc = video.dataset.editableModifiedSrc;
+      if (!originalSrc) continue;
+      if (!editableRegistry.has(video)) continue;
+      const slideIndex = parseInt(video.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      const key = `${chunkIndex}::${originalSrc}`;
+      if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, videos: [] });
+      groups.get(key).videos.push(video);
+    }
+
+    for (const { chunkIndex, originalSrc, videos: groupVideos } of groups.values()) {
+      groupVideos.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+
+      const replacements = groupVideos.map(video => {
+        const dims = editableRegistry.get(video).toDimensions();
         return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
       });
 
@@ -606,6 +743,10 @@ export function exitModifyMode() {
   Reveal.off('slidechanged', applyClassification);
   abortController?.abort();
   abortController = null;
+
+  for (const classifier of _classifiers) {
+    if (typeof classifier.cleanup === 'function') classifier.cleanup();
+  }
 
   document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
     el.classList.remove(VALID_CLASS, WARN_CLASS);

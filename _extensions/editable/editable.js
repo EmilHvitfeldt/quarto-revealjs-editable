@@ -15124,6 +15124,7 @@ ${escapeText(this.code(index, length))}
   };
   var ELEMENT_CAPABILITIES = {
     img: ["move", "resize", "rotate"],
+    video: ["move", "resize", "rotate"],
     div: ["move", "resize", "rotate", "fontControls", "editText"]
   };
   function getCapabilitiesFor(elementType) {
@@ -15256,6 +15257,10 @@ ${escapeText(this.code(index, length))}
       width = elt.naturalWidth || width;
       height = elt.naturalHeight || height;
     }
+    if (elt.tagName.toLowerCase() === "video" && (width === 0 || height === 0)) {
+      width = elt.videoWidth || width || 300;
+      height = elt.videoHeight || height || 150;
+    }
     elt.style.width = width + "px";
     elt.style.height = height + "px";
     elt.style.display = "block";
@@ -15387,6 +15392,9 @@ ${escapeText(this.code(index, length))}
       }
     };
     requestAnimationFrame(checkAndSetup);
+  }
+  function setupVideoWhenReady(video) {
+    setupDraggableElt(video);
   }
 
   // src/serialization.js
@@ -16059,6 +16067,107 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function getVideoSrc(video) {
+    return video.getAttribute("src") || video.getAttribute("data-src") || video.querySelector("source")?.getAttribute("src") || null;
+  }
+  function videoSrcInQmdSource(video) {
+    if (!window._input_file)
+      return false;
+    const src = getVideoSrc(video);
+    return !!src && window._input_file.includes(src);
+  }
+  var _videosWithControlsRemoved = /* @__PURE__ */ new Set();
+  ModifyModeClassifier.register({
+    label: "Videos",
+    classify(slideEl) {
+      for (const video of _videosWithControlsRemoved) {
+        video.setAttribute("controls", "");
+      }
+      _videosWithControlsRemoved.clear();
+      const videos = Array.from(slideEl.querySelectorAll("video"));
+      const valid = [];
+      const warn = [];
+      for (const video of videos) {
+        if (editableRegistry.has(video))
+          continue;
+        if (video.classList.contains("absolute"))
+          continue;
+        if (video.closest("div.absolute"))
+          continue;
+        const src = getVideoSrc(video);
+        if (!src)
+          continue;
+        if (videoSrcInQmdSource(video)) {
+          valid.push(video);
+        }
+      }
+      for (const video of valid) {
+        video.removeAttribute("controls");
+        _videosWithControlsRemoved.add(video);
+      }
+      return { valid, warn };
+    },
+    cleanup() {
+      for (const video of _videosWithControlsRemoved) {
+        video.setAttribute("controls", "");
+      }
+      _videosWithControlsRemoved.clear();
+    },
+    activate(video) {
+      _videosWithControlsRemoved.delete(video);
+      const originalSrc = getVideoSrc(video);
+      if (!video.getAttribute("src") && video.getAttribute("data-src")) {
+        video.src = video.getAttribute("data-src");
+      }
+      video.dataset.editableModifiedSrc = originalSrc;
+      video.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      video.dataset.editableModified = "true";
+      video.style.maxWidth = "none";
+      video.style.maxHeight = "none";
+      setupVideoWhenReady(video);
+    },
+    serialize(text) {
+      const videos = Array.from(
+        document.querySelectorAll('video[data-editable-modified="true"]')
+      );
+      if (videos.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const groups = /* @__PURE__ */ new Map();
+      for (const video of videos) {
+        const originalSrc = video.dataset.editableModifiedSrc;
+        if (!originalSrc)
+          continue;
+        if (!editableRegistry.has(video))
+          continue;
+        const slideIndex = parseInt(video.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        const key = `${chunkIndex}::${originalSrc}`;
+        if (!groups.has(key))
+          groups.set(key, { chunkIndex, originalSrc, videos: [] });
+        groups.get(key).videos.push(video);
+      }
+      for (const { chunkIndex, originalSrc, videos: groupVideos } of groups.values()) {
+        groupVideos.sort(
+          (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+        );
+        const replacements = groupVideos.map((video) => {
+          const dims = editableRegistry.get(video).toDimensions();
+          return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+        });
+        const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, "g");
+        let occurrence = 0;
+        chunks[chunkIndex] = chunks[chunkIndex].replace(
+          regex,
+          (match2) => occurrence < replacements.length ? replacements[occurrence++] : match2
+        );
+      }
+      return chunks.join("");
+    }
+  });
   function escapeRegex(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
@@ -16359,6 +16468,10 @@ ${fence}`;
     Reveal.off("slidechanged", applyClassification);
     abortController?.abort();
     abortController = null;
+    for (const classifier of _classifiers) {
+      if (typeof classifier.cleanup === "function")
+        classifier.cleanup();
+    }
     document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
