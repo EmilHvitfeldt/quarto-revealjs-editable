@@ -265,7 +265,7 @@ cd testing && npm run test:e2e
 
 ## Modify Mode
 
-Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Currently images are supported; additional element types can be added via the classifier registry.
+Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images, `{.absolute}` images, plain videos, `{.absolute}` divs, and slide titles (`## heading`). Additional types can be added via the classifier registry.
 
 ### Lifecycle
 
@@ -275,7 +275,7 @@ The toolbar "Modify" button calls `toggleModifyMode()`. When entering modify mod
 3. **Warn** elements receive `modify-mode-warn` (amber ring, not clickable); their reason string is stored in `_warnReasons` and readable via `getWarnReason(el)`
 4. A `slidechanged` listener re-runs classification on every slide navigation so rings stay current
 
-Mode stays active after each element is clicked. The user dismisses it by clicking the toolbar button again.
+When the user clicks a valid element, `activate(el)` is called. If `activate` returns a truthy value, modify mode stays active (the classifier manages its own exit — e.g. the slide title classifier keeps the toolbar open until the user clicks away). Otherwise `exitModifyMode()` is called immediately.
 
 ### Classifier Registry
 
@@ -291,7 +291,9 @@ New element types are added by calling `ModifyModeClassifier.register(classifier
     };
   },
 
-  // Required — called when the user clicks a valid element
+  // Required — called when the user clicks a valid element.
+  // Return true to keep modify mode active (classifier calls exitModifyMode itself).
+  // Return falsy to exit modify mode automatically after activation.
   activate(el) {
     // stamp data-attributes, call setupImageWhenReady / setupDivWhenReady, etc.
   },

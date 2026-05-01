@@ -283,7 +283,7 @@ npm run test:e2e
 | New slide between middle slides  | Correct position in multi-slide document         |
 | Multiple text on different slides| Each text on correct corresponding slide         |
 
-**`e2e/modify-mode.spec.js`** - Modify Mode — images (5 tests):
+**`e2e/modify-mode.spec.js`** - Modify Mode — images and headings (9 tests):
 
 | Test | What it verifies |
 |---|---|
@@ -292,6 +292,10 @@ npm run test:e2e
 | Clicking valid image makes it editable | `.editable-container img` appears; toolbar stays active |
 | Clicking Modify again exits modify mode | `modify-mode-valid` and `active` classes removed |
 | Modified image serializes to correct slide chunk | `{.absolute` only in activated slide's chunk |
+| Same image on two slides: modifying slide 1 does not affect slide 2 | `{.absolute` only in slide 1 chunk |
+| h2 title is classified as valid in modify mode | `h2.modify-mode-valid` count = 1 |
+| Clicking h2 title makes it contentEditable and exits modify mode | `h2[contenteditable="true"]` present |
+| Editing h2 title serializes back to QMD | `## Updated Title` in the serialized chunk |
 
 **`e2e/modify-mode-absolute.spec.js`** - Modify Mode — `{.absolute}` divs (6 tests):
 

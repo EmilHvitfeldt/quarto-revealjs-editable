@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npx playwright *)",
+      "Bash(node -e ' *)",
+      "Bash(quarto render *)",
+      "Bash(timeout 60 cat)"
+    ]
+  }
+}

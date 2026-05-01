@@ -16407,6 +16407,222 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function headingHtmlToMarkdown(html) {
+    let text = html;
+    text = text.replace(
+      /<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, colorVal, content) => `[${content}]{style='background-color: ${getBrandColorOutput(colorVal.trim())}'}`
+    );
+    text = text.replace(
+      /<span[^>]*style="[^"]*(?<!background-)color:\s*([^;"]+)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, colorVal, content) => {
+        if (colorVal.trim().toLowerCase() === "inherit")
+          return content;
+        return `[${content}]{style='color: ${getBrandColorOutput(colorVal.trim())}'}`;
+      }
+    );
+    text = text.replace(
+      /<font[^>]*\bcolor="([^"]+)"[^>]*>([\s\S]*?)<\/font>/gi,
+      (_, colorVal, content) => `[${content}]{style='color: ${getBrandColorOutput(colorVal.trim())}'}`
+    );
+    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+  }
+  function buildColorPicker(execCmd, title, pickerClass, presetColors) {
+    let savedRange = null;
+    const saveSelection = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount)
+        savedRange = sel.getRangeAt(0).cloneRange();
+    };
+    const restoreSelection = () => {
+      if (!savedRange)
+        return;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    };
+    const isForeground = execCmd === "foreColor";
+    const iconSvg = isForeground ? '<svg viewbox="0 0 18 18"><line class="ql-color-label ql-stroke ql-transparent" x1="3" x2="15" y1="15" y2="15"/><polyline class="ql-stroke" points="5.5 11 9 3 12.5 11"/><line class="ql-stroke" x1="11.63" x2="6.38" y1="9" y2="9"/></svg>' : '<svg viewbox="0 0 18 18"><g class="ql-fill ql-color-label"><polygon points="6 6.868 6 6 5 6 5 7 5.942 7 6 6.868"/><rect height="1" width="1" x="4" y="4"/><polygon points="6.817 5 6 5 6 6 6.38 6 6.817 5"/><rect height="1" width="1" x="2" y="6"/><rect height="1" width="1" x="3" y="5"/><polygon points="11.183 5 11.62 6 12 6 12 5 11.183 5"/><rect height="1" width="1" x="11" y="4"/><polygon points="12 6.868 12.058 7 13 7 13 6 12 6 12 6.868"/><rect height="1" width="1" x="13" y="6"/><rect height="1" width="1" x="14" y="4"/><polygon points="14 5 13.367 5 13.82 6 14 6 14 5"/><rect height="1" width="1" x="14" y="7"/><rect height="1" width="1" x="14" y="2"/><rect height="1" width="1" x="13" y="3"/><polygon points="12 3.132 12 3 11 3 11 4 11.183 4 12 3.132"/><rect height="1" width="1" x="10" y="2"/><rect height="1" width="1" x="9" y="3"/><rect height="1" width="1" x="8" y="2"/><rect height="1" width="1" x="7" y="3"/><rect height="1" width="1" x="6" y="2"/><rect height="1" width="1" x="5" y="3"/><polygon points="3.917 5 4 5 4 6 4.075 6 3.917 5"/><rect height="1" width="1" x="3" y="7"/><rect height="1" width="1" x="2" y="4"/></g><rect class="ql-stroke" height="12" rx="1" ry="1" width="12" x="3" y="3"/></svg>';
+    const label = document.createElement("span");
+    label.className = "ql-picker-label";
+    label.title = title;
+    label.innerHTML = iconSvg;
+    const options = document.createElement("span");
+    options.className = "ql-picker-options";
+    options.style.display = "none";
+    const addItem = (value, bg) => {
+      const item = document.createElement("span");
+      item.className = "ql-picker-item";
+      item.dataset.value = value;
+      if (bg)
+        item.style.backgroundColor = bg;
+      options.appendChild(item);
+      return item;
+    };
+    addItem("unset");
+    for (const color of presetColors)
+      addItem(color, color);
+    const customInput = document.createElement("input");
+    customInput.type = "color";
+    customInput.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;";
+    const updateSwatch = (color) => {
+      const swatchEl = label.querySelector(".ql-color-label");
+      if (swatchEl)
+        swatchEl.style[isForeground ? "stroke" : "fill"] = color || "";
+    };
+    customInput.addEventListener("input", () => {
+      restoreSelection();
+      document.execCommand(execCmd, false, customInput.value);
+      updateSwatch(customInput.value);
+    });
+    addItem("custom");
+    const picker = document.createElement("span");
+    picker.className = `ql-picker ql-color-picker ${pickerClass}`;
+    picker.appendChild(label);
+    picker.appendChild(options);
+    picker.appendChild(customInput);
+    label.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      saveSelection();
+      const isOpen = picker.classList.contains("ql-expanded");
+      picker.closest(".heading-edit-toolbar")?.querySelectorAll(".ql-expanded").forEach((p) => {
+        p.classList.remove("ql-expanded");
+        p.querySelector(".ql-picker-options").style.display = "none";
+      });
+      if (!isOpen) {
+        picker.classList.add("ql-expanded");
+        options.style.display = "flex";
+      }
+    });
+    options.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const item = e.target.closest(".ql-picker-item");
+      if (!item)
+        return;
+      picker.classList.remove("ql-expanded");
+      options.style.display = "none";
+      const value = item.dataset.value;
+      if (value === "custom") {
+        customInput.click();
+        return;
+      }
+      restoreSelection();
+      if (value === "unset") {
+        document.execCommand(execCmd, false, "inherit");
+        updateSwatch("");
+      } else {
+        document.execCommand(execCmd, false, value);
+        updateSwatch(value);
+      }
+    });
+    return picker;
+  }
+  function buildHeadingToolbar(h2) {
+    const toolbar = document.createElement("div");
+    toolbar.className = "heading-edit-toolbar quill-toolbar-container ql-toolbar ql-snow";
+    const buttons = [
+      { command: "bold", label: "B", title: "Bold", style: "font-weight:bold" },
+      { command: "italic", label: "I", title: "Italic", style: "font-style:italic" },
+      { command: "underline", label: "U", title: "Underline", style: "text-decoration:underline" },
+      { command: "strikeThrough", label: "S", title: "Strikethrough", style: "text-decoration:line-through" }
+    ];
+    for (const { command, label, title, style } of buttons) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = label;
+      btn.title = title;
+      btn.style.cssText = style;
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand(command);
+      });
+      toolbar.appendChild(btn);
+    }
+    const presetColors = getColorPalette();
+    toolbar.appendChild(buildColorPicker("foreColor", "Text color", "ql-color", presetColors));
+    toolbar.appendChild(buildColorPicker("backColor", "Background color", "ql-background", presetColors));
+    const onDocMouseDown = (e) => {
+      if (!toolbar.contains(e.target)) {
+        toolbar.querySelectorAll(".ql-expanded").forEach((p) => {
+          p.classList.remove("ql-expanded");
+          p.querySelector(".ql-picker-options").style.display = "none";
+        });
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    toolbar._cleanup = () => document.removeEventListener("mousedown", onDocMouseDown);
+    return toolbar;
+  }
+  ModifyModeClassifier.register({
+    label: "Slide titles",
+    classify(slideEl) {
+      const h2 = slideEl.querySelector("h2");
+      if (!h2)
+        return { valid: [], warn: [] };
+      if (h2.classList.contains("editable-heading-active"))
+        return { valid: [], warn: [] };
+      return { valid: [h2], warn: [] };
+    },
+    activate(h2) {
+      if (h2.classList.contains("editable-heading-active"))
+        return true;
+      h2.dataset.editableModifiedHeading = "true";
+      h2.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      h2.dataset.editableModifiedOriginalHtml = h2.innerHTML;
+      h2.classList.add("editable-heading-active");
+      exitModifyMode({ resetPanel: false });
+      h2.contentEditable = "true";
+      h2.focus();
+      const range = document.createRange();
+      range.selectNodeContents(h2);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      const toolbar = buildHeadingToolbar(h2);
+      const textPanel = document.querySelector(".toolbar-panel-text");
+      if (textPanel)
+        textPanel.appendChild(toolbar);
+      showRightPanel("text");
+      const onKeyDown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          h2.blur();
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          h2.innerHTML = h2.dataset.editableModifiedOriginalHtml;
+          h2.blur();
+        }
+      };
+      h2.addEventListener("keydown", onKeyDown);
+      h2.addEventListener("blur", () => {
+        h2.removeEventListener("keydown", onKeyDown);
+        h2.contentEditable = "false";
+        h2.classList.remove("editable-heading-active");
+        toolbar._cleanup?.();
+        toolbar.remove();
+        showRightPanel("default");
+      }, { once: true });
+      return true;
+    },
+    serialize(text) {
+      const headings = Array.from(
+        document.querySelectorAll('h2[data-editable-modified-heading="true"]')
+      );
+      if (!headings.length)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      for (const h2 of headings) {
+        const slideIndex = parseInt(h2.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        const newText = headingHtmlToMarkdown(h2.innerHTML);
+        chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+      }
+      return chunks.join("");
+    }
+  });
   function classifyElements() {
     const reveal = document.querySelector(".reveal");
     const currentSlide = reveal?.querySelector(".slides section.present:not(.slide-background)") ?? reveal;
@@ -16462,7 +16678,7 @@ ${fence}`;
     applyClassification();
     Reveal.on("slidechanged", applyClassification);
   }
-  function exitModifyMode() {
+  function exitModifyMode({ resetPanel = true } = {}) {
     _active = false;
     document.querySelector(".reveal")?.classList.remove(ROOT_CLASS);
     Reveal.off("slidechanged", applyClassification);
@@ -16476,7 +16692,8 @@ ${fence}`;
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
     document.querySelector(".toolbar-modify")?.classList.remove("active");
-    showRightPanel("default");
+    if (resetPanel)
+      showRightPanel("default");
   }
   function toggleModifyMode() {
     if (_active) {
@@ -16489,8 +16706,9 @@ ${fence}`;
   function onValidElementClick(e, classifier) {
     e.stopPropagation();
     const el = e.currentTarget;
-    classifier.activate(el);
-    exitModifyMode();
+    const stayActive = classifier.activate(el);
+    if (!stayActive)
+      exitModifyMode();
   }
 
   // src/io.js
