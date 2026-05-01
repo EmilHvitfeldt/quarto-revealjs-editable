@@ -93,4 +93,44 @@ test.describe('Modify Mode', () => {
     expect(slide1).toContain('{.absolute');
     expect(slide2).not.toContain('{.absolute');
   });
+
+  test('h2 title is classified as valid in modify mode', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
+    await page.click('.toolbar-modify');
+
+    const validH2 = await page.locator('h2.modify-mode-valid').count();
+    expect(validH2).toBe(1);
+  });
+
+  test('clicking h2 title makes it contentEditable and exits modify mode', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
+    await page.click('.toolbar-modify');
+
+    await page.locator('h2.modify-mode-valid').click();
+
+    // h2 should be contentEditable after activation
+    const editable = await page.locator('h2[contenteditable="true"]').count();
+    expect(editable).toBe(1);
+
+    // Modify mode should be inactive
+    expect(await page.locator('.toolbar-modify.active').count()).toBe(0);
+  });
+
+  test('editing h2 title serializes back to QMD', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
+    await page.click('.toolbar-modify');
+    await page.locator('h2.modify-mode-valid').click();
+
+    // Clear and type new heading text
+    await page.locator('h2[contenteditable="true"]').fill('Updated Title');
+
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const chunks = qmd.split(/(?=^## )/m);
+    const slide1 = chunks.find(c => c.includes('## Slide 1') || c.includes('## Updated Title')) ?? '';
+
+    expect(slide1).toMatch(/^## Updated Title/m);
+  });
 });

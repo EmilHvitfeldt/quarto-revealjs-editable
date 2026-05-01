@@ -27,9 +27,9 @@ New elements are marked with a dashed border to distinguish them from original c
 
 Not every element needs to be marked with `{.editable}` in advance. Click the **Modify** button in the menu bar to enter modify mode, then click any highlighted element to make it editable on the fly.
 
-Elements that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Click a highlighted element to activate it — it becomes a fully editable element supporting drag, resize, and rotate. Modify mode exits automatically after you activate an element.
+Elements that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Click a highlighted element to activate it. Modify mode exits automatically after activation (except for slide titles, which stay in edit mode until you click away or press Enter).
 
-After saving, the element's position and size are written back to your `.qmd` file.
+After saving, changes are written back to your `.qmd` file.
 
 Currently supported element types:
 
@@ -37,9 +37,13 @@ Currently supported element types:
 |---|---|---|
 | Plain image | `![](image.png)` | Move, resize, rotate |
 | `{.absolute}` image | `![](image.png){.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate |
+| Plain video | `![](video.mp4)` | Move, resize, rotate |
 | `{.absolute}` div | `::: {.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate, text editing |
+| Slide title | `## Heading text` | Text editing with formatting toolbar |
 
-Plain images are any image inserted directly in a slide without positional attributes. `{.absolute}` images and divs are elements that have already been positioned by a prior save — they carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
+Plain images and videos are inserted directly in a slide without positional attributes. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
+
+Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
 
 ::: {.callout-note}
 Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode.
