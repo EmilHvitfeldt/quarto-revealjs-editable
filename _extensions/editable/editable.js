@@ -16570,6 +16570,7 @@ ${fence}`;
       h2.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
       h2.dataset.editableModifiedOriginalHtml = h2.innerHTML;
       h2.classList.add("editable-heading-active");
+      exitModifyMode({ resetPanel: false });
       h2.contentEditable = "true";
       h2.focus();
       const range = document.createRange();
@@ -16600,7 +16601,7 @@ ${fence}`;
         h2.classList.remove("editable-heading-active");
         toolbar._cleanup?.();
         toolbar.remove();
-        exitModifyMode();
+        showRightPanel("default");
       }, { once: true });
       return true;
     },
@@ -16677,7 +16678,7 @@ ${fence}`;
     applyClassification();
     Reveal.on("slidechanged", applyClassification);
   }
-  function exitModifyMode() {
+  function exitModifyMode({ resetPanel = true } = {}) {
     _active = false;
     document.querySelector(".reveal")?.classList.remove(ROOT_CLASS);
     Reveal.off("slidechanged", applyClassification);
@@ -16691,7 +16692,8 @@ ${fence}`;
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
     document.querySelector(".toolbar-modify")?.classList.remove("active");
-    showRightPanel("default");
+    if (resetPanel)
+      showRightPanel("default");
   }
   function toggleModifyMode() {
     if (_active) {

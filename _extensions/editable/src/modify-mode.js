@@ -867,6 +867,10 @@ ModifyModeClassifier.register({
     h2.dataset.editableModifiedOriginalHtml = h2.innerHTML;
     h2.classList.add('editable-heading-active');
 
+    // Exit modify mode visually (green rings gone, button inactive) but keep
+    // the text panel so the formatting toolbar can be shown immediately after.
+    exitModifyMode({ resetPanel: false });
+
     h2.contentEditable = 'true';
     h2.focus();
 
@@ -900,10 +904,10 @@ ModifyModeClassifier.register({
       h2.classList.remove('editable-heading-active');
       toolbar._cleanup?.();
       toolbar.remove();
-      exitModifyMode();
+      showRightPanel('default');
     }, { once: true });
 
-    return true; // signal: don't call exitModifyMode() from onValidElementClick
+    return true; // exitModifyMode already called above; skip it in onValidElementClick
   },
 
   serialize(text) {
@@ -1014,7 +1018,7 @@ export function enterModifyMode() {
  * Exit modify mode: remove all classification classes, listeners, and the
  * toolbar active state.
  */
-export function exitModifyMode() {
+export function exitModifyMode({ resetPanel = true } = {}) {
   _active = false;
   document.querySelector('.reveal')?.classList.remove(ROOT_CLASS);
   Reveal.off('slidechanged', applyClassification);
@@ -1030,7 +1034,7 @@ export function exitModifyMode() {
   });
 
   document.querySelector('.toolbar-modify')?.classList.remove('active');
-  showRightPanel('default');
+  if (resetPanel) showRightPanel('default');
 }
 
 /**

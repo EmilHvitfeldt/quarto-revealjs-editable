@@ -114,7 +114,7 @@ test.describe('Modify Mode', () => {
     const editable = await page.locator('h2[contenteditable="true"]').count();
     expect(editable).toBe(1);
 
-    // Modify mode should be inactive
+    // Modify mode should be inactive (exited on click, formatting toolbar takes over)
     expect(await page.locator('.toolbar-modify.active').count()).toBe(0);
   });
 
