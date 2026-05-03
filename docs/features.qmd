@@ -11,7 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-| Modify | Activate plain images, `{.absolute}` images, or `{.absolute}` divs for editing |
+| Modify | Activate plain images, `{.absolute}` images, `{.absolute}` divs, fenced divs, callouts, columns, or slide titles for editing |
 
 ## Adding New Elements
 
@@ -39,9 +39,15 @@ Currently supported element types:
 | `{.absolute}` image | `![](image.png){.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate |
 | Plain video | `![](video.mp4)` | Move, resize, rotate |
 | `{.absolute}` div | `::: {.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate, text editing |
+| Classed fenced div | `::: {.my-class}` | Move, resize, rotate, text editing |
+| Id-keyed fenced div | `::: {#my-id}` | Move, resize, rotate, text editing |
+| Callout block | `::: {.callout-note}` (and other callout types) | Move, resize, rotate |
+| Column layout | `::: {.columns}` | Move, resize, rotate |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
 
 Plain images and videos are inserted directly in a slide without positional attributes. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
+
+Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
 
 Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
 

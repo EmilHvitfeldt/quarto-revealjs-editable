@@ -479,12 +479,28 @@ export const ELEMENT_CAPABILITIES = {
   div: ["move", "resize", "rotate", "fontControls", "editText"],
 };
 
+/** Per-element capability overrides set before setup (e.g., columns → move only). */
+const _capabilityOverrides = new WeakMap();
+
+/**
+ * Override the capabilities for a specific element before it is set up.
+ * @param {Element} el
+ * @param {string[]} capabilityNames
+ */
+export function setCapabilityOverride(el, capabilityNames) {
+  _capabilityOverrides.set(el, capabilityNames);
+}
+
 /**
  * Get capability objects for an element type.
  * @param {string} elementType - Element type ("img" or "div")
+ * @param {Element} [el] - Optional element to check for overrides
  * @returns {Object[]} Array of capability objects
  */
-export function getCapabilitiesFor(elementType) {
+export function getCapabilitiesFor(elementType, el) {
+  if (el && _capabilityOverrides.has(el)) {
+    return _capabilityOverrides.get(el).map((name) => Capabilities[name]).filter(Boolean);
+  }
   const capabilityNames = ELEMENT_CAPABILITIES[elementType] || ["move", "resize"];
   return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);
 }

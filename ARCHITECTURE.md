@@ -265,7 +265,7 @@ cd testing && npm run test:e2e
 
 ## Modify Mode
 
-Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images, `{.absolute}` images, plain videos, `{.absolute}` divs, and slide titles (`## heading`). Additional types can be added via the classifier registry.
+Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images, `{.absolute}` images, plain videos, `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), and slide titles (`## heading`). Additional types can be added via the classifier registry.
 
 ### Lifecycle
 
@@ -316,6 +316,18 @@ The built-in image classifier's `serialize()` uses `splitIntoSlideChunks()` to s
 **After saving**, the image's markdown gains `{.absolute ...}` attributes. On the next render it will be a regular absolute-positioned image (not re-editable without `{.editable}`).
 
 The `{.absolute}` div classifier works similarly but matches the source block by its original position values. At `activate()` time it captures the element's inline `left`/`top`/`width`/`height` into `data-editable-modified-abs-*` attributes before `setupDivWhenReady` overwrites the element's `position` style. `waitForRegistryThenFixPosition()` polls until the element appears in `editableRegistry`, then calls `setState({x, y})` to move the container to the correct position. During `serialize()`, `makeAbsoluteBlockRegex()` builds a regex with four lookaheads (one per original dimension value) to locate the matching `{.absolute ...}` block in the slide chunk regardless of attribute order. Occurrence counters handle the edge case of two divs with identical original positions on the same slide.
+
+### Fenced Div Classifier
+
+The fenced div classifier (`classify()`) parses the slide's QMD chunk via `parseFencedDivOpens()` to find top-level fenced div opening lines, tracking nesting depth so inner fences are ignored. Each opening is assigned a `matchKey`: the first class (`.my-class`), id (`#my-id`), or `null` for keyless divs. Direct-child divs of the slide are matched to these openings by key, with positional indexing among keyless fences as fallback.
+
+At `activate()` time, the element's natural position is captured via `getBoundingClientRect()` relative to the slide section and divided by the Reveal.js CSS scale. After `setupDivWhenReady`, `waitForRegistryThenFixPosition()` places the container at the correct position.
+
+**Callout blocks** are a special case in `serialize()`: Quarto's callout renderer ignores positional attrs on the callout fence itself, so instead of modifying the callout's own fence line, a `:::: {.absolute ...}` wrapper div is inserted around the entire callout block. Height is intentionally omitted from callout wrappers — callout height is content-determined and saving an explicit height causes a mismatch since the callout renders at content height after re-render regardless of the wrapper's height.
+
+**Column layouts** (`.columns`) have two extra steps in `activate()`: (1) natural width and height are read before `setupDivWhenReady` and applied via `setState` afterward, because `createEltContainer` reparents the element into an `inline-block` container where `offsetWidth` would collapse to fit-content; (2) `display: flex` is restored after `setupEltStyles` sets `display: block`, which would otherwise break the two-column layout.
+
+**Per-element capability overrides**: `setCapabilityOverride(el, names)` in `capabilities.js` stores a `WeakMap` entry that `getCapabilitiesFor(type, el)` checks before falling back to `ELEMENT_CAPABILITIES`. Column layouts use `['move', 'resize', 'rotate']` (no text editing); `setCapabilityOverride` is called in `activate()` before `setupDivWhenReady` so the override is in place when `setupDraggableElt` calls `getCapabilitiesFor`.
 
 ### Source Note on `data-src`
 

@@ -388,6 +388,7 @@
 .modify-mode img.modify-mode-valid,
 .modify-mode video.modify-mode-valid,
 .modify-mode div.absolute.modify-mode-valid,
+.modify-mode div.modify-mode-valid,
 .modify-mode h2.modify-mode-valid {
   box-shadow: var(--editable-modify-valid-shadow);
   cursor: pointer;
@@ -397,6 +398,7 @@
 .modify-mode img.modify-mode-valid:hover,
 .modify-mode video.modify-mode-valid:hover,
 .modify-mode div.absolute.modify-mode-valid:hover,
+.modify-mode div.modify-mode-valid:hover,
 .modify-mode h2.modify-mode-valid:hover {
   box-shadow: var(--editable-modify-valid-hover-shadow);
 }
@@ -405,6 +407,7 @@
 .modify-mode img.modify-mode-warn,
 .modify-mode video.modify-mode-warn,
 .modify-mode div.absolute.modify-mode-warn,
+.modify-mode div.modify-mode-warn,
 .modify-mode h2.modify-mode-warn {
   box-shadow: var(--editable-modify-warn-shadow);
   cursor: not-allowed;

@@ -1,0 +1,57 @@
+---
+---
+
+## Slide 1 - Classed div
+
+::: {.my-class}
+Some text in a classed div
+:::
+
+## Slide 2 - Callout
+
+::: {.callout-note}
+A note callout
+:::
+
+## Slide 3 - Columns
+
+::: {.columns}
+::: {.column width="50%"}
+Left column
+:::
+::: {.column width="50%"}
+Right column
+:::
+:::
+
+## Slide 4 - Multiple divs with different classes
+
+::: {.first-class}
+First div
+:::
+
+::: {.second-class}
+Second div
+:::
+
+## Slide 5 - Two divs with the same class
+
+::: {.shared-class}
+First instance of shared-class
+:::
+
+::: {.shared-class}
+Second instance of shared-class
+:::
+
+## Slide 6 - Same class as slide 1 (cross-slide isolation)
+
+::: {.my-class}
+This is on a different slide than the other .my-class div
+:::
+
+## Slide 7 - Id-keyed div
+
+::: {#my-special-id}
+Content keyed by id, no class
+:::
