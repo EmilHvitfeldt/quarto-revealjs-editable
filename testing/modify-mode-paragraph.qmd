@@ -1,0 +1,22 @@
+---
+---
+
+## Slide 1 - Single paragraph
+
+A single paragraph on this slide.
+
+## Slide 2 - Multiple paragraphs
+
+First paragraph on this slide.
+
+Second paragraph on this slide.
+
+## Slide 3 - Paragraph with inline markdown
+
+A paragraph with **bold** and *italic* text.
+
+## Slide 4 - Paragraph alongside image
+
+A paragraph alongside an image.
+
+![](../image.png)

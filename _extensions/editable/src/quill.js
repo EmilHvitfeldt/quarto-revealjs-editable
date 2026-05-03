@@ -20,8 +20,9 @@ export const quillInstances = new Map();
  * @returns {Object|null} Quill data object or null if failed
  */
 export function initializeQuillForElement(element) {
-  // Only for div elements
-  if (element.tagName.toLowerCase() !== "div") return null;
+  // Only for div and p elements
+  const tag = element.tagName.toLowerCase();
+  if (tag !== "div" && tag !== "p") return null;
 
   // Skip if already initialized
   if (quillInstances.has(element)) return quillInstances.get(element);
