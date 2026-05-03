@@ -477,6 +477,7 @@ export const ELEMENT_CAPABILITIES = {
   img: ["move", "resize", "rotate"],
   video: ["move", "resize", "rotate"],
   div: ["move", "resize", "rotate", "fontControls", "editText"],
+  p: ["move", "resize", "rotate", "fontControls", "editText"],
 };
 
 /** Per-element capability overrides set before setup (e.g., columns → move only). */

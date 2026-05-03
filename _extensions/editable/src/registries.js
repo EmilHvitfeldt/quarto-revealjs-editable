@@ -19,7 +19,7 @@ import { showRightPanel } from './toolbar.js';
  *   ariaLabel: "My control",
  *   title: "Tooltip text",
  *   className: "my-control-class",
- *   appliesTo: ["div"],
+ *   appliesTo: ["div", "p"],
  *   onClick: (element, btn, e) => { ... }
  * });
  */
@@ -78,7 +78,7 @@ ControlRegistry.register("decreaseFont", {
   ariaLabel: "Decrease font size",
   title: "Decrease font size",
   className: "editable-button-font editable-button-decrease",
-  appliesTo: ["div"],
+  appliesTo: ["div", "p"],
   onClick: (element) => {
     pushUndoState();
     changeFontSize(element, -CONFIG.FONT_SIZE_STEP, editableRegistry);
@@ -90,7 +90,7 @@ ControlRegistry.register("increaseFont", {
   ariaLabel: "Increase font size",
   title: "Increase font size",
   className: "editable-button-font editable-button-increase",
-  appliesTo: ["div"],
+  appliesTo: ["div", "p"],
   onClick: (element) => {
     pushUndoState();
     changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
@@ -107,7 +107,7 @@ for (const [name, icon, label, value] of [
     ariaLabel: `Align text ${value}`,
     title: `Align ${label}`,
     className: "editable-button-align",
-    appliesTo: ["div"],
+    appliesTo: ["div", "p"],
     onClick: (element) => {
       pushUndoState();
       const editableElt = editableRegistry.get(element);
@@ -122,7 +122,7 @@ ControlRegistry.register("editMode", {
   title: "Edit Text",
   className: "editable-button-edit",
   toggle: true,
-  appliesTo: ["div"],
+  appliesTo: ["div", "p"],
   onClick: (element, btn) => {
     // Use button's active class as the source of truth for edit state
     const isEditing = btn.classList.contains("active");

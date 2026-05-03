@@ -12233,7 +12233,8 @@ ${escapeText(this.code(index, length))}
   // src/quill.js
   var quillInstances = /* @__PURE__ */ new Map();
   function initializeQuillForElement(element) {
-    if (element.tagName.toLowerCase() !== "div")
+    const tag = element.tagName.toLowerCase();
+    if (tag !== "div" && tag !== "p")
       return null;
     if (quillInstances.has(element))
       return quillInstances.get(element);
@@ -14363,7 +14364,7 @@ ${escapeText(this.code(index, length))}
     ariaLabel: "Decrease font size",
     title: "Decrease font size",
     className: "editable-button-font editable-button-decrease",
-    appliesTo: ["div"],
+    appliesTo: ["div", "p"],
     onClick: (element) => {
       pushUndoState();
       changeFontSize(element, -CONFIG.FONT_SIZE_STEP, editableRegistry);
@@ -14374,7 +14375,7 @@ ${escapeText(this.code(index, length))}
     ariaLabel: "Increase font size",
     title: "Increase font size",
     className: "editable-button-font editable-button-increase",
-    appliesTo: ["div"],
+    appliesTo: ["div", "p"],
     onClick: (element) => {
       pushUndoState();
       changeFontSize(element, CONFIG.FONT_SIZE_STEP, editableRegistry);
@@ -14390,7 +14391,7 @@ ${escapeText(this.code(index, length))}
       ariaLabel: `Align text ${value}`,
       title: `Align ${label}`,
       className: "editable-button-align",
-      appliesTo: ["div"],
+      appliesTo: ["div", "p"],
       onClick: (element) => {
         pushUndoState();
         const editableElt = editableRegistry.get(element);
@@ -14407,7 +14408,7 @@ ${escapeText(this.code(index, length))}
     title: "Edit Text",
     className: "editable-button-edit",
     toggle: true,
-    appliesTo: ["div"],
+    appliesTo: ["div", "p"],
     onClick: (element, btn) => {
       const isEditing = btn.classList.contains("active");
       const quillData = quillInstances.get(element);
@@ -15125,7 +15126,8 @@ ${escapeText(this.code(index, length))}
   var ELEMENT_CAPABILITIES = {
     img: ["move", "resize", "rotate"],
     video: ["move", "resize", "rotate"],
-    div: ["move", "resize", "rotate", "fontControls", "editText"]
+    div: ["move", "resize", "rotate", "fontControls", "editText"],
+    p: ["move", "resize", "rotate", "fontControls", "editText"]
   };
   var _capabilityOverrides = /* @__PURE__ */ new WeakMap();
   function setCapabilityOverride(el, capabilityNames) {
@@ -16846,6 +16848,149 @@ ${fence}`;
           } else {
             lines[openEntry.lineIndex] = buildFenceLineWithAbsolute(lines[openEntry.lineIndex], dims);
           }
+        }
+        chunks[chunkIndex] = lines.join("\n");
+      }
+      return chunks.join("");
+    }
+  });
+  function extractParagraphBlocks(chunk) {
+    const lines = chunk.split("\n");
+    const blocks = [];
+    let depth = 0;
+    let inCodeBlock = false;
+    let blockStart = -1;
+    const blockLines = [];
+    const commitBlock = () => {
+      if (blockLines.length > 0) {
+        blocks.push({
+          startLine: blockStart,
+          endLine: blockStart + blockLines.length - 1,
+          text: blockLines.join("\n")
+        });
+      }
+      blockStart = -1;
+      blockLines.length = 0;
+    };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith("```")) {
+        commitBlock();
+        inCodeBlock = !inCodeBlock;
+        continue;
+      }
+      if (inCodeBlock)
+        continue;
+      const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+      if (fenceMatch) {
+        commitBlock();
+        const hasBraces = fenceMatch[2] !== void 0;
+        if (!hasBraces && depth > 0) {
+          depth--;
+        } else {
+          depth++;
+        }
+        continue;
+      }
+      if (depth > 0)
+        continue;
+      if (trimmed.startsWith("#")) {
+        commitBlock();
+        continue;
+      }
+      if (trimmed === "") {
+        commitBlock();
+        continue;
+      }
+      if (blockStart === -1)
+        blockStart = i;
+      blockLines.push(line);
+    }
+    commitBlock();
+    return blocks;
+  }
+  ModifyModeClassifier.register({
+    label: "Paragraphs",
+    classify(slideEl) {
+      const candidates = Array.from(slideEl.children).filter(
+        (el) => el.tagName === "P" && !editableRegistry.has(el) && !el.classList.contains("absolute")
+      );
+      const valid = [];
+      let idx = 0;
+      for (const p of candidates) {
+        p.dataset.editableModifiedParagraphIdx = String(idx++);
+        valid.push(p);
+      }
+      return { valid, warn: [] };
+    },
+    activate(p) {
+      const slideIndex = Reveal.getState().indexh;
+      const slideEl = p.closest("section");
+      const scale = getSlideScale();
+      const pRect = p.getBoundingClientRect();
+      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const origLeft = (pRect.left - slideRect.left) / scale;
+      const origTop = (pRect.top - slideRect.top) / scale;
+      p.dataset.editableModifiedParagraph = "true";
+      p.dataset.editableModifiedSlide = String(slideIndex);
+      initializeQuillForElement(p);
+      setupDivWhenReady(p);
+      waitForRegistryThenFixPosition(p, origLeft, origTop);
+    },
+    serialize(text) {
+      const paras = Array.from(
+        document.querySelectorAll('p[data-editable-modified-paragraph="true"]')
+      );
+      if (paras.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const p of paras) {
+        if (!editableRegistry.has(p))
+          continue;
+        const slideIndex = parseInt(p.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(p);
+      }
+      for (const [chunkIndex, chunkParas] of byChunk) {
+        chunkParas.sort(
+          (a, b) => parseInt(a.dataset.editableModifiedParagraphIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedParagraphIdx ?? "0", 10)
+        );
+        const paraBlocks = extractParagraphBlocks(chunks[chunkIndex]);
+        const lines = chunks[chunkIndex].split("\n");
+        for (let i = chunkParas.length - 1; i >= 0; i--) {
+          const p = chunkParas[i];
+          const paraIdx = parseInt(p.dataset.editableModifiedParagraphIdx ?? "0", 10);
+          if (paraIdx >= paraBlocks.length)
+            continue;
+          const block = paraBlocks[paraIdx];
+          const dims = editableRegistry.get(p).toDimensions();
+          const content = p.querySelector(".ql-editor") ? elementToText(p) : block.text;
+          const posAttrs = [
+            `left=${Math.round(dims.left)}px`,
+            `top=${Math.round(dims.top)}px`,
+            `width=${Math.round(dims.width)}px`,
+            `height=${Math.round(dims.height)}px`
+          ];
+          const styleAttrs = [];
+          if (dims.rotation)
+            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+          let attrs = `.absolute ${posAttrs.join(" ")}`;
+          if (styleAttrs.length)
+            attrs += ` style="${styleAttrs.join(" ")}"`;
+          const blockLineCount = block.endLine - block.startLine + 1;
+          lines.splice(
+            block.startLine,
+            blockLineCount,
+            `::: {${attrs}}`,
+            content,
+            ":::"
+          );
         }
         chunks[chunkIndex] = lines.join("\n");
       }

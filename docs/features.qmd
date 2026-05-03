@@ -35,6 +35,7 @@ Currently supported element types:
 
 | Element | Source syntax | Operations |
 |---|---|---|
+| Plain paragraph | `Some paragraph text` | Move, resize, rotate, text editing |
 | Plain image | `![](image.png)` | Move, resize, rotate |
 | `{.absolute}` image | `![](image.png){.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate |
 | Plain video | `![](video.mp4)` | Move, resize, rotate |
@@ -44,6 +45,8 @@ Currently supported element types:
 | Callout block | `::: {.callout-note}` (and other callout types) | Move, resize, rotate |
 | Column layout | `::: {.columns}` | Move, resize, rotate |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
+
+Plain paragraphs are matched by their position among top-level paragraphs on the slide (Nth paragraph in the DOM = Nth paragraph block in source). On save, the paragraph is wrapped in a `::: {.absolute ...}` fenced div. If the text was edited with the Quill editor, the new content is written back; otherwise the original QMD source text is preserved as-is.
 
 Plain images and videos are inserted directly in a slide without positional attributes. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
 
