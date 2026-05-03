@@ -49,6 +49,7 @@ npm run test:e2e
 | `space in name.qmd`      | Filenames with spaces handled correctly   | -             |
 | `modify-mode-absolute.qmd` | `{.absolute}` divs detectable in modify mode | #119       |
 | `modify-mode-absolute-img.qmd` | `{.absolute}` images detectable in modify mode | #122   |
+| `modify-mode-fenced-div.qmd` | Fenced divs (classed, callouts, columns) detectable in modify mode | #108 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 

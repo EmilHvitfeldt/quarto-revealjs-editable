@@ -126,7 +126,7 @@ export function setupDraggableElt(elt) {
   };
 
   const elementType = elt.tagName.toLowerCase();
-  const capabilities = getCapabilitiesFor(elementType);
+  const capabilities = getCapabilitiesFor(elementType, elt);
 
   capabilities.forEach((cap) => { if (cap.init) cap.init(context); });
 

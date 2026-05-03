@@ -15127,7 +15127,14 @@ ${escapeText(this.code(index, length))}
     video: ["move", "resize", "rotate"],
     div: ["move", "resize", "rotate", "fontControls", "editText"]
   };
-  function getCapabilitiesFor(elementType) {
+  var _capabilityOverrides = /* @__PURE__ */ new WeakMap();
+  function setCapabilityOverride(el, capabilityNames) {
+    _capabilityOverrides.set(el, capabilityNames);
+  }
+  function getCapabilitiesFor(elementType, el) {
+    if (el && _capabilityOverrides.has(el)) {
+      return _capabilityOverrides.get(el).map((name) => Capabilities[name]).filter(Boolean);
+    }
     const capabilityNames = ELEMENT_CAPABILITIES[elementType] || ["move", "resize"];
     return capabilityNames.map((name) => Capabilities[name]).filter(Boolean);
   }
@@ -15218,7 +15225,7 @@ ${escapeText(this.code(index, length))}
       cachedScale: 1
     };
     const elementType = elt.tagName.toLowerCase();
-    const capabilities = getCapabilitiesFor(elementType);
+    const capabilities = getCapabilitiesFor(elementType, elt);
     capabilities.forEach((cap) => {
       if (cap.init)
         cap.init(context);
@@ -16619,6 +16626,228 @@ ${fence}`;
           continue;
         const newText = headingHtmlToMarkdown(h2.innerHTML);
         chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+      }
+      return chunks.join("");
+    }
+  });
+  var CALLOUT_TYPES = ["callout-note", "callout-tip", "callout-warning", "callout-important", "callout-caution"];
+  function parseFencedDivOpens(chunk) {
+    const lines = chunk.split("\n");
+    const result = [];
+    const stack = [];
+    for (let i = 0; i < lines.length; i++) {
+      const match2 = lines[i].match(/^(:{3,})\s*(\{([^}]*)\})?\s*$/);
+      if (!match2)
+        continue;
+      const fenceLen = match2[1].length;
+      const hasBraces = match2[2] !== void 0;
+      const attrsStr = match2[3] || "";
+      if (!hasBraces && stack.length > 0 && fenceLen >= stack[stack.length - 1].fenceLen) {
+        const top = stack.pop();
+        if (top.resultIdx !== void 0)
+          result[top.resultIdx].closeLineIndex = i;
+        continue;
+      }
+      const classes = (attrsStr.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g) || []).map((c) => c.slice(1));
+      const idMatch = attrsStr.match(/#([a-zA-Z_-][a-zA-Z0-9_-]*)/);
+      const matchKey = classes.length > 0 ? `.${classes[0]}` : idMatch ? `#${idMatch[1]}` : null;
+      const entry = { lineIndex: i, closeLineIndex: -1, matchKey, fenceStr: match2[1], attrsStr, depth: stack.length };
+      const resultIdx = result.length;
+      result.push(entry);
+      stack.push({ fenceLen, resultIdx });
+    }
+    return result.filter((e) => e.depth === 0);
+  }
+  function getFencedDivIdentifier(div) {
+    const classes = Array.from(div.classList);
+    if (classes.includes("columns"))
+      return { key: ".columns", type: "columns" };
+    for (const ct of CALLOUT_TYPES) {
+      if (classes.includes(ct))
+        return { key: `.${ct}`, type: "callout" };
+    }
+    const knownInternal = /* @__PURE__ */ new Set([
+      "callout",
+      "callout-style-default",
+      "callout-captioned",
+      "callout-titled",
+      "column",
+      "columns",
+      "fragment",
+      "current-fragment",
+      "visible",
+      "fade-in",
+      "fade-out",
+      "fade-up",
+      "fade-down",
+      "fade-left",
+      "fade-right",
+      "absolute",
+      "editable",
+      "editable-container",
+      "editable-new",
+      "editable-heading-active",
+      "modify-mode-valid",
+      "modify-mode-warn",
+      "r-fit-text",
+      "r-stretch",
+      "r-frame",
+      "r-hstack",
+      "r-vstack",
+      "slide-background",
+      "slide-background-content"
+    ]);
+    const userClass = classes.find((c) => !knownInternal.has(c));
+    if (userClass)
+      return { key: `.${userClass}`, type: "classed" };
+    if (div.id)
+      return { key: `#${div.id}`, type: "id-keyed" };
+    return { key: null, type: "classless" };
+  }
+  function buildFenceLineWithAbsolute(originalLine, dims) {
+    const match2 = originalLine.match(/^(:{3,})\s*(?:\{([^}]*)\})?\s*$/);
+    if (!match2)
+      return originalLine;
+    const fence = match2[1];
+    const existingAttrs = (match2[2] || "").trim();
+    const posAttrs = [
+      `left=${Math.round(dims.left)}px`,
+      `top=${Math.round(dims.top)}px`,
+      `width=${Math.round(dims.width)}px`,
+      `height=${Math.round(dims.height)}px`
+    ];
+    const styleAttrs = [];
+    if (dims.rotation)
+      styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+    let newAttrs = existingAttrs ? `${existingAttrs} ` : "";
+    newAttrs += `.absolute ${posAttrs.join(" ")}`;
+    if (styleAttrs.length > 0)
+      newAttrs += ` style="${styleAttrs.join(" ")}"`;
+    return `${fence} {${newAttrs}}`;
+  }
+  ModifyModeClassifier.register({
+    label: "Fenced divs",
+    classify(slideEl) {
+      if (!window._input_file)
+        return { valid: [], warn: [] };
+      const slideIndex = Reveal.getState().indexh;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      const chunks = splitIntoSlideChunks(window._input_file);
+      const chunk = chunks[chunkIndex];
+      if (!chunk)
+        return { valid: [], warn: [] };
+      const fencedOpens = parseFencedDivOpens(chunk);
+      if (fencedOpens.length === 0)
+        return { valid: [], warn: [] };
+      const candidates = Array.from(slideEl.children).filter(
+        (el) => el.tagName === "DIV" && !editableRegistry.has(el) && !el.classList.contains("editable-container") && !el.classList.contains("editable-new") && !el.classList.contains("editable") && !el.classList.contains("absolute")
+      );
+      const valid = [];
+      const warn = [];
+      const usedFenceIndices = /* @__PURE__ */ new Set();
+      const positionalFences = fencedOpens.map((fo, i) => ({ fo, i })).filter(({ fo }) => fo.matchKey === null);
+      let positionalCursor = 0;
+      for (const div of candidates) {
+        const ident = getFencedDivIdentifier(div);
+        if (!ident)
+          continue;
+        let fenceIdx = -1;
+        if (ident.key !== null) {
+          fenceIdx = fencedOpens.findIndex((fo, i) => !usedFenceIndices.has(i) && fo.matchKey === ident.key);
+        } else {
+          while (positionalCursor < positionalFences.length && usedFenceIndices.has(positionalFences[positionalCursor].i)) {
+            positionalCursor++;
+          }
+          if (positionalCursor < positionalFences.length) {
+            fenceIdx = positionalFences[positionalCursor].i;
+          }
+        }
+        if (fenceIdx === -1)
+          continue;
+        usedFenceIndices.add(fenceIdx);
+        div.dataset.editableModifiedFenceIdx = String(fenceIdx);
+        div.dataset.editableModifiedFenceType = ident.type;
+        valid.push(div);
+      }
+      return { valid, warn };
+    },
+    activate(div) {
+      const slideIndex = Reveal.getState().indexh;
+      div.dataset.editableModifiedFence = "true";
+      div.dataset.editableModifiedSlide = String(slideIndex);
+      const slideEl = div.closest("section");
+      const scale = getSlideScale();
+      const divRect = div.getBoundingClientRect();
+      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const origLeft = (divRect.left - slideRect.left) / scale;
+      const origTop = (divRect.top - slideRect.top) / scale;
+      if (div.dataset.editableModifiedFenceType === "columns") {
+        setCapabilityOverride(div, ["move", "resize", "rotate"]);
+        const naturalWidth = div.offsetWidth;
+        const naturalHeight = div.offsetHeight;
+        setupDivWhenReady(div);
+        div.style.display = "flex";
+        editableRegistry.get(div)?.setState({ width: naturalWidth, height: naturalHeight, x: origLeft, y: origTop });
+      } else {
+        setupDivWhenReady(div);
+        waitForRegistryThenFixPosition(div, origLeft, origTop);
+      }
+    },
+    serialize(text) {
+      const divs = Array.from(
+        document.querySelectorAll('div[data-editable-modified-fence="true"]')
+      );
+      if (divs.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const div of divs) {
+        if (!editableRegistry.has(div))
+          continue;
+        const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(div);
+      }
+      for (const [chunkIndex, chunkDivs] of byChunk) {
+        const fencedOpens = parseFencedDivOpens(chunks[chunkIndex]);
+        const ops = [];
+        for (const div of chunkDivs) {
+          const fenceIdx = parseInt(div.dataset.editableModifiedFenceIdx ?? "-1", 10);
+          if (fenceIdx < 0)
+            continue;
+          const openEntry = fencedOpens[fenceIdx];
+          if (!openEntry)
+            continue;
+          const dims = editableRegistry.get(div).toDimensions();
+          const isCallout = div.dataset.editableModifiedFenceType === "callout";
+          ops.push({ openEntry, dims, isCallout });
+        }
+        ops.sort((a, b) => b.openEntry.lineIndex - a.openEntry.lineIndex);
+        const lines = chunks[chunkIndex].split("\n");
+        for (const { openEntry, dims, isCallout } of ops) {
+          if (isCallout && openEntry.closeLineIndex >= 0) {
+            const posAttrs = [
+              `left=${Math.round(dims.left)}px`,
+              `top=${Math.round(dims.top)}px`,
+              `width=${Math.round(dims.width)}px`
+            ];
+            const styleAttrs = [];
+            if (dims.rotation)
+              styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+            let wrapAttrs = `.absolute ${posAttrs.join(" ")}`;
+            if (styleAttrs.length > 0)
+              wrapAttrs += ` style="${styleAttrs.join(" ")}"`;
+            lines.splice(openEntry.closeLineIndex + 1, 0, "::::");
+            lines.splice(openEntry.lineIndex, 0, `:::: {${wrapAttrs}}`);
+          } else {
+            lines[openEntry.lineIndex] = buildFenceLineWithAbsolute(lines[openEntry.lineIndex], dims);
+          }
+        }
+        chunks[chunkIndex] = lines.join("\n");
       }
       return chunks.join("");
     }

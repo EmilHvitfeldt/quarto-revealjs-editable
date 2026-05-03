@@ -37,8 +37,9 @@ import {
   splitIntoSlideChunks,
   serializeToQmd,
 } from './serialization.js';
-import { getQmdHeadingIndex } from './utils.js';
+import { getQmdHeadingIndex, getSlideScale } from './utils.js';
 import { getColorPalette, getBrandColorOutput } from './colors.js';
+import { setCapabilityOverride } from './capabilities.js';
 
 const VALID_CLASS = 'modify-mode-valid';
 const WARN_CLASS  = 'modify-mode-warn';
@@ -924,6 +925,288 @@ ModifyModeClassifier.register({
       if (chunkIndex >= chunks.length) continue;
       const newText = headingHtmlToMarkdown(h2.innerHTML);
       chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+    }
+
+    return chunks.join('');
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Fenced div classifier
+// ---------------------------------------------------------------------------
+
+const CALLOUT_TYPES = ['callout-note', 'callout-tip', 'callout-warning', 'callout-important', 'callout-caution'];
+
+/**
+ * Parse top-level fenced div opening lines from a QMD slide chunk.
+ * Returns an array of { lineIndex, closeLineIndex, matchKey, fenceStr, attrsStr }
+ * where matchKey is the first class (e.g. ".my-class"), the id (e.g. "#my-id"),
+ * or null for truly attribute-free divs (positional matching only).
+ * closeLineIndex is the line index of the matching closing fence (or -1 if unclosed).
+ *
+ * Distinguishes bare `:::` (closing fence) from `::: {}` (opening fence with
+ * no attrs) by checking whether the `{...}` token was present in the source.
+ *
+ * @param {string} chunk
+ * @returns {Array<{lineIndex: number, closeLineIndex: number, matchKey: string|null, fenceStr: string, attrsStr: string}>}
+ */
+function parseFencedDivOpens(chunk) {
+  const lines = chunk.split('\n');
+  const result = [];
+  const stack = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^(:{3,})\s*(\{([^}]*)\})?\s*$/);
+    if (!match) continue;
+
+    const fenceLen = match[1].length;
+    const hasBraces = match[2] !== undefined; // `::: {}` vs bare `:::`
+    const attrsStr = match[3] || '';
+
+    // A bare `:::` (no braces) closes the innermost open fence.
+    if (!hasBraces && stack.length > 0 && fenceLen >= stack[stack.length - 1].fenceLen) {
+      const top = stack.pop();
+      if (top.resultIdx !== undefined) result[top.resultIdx].closeLineIndex = i;
+      continue;
+    }
+
+    const classes = (attrsStr.match(/\.[a-zA-Z_-][a-zA-Z0-9_-]*/g) || []).map(c => c.slice(1));
+    const idMatch = attrsStr.match(/#([a-zA-Z_-][a-zA-Z0-9_-]*)/);
+    const matchKey = classes.length > 0 ? `.${classes[0]}` : (idMatch ? `#${idMatch[1]}` : null);
+    const entry = { lineIndex: i, closeLineIndex: -1, matchKey, fenceStr: match[1], attrsStr, depth: stack.length };
+    const resultIdx = result.length;
+    result.push(entry);
+    stack.push({ fenceLen, resultIdx });
+  }
+
+  return result.filter(e => e.depth === 0);
+}
+
+/**
+ * Determine how a div can be identified in QMD source.
+ * Returns { key: string|null, type: string } or null if not a fenced div candidate.
+ * key is ".classname", "#id", or null (positional match only).
+ */
+function getFencedDivIdentifier(div) {
+  const classes = Array.from(div.classList);
+
+  if (classes.includes('columns')) return { key: '.columns', type: 'columns' };
+
+  for (const ct of CALLOUT_TYPES) {
+    if (classes.includes(ct)) return { key: `.${ct}`, type: 'callout' };
+  }
+
+  const knownInternal = new Set([
+    'callout', 'callout-style-default', 'callout-captioned', 'callout-titled',
+    'column', 'columns',
+    'fragment', 'current-fragment', 'visible',
+    'fade-in', 'fade-out', 'fade-up', 'fade-down', 'fade-left', 'fade-right',
+    'absolute', 'editable', 'editable-container', 'editable-new', 'editable-heading-active',
+    'modify-mode-valid', 'modify-mode-warn',
+    'r-fit-text', 'r-stretch', 'r-frame', 'r-hstack', 'r-vstack',
+    'slide-background', 'slide-background-content',
+  ]);
+
+  const userClass = classes.find(c => !knownInternal.has(c));
+  if (userClass) return { key: `.${userClass}`, type: 'classed' };
+
+  // Fall through to id-based matching (`::: {#my-id}` renders as <div id="my-id">)
+  if (div.id) return { key: `#${div.id}`, type: 'id-keyed' };
+
+  // No class or id — positional matching only
+  return { key: null, type: 'classless' };
+}
+
+/**
+ * Build the updated fence opening line with absolute position attrs merged in.
+ * Preserves existing classes/attrs on the fence and appends the position data.
+ */
+function buildFenceLineWithAbsolute(originalLine, dims) {
+  const match = originalLine.match(/^(:{3,})\s*(?:\{([^}]*)\})?\s*$/);
+  if (!match) return originalLine;
+
+  const fence = match[1];
+  const existingAttrs = (match[2] || '').trim();
+
+  const posAttrs = [
+    `left=${Math.round(dims.left)}px`,
+    `top=${Math.round(dims.top)}px`,
+    `width=${Math.round(dims.width)}px`,
+    `height=${Math.round(dims.height)}px`,
+  ];
+
+  const styleAttrs = [];
+  if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+
+  let newAttrs = existingAttrs ? `${existingAttrs} ` : '';
+  newAttrs += `.absolute ${posAttrs.join(' ')}`;
+  if (styleAttrs.length > 0) newAttrs += ` style="${styleAttrs.join(' ')}"`;
+
+  return `${fence} {${newAttrs}}`;
+}
+
+ModifyModeClassifier.register({
+  label: 'Fenced divs',
+
+  classify(slideEl) {
+    if (!window._input_file) return { valid: [], warn: [] };
+    const slideIndex = Reveal.getState().indexh;
+    const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+    const chunks = splitIntoSlideChunks(window._input_file);
+    const chunk = chunks[chunkIndex];
+    if (!chunk) return { valid: [], warn: [] };
+
+    const fencedOpens = parseFencedDivOpens(chunk);
+    if (fencedOpens.length === 0) return { valid: [], warn: [] };
+
+    // Collect direct-child divs that aren't already handled by other classifiers
+    const candidates = Array.from(slideEl.children).filter(el =>
+      el.tagName === 'DIV' &&
+      !editableRegistry.has(el) &&
+      !el.classList.contains('editable-container') &&
+      !el.classList.contains('editable-new') &&
+      !el.classList.contains('editable') &&
+      !el.classList.contains('absolute')
+    );
+
+    const valid = [];
+    const warn = [];
+
+    // Track which fenced opens have been claimed (by array index)
+    const usedFenceIndices = new Set();
+    // Track positional (classless/id-less) fence cursor
+    const positionalFences = fencedOpens
+      .map((fo, i) => ({ fo, i }))
+      .filter(({ fo }) => fo.matchKey === null);
+    let positionalCursor = 0;
+
+    for (const div of candidates) {
+      const ident = getFencedDivIdentifier(div);
+      if (!ident) continue;
+
+      let fenceIdx = -1;
+      if (ident.key !== null) {
+        // Match by class or id key
+        fenceIdx = fencedOpens.findIndex((fo, i) => !usedFenceIndices.has(i) && fo.matchKey === ident.key);
+      } else {
+        // No class or id — match by position among keyless fenced divs
+        while (positionalCursor < positionalFences.length && usedFenceIndices.has(positionalFences[positionalCursor].i)) {
+          positionalCursor++;
+        }
+        if (positionalCursor < positionalFences.length) {
+          fenceIdx = positionalFences[positionalCursor].i;
+        }
+      }
+
+      if (fenceIdx === -1) continue;
+
+      usedFenceIndices.add(fenceIdx);
+      div.dataset.editableModifiedFenceIdx = String(fenceIdx);
+      div.dataset.editableModifiedFenceType = ident.type;
+      valid.push(div);
+    }
+
+    return { valid, warn };
+  },
+
+  activate(div) {
+    const slideIndex = Reveal.getState().indexh;
+    div.dataset.editableModifiedFence = 'true';
+    div.dataset.editableModifiedSlide = String(slideIndex);
+
+    // Capture natural position in slide-space coordinates before setup reparents
+    // the element into the absolute editable-container (which starts at 0,0).
+    const slideEl = div.closest('section');
+    const scale = getSlideScale();
+    const divRect   = div.getBoundingClientRect();
+    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+    const origLeft = (divRect.left - slideRect.left) / scale;
+    const origTop  = (divRect.top  - slideRect.top)  / scale;
+
+    if (div.dataset.editableModifiedFenceType === 'columns') {
+      setCapabilityOverride(div, ['move', 'resize', 'rotate']);
+      // Read natural dimensions at click time, before setup reparents into the
+      // inline-block container (collapses width) and sets display:block (breaks flex).
+      const naturalWidth  = div.offsetWidth;
+      const naturalHeight = div.offsetHeight;
+      setupDivWhenReady(div);
+      div.style.display = 'flex';
+      editableRegistry.get(div)?.setState({ width: naturalWidth, height: naturalHeight, x: origLeft, y: origTop });
+    } else {
+      setupDivWhenReady(div);
+      waitForRegistryThenFixPosition(div, origLeft, origTop);
+    }
+  },
+
+  serialize(text) {
+    const divs = Array.from(
+      document.querySelectorAll('div[data-editable-modified-fence="true"]')
+    );
+    if (divs.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+
+    // Group by chunk, then replace fence lines
+    const byChunk = new Map();
+    for (const div of divs) {
+      if (!editableRegistry.has(div)) continue;
+      const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+      byChunk.get(chunkIndex).push(div);
+    }
+
+    for (const [chunkIndex, chunkDivs] of byChunk) {
+      // Re-parse once per chunk (source may have been modified by other serializers)
+      const fencedOpens = parseFencedDivOpens(chunks[chunkIndex]);
+
+      // Build list of operations and sort bottom-to-top so splices don't shift earlier indices
+      const ops = [];
+      for (const div of chunkDivs) {
+        const fenceIdx = parseInt(div.dataset.editableModifiedFenceIdx ?? '-1', 10);
+        if (fenceIdx < 0) continue;
+        const openEntry = fencedOpens[fenceIdx];
+        if (!openEntry) continue;
+        const dims = editableRegistry.get(div).toDimensions();
+        const isCallout = div.dataset.editableModifiedFenceType === 'callout';
+        ops.push({ openEntry, dims, isCallout });
+      }
+      // Process from bottom to top so insertions don't shift line indices of earlier ops
+      ops.sort((a, b) => b.openEntry.lineIndex - a.openEntry.lineIndex);
+
+      const lines = chunks[chunkIndex].split('\n');
+
+      for (const { openEntry, dims, isCallout } of ops) {
+        if (isCallout && openEntry.closeLineIndex >= 0) {
+          // Callout: wrap the entire callout block with a positioned div.
+          // Quarto's callout renderer ignores positional attrs on the callout fence itself,
+          // so we need an outer ::: {.absolute ...} wrapper.
+          // Use :::: (4+ colons) as the outer fence to avoid clashing with inner ::: fences.
+          //
+          // Height is intentionally omitted: callout height is determined by content.
+          // The block-level callout fills container width automatically; saving an explicit
+          // height would cause a mismatch since the callout renders at content height after
+          // re-render regardless of the wrapper's height.
+          const posAttrs = [
+            `left=${Math.round(dims.left)}px`,
+            `top=${Math.round(dims.top)}px`,
+            `width=${Math.round(dims.width)}px`,
+          ];
+          const styleAttrs = [];
+          if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+          let wrapAttrs = `.absolute ${posAttrs.join(' ')}`;
+          if (styleAttrs.length > 0) wrapAttrs += ` style="${styleAttrs.join(' ')}"`;
+
+          lines.splice(openEntry.closeLineIndex + 1, 0, '::::');
+          lines.splice(openEntry.lineIndex, 0, `:::: {${wrapAttrs}}`);
+        } else {
+          // Plain fenced div: modify the fence line in-place
+          lines[openEntry.lineIndex] = buildFenceLineWithAbsolute(lines[openEntry.lineIndex], dims);
+        }
+      }
+
+      chunks[chunkIndex] = lines.join('\n');
     }
 
     return chunks.join('');
