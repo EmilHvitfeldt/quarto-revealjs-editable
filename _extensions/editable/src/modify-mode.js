@@ -1386,6 +1386,211 @@ ModifyModeClassifier.register({
 });
 
 // ---------------------------------------------------------------------------
+// Lists and blockquotes classifiers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract top-level blocks from a QMD slide chunk whose first line matches testLine.
+ * Used to locate ul, ol, and blockquote blocks by position.
+ * @param {string} chunk
+ * @param {function(string): boolean} testLine - returns true if a line starts a new block
+ * @returns {Array<{startLine: number, endLine: number, text: string}>}
+ */
+function extractBlocksStartingWith(chunk, testLine) {
+  const lines = chunk.split('\n');
+  const blocks = [];
+  let depth = 0;
+  let inCodeBlock = false;
+  let blockStart = -1;
+  const blockLines = [];
+
+  const commitBlock = () => {
+    if (blockLines.length > 0) {
+      blocks.push({
+        startLine: blockStart,
+        endLine: blockStart + blockLines.length - 1,
+        text: blockLines.join('\n'),
+      });
+    }
+    blockStart = -1;
+    blockLines.length = 0;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) { commitBlock(); inCodeBlock = !inCodeBlock; continue; }
+    if (inCodeBlock) continue;
+
+    const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+    if (fenceMatch) {
+      commitBlock();
+      const hasBraces = fenceMatch[2] !== undefined;
+      if (!hasBraces && depth > 0) depth--; else depth++;
+      continue;
+    }
+
+    if (depth > 0) continue;
+    if (trimmed === '') { commitBlock(); continue; }
+
+    if (blockStart === -1) {
+      if (testLine(line)) { blockStart = i; blockLines.push(line); }
+    } else {
+      blockLines.push(line);
+    }
+  }
+  commitBlock();
+  return blocks;
+}
+
+/**
+ * Build a classifier for block-level list/blockquote elements.
+ * @param {object} opts
+ * @param {string} opts.tagName - uppercase tag name: 'UL', 'OL', 'BLOCKQUOTE'
+ * @param {string} opts.dataKey - camelCase key used for dataset attrs (e.g. 'Ul')
+ * @param {function(string): boolean} opts.testLine - identifies the first line of a source block
+ * @param {string} opts.label - label shown in the modify panel
+ */
+function makeListClassifier({ tagName, dataKey, testLine, label }) {
+  const idxAttr = `editableModified${dataKey}Idx`;
+  const activeAttr = `editableModified${dataKey}`;
+
+  return {
+    label,
+
+    classify(slideEl) {
+      const candidates = Array.from(slideEl.children).filter(el =>
+        el.tagName === tagName &&
+        !editableRegistry.has(el) &&
+        !el.classList.contains('absolute')
+      );
+      const valid = [];
+      let idx = 0;
+      for (const el of candidates) {
+        el.dataset[idxAttr] = String(idx++);
+        valid.push(el);
+      }
+      return { valid, warn: [] };
+    },
+
+    activate(el) {
+      const slideIndex = Reveal.getState().indexh;
+      const slideEl = el.closest('section');
+      const scale = getSlideScale();
+      const elRect = el.getBoundingClientRect();
+      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const origLeft = (elRect.left - slideRect.left) / scale;
+      const origTop  = (elRect.top  - slideRect.top)  / scale;
+
+      const cs = window.getComputedStyle(el);
+      // Use getBoundingClientRect (already computed as elRect) for sub-pixel accuracy.
+      // offsetWidth truncates to integer and causes text to wrap when the true
+      // content width is fractional (e.g. 208.28px rounds to 208px).
+      const naturalW = elRect.width / scale;
+      const naturalH = elRect.height / scale;
+      el.style.paddingLeft   = cs.paddingLeft;
+      el.style.paddingRight  = cs.paddingRight;
+      el.style.paddingTop    = cs.paddingTop;
+      el.style.paddingBottom = cs.paddingBottom;
+      el.style.margin        = '0';
+      el.style.width         = naturalW + 'px';
+      el.style.height        = naturalH + 'px';
+      el.style.display       = 'block';
+
+      el.dataset[activeAttr] = 'true';
+      el.dataset.editableModifiedSlide = String(slideIndex);
+      setCapabilityOverride(el, ['move', 'resize']);
+      setupDivWhenReady(el);
+
+      waitForRegistryThenFixPosition(el, origLeft, origTop);
+    },
+
+    serialize(text) {
+      const htmlAttr = `data-editable-modified-${dataKey.toLowerCase()}`;
+      const els = Array.from(
+        document.querySelectorAll(`${tagName.toLowerCase()}[${htmlAttr}="true"]`)
+      );
+      if (els.length === 0) return text;
+
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = new Map();
+
+      for (const el of els) {
+        if (!editableRegistry.has(el)) continue;
+        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length) continue;
+        if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(el);
+      }
+
+      for (const [chunkIndex, chunkEls] of byChunk) {
+        chunkEls.sort((a, b) =>
+          parseInt(a.dataset[idxAttr] ?? '0', 10) -
+          parseInt(b.dataset[idxAttr] ?? '0', 10)
+        );
+
+        const blocks = extractBlocksStartingWith(chunks[chunkIndex], testLine);
+        const lines = chunks[chunkIndex].split('\n');
+
+        for (let i = chunkEls.length - 1; i >= 0; i--) {
+          const el = chunkEls[i];
+          const elIdx = parseInt(el.dataset[idxAttr] ?? '0', 10);
+          if (elIdx >= blocks.length) continue;
+
+          const block = blocks[elIdx];
+          const dims = editableRegistry.get(el).toDimensions();
+
+          const posAttrs = [
+            `left=${Math.round(dims.left)}px`,
+            `top=${Math.round(dims.top)}px`,
+            `width=${Math.round(dims.width)}px`,
+            `height=${Math.round(dims.height)}px`,
+          ];
+          const styleAttrs = [];
+          if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+          let attrs = `.absolute ${posAttrs.join(' ')}`;
+          if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+
+          const blockLineCount = block.endLine - block.startLine + 1;
+          lines.splice(block.startLine, blockLineCount,
+            `::: {${attrs}}`,
+            block.text,
+            ':::',
+          );
+        }
+
+        chunks[chunkIndex] = lines.join('\n');
+      }
+
+      return chunks.join('');
+    },
+  };
+}
+
+ModifyModeClassifier.register(makeListClassifier({
+  tagName: 'UL',
+  dataKey: 'Ul',
+  testLine: (line) => /^[-*+] /.test(line),
+  label: 'Bullet lists',
+}));
+
+ModifyModeClassifier.register(makeListClassifier({
+  tagName: 'OL',
+  dataKey: 'Ol',
+  testLine: (line) => /^\d+[.)]\s/.test(line),
+  label: 'Ordered lists',
+}));
+
+ModifyModeClassifier.register(makeListClassifier({
+  tagName: 'BLOCKQUOTE',
+  dataKey: 'Blockquote',
+  testLine: (line) => /^>/.test(line),
+  label: 'Blockquotes',
+}));
+
+// ---------------------------------------------------------------------------
 // Classification and lifecycle
 // ---------------------------------------------------------------------------
 

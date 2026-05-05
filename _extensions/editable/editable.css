@@ -390,7 +390,10 @@
 .modify-mode div.absolute.modify-mode-valid,
 .modify-mode div.modify-mode-valid,
 .modify-mode h2.modify-mode-valid,
-.modify-mode p.modify-mode-valid {
+.modify-mode p.modify-mode-valid,
+.modify-mode ul.modify-mode-valid,
+.modify-mode ol.modify-mode-valid,
+.modify-mode blockquote.modify-mode-valid {
   box-shadow: var(--editable-modify-valid-shadow);
   cursor: pointer;
   transition: box-shadow var(--editable-transition);
@@ -401,7 +404,10 @@
 .modify-mode div.absolute.modify-mode-valid:hover,
 .modify-mode div.modify-mode-valid:hover,
 .modify-mode h2.modify-mode-valid:hover,
-.modify-mode p.modify-mode-valid:hover {
+.modify-mode p.modify-mode-valid:hover,
+.modify-mode ul.modify-mode-valid:hover,
+.modify-mode ol.modify-mode-valid:hover,
+.modify-mode blockquote.modify-mode-valid:hover {
   box-shadow: var(--editable-modify-valid-hover-shadow);
 }
 
