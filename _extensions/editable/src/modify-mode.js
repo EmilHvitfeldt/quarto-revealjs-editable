@@ -1633,6 +1633,7 @@ function applyClassification() {
     el.addEventListener('click', (e) => onValidElementClick(e, classifier), { signal });
   });
   warn.forEach(el => el.classList.add(WARN_CLASS));
+
 }
 
 /**
