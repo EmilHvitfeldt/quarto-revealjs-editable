@@ -448,28 +448,6 @@ h2[data-editable-modified-heading="true"] {
   padding: 0 8px;
 }
 
-.modify-panel-label {
-  font-size: 12px;
-  color: var(--editable-toolbar-muted, rgba(255,255,255,0.6));
-  white-space: nowrap;
-}
-
-.modify-panel-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-}
-
-.modify-panel-list li {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--editable-modify-valid-bg, rgba(40, 167, 69, 0.2));
-  color: var(--editable-modify-valid-text, #6fcf8a);
-  white-space: nowrap;
-}
 
 /* Submenu wrapper */
 .editable-toolbar-submenu-wrapper {

@@ -52,11 +52,13 @@ test.describe('Modify Mode - Video', () => {
     expect(slide1).not.toContain('{.absolute');
   });
 
-  test('Videos label appears in modify panel', async ({ page }) => {
+  test('Modify panel is present and empty (labels removed in favour of on-slide highlights)', async ({ page }) => {
     await setupPage(page, 'modify-mode-video.html');
     await page.click('.toolbar-modify');
 
-    const panelText = await page.locator('.toolbar-panel-modify').innerText();
-    expect(panelText).toContain('Videos');
+    const panel = page.locator('.toolbar-panel-modify');
+    await expect(panel).toBeAttached();
+    const panelText = await panel.innerText();
+    expect(panelText.trim()).toBe('');
   });
 });
