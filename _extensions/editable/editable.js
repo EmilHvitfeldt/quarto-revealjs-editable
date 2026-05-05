@@ -15967,10 +15967,6 @@ ${fence}`;
         }
       }
       return text;
-    },
-    /** Return the label strings from all registered classifiers that have one. */
-    getLabels() {
-      return _classifiers.map((c) => c.label).filter(Boolean);
     }
   };
   function getImgSrc(img) {
@@ -17209,18 +17205,6 @@ ${fence}`;
     if (!panel)
       return;
     panel.innerHTML = "";
-    const label = document.createElement("span");
-    label.className = "modify-panel-label";
-    label.textContent = "Click to edit:";
-    panel.appendChild(label);
-    const list = document.createElement("ul");
-    list.className = "modify-panel-list";
-    ModifyModeClassifier.getLabels().forEach((text) => {
-      const item = document.createElement("li");
-      item.textContent = text;
-      list.appendChild(item);
-    });
-    panel.appendChild(list);
   }
   function enterModifyMode() {
     _active = true;
