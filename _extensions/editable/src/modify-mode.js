@@ -128,10 +128,6 @@ export const ModifyModeClassifier = {
     return text;
   },
 
-  /** Return the label strings from all registered classifiers that have one. */
-  getLabels() {
-    return _classifiers.map(c => c.label).filter(Boolean);
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -1637,6 +1633,7 @@ function applyClassification() {
     el.addEventListener('click', (e) => onValidElementClick(e, classifier), { signal });
   });
   warn.forEach(el => el.classList.add(WARN_CLASS));
+
 }
 
 /**
@@ -1647,18 +1644,6 @@ function buildModifyPanel() {
   const panel = document.querySelector('.toolbar-panel-modify');
   if (!panel) return;
   panel.innerHTML = '';
-  const label = document.createElement('span');
-  label.className = 'modify-panel-label';
-  label.textContent = 'Click to edit:';
-  panel.appendChild(label);
-  const list = document.createElement('ul');
-  list.className = 'modify-panel-list';
-  ModifyModeClassifier.getLabels().forEach(text => {
-    const item = document.createElement('li');
-    item.textContent = text;
-    list.appendChild(item);
-  });
-  panel.appendChild(list);
 }
 
 /**
