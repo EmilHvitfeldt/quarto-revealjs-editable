@@ -3080,8 +3080,8 @@ var EditableModule = (() => {
       this.element = element;
       this.container = null;
       this.type = element.tagName.toLowerCase();
-      let width = element.offsetWidth;
-      let height = element.offsetHeight;
+      let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
+      let height = element.style.height ? parseFloat(element.style.height) : element.offsetHeight;
       if (this.type === "img" && (width === 0 || height === 0)) {
         width = element.naturalWidth || width;
         height = element.naturalHeight || height;
@@ -15270,8 +15270,10 @@ ${escapeText(this.code(index, length))}
       width = elt.videoWidth || width || 300;
       height = elt.videoHeight || height || 150;
     }
-    elt.style.width = width + "px";
-    elt.style.height = height + "px";
+    if (!elt.style.width)
+      elt.style.width = width + "px";
+    if (!elt.style.height)
+      elt.style.height = height + "px";
     elt.style.display = "block";
   }
   function setupContainerAccessibility(container) {
@@ -16997,6 +16999,182 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function extractBlocksStartingWith(chunk, testLine) {
+    const lines = chunk.split("\n");
+    const blocks = [];
+    let depth = 0;
+    let inCodeBlock = false;
+    let blockStart = -1;
+    const blockLines = [];
+    const commitBlock = () => {
+      if (blockLines.length > 0) {
+        blocks.push({
+          startLine: blockStart,
+          endLine: blockStart + blockLines.length - 1,
+          text: blockLines.join("\n")
+        });
+      }
+      blockStart = -1;
+      blockLines.length = 0;
+    };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith("```")) {
+        commitBlock();
+        inCodeBlock = !inCodeBlock;
+        continue;
+      }
+      if (inCodeBlock)
+        continue;
+      const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+      if (fenceMatch) {
+        commitBlock();
+        const hasBraces = fenceMatch[2] !== void 0;
+        if (!hasBraces && depth > 0)
+          depth--;
+        else
+          depth++;
+        continue;
+      }
+      if (depth > 0)
+        continue;
+      if (trimmed === "") {
+        commitBlock();
+        continue;
+      }
+      if (blockStart === -1) {
+        if (testLine(line)) {
+          blockStart = i;
+          blockLines.push(line);
+        }
+      } else {
+        blockLines.push(line);
+      }
+    }
+    commitBlock();
+    return blocks;
+  }
+  function makeListClassifier({ tagName, dataKey, testLine, label }) {
+    const idxAttr = `editableModified${dataKey}Idx`;
+    const activeAttr = `editableModified${dataKey}`;
+    return {
+      label,
+      classify(slideEl) {
+        const candidates = Array.from(slideEl.children).filter(
+          (el) => el.tagName === tagName && !editableRegistry.has(el) && !el.classList.contains("absolute")
+        );
+        const valid = [];
+        let idx = 0;
+        for (const el of candidates) {
+          el.dataset[idxAttr] = String(idx++);
+          valid.push(el);
+        }
+        return { valid, warn: [] };
+      },
+      activate(el) {
+        const slideIndex = Reveal.getState().indexh;
+        const slideEl = el.closest("section");
+        const scale = getSlideScale();
+        const elRect = el.getBoundingClientRect();
+        const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+        const origLeft = (elRect.left - slideRect.left) / scale;
+        const origTop = (elRect.top - slideRect.top) / scale;
+        const cs = window.getComputedStyle(el);
+        const naturalW = elRect.width / scale;
+        const naturalH = elRect.height / scale;
+        el.style.paddingLeft = cs.paddingLeft;
+        el.style.paddingRight = cs.paddingRight;
+        el.style.paddingTop = cs.paddingTop;
+        el.style.paddingBottom = cs.paddingBottom;
+        el.style.margin = "0";
+        el.style.width = naturalW + "px";
+        el.style.height = naturalH + "px";
+        el.style.display = "block";
+        el.dataset[activeAttr] = "true";
+        el.dataset.editableModifiedSlide = String(slideIndex);
+        setCapabilityOverride(el, ["move", "resize"]);
+        setupDivWhenReady(el);
+        waitForRegistryThenFixPosition(el, origLeft, origTop);
+      },
+      serialize(text) {
+        const htmlAttr = `data-editable-modified-${dataKey.toLowerCase()}`;
+        const els = Array.from(
+          document.querySelectorAll(`${tagName.toLowerCase()}[${htmlAttr}="true"]`)
+        );
+        if (els.length === 0)
+          return text;
+        const chunks = splitIntoSlideChunks(text);
+        const byChunk = /* @__PURE__ */ new Map();
+        for (const el of els) {
+          if (!editableRegistry.has(el))
+            continue;
+          const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
+          const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+          if (chunkIndex >= chunks.length)
+            continue;
+          if (!byChunk.has(chunkIndex))
+            byChunk.set(chunkIndex, []);
+          byChunk.get(chunkIndex).push(el);
+        }
+        for (const [chunkIndex, chunkEls] of byChunk) {
+          chunkEls.sort(
+            (a, b) => parseInt(a.dataset[idxAttr] ?? "0", 10) - parseInt(b.dataset[idxAttr] ?? "0", 10)
+          );
+          const blocks = extractBlocksStartingWith(chunks[chunkIndex], testLine);
+          const lines = chunks[chunkIndex].split("\n");
+          for (let i = chunkEls.length - 1; i >= 0; i--) {
+            const el = chunkEls[i];
+            const elIdx = parseInt(el.dataset[idxAttr] ?? "0", 10);
+            if (elIdx >= blocks.length)
+              continue;
+            const block = blocks[elIdx];
+            const dims = editableRegistry.get(el).toDimensions();
+            const posAttrs = [
+              `left=${Math.round(dims.left)}px`,
+              `top=${Math.round(dims.top)}px`,
+              `width=${Math.round(dims.width)}px`,
+              `height=${Math.round(dims.height)}px`
+            ];
+            const styleAttrs = [];
+            if (dims.rotation)
+              styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+            let attrs = `.absolute ${posAttrs.join(" ")}`;
+            if (styleAttrs.length)
+              attrs += ` style="${styleAttrs.join(" ")}"`;
+            const blockLineCount = block.endLine - block.startLine + 1;
+            lines.splice(
+              block.startLine,
+              blockLineCount,
+              `::: {${attrs}}`,
+              block.text,
+              ":::"
+            );
+          }
+          chunks[chunkIndex] = lines.join("\n");
+        }
+        return chunks.join("");
+      }
+    };
+  }
+  ModifyModeClassifier.register(makeListClassifier({
+    tagName: "UL",
+    dataKey: "Ul",
+    testLine: (line) => /^[-*+] /.test(line),
+    label: "Bullet lists"
+  }));
+  ModifyModeClassifier.register(makeListClassifier({
+    tagName: "OL",
+    dataKey: "Ol",
+    testLine: (line) => /^\d+[.)]\s/.test(line),
+    label: "Ordered lists"
+  }));
+  ModifyModeClassifier.register(makeListClassifier({
+    tagName: "BLOCKQUOTE",
+    dataKey: "Blockquote",
+    testLine: (line) => /^>/.test(line),
+    label: "Blockquotes"
+  }));
   function classifyElements() {
     const reveal = document.querySelector(".reveal");
     const currentSlide = reveal?.querySelector(".slides section.present:not(.slide-background)") ?? reveal;

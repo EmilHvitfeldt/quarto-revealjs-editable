@@ -26,9 +26,9 @@ export class EditableElement {
     /** @type {string} Element type ("img" or "div") */
     this.type = element.tagName.toLowerCase();
 
-    // Get dimensions - for images, use naturalWidth/naturalHeight if offset values are 0
-    let width = element.offsetWidth;
-    let height = element.offsetHeight;
+    // Prefer pre-set inline style (sub-pixel accurate) over offsetWidth (integer-truncated).
+    let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
+    let height = element.style.height ? parseFloat(element.style.height) : element.offsetHeight;
     if (this.type === "img" && (width === 0 || height === 0)) {
       width = element.naturalWidth || width;
       height = element.naturalHeight || height;

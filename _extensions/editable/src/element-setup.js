@@ -171,8 +171,8 @@ function setupEltStyles(elt) {
     height = elt.videoHeight || height || 150;
   }
 
-  elt.style.width = width + "px";
-  elt.style.height = height + "px";
+  if (!elt.style.width) elt.style.width = width + "px";
+  if (!elt.style.height) elt.style.height = height + "px";
   elt.style.display = "block";
 }
 
