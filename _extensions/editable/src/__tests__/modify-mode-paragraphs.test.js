@@ -72,4 +72,18 @@ describe('extractParagraphBlocks', () => {
     expect(blocks[1].startLine).toBe(4);
     expect(blocks[1].endLine).toBe(4);
   });
+
+  it('skips standalone image-only paragraph blocks', () => {
+    const blocks = extractParagraphBlocks('Text para\n\n![](img.png)\n\nAnother text\n');
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].text).toBe('Text para');
+    expect(blocks[1].text).toBe('Another text');
+  });
+
+  it('skips paragraph blocks containing inline images', () => {
+    const blocks = extractParagraphBlocks('Plain text\n\nInline ![](img.png){width=80px} image text\n\nLast\n');
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].text).toBe('Plain text');
+    expect(blocks[1].text).toBe('Last');
+  });
 });

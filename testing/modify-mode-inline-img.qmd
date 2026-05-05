@@ -1,0 +1,16 @@
+---
+---
+
+## Slide 1 - Inline image in paragraph
+
+I think that I shall never see a poem lovely as a ![](../image.png){width=80px} tree, whose hungry mouth is prest against the earth's sweet flowing breast.
+
+## Slide 2 - Multiple inline images
+
+First ![](../image.png){width=40px} image and second ![](../image.png){width=40px} image in same paragraph.
+
+## Slide 3 - Inline image alongside plain image
+
+Some text with ![](../image.png){width=40px} an inline image.
+
+![](../image.png)

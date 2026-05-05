@@ -37,6 +37,7 @@ Currently supported element types:
 |---|---|---|
 | Plain paragraph | `Some paragraph text` | Move, resize, rotate, text editing |
 | Plain image | `![](image.png)` | Move, resize, rotate |
+| Inline image | `text ![](image.png) text` | Move, resize, rotate |
 | `{.absolute}` image | `![](image.png){.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate |
 | Plain video | `![](video.mp4)` | Move, resize, rotate |
 | `{.absolute}` div | `::: {.absolute left=Xpx top=Ypx ...}` | Move, resize, rotate, text editing |
@@ -48,7 +49,7 @@ Currently supported element types:
 
 Plain paragraphs are matched by their position among top-level paragraphs on the slide (Nth paragraph in the DOM = Nth paragraph block in source). On save, the paragraph is wrapped in a `::: {.absolute ...}` fenced div. If the text was edited with the Quill editor, the new content is written back; otherwise the original QMD source text is preserved as-is.
 
-Plain images and videos are inserted directly in a slide without positional attributes. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
+Plain images and videos are inserted directly in a slide without positional attributes. Inline images embedded mid-paragraph (`text ![](src) text`) work the same way as plain images — the same `](src)` write-back regex matches both. Activating an inline image pulls it out of the text flow, so the surrounding paragraph text reflows around the now-absolutely-positioned image. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
 
 Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
 

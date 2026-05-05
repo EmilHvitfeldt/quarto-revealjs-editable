@@ -16861,11 +16861,14 @@ ${fence}`;
     const blockLines = [];
     const commitBlock = () => {
       if (blockLines.length > 0) {
-        blocks.push({
-          startLine: blockStart,
-          endLine: blockStart + blockLines.length - 1,
-          text: blockLines.join("\n")
-        });
+        const text = blockLines.join("\n");
+        if (!/!\[[^\]]*\]\(/.test(text)) {
+          blocks.push({
+            startLine: blockStart,
+            endLine: blockStart + blockLines.length - 1,
+            text
+          });
+        }
       }
       blockStart = -1;
       blockLines.length = 0;
@@ -16912,7 +16915,7 @@ ${fence}`;
     label: "Paragraphs",
     classify(slideEl) {
       const candidates = Array.from(slideEl.children).filter(
-        (el) => el.tagName === "P" && !editableRegistry.has(el) && !el.classList.contains("absolute")
+        (el) => el.tagName === "P" && !editableRegistry.has(el) && !el.classList.contains("absolute") && !el.querySelector("img")
       );
       const valid = [];
       let idx = 0;
