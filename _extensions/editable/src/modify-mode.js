@@ -1219,6 +1219,9 @@ ModifyModeClassifier.register({
  * Extract top-level paragraph blocks from a QMD slide chunk.
  * Returns an array of { startLine, endLine, text } for each block.
  * Only blocks at depth 0 (outside fenced divs and code fences) are returned.
+ * Blocks containing markdown image syntax (`![...](...)`) are skipped to keep
+ * indices aligned with the paragraph classifier, which excludes <p> elements
+ * containing <img>.
  * @param {string} chunk
  * @returns {Array<{startLine: number, endLine: number, text: string}>}
  */
@@ -1232,11 +1235,14 @@ export function extractParagraphBlocks(chunk) {
 
   const commitBlock = () => {
     if (blockLines.length > 0) {
-      blocks.push({
-        startLine: blockStart,
-        endLine: blockStart + blockLines.length - 1,
-        text: blockLines.join('\n'),
-      });
+      const text = blockLines.join('\n');
+      if (!/!\[[^\]]*\]\(/.test(text)) {
+        blocks.push({
+          startLine: blockStart,
+          endLine: blockStart + blockLines.length - 1,
+          text,
+        });
+      }
     }
     blockStart = -1;
     blockLines.length = 0;
@@ -1281,10 +1287,17 @@ ModifyModeClassifier.register({
   label: 'Paragraphs',
 
   classify(slideEl) {
+    // Skip <p> elements that contain an <img>: standalone images (`![](src)`) and
+    // inline images (`text ![](src) text`) both render as <img> inside <p>, and the
+    // image classifier handles them directly. Marking the wrapping <p> would create
+    // overlapping click targets and let the user wrap the image in a fenced div,
+    // which produces a much messier write-back than just adding {.absolute} to the
+    // image markdown.
     const candidates = Array.from(slideEl.children).filter(el =>
       el.tagName === 'P' &&
       !editableRegistry.has(el) &&
-      !el.classList.contains('absolute')
+      !el.classList.contains('absolute') &&
+      !el.querySelector('img')
     );
 
     const valid = [];

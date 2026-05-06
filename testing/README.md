@@ -50,6 +50,7 @@ npm run test:e2e
 | `modify-mode-absolute.qmd` | `{.absolute}` divs detectable in modify mode | #119       |
 | `modify-mode-absolute-img.qmd` | `{.absolute}` images detectable in modify mode | #122   |
 | `modify-mode-fenced-div.qmd` | Fenced divs (classed, callouts, columns) detectable in modify mode | #108 |
+| `modify-mode-inline-img.qmd` | Inline images (`text ![](src) text`) detectable in modify mode | #120 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 
@@ -297,6 +298,16 @@ npm run test:e2e
 | h2 title is classified as valid in modify mode | `h2.modify-mode-valid` count = 1 |
 | Clicking h2 title makes it contentEditable and exits modify mode | `h2[contenteditable="true"]` present |
 | Editing h2 title serializes back to QMD | `## Updated Title` in the serialized chunk |
+
+**`e2e/modify-mode-inline-img.spec.js`** - Modify Mode — Inline images (5 tests):
+
+| Test | What it verifies |
+|---|---|
+| Inline image inside paragraph is classified as valid | `p img.modify-mode-valid` count = 1 |
+| Parent paragraph of an inline image is NOT classified as valid | `p.modify-mode-valid` count = 0 |
+| Clicking inline image activates only the image and exits modify mode | `.editable-container img` appears, modify mode inactive |
+| Serialize replaces inline image src with `.absolute` attributes | Paragraph text preserved, image gains `{.absolute ...}`, paragraph not wrapped in fenced div |
+| Multiple inline images in same paragraph: only the clicked one is modified | One occurrence has `.absolute`, the other keeps original `{width=40px}` |
 
 **`e2e/modify-mode-absolute.spec.js`** - Modify Mode — `{.absolute}` divs (6 tests):
 

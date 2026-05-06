@@ -463,6 +463,7 @@ run_render_test "Test 26: Modify mode video rendering" "modify-mode-video.qmd" "
 run_render_test "Test 27: Modify mode fenced divs rendering" "modify-mode-fenced-div.qmd" "inject"
 run_render_test "Test 28: Modify mode paragraph rendering" "modify-mode-paragraph.qmd" "inject"
 run_render_test "Test 29: Modify mode lists rendering" "modify-mode-lists.qmd" "inject"
+run_render_test "Test 30: Modify mode inline image rendering" "modify-mode-inline-img.qmd" "inject"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

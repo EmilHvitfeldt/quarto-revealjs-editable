@@ -265,7 +265,7 @@ cd testing && npm run test:e2e
 
 ## Modify Mode
 
-Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images, `{.absolute}` images, plain videos, `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), and slide titles (`## heading`). Additional types can be added via the classifier registry.
+Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images (including inline images embedded in paragraphs), `{.absolute}` images, plain videos, `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), and slide titles (`## heading`). Additional types can be added via the classifier registry.
 
 ### Lifecycle
 
@@ -314,6 +314,10 @@ New element types are added by calling `ModifyModeClassifier.register(classifier
 The built-in image classifier's `serialize()` uses `splitIntoSlideChunks()` to scope replacements per slide (keyed by `data-editable-modified-slide`), and replaces occurrences by DOM order within a chunk to handle duplicate image srcs correctly.
 
 **After saving**, the image's markdown gains `{.absolute ...}` attributes. On the next render it will be a regular absolute-positioned image (not re-editable without `{.editable}`).
+
+**Inline images** (`text ![](src) text`) are handled by the same image classifier with no special-casing: `slideEl.querySelectorAll('img')` finds them inside their parent `<p>`, and the `\]\(src\)(\{[^}]*\})?` write-back regex matches the inline occurrence. Activating the image reparents it into an absolutely-positioned `editable-container` (created as a sibling next to the image inside the `<p>`), which pulls it out of the text flow — surrounding paragraph text reflows around the gap. To avoid overlapping click targets, the paragraph classifier excludes any `<p>` that contains an `<img>`, and `extractParagraphBlocks()` skips QMD blocks containing `![](` so source-line indices stay aligned with the classified DOM `<p>` order.
+
+**Activation is a one-way transform from inline to absolutely-positioned.** Once saved, the source becomes `text ![](src){.absolute left=Xpx top=Ypx width=Wpx height=Hpx} text`. On the next render the image is no longer inline — Quarto sees `.absolute` and renders it out of flow regardless of its position in the paragraph. The surrounding text remains in the paragraph as a single sentence with no image gap. Modify mode then classifies it under "Positioned images" (the `img.absolute` classifier), not as an inline image. There is no path back to the inline form short of editing the QMD source by hand.
 
 The `{.absolute}` div classifier works similarly but matches the source block by its original position values. At `activate()` time it captures the element's inline `left`/`top`/`width`/`height` into `data-editable-modified-abs-*` attributes before `setupDivWhenReady` overwrites the element's `position` style. `waitForRegistryThenFixPosition()` polls until the element appears in `editableRegistry`, then calls `setState({x, y})` to move the container to the correct position. During `serialize()`, `makeAbsoluteBlockRegex()` builds a regex with four lookaheads (one per original dimension value) to locate the matching `{.absolute ...}` block in the slide chunk regardless of attribute order. Occurrence counters handle the edge case of two divs with identical original positions on the same slide.
 
