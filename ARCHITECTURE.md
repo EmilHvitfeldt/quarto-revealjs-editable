@@ -265,7 +265,7 @@ cd testing && npm run test:e2e
 
 ## Modify Mode
 
-Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images (including inline images embedded in paragraphs), `{.absolute}` images, plain videos, `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), and slide titles (`## heading`). Additional types can be added via the classifier registry.
+Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images (including inline images embedded in paragraphs), `{.absolute}` images, plain videos, `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), slide titles (`## heading`), and positioned arrows from previous-save shortcodes (`{{< arrow ... position="absolute" >}}`). Additional types can be added via the classifier registry.
 
 ### Lifecycle
 
@@ -332,6 +332,18 @@ At `activate()` time, the element's natural position is captured via `getBoundin
 **Column layouts** (`.columns`) have two extra steps in `activate()`: (1) natural width and height are read before `setupDivWhenReady` and applied via `setState` afterward, because `createEltContainer` reparents the element into an `inline-block` container where `offsetWidth` would collapse to fit-content; (2) `display: flex` is restored after `setupEltStyles` sets `display: block`, which would otherwise break the two-column layout.
 
 **Per-element capability overrides**: `setCapabilityOverride(el, names)` in `capabilities.js` stores a `WeakMap` entry that `getCapabilitiesFor(type, el)` checks before falling back to `ELEMENT_CAPABILITIES`. Column layouts use `['move', 'resize', 'rotate']` (no text editing); `setCapabilityOverride` is called in `activate()` before `setupDivWhenReady` so the override is in place when `setupDraggableElt` calls `getCapabilitiesFor`.
+
+### Positioned Arrow Classifier
+
+Positioned arrows from a previous save (rendered via `quarto-arrows` from a `{{< arrow ... position="absolute" >}}` shortcode) are classified by matching the Nth `position="absolute"` arrow shortcode in the slide's QMD chunk to the Nth positioned arrow div in the rendered slide. Positional matching avoids the float-format mismatch between the source's integer coordinates and the Lua filter's `%.1f`-formatted `style.left`/`top` values, and handles duplicates implicitly.
+
+Candidate divs are identified structurally: a top-level `<div style="position: absolute …">` with a single `<svg>` child whose `<defs>` holds a `<marker id="arrow-…">`. `quarto-arrows` always emits this shape. During classification each candidate's inline `pointer-events: none` (set by the Lua filter so arrows don't intercept clicks during a presentation) is temporarily switched to `auto` so the click listener can fire; `cleanup()` restores it on exit.
+
+`activate()` re-parses the matched shortcode's kwargs into a fresh `arrowData` object (preserving color, width, head, dash, line, opacity, label, curve, and waypoints), hides the source div with `display: none`, and creates a new editable arrow via `createArrowElement(arrowData)` appended to the slide section. The new arrow uses the existing arrow editing UI (toolbar panel, drag handles, double-click waypoints).
+
+`serialize()` finds each activated arrow's source-literal shortcode in its slide chunk via plain string search and replaces it with `serializeArrowToShortcode(arrowData)`. Activated arrows are tracked in a module-local `_modifiedArrows` array (not `NewElementRegistry.newArrows`, since write-back is in-place replacement rather than insertion). Per-literal occurrence counters handle the rare case of identical shortcodes on the same slide.
+
+**Unsupported kwargs**: arrows whose shortcode contains kwargs the editable system doesn't yet round-trip (`bend`, `out`, `in`, `fragment*`, `aria-label`, `alt`, `title`, `class`, `head-size`, `head-fill`, `size`, `head-start`, `head-end`, `curve`) are warn-classified instead of activated, so their source attrs aren't silently dropped on save. The `SUPPORTED_ARROW_KWARGS` set in `modify-mode.js` defines the allowed list.
 
 ### Source Note on `data-src`
 

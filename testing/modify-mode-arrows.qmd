@@ -1,0 +1,19 @@
+---
+filters:
+  - editable
+  - arrows
+---
+
+## Slide 1 — Two absolute arrows
+
+{{< arrow from="100,200" to="400,200" position="absolute" >}}
+
+{{< arrow from="314.2,412.8" to="182.6,139.3" color="red" width="3" position="absolute" >}}
+
+## Slide 2 — Inline arrow only
+
+An inline arrow {{< arrow from="0,0" to="50,50" >}} embedded in a paragraph.
+
+## Slide 3 — Absolute arrow with unsupported kwargs
+
+{{< arrow from="50,50" to="200,150" bend="left" position="absolute" >}}
