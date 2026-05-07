@@ -4,6 +4,33 @@ const path = require('path');
 const fs = require('fs');
 const { TESTING_DIR, setupPage, navigateToSlide } = require('./test-helpers');
 
+/**
+ * Click on the painted line of the Nth positioned arrow on the current slide.
+ *
+ * The wrapping arrow div has `pointer-events: none` so empty bbox space stays
+ * click-through (otherwise overlapping diagonal arrows would intercept each
+ * other).  Real users click visually on the rendered line; the path catches
+ * via its `pointer-events: visiblePainted` default.  Playwright's
+ * `locator(div).click()` aims at the div's bbox center, which doesn't always
+ * hit the painted line (the div bbox includes inline-block descender space
+ * below the SVG).  We click the path's geometric center instead.
+ */
+async function clickPositionedArrow(page, index) {
+  const target = await page.evaluate((i) => {
+    const arrow = document.querySelectorAll(
+      'div[style*="position: absolute"].modify-mode-valid'
+    )[i];
+    if (!arrow) return null;
+    const path = arrow.querySelector('svg path[stroke][marker-end]')
+              || arrow.querySelector('svg path[stroke]:not([fill])');
+    if (!path) return null;
+    const r = path.getBoundingClientRect();
+    return { cx: r.left + r.width / 2, cy: r.top + (r.height || 1) / 2 };
+  }, index);
+  if (!target) throw new Error(`No positioned arrow at index ${index}`);
+  await page.mouse.click(target.cx, target.cy);
+}
+
 test.describe('Modify Mode — arrows from previous save', () => {
   test.beforeAll(async () => {
     const htmlPath = path.join(TESTING_DIR, 'modify-mode-arrows.html');
@@ -49,7 +76,7 @@ test.describe('Modify Mode — arrows from previous save', () => {
       document.querySelectorAll('.editable-arrow-container').length
     );
 
-    await page.locator('div[style*="position: absolute"].modify-mode-valid').first().click();
+    await clickPositionedArrow(page, 0);
 
     await page.waitForFunction(
       (initial) => document.querySelectorAll('.editable-arrow-container').length > initial,
@@ -66,7 +93,7 @@ test.describe('Modify Mode — arrows from previous save', () => {
     await setupPage(page, 'modify-mode-arrows.html');
     await page.click('.toolbar-modify');
     // Activate the second arrow on slide 1 — the one with color="red" width="3".
-    await page.locator('div[style*="position: absolute"].modify-mode-valid').nth(1).click();
+    await clickPositionedArrow(page, 1);
     await page.waitForSelector('.editable-arrow-container.active', { timeout: 3000 });
 
     const panel = await page.evaluate(() => ({
@@ -85,7 +112,7 @@ test.describe('Modify Mode — arrows from previous save', () => {
     await page.click('.toolbar-modify');
 
     // Activate the first positioned arrow on slide 1.
-    await page.locator('div[style*="position: absolute"].modify-mode-valid').first().click();
+    await clickPositionedArrow(page, 0);
     await page.waitForSelector('.editable-arrow-container.active', { timeout: 3000 });
 
     // Move the arrow's start point by mutating arrowData and triggering save.
@@ -133,7 +160,7 @@ test.describe('Modify Mode — arrows from previous save', () => {
     await page.click('.toolbar-modify');
 
     // Activate only the first positioned arrow.
-    await page.locator('div[style*="position: absolute"].modify-mode-valid').first().click();
+    await clickPositionedArrow(page, 0);
     await page.waitForSelector('.editable-arrow-container.active', { timeout: 3000 });
 
     const qmd = await page.evaluate(() => getTransformedQmd());

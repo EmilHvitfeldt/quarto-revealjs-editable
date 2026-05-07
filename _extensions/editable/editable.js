@@ -17297,8 +17297,8 @@ ${fence}`;
   ModifyModeClassifier.register({
     label: "Positioned arrows",
     classify(slideEl) {
-      for (const div of _arrowsWithPointerEventsCleared) {
-        div.style.pointerEvents = "none";
+      for (const path of _arrowsWithPointerEventsCleared) {
+        path.style.pointerEvents = "";
       }
       _arrowsWithPointerEventsCleared.clear();
       if (!window._input_file)
@@ -17316,10 +17316,6 @@ ${fence}`;
       const divs = findPositionedArrowDivs(slideEl);
       if (divs.length === 0)
         return { valid: [], warn: [] };
-      for (const div of divs) {
-        div.style.pointerEvents = "auto";
-        _arrowsWithPointerEventsCleared.add(div);
-      }
       const pairCount = Math.min(positioned.length, divs.length);
       const valid = [];
       const warn = [];
@@ -17340,6 +17336,10 @@ ${fence}`;
         div.dataset.editableModifiedArrowSource = sc.raw;
         div.dataset.editableModifiedArrowOccurrence = String(occurrence);
         div.dataset.editableModifiedArrowKwargs = JSON.stringify(sc.kwargs);
+        div.querySelectorAll("svg path").forEach((p) => {
+          p.style.pointerEvents = "auto";
+          _arrowsWithPointerEventsCleared.add(p);
+        });
         valid.push(div);
       }
       return { valid, warn };
@@ -17420,8 +17420,8 @@ ${fence}`;
       return chunks.join("");
     },
     cleanup() {
-      for (const div of _arrowsWithPointerEventsCleared) {
-        div.style.pointerEvents = "none";
+      for (const path of _arrowsWithPointerEventsCleared) {
+        path.style.pointerEvents = "";
       }
       _arrowsWithPointerEventsCleared.clear();
     }

@@ -1762,10 +1762,23 @@ function arrowDataFromKwargs(kwargs) {
 const _modifiedArrows = [];
 
 /**
- * Tracks arrow divs whose inline `pointer-events: none` we cleared during
- * classification so we can restore it on exit.  quarto-arrows emits arrows
- * with pointer-events disabled so they don't intercept clicks during a
- * presentation; modify mode needs them clickable.
+ * Tracks arrow paths whose pointer-events we overrode during classification
+ * so we can restore them on exit.  quarto-arrows emits arrows with the
+ * wrapping div at `pointer-events: none` (so they don't intercept clicks
+ * during a presentation).  Modify mode needs them clickable, but only on
+ * the actual painted line — empty space inside an arrow's SVG bounding box
+ * must remain click-through, otherwise diagonal or curved arrows (with
+ * large bboxes) would swallow clicks meant for another arrow whose visible
+ * line happens to fall inside their bbox.
+ *
+ * The approach: leave the wrapping div at `pointer-events: none` and the
+ * outer SVG at its default.  Set `pointer-events: auto` on each visible
+ * `<path>` element only — paths default to hit-testing on painted pixels
+ * (`visiblePainted`), so empty SVG space stays click-through, while clicks
+ * on the painted line catch on the path and bubble up to the click listener
+ * attached to the wrapping div by `applyClassification`.  (Bubbling fires
+ * the div listener regardless of the div's own `pointer-events: none`,
+ * which only controls the div's own hit-testing target.)
  */
 const _arrowsWithPointerEventsCleared = new Set();
 
@@ -1794,10 +1807,10 @@ ModifyModeClassifier.register({
   label: 'Positioned arrows',
 
   classify(slideEl) {
-    // Restore pointer-events on any arrow divs we touched in a previous
+    // Restore pointer-events on any arrow paths we touched in a previous
     // classification pass (e.g. user navigated away without clicking).
-    for (const div of _arrowsWithPointerEventsCleared) {
-      div.style.pointerEvents = 'none';
+    for (const path of _arrowsWithPointerEventsCleared) {
+      path.style.pointerEvents = '';
     }
     _arrowsWithPointerEventsCleared.clear();
 
@@ -1814,13 +1827,6 @@ ModifyModeClassifier.register({
 
     const divs = findPositionedArrowDivs(slideEl);
     if (divs.length === 0) return { valid: [], warn: [] };
-
-    // quarto-arrows emits divs with pointer-events: none. Re-enable so the
-    // click handler attached in applyClassification can fire on them.
-    for (const div of divs) {
-      div.style.pointerEvents = 'auto';
-      _arrowsWithPointerEventsCleared.add(div);
-    }
 
     // Positional match: Nth shortcode → Nth div, in source/DOM order.
     // If counts differ (e.g. fragment-wrapped arrows produce extra spans, or
@@ -1853,6 +1859,19 @@ ModifyModeClassifier.register({
       div.dataset.editableModifiedArrowSource = sc.raw;
       div.dataset.editableModifiedArrowOccurrence = String(occurrence);
       div.dataset.editableModifiedArrowKwargs = JSON.stringify(sc.kwargs);
+
+      // Enable pointer events on every `<path>` inside the SVG.  Paths
+      // default to `visiblePainted`, so only clicks on the actually painted
+      // line/marker fire — empty SVG space stays click-through, which keeps
+      // overlapping-arrow bboxes from swallowing clicks.  The wrapping div
+      // and outer SVG are left at their defaults (none / visiblePainted)
+      // so they don't intercept the bbox.  Click events bubble up from the
+      // path to the click listener attached in applyClassification.
+      div.querySelectorAll('svg path').forEach(p => {
+        p.style.pointerEvents = 'auto';
+        _arrowsWithPointerEventsCleared.add(p);
+      });
+
       valid.push(div);
     }
 
@@ -1956,12 +1975,12 @@ ModifyModeClassifier.register({
   },
 
   cleanup() {
-    // Restore the original pointer-events: none so arrows don't intercept
-    // clicks once modify mode is closed.  Don't restore on arrows that were
-    // activated — those source divs are now display:none and getting
-    // pointer-events back is harmless either way.
-    for (const div of _arrowsWithPointerEventsCleared) {
-      div.style.pointerEvents = 'none';
+    // Restore path pointer-events to the inherited (none) value so arrows
+    // don't intercept clicks once modify mode is closed.  Activated arrows'
+    // source divs are display:none, so it doesn't matter whether their
+    // paths get reset or not.
+    for (const path of _arrowsWithPointerEventsCleared) {
+      path.style.pointerEvents = '';
     }
     _arrowsWithPointerEventsCleared.clear();
   },
