@@ -38,10 +38,13 @@ import {
   splitIntoSlideChunks,
   serializeToQmd,
   elementToText,
+  serializeArrowToShortcode,
 } from './serialization.js';
 import { getQmdHeadingIndex, getSlideScale } from './utils.js';
 import { getColorPalette, getBrandColorOutput } from './colors.js';
 import { setCapabilityOverride } from './capabilities.js';
+import { createArrowElement, setActiveArrow } from './arrows.js';
+import { CONFIG } from './config.js';
 
 const VALID_CLASS = 'modify-mode-valid';
 const WARN_CLASS  = 'modify-mode-warn';
@@ -1598,6 +1601,371 @@ ModifyModeClassifier.register(makeListClassifier({
   testLine: (line) => /^>/.test(line),
   label: 'Blockquotes',
 }));
+
+// ---------------------------------------------------------------------------
+// Positioned arrow classifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Kwargs the editable arrow system understands. Arrows whose shortcodes use
+ * other kwargs (bend, fragment, aria-label, …) are classified as warn so we
+ * don't silently drop those values during write-back.
+ */
+const SUPPORTED_ARROW_KWARGS = new Set([
+  'from', 'to', 'control1', 'control2',
+  'waypoints', 'smooth',
+  'color', 'width', 'head', 'dash', 'line', 'opacity',
+  'label', 'label-position', 'label-offset',
+  'position',
+]);
+
+/**
+ * Parse `key=value` pairs from a shortcode body. Supports double-quoted,
+ * single-quoted, and unquoted values.
+ * @param {string} body - The body between `{{< arrow ` and ` >}}`
+ * @returns {Object<string,string>} Map of kwarg name → string value
+ */
+function parseArrowKwargs(body) {
+  const kwargs = {};
+  const re = /([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/g;
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    const value = m[2] !== undefined ? m[2]
+                : m[3] !== undefined ? m[3]
+                : m[4];
+    kwargs[m[1]] = value;
+  }
+  return kwargs;
+}
+
+/**
+ * Parse a "x,y" point string into {x, y} numbers, or null if invalid.
+ */
+function parseArrowPoint(s) {
+  if (!s) return null;
+  const parts = s.split(',').map(p => parseFloat(p.trim()));
+  if (parts.length !== 2 || parts.some(isNaN)) return null;
+  return { x: parts[0], y: parts[1] };
+}
+
+/**
+ * Parse a `waypoints` value into an array of {x, y} points.
+ * Accepts space-separated `x,y` pairs (e.g. `"100,50 200,80"`).
+ */
+function parseArrowWaypoints(s) {
+  if (!s) return [];
+  return s.trim().split(/\s+/)
+    .map(parseArrowPoint)
+    .filter(p => p !== null);
+}
+
+/**
+ * Extract every `{{< arrow ... >}}` shortcode from a slide chunk.
+ * Returns each occurrence in source order with its parsed kwargs and the
+ * literal substring as it appeared in the source (so `serialize()` can match
+ * and replace it without normalising whitespace or attribute order).
+ *
+ * @param {string} chunk
+ * @returns {Array<{raw: string, body: string, kwargs: Object, index: number}>}
+ *   `raw` is the full `{{< … >}}` literal, `index` is its character offset
+ *   within `chunk`.
+ */
+export function parseArrowShortcodes(chunk) {
+  const re = /\{\{<\s*arrow\s+([^>]*?)\s*>\}\}/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(chunk)) !== null) {
+    out.push({
+      raw: m[0],
+      body: m[1],
+      kwargs: parseArrowKwargs(m[1]),
+      index: m.index,
+    });
+  }
+  return out;
+}
+
+/**
+ * Filter a list of parsed shortcodes to those that render as a positioned
+ * (block-level) arrow div: only `position="absolute"` (or `"fixed"`) qualifies.
+ */
+function filterPositionedArrows(shortcodes) {
+  return shortcodes.filter(sc =>
+    sc.kwargs.position === 'absolute' || sc.kwargs.position === 'fixed'
+  );
+}
+
+/**
+ * Detect kwargs the editable system would silently drop on round-trip.
+ * Returns the list of unsupported kwarg names (empty if all are supported).
+ */
+function unsupportedArrowKwargs(kwargs) {
+  return Object.keys(kwargs).filter(k => !SUPPORTED_ARROW_KWARGS.has(k));
+}
+
+/**
+ * Build an arrowData object compatible with createArrowElement() from
+ * a parsed shortcode kwargs map. Falls back to defaults that match
+ * addNewArrow() for any kwarg not present in the source.
+ */
+function arrowDataFromKwargs(kwargs) {
+  const from = parseArrowPoint(kwargs.from) || { x: 0, y: 0 };
+  const to   = parseArrowPoint(kwargs.to)   || { x: 0, y: 0 };
+  const c1   = parseArrowPoint(kwargs.control1);
+  const c2   = parseArrowPoint(kwargs.control2);
+  const waypoints = parseArrowWaypoints(kwargs.waypoints);
+
+  const numOr = (v, d) => {
+    if (v === undefined || v === null || v === '') return d;
+    const n = parseFloat(v);
+    return isNaN(n) ? d : n;
+  };
+
+  return {
+    fromX: from.x,
+    fromY: from.y,
+    toX: to.x,
+    toY: to.y,
+    control1X: c1 ? c1.x : null,
+    control1Y: c1 ? c1.y : null,
+    control2X: c2 ? c2.x : null,
+    control2Y: c2 ? c2.y : null,
+    curveMode: !!(c1 || c2),
+    waypoints,
+    smooth: kwargs.smooth === 'true' || kwargs.smooth === true,
+    color: kwargs.color || CONFIG.ARROW_DEFAULT_COLOR,
+    width: numOr(kwargs.width, CONFIG.ARROW_DEFAULT_WIDTH),
+    head: kwargs.head || 'arrow',
+    dash: kwargs.dash || 'solid',
+    line: kwargs.line || 'single',
+    opacity: numOr(kwargs.opacity, 1),
+    label: kwargs.label || '',
+    labelPosition: kwargs['label-position'] || CONFIG.ARROW_DEFAULT_LABEL_POSITION,
+    labelOffset: numOr(kwargs['label-offset'], CONFIG.ARROW_DEFAULT_LABEL_OFFSET),
+    isActive: false,
+  };
+}
+
+/**
+ * Module-level list of arrows that have been activated from previous-save
+ * shortcodes. Distinct from `NewElementRegistry.newArrows` (in-session
+ * insertions) because write-back is in-place replacement of an existing
+ * shortcode rather than appending a new one to the chunk.
+ *
+ * Each entry: { arrowData, sourceEl, slideIndex, sourceLiteral, occurrence }
+ *   - arrowData: the editable arrow's data object (live)
+ *   - sourceEl:  the original positioned div from the rendered slide (hidden)
+ *   - slideIndex: Reveal.getState().indexh at activate time
+ *   - sourceLiteral: exact `{{< arrow … >}}` string from the source chunk
+ *   - occurrence: 0-based index among identical sourceLiteral strings in chunk
+ */
+const _modifiedArrows = [];
+
+/**
+ * Tracks arrow divs whose inline `pointer-events: none` we cleared during
+ * classification so we can restore it on exit.  quarto-arrows emits arrows
+ * with pointer-events disabled so they don't intercept clicks during a
+ * presentation; modify mode needs them clickable.
+ */
+const _arrowsWithPointerEventsCleared = new Set();
+
+/**
+ * Find positioned arrow divs on the current slide that render a quarto-arrows
+ * shortcode (have an SVG with a `<defs><marker id="arrow-…">` directly inside).
+ * Excludes session-added arrows (marked with `editable-arrow-container`) and
+ * already-activated source arrows.
+ */
+function findPositionedArrowDivs(slideEl) {
+  const all = slideEl.querySelectorAll('div[style*="position: absolute"]');
+  const out = [];
+  for (const el of all) {
+    if (el.classList.contains('editable-arrow-container')) continue;
+    if (el.dataset.editableModifiedArrow === 'true') continue;
+    if (el.dataset.editableModifiedArrowHidden === 'true') continue;
+    const svg = el.querySelector(':scope > svg');
+    if (!svg) continue;
+    if (!svg.querySelector(':scope > defs > marker[id^="arrow-"]')) continue;
+    out.push(el);
+  }
+  return out;
+}
+
+ModifyModeClassifier.register({
+  label: 'Positioned arrows',
+
+  classify(slideEl) {
+    // Restore pointer-events on any arrow divs we touched in a previous
+    // classification pass (e.g. user navigated away without clicking).
+    for (const div of _arrowsWithPointerEventsCleared) {
+      div.style.pointerEvents = 'none';
+    }
+    _arrowsWithPointerEventsCleared.clear();
+
+    if (!window._input_file) return { valid: [], warn: [] };
+    const slideIndex = Reveal.getState().indexh;
+    const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+    const chunks = splitIntoSlideChunks(window._input_file);
+    const chunk = chunks[chunkIndex];
+    if (!chunk) return { valid: [], warn: [] };
+
+    const shortcodes = parseArrowShortcodes(chunk);
+    const positioned = filterPositionedArrows(shortcodes);
+    if (positioned.length === 0) return { valid: [], warn: [] };
+
+    const divs = findPositionedArrowDivs(slideEl);
+    if (divs.length === 0) return { valid: [], warn: [] };
+
+    // quarto-arrows emits divs with pointer-events: none. Re-enable so the
+    // click handler attached in applyClassification can fire on them.
+    for (const div of divs) {
+      div.style.pointerEvents = 'auto';
+      _arrowsWithPointerEventsCleared.add(div);
+    }
+
+    // Positional match: Nth shortcode → Nth div, in source/DOM order.
+    // If counts differ (e.g. fragment-wrapped arrows produce extra spans, or
+    // a styling option emits a wrapping element), pair as many as we can and
+    // skip the rest.
+    const pairCount = Math.min(positioned.length, divs.length);
+
+    const valid = [];
+    const warn  = [];
+
+    // Track occurrence counts of identical literal shortcodes for write-back.
+    const literalCounts = new Map();
+
+    for (let i = 0; i < pairCount; i++) {
+      const sc = positioned[i];
+      const div = divs[i];
+      const unsupported = unsupportedArrowKwargs(sc.kwargs);
+      if (unsupported.length > 0) {
+        warn.push({
+          el: div,
+          reason: `Arrow uses attributes not yet supported in modify mode: ${unsupported.join(', ')}`,
+        });
+        continue;
+      }
+
+      const occurrence = literalCounts.get(sc.raw) ?? 0;
+      literalCounts.set(sc.raw, occurrence + 1);
+
+      // Stamp source data for activate() and serialize().
+      div.dataset.editableModifiedArrowSource = sc.raw;
+      div.dataset.editableModifiedArrowOccurrence = String(occurrence);
+      div.dataset.editableModifiedArrowKwargs = JSON.stringify(sc.kwargs);
+      valid.push(div);
+    }
+
+    return { valid, warn };
+  },
+
+  activate(div) {
+    const slideEl = div.closest('section');
+    if (!slideEl) return;
+
+    const kwargsJson = div.dataset.editableModifiedArrowKwargs;
+    if (!kwargsJson) return;
+
+    let kwargs;
+    try { kwargs = JSON.parse(kwargsJson); } catch (e) { return; }
+
+    const slideIndex = Reveal.getState().indexh;
+    const arrowData = arrowDataFromKwargs(kwargs);
+    arrowData.isActive = true;
+
+    // Hide the source-rendered arrow (don't remove — keeping it preserves the
+    // ordering anchor used by classify() if the user re-enters modify mode).
+    div.dataset.editableModifiedArrowHidden = 'true';
+    div.style.display = 'none';
+
+    // Exit modify mode visually (rings off, button inactive) but don't reset
+    // the toolbar panel — createArrowElement → setActiveArrow opens the arrow
+    // style panel below, and we want it to stay visible so the user can see
+    // the source's color/width/etc.  Without this, the default
+    // exitModifyMode() that runs after activate() returns falsy would call
+    // showRightPanel('default') and hide the arrow controls.
+    exitModifyMode({ resetPanel: false });
+
+    const arrowContainer = createArrowElement(arrowData);
+    slideEl.appendChild(arrowContainer);
+    arrowData.element = arrowContainer;
+    arrowContainer.classList.remove('editable-new');
+
+    _modifiedArrows.push({
+      arrowData,
+      sourceEl: div,
+      slideIndex,
+      sourceLiteral: div.dataset.editableModifiedArrowSource,
+      occurrence: parseInt(div.dataset.editableModifiedArrowOccurrence ?? '0', 10),
+    });
+
+    setActiveArrow(arrowData);
+    return true; // we already called exitModifyMode; skip the default exit
+  },
+
+  serialize(text) {
+    if (_modifiedArrows.length === 0) return text;
+    const chunks = splitIntoSlideChunks(text);
+
+    // Group by chunk index so we can apply replacements per slide.
+    const byChunk = new Map();
+    for (const entry of _modifiedArrows) {
+      const chunkIndex = getQmdHeadingIndex(entry.slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+      byChunk.get(chunkIndex).push(entry);
+    }
+
+    for (const [chunkIndex, entries] of byChunk) {
+      // Process longest source-literals first so a shorter literal that is a
+      // substring of a longer one can't accidentally match the wrong span.
+      // Within identical literals, sort by occurrence so the n-th replacement
+      // targets the n-th appearance.
+      entries.sort((a, b) => {
+        if (a.sourceLiteral.length !== b.sourceLiteral.length) {
+          return b.sourceLiteral.length - a.sourceLiteral.length;
+        }
+        return a.occurrence - b.occurrence;
+      });
+
+      // Per-literal replacement counters: track how many times we've already
+      // consumed each unique sourceLiteral so identical-literal occurrences
+      // line up with their occurrence stamps.
+      const consumed = new Map();
+      for (const entry of entries) {
+        const replacement = serializeArrowToShortcode(entry.arrowData);
+        const literal = entry.sourceLiteral;
+        const skipCount = consumed.get(literal) ?? 0;
+
+        let chunk = chunks[chunkIndex];
+        let searchFrom = 0;
+        let hit = -1;
+        for (let i = 0; i <= skipCount; i++) {
+          hit = chunk.indexOf(literal, searchFrom);
+          if (hit === -1) break;
+          searchFrom = hit + literal.length;
+        }
+        if (hit === -1) continue;
+
+        chunks[chunkIndex] = chunk.slice(0, hit) + replacement + chunk.slice(hit + literal.length);
+        consumed.set(literal, skipCount + 1);
+      }
+    }
+
+    return chunks.join('');
+  },
+
+  cleanup() {
+    // Restore the original pointer-events: none so arrows don't intercept
+    // clicks once modify mode is closed.  Don't restore on arrows that were
+    // activated — those source divs are now display:none and getting
+    // pointer-events back is harmless either way.
+    for (const div of _arrowsWithPointerEventsCleared) {
+      div.style.pointerEvents = 'none';
+    }
+    _arrowsWithPointerEventsCleared.clear();
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Classification and lifecycle

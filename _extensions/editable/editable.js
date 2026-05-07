@@ -17174,6 +17174,258 @@ ${fence}`;
     testLine: (line) => /^>/.test(line),
     label: "Blockquotes"
   }));
+  var SUPPORTED_ARROW_KWARGS = /* @__PURE__ */ new Set([
+    "from",
+    "to",
+    "control1",
+    "control2",
+    "waypoints",
+    "smooth",
+    "color",
+    "width",
+    "head",
+    "dash",
+    "line",
+    "opacity",
+    "label",
+    "label-position",
+    "label-offset",
+    "position"
+  ]);
+  function parseArrowKwargs(body) {
+    const kwargs = {};
+    const re = /([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/g;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      const value = m[2] !== void 0 ? m[2] : m[3] !== void 0 ? m[3] : m[4];
+      kwargs[m[1]] = value;
+    }
+    return kwargs;
+  }
+  function parseArrowPoint(s) {
+    if (!s)
+      return null;
+    const parts = s.split(",").map((p) => parseFloat(p.trim()));
+    if (parts.length !== 2 || parts.some(isNaN))
+      return null;
+    return { x: parts[0], y: parts[1] };
+  }
+  function parseArrowWaypoints(s) {
+    if (!s)
+      return [];
+    return s.trim().split(/\s+/).map(parseArrowPoint).filter((p) => p !== null);
+  }
+  function parseArrowShortcodes(chunk) {
+    const re = /\{\{<\s*arrow\s+([^>]*?)\s*>\}\}/g;
+    const out = [];
+    let m;
+    while ((m = re.exec(chunk)) !== null) {
+      out.push({
+        raw: m[0],
+        body: m[1],
+        kwargs: parseArrowKwargs(m[1]),
+        index: m.index
+      });
+    }
+    return out;
+  }
+  function filterPositionedArrows(shortcodes) {
+    return shortcodes.filter(
+      (sc) => sc.kwargs.position === "absolute" || sc.kwargs.position === "fixed"
+    );
+  }
+  function unsupportedArrowKwargs(kwargs) {
+    return Object.keys(kwargs).filter((k) => !SUPPORTED_ARROW_KWARGS.has(k));
+  }
+  function arrowDataFromKwargs(kwargs) {
+    const from = parseArrowPoint(kwargs.from) || { x: 0, y: 0 };
+    const to = parseArrowPoint(kwargs.to) || { x: 0, y: 0 };
+    const c1 = parseArrowPoint(kwargs.control1);
+    const c2 = parseArrowPoint(kwargs.control2);
+    const waypoints = parseArrowWaypoints(kwargs.waypoints);
+    const numOr = (v, d) => {
+      if (v === void 0 || v === null || v === "")
+        return d;
+      const n = parseFloat(v);
+      return isNaN(n) ? d : n;
+    };
+    return {
+      fromX: from.x,
+      fromY: from.y,
+      toX: to.x,
+      toY: to.y,
+      control1X: c1 ? c1.x : null,
+      control1Y: c1 ? c1.y : null,
+      control2X: c2 ? c2.x : null,
+      control2Y: c2 ? c2.y : null,
+      curveMode: !!(c1 || c2),
+      waypoints,
+      smooth: kwargs.smooth === "true" || kwargs.smooth === true,
+      color: kwargs.color || CONFIG.ARROW_DEFAULT_COLOR,
+      width: numOr(kwargs.width, CONFIG.ARROW_DEFAULT_WIDTH),
+      head: kwargs.head || "arrow",
+      dash: kwargs.dash || "solid",
+      line: kwargs.line || "single",
+      opacity: numOr(kwargs.opacity, 1),
+      label: kwargs.label || "",
+      labelPosition: kwargs["label-position"] || CONFIG.ARROW_DEFAULT_LABEL_POSITION,
+      labelOffset: numOr(kwargs["label-offset"], CONFIG.ARROW_DEFAULT_LABEL_OFFSET),
+      isActive: false
+    };
+  }
+  var _modifiedArrows = [];
+  var _arrowsWithPointerEventsCleared = /* @__PURE__ */ new Set();
+  function findPositionedArrowDivs(slideEl) {
+    const all = slideEl.querySelectorAll('div[style*="position: absolute"]');
+    const out = [];
+    for (const el of all) {
+      if (el.classList.contains("editable-arrow-container"))
+        continue;
+      if (el.dataset.editableModifiedArrow === "true")
+        continue;
+      if (el.dataset.editableModifiedArrowHidden === "true")
+        continue;
+      const svg = el.querySelector(":scope > svg");
+      if (!svg)
+        continue;
+      if (!svg.querySelector(':scope > defs > marker[id^="arrow-"]'))
+        continue;
+      out.push(el);
+    }
+    return out;
+  }
+  ModifyModeClassifier.register({
+    label: "Positioned arrows",
+    classify(slideEl) {
+      for (const div of _arrowsWithPointerEventsCleared) {
+        div.style.pointerEvents = "none";
+      }
+      _arrowsWithPointerEventsCleared.clear();
+      if (!window._input_file)
+        return { valid: [], warn: [] };
+      const slideIndex = Reveal.getState().indexh;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      const chunks = splitIntoSlideChunks(window._input_file);
+      const chunk = chunks[chunkIndex];
+      if (!chunk)
+        return { valid: [], warn: [] };
+      const shortcodes = parseArrowShortcodes(chunk);
+      const positioned = filterPositionedArrows(shortcodes);
+      if (positioned.length === 0)
+        return { valid: [], warn: [] };
+      const divs = findPositionedArrowDivs(slideEl);
+      if (divs.length === 0)
+        return { valid: [], warn: [] };
+      for (const div of divs) {
+        div.style.pointerEvents = "auto";
+        _arrowsWithPointerEventsCleared.add(div);
+      }
+      const pairCount = Math.min(positioned.length, divs.length);
+      const valid = [];
+      const warn = [];
+      const literalCounts = /* @__PURE__ */ new Map();
+      for (let i = 0; i < pairCount; i++) {
+        const sc = positioned[i];
+        const div = divs[i];
+        const unsupported = unsupportedArrowKwargs(sc.kwargs);
+        if (unsupported.length > 0) {
+          warn.push({
+            el: div,
+            reason: `Arrow uses attributes not yet supported in modify mode: ${unsupported.join(", ")}`
+          });
+          continue;
+        }
+        const occurrence = literalCounts.get(sc.raw) ?? 0;
+        literalCounts.set(sc.raw, occurrence + 1);
+        div.dataset.editableModifiedArrowSource = sc.raw;
+        div.dataset.editableModifiedArrowOccurrence = String(occurrence);
+        div.dataset.editableModifiedArrowKwargs = JSON.stringify(sc.kwargs);
+        valid.push(div);
+      }
+      return { valid, warn };
+    },
+    activate(div) {
+      const slideEl = div.closest("section");
+      if (!slideEl)
+        return;
+      const kwargsJson = div.dataset.editableModifiedArrowKwargs;
+      if (!kwargsJson)
+        return;
+      let kwargs;
+      try {
+        kwargs = JSON.parse(kwargsJson);
+      } catch (e) {
+        return;
+      }
+      const slideIndex = Reveal.getState().indexh;
+      const arrowData = arrowDataFromKwargs(kwargs);
+      arrowData.isActive = true;
+      div.dataset.editableModifiedArrowHidden = "true";
+      div.style.display = "none";
+      exitModifyMode({ resetPanel: false });
+      const arrowContainer = createArrowElement(arrowData);
+      slideEl.appendChild(arrowContainer);
+      arrowData.element = arrowContainer;
+      arrowContainer.classList.remove("editable-new");
+      _modifiedArrows.push({
+        arrowData,
+        sourceEl: div,
+        slideIndex,
+        sourceLiteral: div.dataset.editableModifiedArrowSource,
+        occurrence: parseInt(div.dataset.editableModifiedArrowOccurrence ?? "0", 10)
+      });
+      setActiveArrow(arrowData);
+      return true;
+    },
+    serialize(text) {
+      if (_modifiedArrows.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const entry of _modifiedArrows) {
+        const chunkIndex = getQmdHeadingIndex(entry.slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(entry);
+      }
+      for (const [chunkIndex, entries] of byChunk) {
+        entries.sort((a, b) => {
+          if (a.sourceLiteral.length !== b.sourceLiteral.length) {
+            return b.sourceLiteral.length - a.sourceLiteral.length;
+          }
+          return a.occurrence - b.occurrence;
+        });
+        const consumed = /* @__PURE__ */ new Map();
+        for (const entry of entries) {
+          const replacement = serializeArrowToShortcode(entry.arrowData);
+          const literal = entry.sourceLiteral;
+          const skipCount = consumed.get(literal) ?? 0;
+          let chunk = chunks[chunkIndex];
+          let searchFrom = 0;
+          let hit = -1;
+          for (let i = 0; i <= skipCount; i++) {
+            hit = chunk.indexOf(literal, searchFrom);
+            if (hit === -1)
+              break;
+            searchFrom = hit + literal.length;
+          }
+          if (hit === -1)
+            continue;
+          chunks[chunkIndex] = chunk.slice(0, hit) + replacement + chunk.slice(hit + literal.length);
+          consumed.set(literal, skipCount + 1);
+        }
+      }
+      return chunks.join("");
+    },
+    cleanup() {
+      for (const div of _arrowsWithPointerEventsCleared) {
+        div.style.pointerEvents = "none";
+      }
+      _arrowsWithPointerEventsCleared.clear();
+    }
+  });
   function classifyElements() {
     const reveal = document.querySelector(".reveal");
     const currentSlide = reveal?.querySelector(".slides section.present:not(.slide-background)") ?? reveal;

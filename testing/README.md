@@ -51,6 +51,7 @@ npm run test:e2e
 | `modify-mode-absolute-img.qmd` | `{.absolute}` images detectable in modify mode | #122   |
 | `modify-mode-fenced-div.qmd` | Fenced divs (classed, callouts, columns) detectable in modify mode | #108 |
 | `modify-mode-inline-img.qmd` | Inline images (`text ![](src) text`) detectable in modify mode | #120 |
+| `modify-mode-arrows.qmd` | Positioned arrows from previous-save shortcodes detectable in modify mode | #118 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 
@@ -298,6 +299,18 @@ npm run test:e2e
 | h2 title is classified as valid in modify mode | `h2.modify-mode-valid` count = 1 |
 | Clicking h2 title makes it contentEditable and exits modify mode | `h2[contenteditable="true"]` present |
 | Editing h2 title serializes back to QMD | `## Updated Title` in the serialized chunk |
+
+**`e2e/modify-mode-arrows.spec.js`** - Modify Mode — Positioned arrows (7 tests):
+
+| Test | What it verifies |
+|---|---|
+| Positioned arrows on slide get `modify-mode-valid` | Count = number of `position="absolute"` arrows in source |
+| Inline arrows (no `position="absolute"`) are not classified | Inline `{{< arrow >}}` does not produce a green ring |
+| Arrows with unsupported kwargs (`bend`, etc.) are warn-classified | `modify-mode-warn` ring; not clickable |
+| Clicking a valid arrow makes it editable | `.editable-arrow-container.active` with handles appears |
+| Arrow style panel shows source values after activation | `toolbar-panel-arrow` visible; width/color inputs reflect source kwargs |
+| Serialize updates the activated arrow's shortcode in QMD source | Coordinates rewritten in-place; other shortcodes untouched |
+| Non-activated arrows remain unchanged in saved QMD | Source kwargs (`color`, `width`, `bend`) preserved verbatim |
 
 **`e2e/modify-mode-inline-img.spec.js`** - Modify Mode — Inline images (5 tests):
 

@@ -11,7 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-| Modify | Activate plain images, `{.absolute}` images, `{.absolute}` divs, fenced divs, callouts, columns, or slide titles for editing |
+| Modify | Activate plain images, `{.absolute}` images, `{.absolute}` divs, fenced divs, callouts, columns, slide titles, or positioned arrows for editing |
 
 ## Adding New Elements
 
@@ -46,6 +46,7 @@ Currently supported element types:
 | Callout block | `::: {.callout-note}` (and other callout types) | Move, resize, rotate |
 | Column layout | `::: {.columns}` | Move, resize, rotate |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
+| Positioned arrow | `{{< arrow ... position="absolute" >}}` | Move, resize (full styling preserved) |
 
 Plain paragraphs are matched by their position among top-level paragraphs on the slide (Nth paragraph in the DOM = Nth paragraph block in source). On save, the paragraph is wrapped in a `::: {.absolute ...}` fenced div. If the text was edited with the Quill editor, the new content is written back; otherwise the original QMD source text is preserved as-is.
 
@@ -54,6 +55,8 @@ Plain images and videos are inserted directly in a slide without positional attr
 Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
 
 Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
+
+Positioned arrows from previous saves (`{{< arrow ... position="absolute" >}}` shortcodes rendered via [`quarto-arrows`](https://github.com/EmilHvitfeldt/quarto-arrows)) are activatable too. Click a highlighted arrow to drag and resize it via the standard arrow handles; the source's color, width, head, dash, line, opacity, label, curve, and waypoints are preserved. On save, the matching shortcode is rewritten in-place with the new coordinates. Arrows whose shortcodes use kwargs the editable system doesn't yet round-trip (`bend`, `fragment`, `aria-label`, `class`, `head-fill`, …) get an amber warning ring instead, so their source attributes aren't silently dropped.
 
 ::: {.callout-note}
 Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode.
