@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
-const { TESTING_DIR, setupPage, clickAddArrow, getArrowData, deselectArrow } = require('./test-helpers');
+const { TESTING_DIR, setupPage, clickAddArrow, getArrowData, deselectArrow, navigateToSlide } = require('./test-helpers');
 
 // Fill an input that may be clipped by overflow-x in the toolbar panel
 async function fillInput(page, selector, value) {
@@ -36,14 +36,12 @@ async function pressUndo(page) {
   await page.evaluate(() => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
   });
-  await page.waitForTimeout(200);
 }
 
 async function pressRedo(page) {
   await page.evaluate(() => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true, cancelable: true }));
   });
-  await page.waitForTimeout(200);
 }
 
 // Helper to open color presets popover then click a swatch
@@ -466,7 +464,6 @@ test.describe('Arrow Feature', () => {
 
       // Click curve toggle
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       const arrows = await getArrowData(page);
       expect(arrows.find(a => a.isNew).hasCurveMode).toBe(true);
@@ -477,7 +474,6 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Check control handles are visible
       const control1Visible = await page.locator('.editable-arrow-handle-control1').isVisible();
@@ -501,7 +497,6 @@ test.describe('Arrow Feature', () => {
 
       // Enable curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Check path is now a curve (M...C for cubic Bezier)
       const curvePath = await page.evaluate(() => {
@@ -518,9 +513,7 @@ test.describe('Arrow Feature', () => {
 
       // Enable then disable curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Check path is back to line
       const pathD = await page.evaluate(() => {
@@ -539,7 +532,6 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Get initial curve path
       const initialPath = await page.evaluate(() => {
@@ -568,7 +560,6 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Check guide lines exist and are visible
       const guideLines = await page.evaluate(() => {
@@ -603,7 +594,6 @@ test.describe('Arrow Feature', () => {
 
       // Enable curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Should have active class
       hasActiveClass = await page.evaluate(() => {
@@ -614,7 +604,6 @@ test.describe('Arrow Feature', () => {
 
       // Disable curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Should not have active class
       hasActiveClass = await page.evaluate(() => {
@@ -630,7 +619,6 @@ test.describe('Arrow Feature', () => {
       // Create first arrow and enable curve mode
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Verify curve mode is on
       let hasActiveClass = await page.evaluate(() => {
@@ -641,7 +629,6 @@ test.describe('Arrow Feature', () => {
 
       // Deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Create second arrow (straight by default)
       await clickAddArrow(page);
@@ -677,8 +664,7 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
 
       // Navigate to slide 1 (first content slide after title)
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       await clickAddArrow(page);
 
@@ -700,8 +686,7 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
 
       // Navigate to a content slide
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       await clickAddArrow(page);
 
@@ -718,12 +703,10 @@ test.describe('Arrow Feature', () => {
     test('Curved arrow has Bezier path with control points', async ({ page }) => {
       await setupPage(page, 'arrows.html');
 
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Get arrow path - should be cubic Bezier with control points
       const pathData = await page.evaluate(() => {
@@ -744,8 +727,7 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
 
       // Add an arrow
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
       await clickAddArrow(page);
 
       // Check that getTransformedQmd doesn't throw
@@ -855,8 +837,7 @@ test.describe('Arrow Feature', () => {
     test('Multiple arrows on same slide are all created', async ({ page }) => {
       await setupPage(page, 'arrows.html');
 
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       // Add 3 arrows to the same slide
       await clickAddArrow(page);
@@ -913,8 +894,7 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
 
       // Make sure we're on title slide (index 0)
-      await page.evaluate(() => Reveal.slide(0));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 0);
 
       await clickAddArrow(page);
 
@@ -934,8 +914,7 @@ test.describe('Arrow Feature', () => {
       await setupPage(page, 'arrows.html');
 
       // Go to slide with existing arrow (slide 1 in arrows.qmd)
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       // Check for arrow SVG element (quarto-arrows creates these)
       const hasArrowSvg = await page.evaluate(() => {
@@ -1043,8 +1022,7 @@ test.describe('Arrow Feature', () => {
     test('Arrow state preserved when navigating away and back', async ({ page }) => {
       await setupPage(page, 'arrows.html');
 
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       await clickAddArrow(page);
 
@@ -1063,12 +1041,10 @@ test.describe('Arrow Feature', () => {
       });
 
       // Navigate away
-      await page.evaluate(() => Reveal.slide(2));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 2);
 
       // Navigate back
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       // Path should be preserved
       const pathAfter = await page.evaluate(() => {
@@ -1082,18 +1058,15 @@ test.describe('Arrow Feature', () => {
     test('Creating arrow then immediately switching slides', async ({ page }) => {
       await setupPage(page, 'arrows.html');
 
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       await clickAddArrow(page);
 
       // Immediately navigate away
-      await page.evaluate(() => Reveal.slide(2));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 2);
 
       // Navigate back - arrow should still exist
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       const arrowExists = await page.evaluate(() => {
         const currentSlide = document.querySelector('section.present');
@@ -1112,7 +1085,6 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Get initial control point position
       const initialControlPos = await page.evaluate(() => {
@@ -1154,7 +1126,6 @@ test.describe('Arrow Feature', () => {
       // Rapidly toggle curve mode
       for (let i = 0; i < 5; i++) {
         await page.click('#arrow-style-curve');
-        await page.waitForTimeout(50);
       }
 
       // Arrow should still be functional
@@ -1178,7 +1149,6 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Verify guide lines are visible when active
       let guideLinesVisible = await page.evaluate(() => {
@@ -1284,7 +1254,6 @@ test.describe('Arrow Feature', () => {
       // Create 10 arrows
       for (let i = 0; i < 10; i++) {
         await clickAddArrow(page);
-        await page.waitForTimeout(50);
       }
 
       const arrowCount = await page.evaluate(() =>
@@ -1300,7 +1269,6 @@ test.describe('Arrow Feature', () => {
       // Create several arrows
       for (let i = 0; i < 5; i++) {
         await clickAddArrow(page);
-        await page.waitForTimeout(50);
       }
 
       // Verify we can still interact with the last arrow
@@ -1333,8 +1301,7 @@ test.describe('Arrow Feature', () => {
       // Grant clipboard permissions
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
-      await page.evaluate(() => Reveal.slide(1));
-      await page.waitForTimeout(200);
+      await navigateToSlide(page, 1);
 
       await clickAddArrow(page);
 
@@ -1364,7 +1331,6 @@ test.describe('Arrow Feature', () => {
 
       await clickAddArrow(page);
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Both paths should be Bezier curves
       const paths = await page.evaluate(() => {
@@ -1450,7 +1416,6 @@ test.describe('Arrow Feature', () => {
 
       // Change color to red
       await page.fill('#arrow-style-color', '#ff0000');
-      await page.waitForTimeout(50);
 
       // Verify path stroke changed
       const strokeColor = await page.evaluate(() => {
@@ -1468,7 +1433,6 @@ test.describe('Arrow Feature', () => {
 
       // Change width to 5
       await page.fill('#arrow-style-width', '5');
-      await page.waitForTimeout(50);
 
       // Verify path stroke-width changed
       const strokeWidth = await page.evaluate(() => {
@@ -1493,7 +1457,6 @@ test.describe('Arrow Feature', () => {
 
       // Change head to diamond
       await selectIconOption(page, 'arrow-style-head', 'diamond');
-      await page.waitForTimeout(50);
 
       // Verify marker path changed
       const newMarkerPath = await page.evaluate(() => {
@@ -1511,7 +1474,6 @@ test.describe('Arrow Feature', () => {
 
       // Change head to none
       await selectIconOption(page, 'arrow-style-head', 'none');
-      await page.waitForTimeout(50);
 
       // Verify marker-end is removed
       const hasMarker = await page.evaluate(() => {
@@ -1528,11 +1490,9 @@ test.describe('Arrow Feature', () => {
       // Create first arrow and change its color
       await clickAddArrow(page);
       await page.fill('#arrow-style-color', '#ff0000');
-      await page.waitForTimeout(50);
 
       // Click outside to deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Create second arrow (default color)
       await clickAddArrow(page);
@@ -1549,7 +1509,6 @@ test.describe('Arrow Feature', () => {
 
       // Change dash to dashed
       await selectIconOption(page, 'arrow-style-dash', 'dashed');
-      await page.waitForTimeout(50);
 
       // Verify path has stroke-dasharray
       const dashArray = await page.evaluate(() => {
@@ -1568,7 +1527,6 @@ test.describe('Arrow Feature', () => {
 
       // Change opacity to 0.5
       await page.fill('#arrow-style-opacity', '0.5');
-      await page.waitForTimeout(50);
 
       // Verify path opacity changed
       const opacity = await page.evaluate(() => {
@@ -1586,7 +1544,6 @@ test.describe('Arrow Feature', () => {
 
       // Change line to double
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
 
       // Verify extra lines were created
       const extraLineCount = await page.evaluate(() => {
@@ -1604,18 +1561,15 @@ test.describe('Arrow Feature', () => {
       // Change styles
       await page.fill('#arrow-style-color', '#00ff00');
       await page.fill('#arrow-style-width', '4');
-      await page.waitForTimeout(50);
 
       // Click outside to deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Click arrow to reselect (use evaluate to dispatch click event on hit area)
       await page.evaluate(() => {
         const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
         hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
-      await page.waitForTimeout(100);
 
       // Verify controls show saved values
       const colorValue = await page.$eval('#arrow-style-color', el => el.value);
@@ -1684,7 +1638,6 @@ test.describe('Arrow Feature', () => {
 
       // Click the second swatch
       await clickColorSwatch(page, 2);
-      await page.waitForTimeout(50);
 
       // Verify arrow color changed
       const arrowColor = await page.evaluate(() => {
@@ -1723,7 +1676,6 @@ test.describe('Arrow Feature', () => {
 
       // Click second swatch
       await clickColorSwatch(page, 2);
-      await page.waitForTimeout(50);
 
       // Verify second swatch is now selected and only one is selected
       const selectionState = await page.evaluate(() => {
@@ -1754,7 +1706,6 @@ test.describe('Arrow Feature', () => {
 
       // Use the custom color picker
       await page.fill('#arrow-style-color', '#123456');
-      await page.waitForTimeout(50);
 
       // Verify no swatches are selected
       selectedCount = await page.evaluate(() => {
@@ -1770,7 +1721,6 @@ test.describe('Arrow Feature', () => {
 
       // Click second swatch to set a non-black color
       await clickColorSwatch(page, 2);
-      await page.waitForTimeout(50);
 
       // Deselect arrow
       await deselectArrow(page);
@@ -1780,7 +1730,6 @@ test.describe('Arrow Feature', () => {
         const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
         hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
-      await page.waitForTimeout(100);
 
       // Verify second swatch is selected
       const secondIsSelected = await page.evaluate(() => {
@@ -1904,18 +1853,15 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await selectIconOption(page, 'arrow-style-dash', 'dotted');
-      await page.waitForTimeout(50);
 
       // Deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Reselect
       await page.evaluate(() => {
         const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
         hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
-      await page.waitForTimeout(100);
 
       const dashValue = await page.$eval('#arrow-style-dash', el => el.value);
       expect(dashValue).toBe('dotted');
@@ -1931,7 +1877,6 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await selectIconOption(page, 'arrow-style-line', 'triple');
-      await page.waitForTimeout(50);
 
       const result = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -1983,7 +1928,6 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
 
       // Get initial extra line paths
       const initialPaths = await page.evaluate(() => {
@@ -1999,7 +1943,6 @@ test.describe('Arrow Feature', () => {
       await page.mouse.down();
       await page.mouse.move(box.x + 50, box.y + 30);
       await page.mouse.up();
-      await page.waitForTimeout(50);
 
       // Get updated extra line paths
       const updatedPaths = await page.evaluate(() => {
@@ -2051,7 +1994,6 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
 
       // Main path should have marker-end and be visible (even if stroke is transparent)
       const hasMarker = await page.evaluate(() => {
@@ -2070,11 +2012,9 @@ test.describe('Arrow Feature', () => {
 
       // Enable curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Set double line
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
 
       const result = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -2099,7 +2039,6 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await page.fill('#arrow-style-opacity', '0');
-      await page.waitForTimeout(50);
 
       const opacity = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -2117,7 +2056,6 @@ test.describe('Arrow Feature', () => {
 
       await page.fill('#arrow-style-opacity', '0.5');
       await selectIconOption(page, 'arrow-style-line', 'double');
-      await page.waitForTimeout(50);
 
       const opacities = await page.evaluate(() => {
         const container = document.querySelector('.editable-arrow-container.editable-new');
@@ -2137,18 +2075,15 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
 
       await page.fill('#arrow-style-opacity', '0.3');
-      await page.waitForTimeout(50);
 
       // Deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Reselect
       await page.evaluate(() => {
         const hitArea = document.querySelector('.editable-arrow-container.editable-new svg path[stroke="transparent"]');
         hitArea.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
-      await page.waitForTimeout(100);
 
       const opacityValue = await page.$eval('#arrow-style-opacity', el => el.value);
       expect(opacityValue).toBe('0.3');
@@ -2180,7 +2115,6 @@ test.describe('Arrow Feature', () => {
       await page.mouse.down();
       await page.mouse.move(box.x + box.width / 2 + 50, box.y + box.height / 2 + 30);
       await page.mouse.up();
-      await page.waitForTimeout(50);
 
       // Get new positions
       const newPos = await page.evaluate(() => {
@@ -2228,7 +2162,6 @@ test.describe('Arrow Feature', () => {
       await page.mouse.down();
       await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2 + 50);
       await page.mouse.up();
-      await page.waitForTimeout(50);
 
       // Get new positions
       const newPositions = await page.evaluate(() => {
@@ -2259,7 +2192,6 @@ test.describe('Arrow Feature', () => {
 
       // Enable curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Get initial control point positions
       const initial = await page.evaluate(() => {
@@ -2308,8 +2240,6 @@ test.describe('Arrow Feature', () => {
         const upEvent = new MouseEvent('mouseup', { bubbles: true });
         document.dispatchEvent(upEvent);
       }, { x: 80, y: 40 });
-
-      await page.waitForTimeout(50);
 
       // Get new control point positions
       const newPositions = await page.evaluate(() => {
@@ -2393,11 +2323,9 @@ test.describe('Arrow Feature', () => {
       await clickAddArrow(page);
       await page.fill('#arrow-style-color', '#ff0000');
       await selectIconOption(page, 'arrow-style-dash', 'dashed');
-      await page.waitForTimeout(50);
 
       // Deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Create second arrow
       await clickAddArrow(page);
@@ -2444,7 +2372,6 @@ test.describe('Arrow Feature', () => {
       await page.mouse.down();
       await page.mouse.move(box.x + 100, box.y + 100, { steps: 5 });
       await page.mouse.up();
-      await page.waitForTimeout(50);
 
       // Get position after drag
       const afterDragPos = await page.evaluate(() => {
@@ -2490,7 +2417,6 @@ test.describe('Arrow Feature', () => {
 
       // Change color
       await page.fill('#arrow-style-color', '#ff0000');
-      await page.waitForTimeout(50);
 
       // Verify color changed
       const afterChangeColor = await page.evaluate(() => {
@@ -2528,7 +2454,6 @@ test.describe('Arrow Feature', () => {
 
       // Toggle curve mode
       await page.click('#arrow-style-curve');
-      await page.waitForTimeout(100);
 
       // Verify now in curve mode (path has C for cubic Bezier)
       const afterTogglePath = await page.evaluate(() => {
@@ -2570,7 +2495,6 @@ test.describe('Arrow Feature', () => {
       await page.mouse.down();
       await page.mouse.move(box.x + 100, box.y + 100, { steps: 5 });
       await page.mouse.up();
-      await page.waitForTimeout(50);
 
       // Get position after drag
       const afterDragPos = await page.evaluate(() => {
@@ -2626,7 +2550,6 @@ test.describe('Arrow Feature', () => {
 
       // Change width
       await page.fill('#arrow-style-width', '8');
-      await page.waitForTimeout(50);
 
       // Verify width changed
       const afterChangeWidth = await page.evaluate(() => {
@@ -2664,7 +2587,6 @@ test.describe('Arrow Feature', () => {
 
       // Change head style
       await selectIconOption(page, 'arrow-style-head', 'diamond');
-      await page.waitForTimeout(50);
 
       // Verify marker changed
       const afterChangeMarkerPath = await page.evaluate(() => {
@@ -3096,7 +3018,6 @@ test.describe('Arrow Feature', () => {
 
       // Click outside to deselect
       await page.click('.reveal', { position: { x: 10, y: 10 } });
-      await page.waitForTimeout(100);
 
       // Create second arrow
       await clickAddArrow(page);
