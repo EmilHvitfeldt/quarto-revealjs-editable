@@ -17779,6 +17779,264 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function extractTables(chunk) {
+    const lines = chunk.split("\n");
+    const tables = [];
+    let depth = 0;
+    let inCode = false;
+    const isPipeRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+    const isPipeSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+    const isGridBorder = (l) => /^\s*\+[-=+:]{3,}\+\s*$/.test(l);
+    const isGridRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+    const isHtmlOpen = (l) => /^\s*<table[\s>]/i.test(l);
+    const isHtmlClose = (l) => /<\/table\s*>/i.test(l);
+    const isCaption = (l) => /^\s*(:|Table:)\s+\S/.test(l);
+    function extendWithCaption(end) {
+      let j = end + 1;
+      while (j < lines.length && lines[j].trim() === "")
+        j++;
+      if (j < lines.length && isCaption(lines[j])) {
+        let capEnd = j;
+        while (capEnd + 1 < lines.length && lines[capEnd + 1].trim() !== "")
+          capEnd++;
+        return capEnd;
+      }
+      return end;
+    }
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (inCode) {
+        if (/^```\s*$/.test(line))
+          inCode = false;
+        continue;
+      }
+      if (/^```/.test(line)) {
+        inCode = true;
+        continue;
+      }
+      const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+      if (fenceMatch) {
+        const hasBraces = fenceMatch[2] !== void 0;
+        if (hasBraces && depth === 0 && /(^|[\s\{])\.list-table(\s|\})/.test(fenceMatch[2])) {
+          const start = i;
+          let inner = 1;
+          let end = -1;
+          let firstContent = null;
+          for (let j = i + 1; j < lines.length; j++) {
+            const m2 = lines[j].match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+            if (m2) {
+              if (m2[2] !== void 0)
+                inner++;
+              else
+                inner--;
+              if (inner === 0) {
+                end = j;
+                break;
+              }
+            } else if (firstContent === null && lines[j].trim()) {
+              firstContent = lines[j];
+            }
+          }
+          if (end !== -1) {
+            const extended = extendWithCaption(end);
+            tables.push({
+              startLine: start,
+              endLine: extended,
+              headerLine: firstContent ?? line,
+              kind: "list"
+            });
+            i = extended;
+            continue;
+          }
+        }
+        if (!hasBraces && depth > 0)
+          depth--;
+        else
+          depth++;
+        continue;
+      }
+      if (depth !== 0)
+        continue;
+      if (isPipeRow(line) && i + 1 < lines.length && isPipeSep(lines[i + 1])) {
+        const start = i;
+        let end = i + 1;
+        for (let j = i + 2; j < lines.length; j++) {
+          if (isPipeRow(lines[j]))
+            end = j;
+          else
+            break;
+        }
+        end = extendWithCaption(end);
+        tables.push({ startLine: start, endLine: end, headerLine: line, kind: "pipe" });
+        i = end;
+        continue;
+      }
+      if (isGridBorder(line)) {
+        const start = i;
+        let end = i;
+        let firstContent = null;
+        let j = i + 1;
+        while (j < lines.length && (isGridBorder(lines[j]) || isGridRow(lines[j]))) {
+          if (firstContent === null && isGridRow(lines[j]))
+            firstContent = lines[j];
+          end = j;
+          j++;
+        }
+        if (firstContent === null || end === start)
+          continue;
+        end = extendWithCaption(end);
+        tables.push({ startLine: start, endLine: end, headerLine: firstContent, kind: "grid" });
+        i = end;
+        continue;
+      }
+      if (isHtmlOpen(line)) {
+        const start = i;
+        let end = -1;
+        if (isHtmlClose(line)) {
+          end = i;
+        } else {
+          for (let j = i + 1; j < lines.length; j++) {
+            if (isHtmlClose(lines[j])) {
+              end = j;
+              break;
+            }
+          }
+        }
+        if (end === -1)
+          continue;
+        end = extendWithCaption(end);
+        tables.push({ startLine: start, endLine: end, headerLine: line, kind: "html" });
+        i = end;
+      }
+    }
+    return tables;
+  }
+  ModifyModeClassifier.register({
+    label: "Tables",
+    classify(slideEl) {
+      if (!window._input_file)
+        return { valid: [], warn: [] };
+      const slideIndex = Reveal.getState().indexh;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      const chunks = splitIntoSlideChunks(window._input_file);
+      const chunk = chunks[chunkIndex];
+      if (!chunk)
+        return { valid: [], warn: [] };
+      const sourceTables = extractTables(chunk);
+      if (sourceTables.length === 0)
+        return { valid: [], warn: [] };
+      const tables = Array.from(slideEl.querySelectorAll("table"));
+      const wrappers = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const t of tables) {
+        if (t.closest("div.cell"))
+          continue;
+        const w = topLevelAncestorIn(slideEl, t);
+        if (!w)
+          continue;
+        if (seen.has(w))
+          continue;
+        seen.add(w);
+        if (editableRegistry.has(w))
+          continue;
+        if (w.classList.contains("editable-container"))
+          continue;
+        if (w.classList.contains("absolute"))
+          continue;
+        if (w.closest("div.absolute"))
+          continue;
+        wrappers.push(w);
+      }
+      if (wrappers.length !== sourceTables.length)
+        return { valid: [], warn: [] };
+      const valid = [];
+      for (let i = 0; i < wrappers.length; i++) {
+        const w = wrappers[i];
+        w.dataset.editableModifiedTableIdx = String(i);
+        w.dataset.editableModifiedTableHeader = sourceTables[i].headerLine;
+        valid.push(w);
+      }
+      return { valid, warn: [] };
+    },
+    activate(el) {
+      const slideIndex = Reveal.getState().indexh;
+      const slideEl = el.closest("section");
+      const scale = getSlideScale();
+      const elRect = el.getBoundingClientRect();
+      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const origLeft = (elRect.left - slideRect.left) / scale;
+      const origTop = (elRect.top - slideRect.top) / scale;
+      const cs = window.getComputedStyle(el);
+      const naturalW = elRect.width / scale;
+      const naturalH = elRect.height / scale;
+      const isTable = el.tagName === "TABLE";
+      el.style.paddingLeft = cs.paddingLeft;
+      el.style.paddingRight = cs.paddingRight;
+      el.style.paddingTop = cs.paddingTop;
+      el.style.paddingBottom = cs.paddingBottom;
+      el.style.margin = "0";
+      el.style.width = naturalW + "px";
+      el.style.height = naturalH + "px";
+      el.dataset.editableModifiedTable = "true";
+      el.dataset.editableModifiedSlide = String(slideIndex);
+      setCapabilityOverride(el, ["move"]);
+      setupDraggableElt(el);
+      if (isTable)
+        el.style.display = "table";
+      waitForRegistryThenFixPosition(el, origLeft, origTop);
+    },
+    serialize(text) {
+      const els = Array.from(
+        document.querySelectorAll('[data-editable-modified-table="true"]')
+      );
+      if (els.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const el of els) {
+        if (!editableRegistry.has(el))
+          continue;
+        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(el);
+      }
+      for (const [chunkIndex, chunkEls] of byChunk) {
+        chunkEls.sort(
+          (a, b) => parseInt(a.dataset.editableModifiedTableIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedTableIdx ?? "0", 10)
+        );
+        const sourceTables = extractTables(chunks[chunkIndex]);
+        const lines = chunks[chunkIndex].split("\n");
+        const headerCounts = /* @__PURE__ */ new Map();
+        for (const t of sourceTables) {
+          const h = (t.headerLine ?? "").trim();
+          headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
+        }
+        const resolved = chunkEls.map((el) => {
+          const tableIdx = parseInt(el.dataset.editableModifiedTableIdx ?? "-1", 10);
+          const expectedHeader = (el.dataset.editableModifiedTableHeader ?? "").trim();
+          if (expectedHeader && headerCounts.get(expectedHeader) === 1) {
+            return sourceTables.find((t) => (t.headerLine ?? "").trim() === expectedHeader) ?? null;
+          }
+          if (tableIdx >= 0 && tableIdx < sourceTables.length)
+            return sourceTables[tableIdx];
+          return null;
+        });
+        const plan = chunkEls.map((el, i) => ({ el, target: resolved[i] })).filter((p) => p.target).sort((a, b) => b.target.startLine - a.target.startLine);
+        for (const { el, target } of plan) {
+          const dims = editableRegistry.get(el).toDimensions();
+          const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
+          lines.splice(target.endLine + 1, 0, ":::");
+          lines.splice(target.startLine, 0, `::: {${attrs}}`);
+        }
+        chunks[chunkIndex] = lines.join("\n");
+      }
+      return chunks.join("");
+    }
+  });
   function classifyElements() {
     const reveal = document.querySelector(".reveal");
     const currentSlide = reveal?.querySelector(".slides section.present:not(.slide-background)") ?? reveal;

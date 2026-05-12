@@ -2420,6 +2420,303 @@ ModifyModeClassifier.register({
 });
 
 // ---------------------------------------------------------------------------
+// Table classifier (move only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract top-level tables from a QMD slide chunk.
+ *
+ * Supports four Quarto table syntaxes:
+ *   - pipe tables   (`| A | B |` ... `|---|---|`)
+ *   - grid tables   (`+---+---+` borders with `|` content rows)
+ *   - HTML tables   (raw `<table>...</table>`)
+ *   - list tables   (`::: {.list-table}` … `:::`)
+ *
+ * Quarto's list-table Lua filter replaces the fenced div with a bare
+ * `<table>` in the rendered DOM, so it doesn't surface to the fenced-divs
+ * classifier — we have to claim it here.  Tables inside ``` code fences
+ * and other `:::` fenced divs are skipped (depth filter).
+ *
+ * If a table is immediately followed (optionally across blank lines) by a
+ * Pandoc caption line (`: Caption ...` or `Table: ...`), the caption is
+ * included in the table's line range so the write-back wrap covers it.
+ *
+ * @param {string} chunk
+ * @returns {Array<{startLine: number, endLine: number, headerLine: string, kind: string}>}
+ */
+export function extractTables(chunk) {
+  const lines = chunk.split('\n');
+  const tables = [];
+  let depth = 0;
+  let inCode = false;
+
+  const isPipeRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const isPipeSep = (l) =>
+    /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+  const isGridBorder = (l) => /^\s*\+[-=+:]{3,}\+\s*$/.test(l);
+  const isGridRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const isHtmlOpen  = (l) => /^\s*<table[\s>]/i.test(l);
+  const isHtmlClose = (l) => /<\/table\s*>/i.test(l);
+  const isCaption   = (l) => /^\s*(:|Table:)\s+\S/.test(l);
+
+  // Extend `end` to include a trailing Pandoc caption block, if present.
+  function extendWithCaption(end) {
+    let j = end + 1;
+    while (j < lines.length && lines[j].trim() === '') j++;
+    if (j < lines.length && isCaption(lines[j])) {
+      let capEnd = j;
+      while (capEnd + 1 < lines.length && lines[capEnd + 1].trim() !== '') capEnd++;
+      return capEnd;
+    }
+    return end;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (inCode) {
+      if (/^```\s*$/.test(line)) inCode = false;
+      continue;
+    }
+    if (/^```/.test(line)) { inCode = true; continue; }
+
+    const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+    if (fenceMatch) {
+      const hasBraces = fenceMatch[2] !== undefined;
+      // List table: a `.list-table` fenced div at depth 0 — Quarto's filter
+      // renders this directly to a `<table>`, so we need to claim the whole
+      // fenced block as a table.
+      if (hasBraces && depth === 0 && /(^|[\s\{])\.list-table(\s|\})/.test(fenceMatch[2])) {
+        const start = i;
+        let inner = 1;
+        let end = -1;
+        let firstContent = null;
+        for (let j = i + 1; j < lines.length; j++) {
+          const m2 = lines[j].match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+          if (m2) {
+            if (m2[2] !== undefined) inner++; else inner--;
+            if (inner === 0) { end = j; break; }
+          } else if (firstContent === null && lines[j].trim()) {
+            firstContent = lines[j];
+          }
+        }
+        if (end !== -1) {
+          const extended = extendWithCaption(end);
+          tables.push({
+            startLine: start,
+            endLine: extended,
+            headerLine: firstContent ?? line,
+            kind: 'list',
+          });
+          i = extended;
+          continue;
+        }
+      }
+      if (!hasBraces && depth > 0) depth--; else depth++;
+      continue;
+    }
+    if (depth !== 0) continue;
+
+    // Pipe table: header row + separator
+    if (isPipeRow(line) && i + 1 < lines.length && isPipeSep(lines[i + 1])) {
+      const start = i;
+      let end = i + 1;
+      for (let j = i + 2; j < lines.length; j++) {
+        if (isPipeRow(lines[j])) end = j;
+        else break;
+      }
+      end = extendWithCaption(end);
+      tables.push({ startLine: start, endLine: end, headerLine: line, kind: 'pipe' });
+      i = end;
+      continue;
+    }
+
+    // Grid table: starts with `+---+`, alternating borders and `|` rows
+    if (isGridBorder(line)) {
+      const start = i;
+      let end = i;
+      let firstContent = null;
+      let j = i + 1;
+      while (j < lines.length && (isGridBorder(lines[j]) || isGridRow(lines[j]))) {
+        if (firstContent === null && isGridRow(lines[j])) firstContent = lines[j];
+        end = j;
+        j++;
+      }
+      if (firstContent === null || end === start) continue;
+      end = extendWithCaption(end);
+      tables.push({ startLine: start, endLine: end, headerLine: firstContent, kind: 'grid' });
+      i = end;
+      continue;
+    }
+
+    // Raw HTML table
+    if (isHtmlOpen(line)) {
+      const start = i;
+      let end = -1;
+      if (isHtmlClose(line)) {
+        end = i;
+      } else {
+        for (let j = i + 1; j < lines.length; j++) {
+          if (isHtmlClose(lines[j])) { end = j; break; }
+        }
+      }
+      if (end === -1) continue;
+      end = extendWithCaption(end);
+      tables.push({ startLine: start, endLine: end, headerLine: line, kind: 'html' });
+      i = end;
+    }
+  }
+
+  return tables;
+}
+
+// Kept for backward compatibility with existing tests/imports.
+export const extractPipeTables = (chunk) =>
+  extractTables(chunk).filter(t => t.kind === 'pipe');
+
+ModifyModeClassifier.register({
+  label: 'Tables',
+
+  classify(slideEl) {
+    if (!window._input_file) return { valid: [], warn: [] };
+    const slideIndex = Reveal.getState().indexh;
+    const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+    const chunks = splitIntoSlideChunks(window._input_file);
+    const chunk = chunks[chunkIndex];
+    if (!chunk) return { valid: [], warn: [] };
+
+    const sourceTables = extractTables(chunk);
+    if (sourceTables.length === 0) return { valid: [], warn: [] };
+
+    const tables = Array.from(slideEl.querySelectorAll('table'));
+    const wrappers = [];
+    const seen = new Set();
+    for (const t of tables) {
+      // Tables rendered as the output of an executable code chunk belong
+      // to the code-output classifier.
+      if (t.closest('div.cell')) continue;
+      const w = topLevelAncestorIn(slideEl, t);
+      if (!w) continue;
+      if (seen.has(w)) continue;
+      seen.add(w);
+      if (editableRegistry.has(w)) continue;
+      if (w.classList.contains('editable-container')) continue;
+      if (w.classList.contains('absolute')) continue;
+      if (w.closest('div.absolute')) continue;
+      wrappers.push(w);
+    }
+
+    // Positional pairing: bail if counts differ so we don't mis-anchor.
+    if (wrappers.length !== sourceTables.length) return { valid: [], warn: [] };
+
+    const valid = [];
+    for (let i = 0; i < wrappers.length; i++) {
+      const w = wrappers[i];
+      w.dataset.editableModifiedTableIdx = String(i);
+      w.dataset.editableModifiedTableHeader = sourceTables[i].headerLine;
+      valid.push(w);
+    }
+    return { valid, warn: [] };
+  },
+
+  activate(el) {
+    const slideIndex = Reveal.getState().indexh;
+    const slideEl = el.closest('section');
+    const scale = getSlideScale();
+    const elRect = el.getBoundingClientRect();
+    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+    const origLeft = (elRect.left - slideRect.left) / scale;
+    const origTop  = (elRect.top  - slideRect.top)  / scale;
+
+    const cs = window.getComputedStyle(el);
+    const naturalW = elRect.width / scale;
+    const naturalH = elRect.height / scale;
+    const isTable = el.tagName === 'TABLE';
+    el.style.paddingLeft   = cs.paddingLeft;
+    el.style.paddingRight  = cs.paddingRight;
+    el.style.paddingTop    = cs.paddingTop;
+    el.style.paddingBottom = cs.paddingBottom;
+    el.style.margin        = '0';
+    el.style.width         = naturalW + 'px';
+    el.style.height        = naturalH + 'px';
+
+    el.dataset.editableModifiedTable = 'true';
+    el.dataset.editableModifiedSlide = String(slideIndex);
+    setCapabilityOverride(el, ['move']);
+    setupDraggableElt(el);
+
+    // setupEltStyles forces display:block; restore table layout so the table
+    // renders correctly inside the inline-block editable-container.
+    if (isTable) el.style.display = 'table';
+
+    waitForRegistryThenFixPosition(el, origLeft, origTop);
+  },
+
+  serialize(text) {
+    const els = Array.from(
+      document.querySelectorAll('[data-editable-modified-table="true"]')
+    );
+    if (els.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+    const byChunk = new Map();
+    for (const el of els) {
+      if (!editableRegistry.has(el)) continue;
+      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+      byChunk.get(chunkIndex).push(el);
+    }
+
+    for (const [chunkIndex, chunkEls] of byChunk) {
+      chunkEls.sort((a, b) =>
+        parseInt(a.dataset.editableModifiedTableIdx ?? '0', 10) -
+        parseInt(b.dataset.editableModifiedTableIdx ?? '0', 10)
+      );
+
+      const sourceTables = extractTables(chunks[chunkIndex]);
+      const lines = chunks[chunkIndex].split('\n');
+
+      // Resolve target source table per element. Primary anchor: header line
+      // text. If the header is duplicated in the chunk, fall back to the
+      // positional index stamped at classify time.
+      const headerCounts = new Map();
+      for (const t of sourceTables) {
+        const h = (t.headerLine ?? '').trim();
+        headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
+      }
+
+      const resolved = chunkEls.map((el) => {
+        const tableIdx = parseInt(el.dataset.editableModifiedTableIdx ?? '-1', 10);
+        const expectedHeader = (el.dataset.editableModifiedTableHeader ?? '').trim();
+        if (expectedHeader && headerCounts.get(expectedHeader) === 1) {
+          return sourceTables.find(t => (t.headerLine ?? '').trim() === expectedHeader) ?? null;
+        }
+        if (tableIdx >= 0 && tableIdx < sourceTables.length) return sourceTables[tableIdx];
+        return null;
+      });
+
+      // Build splice plan and apply bottom-to-top so earlier indices aren't shifted.
+      const plan = chunkEls
+        .map((el, i) => ({ el, target: resolved[i] }))
+        .filter(p => p.target)
+        .sort((a, b) => b.target.startLine - a.target.startLine);
+
+      for (const { el, target } of plan) {
+        const dims = editableRegistry.get(el).toDimensions();
+        const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
+        lines.splice(target.endLine + 1, 0, ':::');
+        lines.splice(target.startLine, 0, `::: {${attrs}}`);
+      }
+
+      chunks[chunkIndex] = lines.join('\n');
+    }
+
+    return chunks.join('');
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Classification and lifecycle
 // ---------------------------------------------------------------------------
 

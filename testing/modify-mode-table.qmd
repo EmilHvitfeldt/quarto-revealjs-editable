@@ -1,0 +1,60 @@
+---
+---
+
+## Slide 1 - Single pipe table
+
+| A | B |
+|---|---|
+| 1 | 2 |
+| 3 | 4 |
+
+## Slide 2 - Multiple pipe tables
+
+| X | Y |
+|---|---|
+| 1 | 2 |
+
+| P | Q |
+|---|---|
+| 9 | 8 |
+
+## Slide 3 - Pipe table alongside paragraph
+
+A paragraph next to a table.
+
+| Name | Value |
+|------|-------|
+| foo  | 1     |
+| bar  | 2     |
+
+## Slide 4 - Grid table
+
++---+---+
+| A | B |
++===+===+
+| 1 | 2 |
++---+---+
+
+## Slide 5 - HTML table
+
+<table>
+<tr><th>A</th><th>B</th></tr>
+<tr><td>1</td><td>2</td></tr>
+</table>
+
+## Slide 6 - Captioned pipe table
+
+| A | B |
+|---|---|
+| 1 | 2 |
+
+: My caption {#tbl-cap}
+
+## Slide 7 - List table
+
+::: {.list-table}
+  - - A
+    - B
+  - - 1
+    - 2
+:::

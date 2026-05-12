@@ -11,7 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-| Modify | Activate plain images, `{.absolute}` images, `{.absolute}` divs, fenced divs, callouts, columns, code blocks, slide titles, or positioned arrows for editing |
+| Modify | Activate plain images, `{.absolute}` images, `{.absolute}` divs, fenced divs, callouts, columns, code blocks, tables, slide titles, or positioned arrows for editing |
 
 ## Adding New Elements
 
@@ -45,6 +45,7 @@ Currently supported element types:
 | Id-keyed fenced div | `::: {#my-id}` | Move, resize, rotate, text editing |
 | Callout block | `::: {.callout-note}` (and other callout types) | Move, resize, rotate |
 | Column layout | `::: {.columns}` | Move, resize, rotate |
+| Table (pipe, grid, HTML, list) | `\| A \| B \|` / `+---+---+` / `<table>…</table>` / `::: {.list-table}` | Move |
 | Display code block | ` ```python ` / ` ``` ` (non-executed) | Move, resize |
 | Code chunk output | ` ```{r} `, ` ```{python} `, ` ```{ojs} ` producing non-image output | Move, resize |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
@@ -55,6 +56,8 @@ Plain paragraphs are matched by their position among top-level paragraphs on the
 Plain images and videos are inserted directly in a slide without positional attributes. Inline images embedded mid-paragraph (`text ![](src) text`) work the same way as plain images — the same `](src)` write-back regex matches both. Activating an inline image pulls it out of the text flow, so the surrounding paragraph text reflows around the now-absolutely-positioned image. **Activation is a one-way transform**: once saved with `.absolute` attrs, the image is no longer inline on re-render — Quarto positions it out of flow and the paragraph reads as one continuous sentence. Going back to the inline form requires editing the source `.qmd` by hand. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
 
 Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
+
+Tables in pipe, grid, raw-HTML, and list-table syntax are matched to their source by the first (header) row of the table within the slide chunk; if the same header row appears more than once, matching falls back to position. A trailing Pandoc caption line (`: caption {#tbl-id}` or `Table: caption`) is included in the wrapped block so the caption stays anchored to the table. On save, the entire table block is wrapped in `::: {.absolute left=Xpx top=Ypx}\n…\n:::` (for list tables, the outer `.absolute` fence wraps the existing `::: {.list-table}` block). Resize and rotate are intentionally not provided — table width is determined by content and column definitions, not a CSS dimension on a wrapper. Computational tables produced by executable chunks are handled by the code-chunk-output path.
 
 Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.) are matched to their source by position among the top-level code fences on the slide, anchored to the first non-empty line of code content. On save, the entire fenced code block is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Text editing is not provided — the source remains literal code.
 
