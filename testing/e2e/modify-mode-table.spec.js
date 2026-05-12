@@ -69,7 +69,7 @@ test.describe('Modify Mode — Tables', () => {
 
   test('grid table is classified valid and serializes wrapped', async ({ page }) => {
     await setupPage(page, 'modify-mode-table.html');
-    await navigateToSlide(page, 7);
+    await navigateToSlide(page, 3);
     await page.click('.toolbar-modify');
     expect(await page.locator('table.modify-mode-valid').count()).toBe(1);
     await page.locator('table.modify-mode-valid').first().click();
@@ -78,14 +78,14 @@ test.describe('Modify Mode — Tables', () => {
       return c && c.style.left !== '';
     }, { timeout: 3000 });
     const qmd = await page.evaluate(() => getTransformedQmd());
-    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 8')) ?? '');
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 4')) ?? '');
     expect(slide).toMatch(/::: \{\.absolute[^}]*\}\n\+---/);
     expect(slide).toContain('+===+===+');
   });
 
   test('HTML table is classified valid and serializes wrapped', async ({ page }) => {
     await setupPage(page, 'modify-mode-table.html');
-    await navigateToSlide(page, 8);
+    await navigateToSlide(page, 4);
     await page.click('.toolbar-modify');
     expect(await page.locator('table.modify-mode-valid').count()).toBe(1);
     await page.locator('table.modify-mode-valid').first().click();
@@ -94,7 +94,7 @@ test.describe('Modify Mode — Tables', () => {
       return c && c.style.left !== '';
     }, { timeout: 3000 });
     const qmd = await page.evaluate(() => getTransformedQmd());
-    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 9')) ?? '');
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 5')) ?? '');
     expect(slide).toMatch(/::: \{\.absolute[^}]*\}\n<table/);
     // Closing fence appears after </table>.
     const close = slide.indexOf('</table>');
@@ -103,7 +103,7 @@ test.describe('Modify Mode — Tables', () => {
 
   test('captioned table wrap includes the caption line', async ({ page }) => {
     await setupPage(page, 'modify-mode-table.html');
-    await navigateToSlide(page, 9);
+    await navigateToSlide(page, 5);
     await page.click('.toolbar-modify');
     await page.locator('[data-editable-modified-table-idx]').first().click();
     await page.waitForFunction(() => {
@@ -111,7 +111,7 @@ test.describe('Modify Mode — Tables', () => {
       return c && c.style.left !== '';
     }, { timeout: 3000 });
     const qmd = await page.evaluate(() => getTransformedQmd());
-    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 10')) ?? '');
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 6')) ?? '');
     const wrapStart = slide.indexOf('::: {.absolute');
     const captionIdx = slide.indexOf(': My caption');
     const closeIdx = slide.indexOf(':::', captionIdx);
