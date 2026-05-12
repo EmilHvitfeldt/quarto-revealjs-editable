@@ -17798,6 +17798,160 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  ModifyModeClassifier.register({
+    label: "Code chunk figures",
+    classify(slideEl) {
+      if (!window._input_file)
+        return { valid: [], warn: [] };
+      const slideIndex = Reveal.getState().indexh;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      const chunks = splitIntoSlideChunks(window._input_file);
+      const chunk = chunks[chunkIndex];
+      if (!chunk)
+        return { valid: [], warn: [] };
+      const execChunks = extractExecutableChunks(chunk);
+      if (execChunks.length === 0)
+        return { valid: [], warn: [] };
+      const imgs = Array.from(slideEl.querySelectorAll("img"));
+      const prefixCounts = buildChunkPrefixCounts(imgs);
+      const candidates = [];
+      for (const img of imgs) {
+        if (editableRegistry.has(img))
+          continue;
+        if (img.classList.contains("absolute"))
+          continue;
+        if (img.closest("div.absolute"))
+          continue;
+        const src = getImgSrc(img);
+        if (!src)
+          continue;
+        const prefix = getChunkPrefix(src);
+        if (!prefix)
+          continue;
+        if (prefixCounts.get(prefix) !== 1)
+          continue;
+        candidates.push({ img, prefix });
+      }
+      if (candidates.length === 0)
+        return { valid: [], warn: [] };
+      candidates.sort(
+        (a, b) => a.img.compareDocumentPosition(b.img) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+      const usedExecIdx = /* @__PURE__ */ new Set();
+      const assignments = [];
+      const unresolved = [];
+      for (const { img, prefix } of candidates) {
+        const idx = execChunks.findIndex((c, i) => c.label === prefix && !usedExecIdx.has(i));
+        if (idx >= 0) {
+          assignments.push({ img, execIdx: idx, exec: execChunks[idx] });
+          usedExecIdx.add(idx);
+        } else {
+          unresolved.push({ img, prefix });
+        }
+      }
+      const remainingExec = [];
+      for (let i = 0; i < execChunks.length; i++) {
+        if (usedExecIdx.has(i))
+          continue;
+        if (execChunks[i].label)
+          continue;
+        remainingExec.push({ execIdx: i, exec: execChunks[i] });
+      }
+      for (let i = 0; i < unresolved.length && i < remainingExec.length; i++) {
+        assignments.push({ img: unresolved[i].img, ...remainingExec[i] });
+      }
+      const valid = [];
+      for (const { img, execIdx, exec } of assignments) {
+        img.dataset.editableModifiedChunkFigExecIdx = String(execIdx);
+        img.dataset.editableModifiedChunkFigLabel = exec.label || "";
+        img.dataset.editableModifiedChunkFigFirstLine = exec.firstCodeLine;
+        valid.push(img);
+      }
+      return { valid, warn: [] };
+    },
+    activate(img) {
+      const originalSrc = getImgSrc(img);
+      if (!img.getAttribute("src") && img.getAttribute("data-src")) {
+        img.src = img.getAttribute("data-src");
+      }
+      img.classList.remove("r-stretch");
+      const scale = getSlideScale();
+      const rect = img.getBoundingClientRect();
+      img.style.width = rect.width / scale + "px";
+      img.style.height = rect.height / scale + "px";
+      img.style.maxWidth = "none";
+      img.style.maxHeight = "none";
+      img.removeAttribute("width");
+      img.removeAttribute("height");
+      img.dataset.editableModifiedSrc = originalSrc;
+      img.dataset.editableModifiedChunkFig = "true";
+      img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      setupImageWhenReady(img);
+    },
+    serialize(text) {
+      const imgs = Array.from(
+        document.querySelectorAll('img[data-editable-modified-chunk-fig="true"]')
+      );
+      if (imgs.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const img of imgs) {
+        if (!editableRegistry.has(img))
+          continue;
+        const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(img);
+      }
+      for (const [chunkIndex, chunkImgs] of byChunk) {
+        chunkImgs.sort(
+          (a, b) => parseInt(a.dataset.editableModifiedChunkFigExecIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedChunkFigExecIdx ?? "0", 10)
+        );
+        const execChunks = extractExecutableChunks(chunks[chunkIndex]);
+        const lines = chunks[chunkIndex].split("\n");
+        for (let i = chunkImgs.length - 1; i >= 0; i--) {
+          const img = chunkImgs[i];
+          const label = img.dataset.editableModifiedChunkFigLabel || "";
+          const firstLine = (img.dataset.editableModifiedChunkFigFirstLine ?? "").trim();
+          const execIdx = parseInt(img.dataset.editableModifiedChunkFigExecIdx ?? "-1", 10);
+          let target = null;
+          if (label) {
+            target = execChunks.find((c) => c.label === label) ?? null;
+          }
+          if (!target && execIdx >= 0 && execIdx < execChunks.length) {
+            const candidate = execChunks[execIdx];
+            const actualFirst = (candidate.firstCodeLine ?? "").trim();
+            if (!firstLine || !actualFirst || firstLine === actualFirst) {
+              target = candidate;
+            }
+          }
+          if (!target)
+            continue;
+          const dims = editableRegistry.get(img).toDimensions();
+          const posAttrs = [
+            `left=${Math.round(dims.left)}px`,
+            `top=${Math.round(dims.top)}px`,
+            `width=${Math.round(dims.width)}px`,
+            `height=${Math.round(dims.height)}px`
+          ];
+          const styleAttrs = [];
+          if (dims.rotation)
+            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+          let attrs = `.absolute ${posAttrs.join(" ")}`;
+          if (styleAttrs.length)
+            attrs += ` style="${styleAttrs.join(" ")}"`;
+          lines.splice(target.endLine + 1, 0, ":::");
+          lines.splice(target.startLine, 0, `::: {${attrs}}`);
+        }
+        chunks[chunkIndex] = lines.join("\n");
+      }
+      return chunks.join("");
+    }
+  });
   function extractTables(chunk) {
     const lines = chunk.split("\n");
     const tables = [];
