@@ -1,0 +1,42 @@
+---
+---
+
+## Slide 1 - Highlighted code block
+
+```python
+x = 1
+print(x)
+```
+
+## Slide 2 - Plain code block
+
+```
+plain text block
+no language here
+```
+
+## Slide 3 - Multiple code blocks
+
+```python
+a = 1
+```
+
+```r
+b <- 2
+```
+
+## Slide 4 - Code block alongside image
+
+```python
+hello = "world"
+```
+
+![](../image.png)
+
+## Slide 5 - Code block alongside paragraph
+
+A paragraph next to a code block.
+
+```python
+foo = bar
+```

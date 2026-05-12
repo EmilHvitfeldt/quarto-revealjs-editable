@@ -16695,7 +16695,12 @@ ${fence}`;
       "r-hstack",
       "r-vstack",
       "slide-background",
-      "slide-background-content"
+      "slide-background-content",
+      // Code-block wrappers handled by the Code blocks classifier.
+      "sourceCode",
+      "code-copy-outer-scaffold",
+      "code-with-copy",
+      "numberSource"
     ]);
     const userClass = classes.find((c) => !knownInternal.has(c));
     if (userClass)
@@ -17424,6 +17429,162 @@ ${fence}`;
         path.style.pointerEvents = "";
       }
       _arrowsWithPointerEventsCleared.clear();
+    }
+  });
+  function extractCodeBlocks(chunk) {
+    const lines = chunk.split("\n");
+    const blocks = [];
+    let depth = 0;
+    let blockStart = -1;
+    let inBlock = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!inBlock) {
+        const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+        if (fenceMatch) {
+          const hasBraces = fenceMatch[2] !== void 0;
+          if (!hasBraces && depth > 0)
+            depth--;
+          else
+            depth++;
+          continue;
+        }
+        if (depth === 0 && /^```/.test(line)) {
+          inBlock = true;
+          blockStart = i;
+        }
+      } else {
+        if (/^```\s*$/.test(line)) {
+          const firstCodeLine = lines.slice(blockStart + 1, i).find((l) => l.trim() !== "") ?? "";
+          blocks.push({ startLine: blockStart, endLine: i, firstCodeLine });
+          inBlock = false;
+          blockStart = -1;
+        }
+      }
+    }
+    return blocks;
+  }
+  function topLevelAncestorIn(slideEl, el) {
+    let node = el;
+    while (node && node.parentElement && node.parentElement !== slideEl) {
+      node = node.parentElement;
+    }
+    return node && node.parentElement === slideEl ? node : null;
+  }
+  function getCodeFirstLine(wrapper) {
+    const code = wrapper.querySelector("pre code") ?? wrapper.querySelector("pre") ?? wrapper;
+    const text = code.textContent || "";
+    return text.split("\n").find((l) => l.trim() !== "") ?? "";
+  }
+  ModifyModeClassifier.register({
+    label: "Code blocks",
+    classify(slideEl) {
+      const pres = Array.from(slideEl.querySelectorAll("pre"));
+      if (pres.length === 0)
+        return { valid: [], warn: [] };
+      const seen = /* @__PURE__ */ new Set();
+      const valid = [];
+      let idx = 0;
+      for (const pre of pres) {
+        const wrapper = topLevelAncestorIn(slideEl, pre);
+        if (!wrapper)
+          continue;
+        if (seen.has(wrapper))
+          continue;
+        seen.add(wrapper);
+        if (editableRegistry.has(wrapper))
+          continue;
+        if (wrapper.classList.contains("editable-container"))
+          continue;
+        if (wrapper.classList.contains("absolute"))
+          continue;
+        if (wrapper.closest("div.absolute"))
+          continue;
+        wrapper.dataset.editableModifiedCodeIdx = String(idx++);
+        wrapper.dataset.editableModifiedCodeFirstLine = getCodeFirstLine(wrapper);
+        valid.push(wrapper);
+      }
+      return { valid, warn: [] };
+    },
+    activate(el) {
+      const slideIndex = Reveal.getState().indexh;
+      const slideEl = el.closest("section");
+      const scale = getSlideScale();
+      const elRect = el.getBoundingClientRect();
+      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const origLeft = (elRect.left - slideRect.left) / scale;
+      const origTop = (elRect.top - slideRect.top) / scale;
+      const cs = window.getComputedStyle(el);
+      const naturalW = elRect.width / scale;
+      const naturalH = elRect.height / scale;
+      el.style.paddingLeft = cs.paddingLeft;
+      el.style.paddingRight = cs.paddingRight;
+      el.style.paddingTop = cs.paddingTop;
+      el.style.paddingBottom = cs.paddingBottom;
+      el.style.margin = "0";
+      el.style.width = naturalW + "px";
+      el.style.height = naturalH + "px";
+      el.style.display = "block";
+      el.dataset.editableModifiedCode = "true";
+      el.dataset.editableModifiedSlide = String(slideIndex);
+      setCapabilityOverride(el, ["move", "resize"]);
+      setupDraggableElt(el);
+      waitForRegistryThenFixPosition(el, origLeft, origTop);
+    },
+    serialize(text) {
+      const els = Array.from(
+        document.querySelectorAll('[data-editable-modified-code="true"]')
+      );
+      if (els.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const el of els) {
+        if (!editableRegistry.has(el))
+          continue;
+        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(el);
+      }
+      for (const [chunkIndex, chunkEls] of byChunk) {
+        chunkEls.sort(
+          (a, b) => parseInt(a.dataset.editableModifiedCodeIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedCodeIdx ?? "0", 10)
+        );
+        const blocks = extractCodeBlocks(chunks[chunkIndex]);
+        const lines = chunks[chunkIndex].split("\n");
+        for (let i = chunkEls.length - 1; i >= 0; i--) {
+          const el = chunkEls[i];
+          const codeIdx = parseInt(el.dataset.editableModifiedCodeIdx ?? "0", 10);
+          if (codeIdx >= blocks.length)
+            continue;
+          const expectedFirst = (el.dataset.editableModifiedCodeFirstLine ?? "").trim();
+          const actualFirst = (blocks[codeIdx].firstCodeLine ?? "").trim();
+          if (expectedFirst && actualFirst && expectedFirst !== actualFirst)
+            continue;
+          const block = blocks[codeIdx];
+          const dims = editableRegistry.get(el).toDimensions();
+          const posAttrs = [
+            `left=${Math.round(dims.left)}px`,
+            `top=${Math.round(dims.top)}px`,
+            `width=${Math.round(dims.width)}px`,
+            `height=${Math.round(dims.height)}px`
+          ];
+          const styleAttrs = [];
+          if (dims.rotation)
+            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+          let attrs = `.absolute ${posAttrs.join(" ")}`;
+          if (styleAttrs.length)
+            attrs += ` style="${styleAttrs.join(" ")}"`;
+          lines.splice(block.endLine + 1, 0, ":::");
+          lines.splice(block.startLine, 0, `::: {${attrs}}`);
+        }
+        chunks[chunkIndex] = lines.join("\n");
+      }
+      return chunks.join("");
     }
   });
   function classifyElements() {

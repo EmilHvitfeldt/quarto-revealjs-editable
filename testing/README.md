@@ -52,6 +52,7 @@ npm run test:e2e
 | `modify-mode-fenced-div.qmd` | Fenced divs (classed, callouts, columns) detectable in modify mode | #108 |
 | `modify-mode-inline-img.qmd` | Inline images (`text ![](src) text`) detectable in modify mode | #120 |
 | `modify-mode-arrows.qmd` | Positioned arrows from previous-save shortcodes detectable in modify mode | #118 |
+| `modify-mode-code.qmd`   | Non-executed display code blocks detectable in modify mode | #111 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 
@@ -299,6 +300,16 @@ npm run test:e2e
 | h2 title is classified as valid in modify mode | `h2.modify-mode-valid` count = 1 |
 | Clicking h2 title makes it contentEditable and exits modify mode | `h2[contenteditable="true"]` present |
 | Editing h2 title serializes back to QMD | `## Updated Title` in the serialized chunk |
+
+**`e2e/modify-mode-code.spec.js`** - Modify Mode — Display code blocks (5 tests):
+
+| Test | What it verifies |
+|---|---|
+| Highlighted code-block wrapper gets `modify-mode-valid` | `div.code-copy-outer-scaffold.modify-mode-valid` count = 1 |
+| Plain (no-language) `<pre>` is clickable | `pre.modify-mode-valid` count = 1 |
+| Clicking a valid code block wraps it in `editable-container` | `.editable-container` appears |
+| Multiple code blocks on a slide are all classified valid | Both wrappers stamped with `data-editable-modified-code-idx` |
+| Serialize wraps activated code block in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ``` ` fence |
 
 **`e2e/modify-mode-arrows.spec.js`** - Modify Mode — Positioned arrows (7 tests):
 

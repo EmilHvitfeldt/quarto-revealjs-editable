@@ -31,7 +31,7 @@
  */
 
 import { editableRegistry } from './editable-element.js';
-import { setupImageWhenReady, setupDivWhenReady, setupVideoWhenReady } from './element-setup.js';
+import { setupImageWhenReady, setupDivWhenReady, setupVideoWhenReady, setupDraggableElt } from './element-setup.js';
 import { initializeQuillForElement } from './quill.js';
 import { showRightPanel } from './toolbar.js';
 import {
@@ -1006,6 +1006,8 @@ function getFencedDivIdentifier(div) {
     'modify-mode-valid', 'modify-mode-warn',
     'r-fit-text', 'r-stretch', 'r-frame', 'r-hstack', 'r-vstack',
     'slide-background', 'slide-background-content',
+    // Code-block wrappers handled by the Code blocks classifier.
+    'sourceCode', 'code-copy-outer-scaffold', 'code-with-copy', 'numberSource',
   ]);
 
   const userClass = classes.find(c => !knownInternal.has(c));
@@ -1983,6 +1985,201 @@ ModifyModeClassifier.register({
       path.style.pointerEvents = '';
     }
     _arrowsWithPointerEventsCleared.clear();
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Display code block classifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract top-level fenced code blocks from a QMD slide chunk.
+ * Only blocks at depth 0 (not inside `:::` fenced divs) are returned.
+ * @param {string} chunk
+ * @returns {Array<{startLine: number, endLine: number, firstCodeLine: string}>}
+ */
+export function extractCodeBlocks(chunk) {
+  const lines = chunk.split('\n');
+  const blocks = [];
+  let depth = 0;
+  let blockStart = -1;
+  let inBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (!inBlock) {
+      // Track fenced-div depth so we skip code blocks inside `:::` wrappers.
+      const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+      if (fenceMatch) {
+        const hasBraces = fenceMatch[2] !== undefined;
+        if (!hasBraces && depth > 0) depth--; else depth++;
+        continue;
+      }
+
+      if (depth === 0 && /^```/.test(line)) {
+        inBlock = true;
+        blockStart = i;
+      }
+    } else {
+      if (/^```\s*$/.test(line)) {
+        const firstCodeLine = lines
+          .slice(blockStart + 1, i)
+          .find(l => l.trim() !== '') ?? '';
+        blocks.push({ startLine: blockStart, endLine: i, firstCodeLine });
+        inBlock = false;
+        blockStart = -1;
+      }
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Find the topmost ancestor of `el` that is a direct child of `slideEl`.
+ * Returns null if `el` is not contained in `slideEl`.
+ */
+function topLevelAncestorIn(slideEl, el) {
+  let node = el;
+  while (node && node.parentElement && node.parentElement !== slideEl) {
+    node = node.parentElement;
+  }
+  return node && node.parentElement === slideEl ? node : null;
+}
+
+/**
+ * Read the first non-empty line of code text from a code-block wrapping
+ * element (either a `<div class="code-copy-outer-scaffold">`/`<div
+ * class="sourceCode">` or a bare `<pre>`).
+ */
+function getCodeFirstLine(wrapper) {
+  const code = wrapper.querySelector('pre code') ?? wrapper.querySelector('pre') ?? wrapper;
+  const text = code.textContent || '';
+  return text.split('\n').find(l => l.trim() !== '') ?? '';
+}
+
+ModifyModeClassifier.register({
+  label: 'Code blocks',
+
+  classify(slideEl) {
+    const pres = Array.from(slideEl.querySelectorAll('pre'));
+    if (pres.length === 0) return { valid: [], warn: [] };
+
+    const seen = new Set();
+    const valid = [];
+    let idx = 0;
+
+    for (const pre of pres) {
+      const wrapper = topLevelAncestorIn(slideEl, pre);
+      if (!wrapper) continue;
+      if (seen.has(wrapper)) continue;
+      seen.add(wrapper);
+      if (editableRegistry.has(wrapper)) continue;
+      if (wrapper.classList.contains('editable-container')) continue;
+      if (wrapper.classList.contains('absolute')) continue;
+      if (wrapper.closest('div.absolute')) continue;
+
+      wrapper.dataset.editableModifiedCodeIdx = String(idx++);
+      wrapper.dataset.editableModifiedCodeFirstLine = getCodeFirstLine(wrapper);
+      valid.push(wrapper);
+    }
+
+    return { valid, warn: [] };
+  },
+
+  activate(el) {
+    const slideIndex = Reveal.getState().indexh;
+    const slideEl = el.closest('section');
+    const scale = getSlideScale();
+    const elRect = el.getBoundingClientRect();
+    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+    const origLeft = (elRect.left - slideRect.left) / scale;
+    const origTop  = (elRect.top  - slideRect.top)  / scale;
+
+    // Lock natural dimensions before setup so reparenting into the inline-block
+    // editable-container doesn't collapse or stretch the block.
+    const cs = window.getComputedStyle(el);
+    const naturalW = elRect.width / scale;
+    const naturalH = elRect.height / scale;
+    el.style.paddingLeft   = cs.paddingLeft;
+    el.style.paddingRight  = cs.paddingRight;
+    el.style.paddingTop    = cs.paddingTop;
+    el.style.paddingBottom = cs.paddingBottom;
+    el.style.margin        = '0';
+    el.style.width         = naturalW + 'px';
+    el.style.height        = naturalH + 'px';
+    el.style.display       = 'block';
+
+    el.dataset.editableModifiedCode = 'true';
+    el.dataset.editableModifiedSlide = String(slideIndex);
+    setCapabilityOverride(el, ['move', 'resize']);
+    // Single-line code blocks can be shorter than setupDivWhenReady's
+    // MIN_ELEMENT_SIZE polling threshold; we already locked the natural
+    // dimensions above, so go straight to setup.
+    setupDraggableElt(el);
+
+    waitForRegistryThenFixPosition(el, origLeft, origTop);
+  },
+
+  serialize(text) {
+    const els = Array.from(
+      document.querySelectorAll('[data-editable-modified-code="true"]')
+    );
+    if (els.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+    const byChunk = new Map();
+    for (const el of els) {
+      if (!editableRegistry.has(el)) continue;
+      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+      byChunk.get(chunkIndex).push(el);
+    }
+
+    for (const [chunkIndex, chunkEls] of byChunk) {
+      chunkEls.sort((a, b) =>
+        parseInt(a.dataset.editableModifiedCodeIdx ?? '0', 10) -
+        parseInt(b.dataset.editableModifiedCodeIdx ?? '0', 10)
+      );
+
+      const blocks = extractCodeBlocks(chunks[chunkIndex]);
+      const lines = chunks[chunkIndex].split('\n');
+
+      // Bottom-to-top so line splices don't shift earlier indices.
+      for (let i = chunkEls.length - 1; i >= 0; i--) {
+        const el = chunkEls[i];
+        const codeIdx = parseInt(el.dataset.editableModifiedCodeIdx ?? '0', 10);
+        if (codeIdx >= blocks.length) continue;
+
+        // Safety: verify the positional match still names the same code block.
+        const expectedFirst = (el.dataset.editableModifiedCodeFirstLine ?? '').trim();
+        const actualFirst   = (blocks[codeIdx].firstCodeLine ?? '').trim();
+        if (expectedFirst && actualFirst && expectedFirst !== actualFirst) continue;
+
+        const block = blocks[codeIdx];
+        const dims = editableRegistry.get(el).toDimensions();
+
+        const posAttrs = [
+          `left=${Math.round(dims.left)}px`,
+          `top=${Math.round(dims.top)}px`,
+          `width=${Math.round(dims.width)}px`,
+          `height=${Math.round(dims.height)}px`,
+        ];
+        const styleAttrs = [];
+        if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+        let attrs = `.absolute ${posAttrs.join(' ')}`;
+        if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+
+        lines.splice(block.endLine + 1, 0, ':::');
+        lines.splice(block.startLine, 0, `::: {${attrs}}`);
+      }
+
+      chunks[chunkIndex] = lines.join('\n');
+    }
+
+    return chunks.join('');
   },
 });
 
