@@ -106,6 +106,9 @@ export function addNewSlide() {
 /**
  * Set up an element with editable capabilities.
  * Creates container, initializes state, attaches capabilities.
+ * Exported so callers that have already established the element's natural
+ * dimensions (e.g. the modify-mode code-block classifier) can skip the
+ * dimension-polling helpers.
  * @param {HTMLElement} elt - Element to make editable
  */
 export function setupDraggableElt(elt) {
