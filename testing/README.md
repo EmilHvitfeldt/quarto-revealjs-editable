@@ -54,6 +54,7 @@ npm run test:e2e
 | `modify-mode-arrows.qmd` | Positioned arrows from previous-save shortcodes detectable in modify mode | #118 |
 | `modify-mode-code.qmd`   | Non-executed display code blocks detectable in modify mode | #111 |
 | `modify-mode-code-output.qmd` | Code chunk outputs (`{ojs}`, `{r}`, `{python}`) detectable in modify mode | #113 |
+| `modify-mode-table.qmd` | Pipe tables detectable in modify mode (move only) | #117 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 

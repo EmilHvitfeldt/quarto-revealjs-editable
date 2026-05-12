@@ -1,0 +1,28 @@
+---
+---
+
+## Slide 1 - Single table
+
+| A | B |
+|---|---|
+| 1 | 2 |
+| 3 | 4 |
+
+## Slide 2 - Multiple tables
+
+| X | Y |
+|---|---|
+| 1 | 2 |
+
+| P | Q |
+|---|---|
+| 9 | 8 |
+
+## Slide 3 - Table alongside paragraph
+
+A paragraph next to a table.
+
+| Name | Value |
+|------|-------|
+| foo  | 1     |
+| bar  | 2     |
