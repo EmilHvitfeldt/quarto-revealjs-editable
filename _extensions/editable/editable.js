@@ -17500,6 +17500,8 @@ ${fence}`;
           continue;
         if (wrapper.closest("div.absolute"))
           continue;
+        if (wrapper.tagName === "DIV" && wrapper.classList.contains("cell"))
+          continue;
         wrapper.dataset.editableModifiedCodeIdx = String(idx++);
         wrapper.dataset.editableModifiedCodeFirstLine = getCodeFirstLine(wrapper);
         valid.push(wrapper);
@@ -17581,6 +17583,196 @@ ${fence}`;
             attrs += ` style="${styleAttrs.join(" ")}"`;
           lines.splice(block.endLine + 1, 0, ":::");
           lines.splice(block.startLine, 0, `::: {${attrs}}`);
+        }
+        chunks[chunkIndex] = lines.join("\n");
+      }
+      return chunks.join("");
+    }
+  });
+  function extractExecutableChunks(chunk) {
+    const lines = chunk.split("\n");
+    const chunks = [];
+    let depth = 0;
+    let chunkStart = -1;
+    let chunkLabel = null;
+    let inChunk = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!inChunk) {
+        const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+        if (fenceMatch) {
+          const hasBraces = fenceMatch[2] !== void 0;
+          if (!hasBraces && depth > 0)
+            depth--;
+          else
+            depth++;
+          continue;
+        }
+        if (depth === 0) {
+          const execMatch = line.match(/^```+\s*\{([^}]+)\}\s*$/);
+          if (execMatch) {
+            const inner = execMatch[1].trim();
+            const tokens = inner.split(/\s+/);
+            let label = null;
+            if (tokens.length >= 2 && !tokens[1].includes("=") && !tokens[1].startsWith(".")) {
+              label = tokens[1];
+            }
+            inChunk = true;
+            chunkStart = i;
+            chunkLabel = label;
+          }
+        }
+      } else {
+        if (/^```\s*$/.test(line)) {
+          const body = lines.slice(chunkStart + 1, i);
+          const firstCodeLine = body.find((l) => l.trim() !== "" && !l.trim().startsWith("#|")) ?? "";
+          if (chunkLabel === null) {
+            for (const l of body) {
+              const m = l.match(/^\s*#\|\s*label:\s*([A-Za-z0-9_-]+)\s*$/);
+              if (m) {
+                chunkLabel = m[1];
+                break;
+              }
+              if (l.trim() !== "" && !l.trim().startsWith("#|"))
+                break;
+            }
+          }
+          chunks.push({ startLine: chunkStart, endLine: i, label: chunkLabel, firstCodeLine });
+          inChunk = false;
+          chunkStart = -1;
+          chunkLabel = null;
+        }
+      }
+    }
+    return chunks;
+  }
+  function cellQualifiesForOutput(cell) {
+    const outputs = cell.querySelectorAll('[class*="cell-output"]');
+    if (outputs.length === 0)
+      return false;
+    if (cell.querySelector("img"))
+      return false;
+    for (const out of outputs) {
+      if (out.children.length > 0 || out.textContent.trim() !== "")
+        return true;
+    }
+    return false;
+  }
+  ModifyModeClassifier.register({
+    label: "Code chunk outputs",
+    classify(slideEl) {
+      if (!window._input_file)
+        return { valid: [], warn: [] };
+      const slideIndex = Reveal.getState().indexh;
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      const chunks = splitIntoSlideChunks(window._input_file);
+      const chunk = chunks[chunkIndex];
+      if (!chunk)
+        return { valid: [], warn: [] };
+      const execChunks = extractExecutableChunks(chunk);
+      if (execChunks.length === 0)
+        return { valid: [], warn: [] };
+      const cells = Array.from(slideEl.children).filter(
+        (el) => el.tagName === "DIV" && el.classList.contains("cell") && !editableRegistry.has(el) && !el.classList.contains("editable-container") && !el.classList.contains("absolute") && !el.closest("div.absolute")
+      );
+      if (cells.length !== execChunks.length)
+        return { valid: [], warn: [] };
+      const valid = [];
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        if (!cellQualifiesForOutput(cell))
+          continue;
+        const exec = execChunks[i];
+        cell.dataset.editableModifiedCellIdx = String(i);
+        cell.dataset.editableModifiedCellLabel = exec.label || "";
+        cell.dataset.editableModifiedCellFirstLine = exec.firstCodeLine;
+        valid.push(cell);
+      }
+      return { valid, warn: [] };
+    },
+    activate(el) {
+      const slideIndex = Reveal.getState().indexh;
+      const slideEl = el.closest("section");
+      const scale = getSlideScale();
+      const elRect = el.getBoundingClientRect();
+      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const origLeft = (elRect.left - slideRect.left) / scale;
+      const origTop = (elRect.top - slideRect.top) / scale;
+      const cs = window.getComputedStyle(el);
+      const naturalW = elRect.width / scale;
+      const naturalH = elRect.height / scale;
+      el.style.paddingLeft = cs.paddingLeft;
+      el.style.paddingRight = cs.paddingRight;
+      el.style.paddingTop = cs.paddingTop;
+      el.style.paddingBottom = cs.paddingBottom;
+      el.style.margin = "0";
+      el.style.width = naturalW + "px";
+      el.style.height = naturalH + "px";
+      el.style.display = "block";
+      el.dataset.editableModifiedCell = "true";
+      el.dataset.editableModifiedSlide = String(slideIndex);
+      setCapabilityOverride(el, ["move", "resize"]);
+      setupDraggableElt(el);
+      waitForRegistryThenFixPosition(el, origLeft, origTop);
+    },
+    serialize(text) {
+      const els = Array.from(
+        document.querySelectorAll('[data-editable-modified-cell="true"]')
+      );
+      if (els.length === 0)
+        return text;
+      const chunks = splitIntoSlideChunks(text);
+      const byChunk = /* @__PURE__ */ new Map();
+      for (const el of els) {
+        if (!editableRegistry.has(el))
+          continue;
+        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length)
+          continue;
+        if (!byChunk.has(chunkIndex))
+          byChunk.set(chunkIndex, []);
+        byChunk.get(chunkIndex).push(el);
+      }
+      for (const [chunkIndex, chunkEls] of byChunk) {
+        chunkEls.sort(
+          (a, b) => parseInt(a.dataset.editableModifiedCellIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedCellIdx ?? "0", 10)
+        );
+        const execChunks = extractExecutableChunks(chunks[chunkIndex]);
+        const lines = chunks[chunkIndex].split("\n");
+        for (let i = chunkEls.length - 1; i >= 0; i--) {
+          const el = chunkEls[i];
+          const cellLabel = el.dataset.editableModifiedCellLabel || "";
+          const cellFirstLine = (el.dataset.editableModifiedCellFirstLine ?? "").trim();
+          const cellIdx = parseInt(el.dataset.editableModifiedCellIdx ?? "-1", 10);
+          let target = null;
+          if (cellLabel) {
+            target = execChunks.find((c) => c.label === cellLabel) ?? null;
+          }
+          if (!target && cellIdx >= 0 && cellIdx < execChunks.length) {
+            const candidate = execChunks[cellIdx];
+            const actualFirst = (candidate.firstCodeLine ?? "").trim();
+            if (!cellFirstLine || !actualFirst || cellFirstLine === actualFirst) {
+              target = candidate;
+            }
+          }
+          if (!target)
+            continue;
+          const dims = editableRegistry.get(el).toDimensions();
+          const posAttrs = [
+            `left=${Math.round(dims.left)}px`,
+            `top=${Math.round(dims.top)}px`,
+            `width=${Math.round(dims.width)}px`,
+            `height=${Math.round(dims.height)}px`
+          ];
+          const styleAttrs = [];
+          if (dims.rotation)
+            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+          let attrs = `.absolute ${posAttrs.join(" ")}`;
+          if (styleAttrs.length)
+            attrs += ` style="${styleAttrs.join(" ")}"`;
+          lines.splice(target.endLine + 1, 0, ":::");
+          lines.splice(target.startLine, 0, `::: {${attrs}}`);
         }
         chunks[chunkIndex] = lines.join("\n");
       }

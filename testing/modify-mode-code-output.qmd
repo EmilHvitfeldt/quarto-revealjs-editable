@@ -1,0 +1,35 @@
+---
+---
+
+## Slide 1 - OJS cell output
+
+```{ojs}
+md`**hello** from observable`
+```
+
+## Slide 2 - Multiple OJS cells
+
+```{ojs}
+1 + 1
+```
+
+```{ojs}
+2 + 2
+```
+
+## Slide 3 - OJS alongside plain code block
+
+```python
+not_executed = True
+```
+
+```{ojs}
+"observable runs"
+```
+
+## Slide 4 - echo true (source + output visible)
+
+```{ojs}
+//| echo: true
+3 + 3
+```

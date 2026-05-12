@@ -46,6 +46,7 @@ Currently supported element types:
 | Callout block | `::: {.callout-note}` (and other callout types) | Move, resize, rotate |
 | Column layout | `::: {.columns}` | Move, resize, rotate |
 | Display code block | ` ```python ` / ` ``` ` (non-executed) | Move, resize |
+| Code chunk output | ` ```{r} `, ` ```{python} `, ` ```{ojs} ` producing non-image output | Move, resize |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
 | Positioned arrow | `{{< arrow ... position="absolute" >}}` | Move, resize (full styling preserved) |
 
@@ -55,14 +56,16 @@ Plain images and videos are inserted directly in a slide without positional attr
 
 Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
 
-Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.) are matched to their source by position among the top-level code fences on the slide, anchored to the first non-empty line of code content. On save, the entire fenced code block is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Text editing is not provided — the source remains literal code. Executed code chunks (` ```{python} `, ` ```{r} `) are not yet supported in modify mode.
+Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.) are matched to their source by position among the top-level code fences on the slide, anchored to the first non-empty line of code content. On save, the entire fenced code block is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Text editing is not provided — the source remains literal code.
+
+Executable code chunks that render non-image output — HTML tables, printed stdout, interactive widgets, and Observable JS (` ```{ojs} `) — are activatable as a single block (the `<div class="cell">` wrapping the chunk's code and output). Named chunks are matched to source by `#| label:` or fence-token label; unnamed chunks are matched positionally. On save, the entire chunk (fence to fence) is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Chunks producing only images aren't activatable through this path — the figure itself is the meaningful target.
 
 Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
 
 Positioned arrows from previous saves (`{{< arrow ... position="absolute" >}}` shortcodes rendered via [`quarto-arrows`](https://github.com/EmilHvitfeldt/quarto-arrows)) are activatable too. Click a highlighted arrow to drag and resize it via the standard arrow handles; the source's color, width, head, dash, line, opacity, label, curve, and waypoints are preserved. On save, the matching shortcode is rewritten in-place with the new coordinates. Arrows whose shortcodes use kwargs the editable system doesn't yet round-trip (`bend`, `fragment`, `aria-label`, `class`, `head-fill`, …) get an amber warning ring instead, so their source attributes aren't silently dropped.
 
 ::: {.callout-note}
-Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode.
+Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode. Non-image chunk outputs — tables, printed text, widgets, OJS — are supported as described above.
 :::
 
 ## Rich Text Editing

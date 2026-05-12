@@ -53,6 +53,7 @@ npm run test:e2e
 | `modify-mode-inline-img.qmd` | Inline images (`text ![](src) text`) detectable in modify mode | #120 |
 | `modify-mode-arrows.qmd` | Positioned arrows from previous-save shortcodes detectable in modify mode | #118 |
 | `modify-mode-code.qmd`   | Non-executed display code blocks detectable in modify mode | #111 |
+| `modify-mode-code-output.qmd` | Code chunk outputs (`{ojs}`, `{r}`, `{python}`) detectable in modify mode | #113 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 
@@ -310,6 +311,17 @@ npm run test:e2e
 | Clicking a valid code block wraps it in `editable-container` | `.editable-container` appears |
 | Multiple code blocks on a slide are all classified valid | Both wrappers stamped with `data-editable-modified-code-idx` |
 | Serialize wraps activated code block in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ``` ` fence |
+
+**`e2e/modify-mode-code-output.spec.js`** - Modify Mode — Code chunk outputs (6 tests):
+
+| Test | What it verifies |
+|---|---|
+| OJS cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 |
+| Cell has move+resize but not text-editing capabilities | No `.ql-editor` or font-size controls in the container |
+| Multiple cells on a slide are all classified valid | Both `div.cell` cells get the green ring |
+| Plain code block alongside OJS cell — both classifiers apply without conflict | Code blocks classifier handles the plain ` ``` `, Code chunk outputs handles the `{ojs}` cell |
+| `echo=true` cell (visible source + output) is classified and wraps whole chunk on save | `sourceCode cell-code` is not `hidden`; serialize wraps the chunk including the `#\| echo: true` option line |
+| Serialize wraps activated cell in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{ojs} ` chunk |
 
 **`e2e/modify-mode-arrows.spec.js`** - Modify Mode — Positioned arrows (7 tests):
 
