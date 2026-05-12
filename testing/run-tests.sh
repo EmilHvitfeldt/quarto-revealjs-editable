@@ -469,6 +469,7 @@ run_render_test "Test 32: Modify mode code-block rendering" "modify-mode-code.qm
 run_render_test "Test 33: Modify mode code chunk output rendering" "modify-mode-code-output.qmd" "inject"
 run_render_test "Test 34: Modify mode table rendering" "modify-mode-table.qmd" "inject"
 run_render_test "Test 35: Modify mode diagram chunk rendering" "modify-mode-diagrams.qmd" "inject"
+run_render_test "Test 36: Modify mode display equation rendering" "modify-mode-equations.qmd" "inject"
 
 echo ""
 if [ $FAILED -eq 0 ]; then

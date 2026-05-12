@@ -1,0 +1,31 @@
+---
+---
+
+## Slide 1 - Single display equation
+
+$$E = mc^2$$
+
+## Slide 2 - Multi-line display equation
+
+$$
+x^* = \left\{
+    \begin{array}{ll}
+      \dfrac{x^\lambda - 1}{\lambda} & \lambda \neq 0 \\
+      \log x & \lambda = 0
+    \end{array}
+  \right.
+$$
+
+## Slide 3 - Multiple display equations
+
+$$a^2 + b^2 = c^2$$
+
+$$E = mc^2$$
+
+## Slide 4 - Equation alongside paragraph
+
+Some preceding paragraph text.
+
+$$\int_0^\infty e^{-x}\, dx = 1$$
+
+A trailing paragraph.
