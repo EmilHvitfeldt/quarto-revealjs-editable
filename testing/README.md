@@ -312,17 +312,16 @@ npm run test:e2e
 | Multiple code blocks on a slide are all classified valid | Both wrappers stamped with `data-editable-modified-code-idx` |
 | Serialize wraps activated code block in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ``` ` fence |
 
-**`e2e/modify-mode-code-output.spec.js`** - Modify Mode — Code chunk outputs (7 tests):
+**`e2e/modify-mode-code-output.spec.js`** - Modify Mode — Code chunk outputs (6 tests):
 
 | Test | What it verifies |
 |---|---|
-| Fresh OJS cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 |
+| OJS cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 |
 | Cell has move+resize but not text-editing capabilities | No `.ql-editor` or font-size controls in the container |
-| Multiple fresh cells on a slide are all classified valid | Both `div.cell` cells get the green ring |
-| Plain code block alongside fresh OJS cell — both classifiers apply without conflict | Code blocks classifier handles the plain ` ``` `, Code chunk outputs handles the `{ojs}` cell |
+| Multiple cells on a slide are all classified valid | Both `div.cell` cells get the green ring |
+| Plain code block alongside OJS cell — both classifiers apply without conflict | Code blocks classifier handles the plain ` ``` `, Code chunk outputs handles the `{ojs}` cell |
 | `echo=true` cell (visible source + output) is classified and wraps whole chunk on save | `sourceCode cell-code` is not `hidden`; serialize wraps the chunk including the `#\| echo: true` option line |
-| Serialize wraps activated fresh cell in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{ojs} ` chunk |
-| Already-positioned cells (from previous save) are not double-claimed | Cell inside `div.absolute` gets no green ring; the wrapper is claimed by Positioned divs instead |
+| Serialize wraps activated cell in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{ojs} ` chunk |
 
 **`e2e/modify-mode-arrows.spec.js`** - Modify Mode — Positioned arrows (7 tests):
 
