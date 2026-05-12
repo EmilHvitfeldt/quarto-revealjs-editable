@@ -48,6 +48,7 @@ Currently supported element types:
 | Table (pipe, grid, HTML, list) | `\| A \| B \|` / `+---+---+` / `<table>…</table>` / `::: {.list-table}` | Move |
 | Display code block | ` ```python ` / ` ``` ` (non-executed) | Move, resize |
 | Code chunk output | ` ```{r} `, ` ```{python} `, ` ```{ojs} ` producing non-image output | Move, resize |
+| Diagram chunk | ` ```{mermaid} `, ` ```{dot} ` (Graphviz) | Move, resize |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
 | Positioned arrow | `{{< arrow ... position="absolute" >}}` | Move, resize (full styling preserved) |
 
@@ -62,6 +63,8 @@ Tables in pipe, grid, raw-HTML, and list-table syntax are matched to their sourc
 Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.) are matched to their source by position among the top-level code fences on the slide, anchored to the first non-empty line of code content. On save, the entire fenced code block is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Text editing is not provided — the source remains literal code.
 
 Executable code chunks that render non-image output — HTML tables, printed stdout, interactive widgets, and Observable JS (` ```{ojs} `) — are activatable as a single block (the `<div class="cell">` wrapping the chunk's code and output). Named chunks are matched to source by `#| label:` or fence-token label; unnamed chunks are matched positionally. On save, the entire chunk (fence to fence) is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Chunks producing only images aren't activatable through this path — the figure itself is the meaningful target.
+
+Diagram chunks (` ```{mermaid} ` and ` ```{dot} `) follow the same path. Their SVG output is rendered into the same `<div class="cell">` wrapper, so they are matched, activated, and written back identically to other executable chunks — named by `#| label:` or fence-token label, otherwise positionally.
 
 Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
 

@@ -1,0 +1,36 @@
+---
+---
+
+## Slide 1 - mermaid
+
+```{mermaid}
+flowchart LR
+  A --> B
+```
+
+## Slide 2 - dot (graphviz)
+
+```{dot}
+digraph G {
+  a -> b
+}
+```
+
+## Slide 3 - Multiple diagrams
+
+```{mermaid}
+flowchart LR
+  A --> B
+```
+
+```{dot}
+digraph G { x -> y }
+```
+
+## Slide 4 - named mermaid
+
+```{mermaid}
+%%| label: mychart
+flowchart LR
+  X --> Y
+```
