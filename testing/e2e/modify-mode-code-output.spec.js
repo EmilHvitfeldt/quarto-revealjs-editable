@@ -12,22 +12,25 @@ test.describe('Modify Mode — Code chunk outputs', () => {
     }
   });
 
-  test('OJS cell gets modify-mode-valid class', async ({ page }) => {
+  test('fresh OJS cell gets modify-mode-valid class', async ({ page }) => {
     await setupPage(page, 'modify-mode-code-output.html');
-    await navigateToSlide(page, 0);
+    // Slide 4 — single unpositioned OJS cell
+    await navigateToSlide(page, 3);
     await page.click('.toolbar-modify');
 
-    const valid = await page.locator('div.cell.modify-mode-valid').count();
+    const valid = await page.locator('section.present div.cell.modify-mode-valid').count();
     expect(valid).toBe(1);
   });
 
   test('the cell has move+resize but not text editing capabilities', async ({ page }) => {
     await setupPage(page, 'modify-mode-code-output.html');
-    await navigateToSlide(page, 0);
+    await navigateToSlide(page, 3);
     await page.click('.toolbar-modify');
     // OJS output may not have rendered yet (zero-height cell), so dispatch the
     // click directly via JS to bypass viewport/visibility checks.
-    await page.evaluate(() => document.querySelector('div.cell.modify-mode-valid').click());
+    await page.evaluate(() =>
+      document.querySelector('section.present div.cell.modify-mode-valid').click()
+    );
 
     await page.waitForSelector('.editable-container', { timeout: 3000 });
     expect(await page.locator('.editable-container').count()).toBe(1);
@@ -41,34 +44,80 @@ test.describe('Modify Mode — Code chunk outputs', () => {
     expect(fontControls).toBe(0);
   });
 
-  test('multiple cells on a slide are all classified valid', async ({ page }) => {
+  test('multiple fresh cells on a slide are all classified valid', async ({ page }) => {
     await setupPage(page, 'modify-mode-code-output.html');
-    await navigateToSlide(page, 1);
+    // Slide 5 — two unpositioned OJS cells
+    await navigateToSlide(page, 4);
     await page.click('.toolbar-modify');
 
-    const valid = await page.locator('div.cell.modify-mode-valid').count();
+    const valid = await page.locator('section.present div.cell.modify-mode-valid').count();
     expect(valid).toBe(2);
   });
 
-  test('plain code block alongside OJS cell — both classifiers apply without conflict', async ({ page }) => {
+  test('plain code block alongside fresh OJS cell — both classifiers apply without conflict', async ({ page }) => {
     await setupPage(page, 'modify-mode-code-output.html');
-    await navigateToSlide(page, 2);
+    // Slide 6 — plain ```python``` + fresh ```{ojs}```
+    await navigateToSlide(page, 5);
     await page.click('.toolbar-modify');
 
     // OJS cell is claimed by the new classifier
-    const cellValid = await page.locator('div.cell.modify-mode-valid').count();
+    const cellValid = await page.locator('section.present div.cell.modify-mode-valid').count();
     expect(cellValid).toBe(1);
 
-    // Plain ```python``` block (non-executable) is claimed by the Code blocks classifier
-    const codeValid = await page.locator('div.code-copy-outer-scaffold.modify-mode-valid').count();
+    // Plain ```python``` (non-executable) is claimed by the Code blocks classifier
+    const codeValid = await page.locator('section.present div.code-copy-outer-scaffold.modify-mode-valid').count();
     expect(codeValid).toBe(1);
   });
 
-  test('serialize wraps activated cell in fenced div with absolute position', async ({ page }) => {
+  test('echo=true cell (visible source + output) is classified and wraps whole chunk on save', async ({ page }) => {
     await setupPage(page, 'modify-mode-code-output.html');
-    await navigateToSlide(page, 0);
+    // Slide 7 — `#| echo: true`
+    await navigateToSlide(page, 6);
+
+    // Sanity check that the fixture actually exercises the echo=true path:
+    // the source-code div should NOT have the `hidden` class.
+    const sourceVisible = await page.locator(
+      'section.present div.cell div.sourceCode.cell-code:not(.hidden)'
+    ).count();
+    expect(sourceVisible).toBe(1);
+
     await page.click('.toolbar-modify');
-    await page.evaluate(() => document.querySelector('div.cell.modify-mode-valid').click());
+
+    const valid = await page.locator('section.present div.cell.modify-mode-valid').count();
+    expect(valid).toBe(1);
+
+    await page.evaluate(() =>
+      document.querySelector('section.present div.cell.modify-mode-valid').click()
+    );
+    await page.waitForSelector('.editable-container', { timeout: 3000 });
+    await page.waitForFunction(() => {
+      const c = document.querySelector('.editable-container');
+      return c && c.style.left !== '';
+    }, { timeout: 3000 });
+
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const slide = qmd.split(/(?=^## )/m).find(c => c.includes('Slide 7')) ?? '';
+
+    // Whole chunk (echo option line + body) wrapped, source preserved verbatim.
+    const wrapStart = slide.indexOf('::: {.absolute');
+    const chunkStart = slide.indexOf('```{ojs}');
+    const chunkEnd = slide.indexOf('```', chunkStart + 3);
+    const wrapEnd = slide.indexOf(':::', chunkEnd + 3);
+    expect(wrapStart).toBeGreaterThanOrEqual(0);
+    expect(chunkStart).toBeGreaterThan(wrapStart);
+    expect(chunkEnd).toBeGreaterThan(chunkStart);
+    expect(wrapEnd).toBeGreaterThan(chunkEnd);
+    expect(slide).toContain('//| echo: true');
+    expect(slide).toContain('3 + 3');
+  });
+
+  test('serialize wraps activated fresh cell in fenced div with absolute position', async ({ page }) => {
+    await setupPage(page, 'modify-mode-code-output.html');
+    await navigateToSlide(page, 3);
+    await page.click('.toolbar-modify');
+    await page.evaluate(() =>
+      document.querySelector('section.present div.cell.modify-mode-valid').click()
+    );
 
     await page.waitForSelector('.editable-container', { timeout: 3000 });
     await page.waitForFunction(() => {
@@ -77,10 +126,8 @@ test.describe('Modify Mode — Code chunk outputs', () => {
     }, { timeout: 3000 });
 
     const qmd = await page.evaluate(() => getTransformedQmd());
-    const slide = qmd.split(/(?=^## )/m).find(c => c.includes('Slide 1')) ?? '';
+    const slide = qmd.split(/(?=^## )/m).find(c => c.includes('Slide 4')) ?? '';
 
-    // The OJS chunk should now be wrapped in a positioned fenced div, with
-    // the original ```{ojs}``` fence preserved inside.
     const wrapStart = slide.indexOf('::: {.absolute');
     const chunkStart = slide.indexOf('```{ojs}');
     const chunkEnd = slide.indexOf('```', chunkStart + 3);
@@ -90,6 +137,22 @@ test.describe('Modify Mode — Code chunk outputs', () => {
     expect(chunkStart).toBeGreaterThan(wrapStart);
     expect(chunkEnd).toBeGreaterThan(chunkStart);
     expect(wrapEnd).toBeGreaterThan(chunkEnd);
-    expect(slide).toContain('md`**hello** from observable`');
+    expect(slide).toContain('md`**fresh** observable cell`');
+  });
+
+  test('already-positioned cells (from previous save) are not double-claimed', async ({ page }) => {
+    await setupPage(page, 'modify-mode-code-output.html');
+    // Slide 1 — already wrapped in ::: {.absolute ...}
+    await navigateToSlide(page, 0);
+    await page.click('.toolbar-modify');
+
+    // The OJS chunk is inside a div.absolute, so the Code chunk outputs
+    // classifier should NOT ring its cell — only the Positioned divs classifier
+    // claims the wrapper.
+    const cellValid = await page.locator('section.present div.cell.modify-mode-valid').count();
+    expect(cellValid).toBe(0);
+
+    const absoluteValid = await page.locator('section.present div.absolute.modify-mode-valid').count();
+    expect(absoluteValid).toBe(1);
   });
 });
