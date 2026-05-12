@@ -56,6 +56,7 @@ npm run test:e2e
 | `modify-mode-code-output.qmd` | Code chunk outputs (`{ojs}`, `{r}`, `{python}`) detectable in modify mode | #113 |
 | `modify-mode-table.qmd` | Pipe tables detectable in modify mode (move only) | #117 |
 | `modify-mode-diagrams.qmd` | Mermaid and Graphviz diagram chunks detectable in modify mode | #114 |
+| `modify-mode-equations.qmd` | Display equations (`$$...$$`) detectable in modify mode (move only) | #115 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 

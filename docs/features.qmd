@@ -49,6 +49,7 @@ Currently supported element types:
 | Display code block | ` ```python ` / ` ``` ` (non-executed) | Move, resize |
 | Code chunk output | ` ```{r} `, ` ```{python} `, ` ```{ojs} ` producing non-image output | Move, resize |
 | Diagram chunk | ` ```{mermaid} `, ` ```{dot} ` (Graphviz) | Move, resize |
+| Display equation | `$$E = mc^2$$` (single- or multi-line) | Move |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
 | Positioned arrow | `{{< arrow ... position="absolute" >}}` | Move, resize (full styling preserved) |
 
@@ -65,6 +66,8 @@ Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.)
 Executable code chunks that render non-image output — HTML tables, printed stdout, interactive widgets, and Observable JS (` ```{ojs} `) — are activatable as a single block (the `<div class="cell">` wrapping the chunk's code and output). Named chunks are matched to source by `#| label:` or fence-token label; unnamed chunks are matched positionally. On save, the entire chunk (fence to fence) is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Chunks producing only images aren't activatable through this path — the figure itself is the meaningful target.
 
 Diagram chunks (` ```{mermaid} ` and ` ```{dot} `) follow the same path. Their SVG output is rendered into the same `<div class="cell">` wrapper, so they are matched, activated, and written back identically to other executable chunks — named by `#| label:` or fence-token label, otherwise positionally.
+
+Display equations (`$$...$$`, both single- and multi-line) are matched to source by the LaTeX body line, with positional fallback when the same line appears more than once. Equations inside fenced code blocks or other `:::` fenced divs are skipped. On save, the entire `$$...$$` block is wrapped in `::: {.absolute left=Xpx top=Ypx}\n…\n:::`. Resize, rotate, and text editing are intentionally not provided — equation size is set by the LaTeX content and the content itself is raw LaTeX, not prose.
 
 Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
 

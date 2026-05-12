@@ -1241,7 +1241,10 @@ export function extractParagraphBlocks(chunk) {
   const commitBlock = () => {
     if (blockLines.length > 0) {
       const text = blockLines.join('\n');
-      if (!/!\[[^\]]*\]\(/.test(text)) {
+      // Skip display-equation blocks (`$$...$$`): these are handled by the
+      // Display equations classifier, and including them here would mis-align
+      // the positional paragraph index in slides that mix equations and prose.
+      if (!/!\[[^\]]*\]\(/.test(text) && !/^\s*\$\$/.test(text)) {
         blocks.push({
           startLine: blockStart,
           endLine: blockStart + blockLines.length - 1,
@@ -1302,7 +1305,10 @@ ModifyModeClassifier.register({
       el.tagName === 'P' &&
       !editableRegistry.has(el) &&
       !el.classList.contains('absolute') &&
-      !el.querySelector('img')
+      !el.querySelector('img') &&
+      // Standalone display equations are handled by the Display equations
+      // classifier; don't double-claim them as plain paragraphs.
+      !el.querySelector('span.math.display')
     );
 
     const valid = [];
@@ -2710,6 +2716,237 @@ ModifyModeClassifier.register({
       });
 
       // Build splice plan and apply bottom-to-top so earlier indices aren't shifted.
+      const plan = chunkEls
+        .map((el, i) => ({ el, target: resolved[i] }))
+        .filter(p => p.target)
+        .sort((a, b) => b.target.startLine - a.target.startLine);
+
+      for (const { el, target } of plan) {
+        const dims = editableRegistry.get(el).toDimensions();
+        const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
+        lines.splice(target.endLine + 1, 0, ':::');
+        lines.splice(target.startLine, 0, `::: {${attrs}}`);
+      }
+
+      chunks[chunkIndex] = lines.join('\n');
+    }
+
+    return chunks.join('');
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Display equation classifier (move + resize)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract top-level display equation blocks (`$$...$$`) from a QMD slide
+ * chunk. Skips equations inside fenced code blocks (``` ```) and fenced
+ * divs (`:::`). Supports both single-line (`$$E=mc^2$$`) and multi-line
+ * (`$$\n…\n$$`) forms.
+ *
+ * @param {string} chunk
+ * @returns {Array<{startLine: number, endLine: number, headerLine: string}>}
+ */
+export function extractDisplayEquations(chunk) {
+  const lines = chunk.split('\n');
+  const eqs = [];
+  let depth = 0;
+  let inCode = false;
+  let mathStart = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (inCode) {
+      if (/^```\s*$/.test(line)) inCode = false;
+      continue;
+    }
+    if (mathStart === -1 && /^```/.test(line)) { inCode = true; continue; }
+
+    if (mathStart === -1) {
+      const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+      if (fenceMatch) {
+        const hasBraces = fenceMatch[2] !== undefined;
+        if (!hasBraces && depth > 0) depth--; else depth++;
+        continue;
+      }
+      if (depth !== 0) continue;
+
+      const open = line.match(/^\s*\$\$(.*)$/);
+      if (!open) continue;
+      const rest = open[1];
+      const closeIdx = rest.indexOf('$$');
+      if (closeIdx !== -1) {
+        // Single-line block: `$$ ... $$`. Require nothing significant after.
+        const after = rest.slice(closeIdx + 2).trim();
+        if (after === '') {
+          eqs.push({ startLine: i, endLine: i, headerLine: line });
+        }
+      } else {
+        mathStart = i;
+      }
+    } else {
+      // Inside a multi-line display block — look for closing `$$`.
+      if (/\$\$\s*$/.test(line)) {
+        const body = lines.slice(mathStart, i + 1);
+        const headerLine = body.find(l => l.trim() && l.trim() !== '$$') ?? lines[mathStart];
+        eqs.push({ startLine: mathStart, endLine: i, headerLine });
+        mathStart = -1;
+      }
+    }
+  }
+  return eqs;
+}
+
+/**
+ * Returns true when `el` contains exactly one rendered display-math node
+ * (the `<span class="math display">` or its MathJax/KaTeX replacement) and
+ * no other significant content. We use this to recognise standalone
+ * display equations (Pandoc emits each one inside its own `<p>`).
+ */
+function isDisplayEquationContainer(el) {
+  const span = el.querySelector(':scope span.math.display, :scope > span.math.display');
+  if (!span) return false;
+  // Walk children — allow whitespace text and MathJax-inserted siblings
+  // (`<script type="math/tex">`, `<mjx-container>`, `.MathJax_Preview`),
+  // reject any inline text or other content.
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent && node.textContent.trim() !== '') return false;
+      continue;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    if (node === span) continue;
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'script' || tag === 'mjx-container') continue;
+    if (node.classList.contains('MathJax') ||
+        node.classList.contains('MathJax_Preview') ||
+        node.classList.contains('MathJax_Display') ||
+        node.classList.contains('katex-display')) continue;
+    return false;
+  }
+  return true;
+}
+
+ModifyModeClassifier.register({
+  label: 'Display equations',
+
+  classify(slideEl) {
+    if (!window._input_file) return { valid: [], warn: [] };
+    const slideIndex = Reveal.getState().indexh;
+    const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+    const chunks = splitIntoSlideChunks(window._input_file);
+    const chunk = chunks[chunkIndex];
+    if (!chunk) return { valid: [], warn: [] };
+
+    const sourceEqs = extractDisplayEquations(chunk);
+    if (sourceEqs.length === 0) return { valid: [], warn: [] };
+
+    const spans = Array.from(slideEl.querySelectorAll('span.math.display'));
+    const wrappers = [];
+    const seen = new Set();
+    for (const s of spans) {
+      const w = topLevelAncestorIn(slideEl, s);
+      if (!w) continue;
+      if (seen.has(w)) continue;
+      seen.add(w);
+      if (editableRegistry.has(w)) continue;
+      if (w.classList.contains('editable-container')) continue;
+      if (w.classList.contains('absolute')) continue;
+      if (w.closest('div.absolute')) continue;
+      if (!isDisplayEquationContainer(w)) continue;
+      wrappers.push(w);
+    }
+
+    if (wrappers.length !== sourceEqs.length) return { valid: [], warn: [] };
+
+    const valid = [];
+    for (let i = 0; i < wrappers.length; i++) {
+      const w = wrappers[i];
+      w.dataset.editableModifiedEqIdx = String(i);
+      w.dataset.editableModifiedEqHeader = sourceEqs[i].headerLine;
+      valid.push(w);
+    }
+    return { valid, warn: [] };
+  },
+
+  activate(el) {
+    const slideIndex = Reveal.getState().indexh;
+    const slideEl = el.closest('section');
+    const scale = getSlideScale();
+    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+
+    // Anchor on the rendered math node when available so the container's
+    // top edge sits at the visible top of the equation (not the top of the
+    // wrapping `<p>`'s margin box, which would shift the equation down).
+    const inner = el.querySelector('.MathJax_Display, mjx-container, .katex-display, span.math.display') ?? el;
+    const innerRect = inner.getBoundingClientRect();
+    const origLeft = (innerRect.left - slideRect.left) / scale;
+    const origTop  = (innerRect.top  - slideRect.top)  / scale;
+    const naturalW = innerRect.width  / scale;
+    const naturalH = innerRect.height / scale;
+
+    el.style.padding = '0';
+    el.style.margin  = '0';
+    el.style.width   = naturalW + 'px';
+    el.style.height  = naturalH + 'px';
+    el.querySelectorAll('.MathJax_Display, mjx-container, .katex-display').forEach(n => {
+      n.style.margin = '0';
+    });
+
+    el.dataset.editableModifiedEq = 'true';
+    el.dataset.editableModifiedSlide = String(slideIndex);
+    setCapabilityOverride(el, ['move']);
+    setupDraggableElt(el);
+
+    waitForRegistryThenFixPosition(el, origLeft, origTop);
+  },
+
+  serialize(text) {
+    const els = Array.from(
+      document.querySelectorAll('[data-editable-modified-eq="true"]')
+    );
+    if (els.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+    const byChunk = new Map();
+    for (const el of els) {
+      if (!editableRegistry.has(el)) continue;
+      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+      byChunk.get(chunkIndex).push(el);
+    }
+
+    for (const [chunkIndex, chunkEls] of byChunk) {
+      chunkEls.sort((a, b) =>
+        parseInt(a.dataset.editableModifiedEqIdx ?? '0', 10) -
+        parseInt(b.dataset.editableModifiedEqIdx ?? '0', 10)
+      );
+
+      const sourceEqs = extractDisplayEquations(chunks[chunkIndex]);
+      const lines = chunks[chunkIndex].split('\n');
+
+      // Header-anchored resolution with positional fallback (same approach
+      // as Tables): the LaTeX body line is the same source twice would be a
+      // rare collision.
+      const headerCounts = new Map();
+      for (const eq of sourceEqs) {
+        const h = (eq.headerLine ?? '').trim();
+        headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
+      }
+
+      const resolved = chunkEls.map((el) => {
+        const idx = parseInt(el.dataset.editableModifiedEqIdx ?? '-1', 10);
+        const expected = (el.dataset.editableModifiedEqHeader ?? '').trim();
+        if (expected && headerCounts.get(expected) === 1) {
+          return sourceEqs.find(e => (e.headerLine ?? '').trim() === expected) ?? null;
+        }
+        if (idx >= 0 && idx < sourceEqs.length) return sourceEqs[idx];
+        return null;
+      });
+
       const plan = chunkEls
         .map((el, i) => ({ el, target: resolved[i] }))
         .filter(p => p.target)
