@@ -2424,21 +2424,52 @@ ModifyModeClassifier.register({
 // ---------------------------------------------------------------------------
 
 /**
- * Extract top-level pipe tables from a QMD slide chunk.
- * Only tables at depth 0 (outside `:::` fenced divs and ``` code fences)
- * are returned.
+ * Extract top-level tables from a QMD slide chunk.
+ *
+ * Supports four Quarto table syntaxes:
+ *   - pipe tables   (`| A | B |` ... `|---|---|`)
+ *   - grid tables   (`+---+---+` borders with `|` content rows)
+ *   - HTML tables   (raw `<table>...</table>`)
+ *   - list tables   (`::: {.list-table}` … `:::`)
+ *
+ * Quarto's list-table Lua filter replaces the fenced div with a bare
+ * `<table>` in the rendered DOM, so it doesn't surface to the fenced-divs
+ * classifier — we have to claim it here.  Tables inside ``` code fences
+ * and other `:::` fenced divs are skipped (depth filter).
+ *
+ * If a table is immediately followed (optionally across blank lines) by a
+ * Pandoc caption line (`: Caption ...` or `Table: ...`), the caption is
+ * included in the table's line range so the write-back wrap covers it.
  *
  * @param {string} chunk
- * @returns {Array<{startLine: number, endLine: number, headerLine: string}>}
+ * @returns {Array<{startLine: number, endLine: number, headerLine: string, kind: string}>}
  */
-export function extractPipeTables(chunk) {
+export function extractTables(chunk) {
   const lines = chunk.split('\n');
   const tables = [];
   let depth = 0;
   let inCode = false;
-  const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
-  const isSep = (l) =>
+
+  const isPipeRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const isPipeSep = (l) =>
     /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+  const isGridBorder = (l) => /^\s*\+[-=+:]{3,}\+\s*$/.test(l);
+  const isGridRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const isHtmlOpen  = (l) => /^\s*<table[\s>]/i.test(l);
+  const isHtmlClose = (l) => /<\/table\s*>/i.test(l);
+  const isCaption   = (l) => /^\s*(:|Table:)\s+\S/.test(l);
+
+  // Extend `end` to include a trailing Pandoc caption block, if present.
+  function extendWithCaption(end) {
+    let j = end + 1;
+    while (j < lines.length && lines[j].trim() === '') j++;
+    if (j < lines.length && isCaption(lines[j])) {
+      let capEnd = j;
+      while (capEnd + 1 < lines.length && lines[capEnd + 1].trim() !== '') capEnd++;
+      return capEnd;
+    }
+    return end;
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -2451,24 +2482,96 @@ export function extractPipeTables(chunk) {
     const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
     if (fenceMatch) {
       const hasBraces = fenceMatch[2] !== undefined;
+      // List table: a `.list-table` fenced div at depth 0 — Quarto's filter
+      // renders this directly to a `<table>`, so we need to claim the whole
+      // fenced block as a table.
+      if (hasBraces && depth === 0 && /(^|[\s\{])\.list-table(\s|\})/.test(fenceMatch[2])) {
+        const start = i;
+        let inner = 1;
+        let end = -1;
+        let firstContent = null;
+        for (let j = i + 1; j < lines.length; j++) {
+          const m2 = lines[j].match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+          if (m2) {
+            if (m2[2] !== undefined) inner++; else inner--;
+            if (inner === 0) { end = j; break; }
+          } else if (firstContent === null && lines[j].trim()) {
+            firstContent = lines[j];
+          }
+        }
+        if (end !== -1) {
+          const extended = extendWithCaption(end);
+          tables.push({
+            startLine: start,
+            endLine: extended,
+            headerLine: firstContent ?? line,
+            kind: 'list',
+          });
+          i = extended;
+          continue;
+        }
+      }
       if (!hasBraces && depth > 0) depth--; else depth++;
       continue;
     }
     if (depth !== 0) continue;
 
-    if (isRow(line) && i + 1 < lines.length && isSep(lines[i + 1])) {
+    // Pipe table: header row + separator
+    if (isPipeRow(line) && i + 1 < lines.length && isPipeSep(lines[i + 1])) {
       const start = i;
       let end = i + 1;
       for (let j = i + 2; j < lines.length; j++) {
-        if (isRow(lines[j])) end = j;
+        if (isPipeRow(lines[j])) end = j;
         else break;
       }
-      tables.push({ startLine: start, endLine: end, headerLine: line });
+      end = extendWithCaption(end);
+      tables.push({ startLine: start, endLine: end, headerLine: line, kind: 'pipe' });
+      i = end;
+      continue;
+    }
+
+    // Grid table: starts with `+---+`, alternating borders and `|` rows
+    if (isGridBorder(line)) {
+      const start = i;
+      let end = i;
+      let firstContent = null;
+      let j = i + 1;
+      while (j < lines.length && (isGridBorder(lines[j]) || isGridRow(lines[j]))) {
+        if (firstContent === null && isGridRow(lines[j])) firstContent = lines[j];
+        end = j;
+        j++;
+      }
+      if (firstContent === null || end === start) continue;
+      end = extendWithCaption(end);
+      tables.push({ startLine: start, endLine: end, headerLine: firstContent, kind: 'grid' });
+      i = end;
+      continue;
+    }
+
+    // Raw HTML table
+    if (isHtmlOpen(line)) {
+      const start = i;
+      let end = -1;
+      if (isHtmlClose(line)) {
+        end = i;
+      } else {
+        for (let j = i + 1; j < lines.length; j++) {
+          if (isHtmlClose(lines[j])) { end = j; break; }
+        }
+      }
+      if (end === -1) continue;
+      end = extendWithCaption(end);
+      tables.push({ startLine: start, endLine: end, headerLine: line, kind: 'html' });
       i = end;
     }
   }
+
   return tables;
 }
+
+// Kept for backward compatibility with existing tests/imports.
+export const extractPipeTables = (chunk) =>
+  extractTables(chunk).filter(t => t.kind === 'pipe');
 
 ModifyModeClassifier.register({
   label: 'Tables',
@@ -2481,13 +2584,16 @@ ModifyModeClassifier.register({
     const chunk = chunks[chunkIndex];
     if (!chunk) return { valid: [], warn: [] };
 
-    const sourceTables = extractPipeTables(chunk);
+    const sourceTables = extractTables(chunk);
     if (sourceTables.length === 0) return { valid: [], warn: [] };
 
     const tables = Array.from(slideEl.querySelectorAll('table'));
     const wrappers = [];
     const seen = new Set();
     for (const t of tables) {
+      // Tables rendered as the output of an executable code chunk belong
+      // to the code-output classifier.
+      if (t.closest('div.cell')) continue;
       const w = topLevelAncestorIn(slideEl, t);
       if (!w) continue;
       if (seen.has(w)) continue;
@@ -2568,7 +2674,7 @@ ModifyModeClassifier.register({
         parseInt(b.dataset.editableModifiedTableIdx ?? '0', 10)
       );
 
-      const sourceTables = extractPipeTables(chunks[chunkIndex]);
+      const sourceTables = extractTables(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
 
       // Resolve target source table per element. Primary anchor: header line

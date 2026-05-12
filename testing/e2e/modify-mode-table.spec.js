@@ -12,19 +12,17 @@ test.describe('Modify Mode — Tables', () => {
     }
   });
 
-  test('table on a slide gets modify-mode-valid class', async ({ page }) => {
+  test('pipe table on a slide gets modify-mode-valid class', async ({ page }) => {
     await setupPage(page, 'modify-mode-table.html');
     await navigateToSlide(page, 0);
     await page.click('.toolbar-modify');
-
     expect(await page.locator('table.modify-mode-valid').count()).toBe(1);
   });
 
-  test('multiple tables on a slide are all classified valid', async ({ page }) => {
+  test('multiple pipe tables on a slide are all classified valid', async ({ page }) => {
     await setupPage(page, 'modify-mode-table.html');
     await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
-
     expect(await page.locator('[data-editable-modified-table-idx]').count()).toBe(2);
   });
 
@@ -32,9 +30,7 @@ test.describe('Modify Mode — Tables', () => {
     await setupPage(page, 'modify-mode-table.html');
     await navigateToSlide(page, 0);
     await page.click('.toolbar-modify');
-
     await page.locator('table.modify-mode-valid').first().click();
-
     await page.waitForSelector('.editable-container', { timeout: 3000 });
     expect(await page.locator('.editable-container').count()).toBe(1);
   });
@@ -44,43 +40,102 @@ test.describe('Modify Mode — Tables', () => {
     await navigateToSlide(page, 0);
     await page.click('.toolbar-modify');
     await page.locator('table.modify-mode-valid').first().click();
-
     await page.waitForSelector('.editable-container', { timeout: 3000 });
-    // Resize corner handles should not be created for tables.
-    const handles = await page.locator('.editable-container .editable-handle').count();
-    expect(handles).toBe(0);
+    expect(await page.locator('.editable-container .editable-handle').count()).toBe(0);
   });
 
-  test('serialize wraps activated table in fenced div with absolute position', async ({ page }) => {
+  test('serialize wraps activated pipe table in fenced div with absolute position only', async ({ page }) => {
     await setupPage(page, 'modify-mode-table.html');
     await navigateToSlide(page, 0);
     await page.click('.toolbar-modify');
     await page.locator('table.modify-mode-valid').first().click();
-
     await page.waitForSelector('.editable-container', { timeout: 3000 });
     await page.waitForFunction(() => {
-      const container = document.querySelector('.editable-container');
-      return container && container.style.left !== '';
+      const c = document.querySelector('.editable-container');
+      return c && c.style.left !== '';
     }, { timeout: 3000 });
 
     const qmd = await page.evaluate(() => getTransformedQmd());
-    const chunks = qmd.split(/(?=^## )/m);
-    const slide = chunks.find(c => c.includes('Slide 1')) ?? '';
-
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 1')) ?? '');
     const wrapStart = slide.indexOf('::: {.absolute');
-    const headerIdx = slide.indexOf('| A | B |');
-    const sepIdx    = slide.indexOf('|---|---|');
-    const wrapEnd   = slide.indexOf(':::', sepIdx);
-
     expect(wrapStart).toBeGreaterThanOrEqual(0);
-    expect(headerIdx).toBeGreaterThan(wrapStart);
-    expect(sepIdx).toBeGreaterThan(headerIdx);
-    expect(wrapEnd).toBeGreaterThan(sepIdx);
-    // The serialized attrs must include left/top but not width/height (move-only).
     const wrapLine = slide.slice(wrapStart, slide.indexOf('\n', wrapStart));
     expect(wrapLine).toMatch(/left=\d+px/);
     expect(wrapLine).toMatch(/top=\d+px/);
-    expect(wrapLine).not.toMatch(/width=/);
-    expect(wrapLine).not.toMatch(/height=/);
+    expect(wrapLine).not.toMatch(/width=|height=/);
+    expect(slide).toContain('| A | B |');
+    expect(slide).toContain('|---|---|');
+  });
+
+  test('grid table is classified valid and serializes wrapped', async ({ page }) => {
+    await setupPage(page, 'modify-mode-table.html');
+    await navigateToSlide(page, 7);
+    await page.click('.toolbar-modify');
+    expect(await page.locator('table.modify-mode-valid').count()).toBe(1);
+    await page.locator('table.modify-mode-valid').first().click();
+    await page.waitForFunction(() => {
+      const c = document.querySelector('.editable-container');
+      return c && c.style.left !== '';
+    }, { timeout: 3000 });
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 8')) ?? '');
+    expect(slide).toMatch(/::: \{\.absolute[^}]*\}\n\+---/);
+    expect(slide).toContain('+===+===+');
+  });
+
+  test('HTML table is classified valid and serializes wrapped', async ({ page }) => {
+    await setupPage(page, 'modify-mode-table.html');
+    await navigateToSlide(page, 8);
+    await page.click('.toolbar-modify');
+    expect(await page.locator('table.modify-mode-valid').count()).toBe(1);
+    await page.locator('table.modify-mode-valid').first().click();
+    await page.waitForFunction(() => {
+      const c = document.querySelector('.editable-container');
+      return c && c.style.left !== '';
+    }, { timeout: 3000 });
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 9')) ?? '');
+    expect(slide).toMatch(/::: \{\.absolute[^}]*\}\n<table/);
+    // Closing fence appears after </table>.
+    const close = slide.indexOf('</table>');
+    expect(slide.indexOf(':::', close)).toBeGreaterThan(close);
+  });
+
+  test('captioned table wrap includes the caption line', async ({ page }) => {
+    await setupPage(page, 'modify-mode-table.html');
+    await navigateToSlide(page, 9);
+    await page.click('.toolbar-modify');
+    await page.locator('[data-editable-modified-table-idx]').first().click();
+    await page.waitForFunction(() => {
+      const c = document.querySelector('.editable-container');
+      return c && c.style.left !== '';
+    }, { timeout: 3000 });
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 10')) ?? '');
+    const wrapStart = slide.indexOf('::: {.absolute');
+    const captionIdx = slide.indexOf(': My caption');
+    const closeIdx = slide.indexOf(':::', captionIdx);
+    expect(wrapStart).toBeGreaterThanOrEqual(0);
+    expect(captionIdx).toBeGreaterThan(wrapStart);
+    expect(closeIdx).toBeGreaterThan(captionIdx);
+  });
+
+  test('list-table is classified valid and serializes wrapped', async ({ page }) => {
+    await setupPage(page, 'modify-mode-table.html');
+    await navigateToSlide(page, 6);
+    await page.click('.toolbar-modify');
+    expect(await page.locator('[data-editable-modified-table-idx]').count()).toBe(1);
+    await page.locator('[data-editable-modified-table-idx]').first().click();
+    await page.waitForFunction(() => {
+      const c = document.querySelector('.editable-container');
+      return c && c.style.left !== '';
+    }, { timeout: 3000 });
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const slide = (qmd.split(/(?=^## )/m).find(c => c.includes('Slide 7')) ?? '');
+    // Outer .absolute wrap surrounds the inner .list-table fenced div.
+    const outer = slide.indexOf('::: {.absolute');
+    const inner = slide.indexOf('::: {.list-table}', outer);
+    expect(outer).toBeGreaterThanOrEqual(0);
+    expect(inner).toBeGreaterThan(outer);
   });
 });

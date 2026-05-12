@@ -17779,13 +17779,30 @@ ${fence}`;
       return chunks.join("");
     }
   });
-  function extractPipeTables(chunk) {
+  function extractTables(chunk) {
     const lines = chunk.split("\n");
     const tables = [];
     let depth = 0;
     let inCode = false;
-    const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
-    const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+    const isPipeRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+    const isPipeSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+    const isGridBorder = (l) => /^\s*\+[-=+:]{3,}\+\s*$/.test(l);
+    const isGridRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+    const isHtmlOpen = (l) => /^\s*<table[\s>]/i.test(l);
+    const isHtmlClose = (l) => /<\/table\s*>/i.test(l);
+    const isCaption = (l) => /^\s*(:|Table:)\s+\S/.test(l);
+    function extendWithCaption(end) {
+      let j = end + 1;
+      while (j < lines.length && lines[j].trim() === "")
+        j++;
+      if (j < lines.length && isCaption(lines[j])) {
+        let capEnd = j;
+        while (capEnd + 1 < lines.length && lines[capEnd + 1].trim() !== "")
+          capEnd++;
+        return capEnd;
+      }
+      return end;
+    }
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (inCode) {
@@ -17800,6 +17817,38 @@ ${fence}`;
       const fenceMatch = line.match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
       if (fenceMatch) {
         const hasBraces = fenceMatch[2] !== void 0;
+        if (hasBraces && depth === 0 && /(^|[\s\{])\.list-table(\s|\})/.test(fenceMatch[2])) {
+          const start = i;
+          let inner = 1;
+          let end = -1;
+          let firstContent = null;
+          for (let j = i + 1; j < lines.length; j++) {
+            const m2 = lines[j].match(/^(:{3,})\s*(\{[^}]*\})?\s*$/);
+            if (m2) {
+              if (m2[2] !== void 0)
+                inner++;
+              else
+                inner--;
+              if (inner === 0) {
+                end = j;
+                break;
+              }
+            } else if (firstContent === null && lines[j].trim()) {
+              firstContent = lines[j];
+            }
+          }
+          if (end !== -1) {
+            const extended = extendWithCaption(end);
+            tables.push({
+              startLine: start,
+              endLine: extended,
+              headerLine: firstContent ?? line,
+              kind: "list"
+            });
+            i = extended;
+            continue;
+          }
+        }
         if (!hasBraces && depth > 0)
           depth--;
         else
@@ -17808,16 +17857,55 @@ ${fence}`;
       }
       if (depth !== 0)
         continue;
-      if (isRow(line) && i + 1 < lines.length && isSep(lines[i + 1])) {
+      if (isPipeRow(line) && i + 1 < lines.length && isPipeSep(lines[i + 1])) {
         const start = i;
         let end = i + 1;
         for (let j = i + 2; j < lines.length; j++) {
-          if (isRow(lines[j]))
+          if (isPipeRow(lines[j]))
             end = j;
           else
             break;
         }
-        tables.push({ startLine: start, endLine: end, headerLine: line });
+        end = extendWithCaption(end);
+        tables.push({ startLine: start, endLine: end, headerLine: line, kind: "pipe" });
+        i = end;
+        continue;
+      }
+      if (isGridBorder(line)) {
+        const start = i;
+        let end = i;
+        let firstContent = null;
+        let j = i + 1;
+        while (j < lines.length && (isGridBorder(lines[j]) || isGridRow(lines[j]))) {
+          if (firstContent === null && isGridRow(lines[j]))
+            firstContent = lines[j];
+          end = j;
+          j++;
+        }
+        if (firstContent === null || end === start)
+          continue;
+        end = extendWithCaption(end);
+        tables.push({ startLine: start, endLine: end, headerLine: firstContent, kind: "grid" });
+        i = end;
+        continue;
+      }
+      if (isHtmlOpen(line)) {
+        const start = i;
+        let end = -1;
+        if (isHtmlClose(line)) {
+          end = i;
+        } else {
+          for (let j = i + 1; j < lines.length; j++) {
+            if (isHtmlClose(lines[j])) {
+              end = j;
+              break;
+            }
+          }
+        }
+        if (end === -1)
+          continue;
+        end = extendWithCaption(end);
+        tables.push({ startLine: start, endLine: end, headerLine: line, kind: "html" });
         i = end;
       }
     }
@@ -17834,13 +17922,15 @@ ${fence}`;
       const chunk = chunks[chunkIndex];
       if (!chunk)
         return { valid: [], warn: [] };
-      const sourceTables = extractPipeTables(chunk);
+      const sourceTables = extractTables(chunk);
       if (sourceTables.length === 0)
         return { valid: [], warn: [] };
       const tables = Array.from(slideEl.querySelectorAll("table"));
       const wrappers = [];
       const seen = /* @__PURE__ */ new Set();
       for (const t of tables) {
+        if (t.closest("div.cell"))
+          continue;
         const w = topLevelAncestorIn(slideEl, t);
         if (!w)
           continue;
@@ -17918,7 +18008,7 @@ ${fence}`;
         chunkEls.sort(
           (a, b) => parseInt(a.dataset.editableModifiedTableIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedTableIdx ?? "0", 10)
         );
-        const sourceTables = extractPipeTables(chunks[chunkIndex]);
+        const sourceTables = extractTables(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
         const headerCounts = /* @__PURE__ */ new Map();
         for (const t of sourceTables) {

@@ -45,7 +45,7 @@ Currently supported element types:
 | Id-keyed fenced div | `::: {#my-id}` | Move, resize, rotate, text editing |
 | Callout block | `::: {.callout-note}` (and other callout types) | Move, resize, rotate |
 | Column layout | `::: {.columns}` | Move, resize, rotate |
-| Pipe table | `\| A \| B \|` / `\|---\|---\|` … | Move |
+| Table (pipe, grid, HTML, list) | `\| A \| B \|` / `+---+---+` / `<table>…</table>` / `::: {.list-table}` | Move |
 | Display code block | ` ```python ` / ` ``` ` (non-executed) | Move, resize |
 | Code chunk output | ` ```{r} `, ` ```{python} `, ` ```{ojs} ` producing non-image output | Move, resize |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
@@ -57,7 +57,7 @@ Plain images and videos are inserted directly in a slide without positional attr
 
 Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
 
-Pipe tables are matched to their source by the first (header) row of the table within the slide chunk; if the same header row appears more than once, matching falls back to position. On save, the entire table block is wrapped in `::: {.absolute left=Xpx top=Ypx}\n…\n:::`. Resize and rotate are intentionally not provided — table width is determined by content and column definitions, not a CSS dimension on a wrapper.
+Tables in pipe, grid, raw-HTML, and list-table syntax are matched to their source by the first (header) row of the table within the slide chunk; if the same header row appears more than once, matching falls back to position. A trailing Pandoc caption line (`: caption {#tbl-id}` or `Table: caption`) is included in the wrapped block so the caption stays anchored to the table. On save, the entire table block is wrapped in `::: {.absolute left=Xpx top=Ypx}\n…\n:::` (for list tables, the outer `.absolute` fence wraps the existing `::: {.list-table}` block). Resize and rotate are intentionally not provided — table width is determined by content and column definitions, not a CSS dimension on a wrapper. Computational tables produced by executable chunks are handled by the code-chunk-output path.
 
 Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.) are matched to their source by position among the top-level code fences on the slide, anchored to the first non-empty line of code content. On save, the entire fenced code block is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Text editing is not provided — the source remains literal code.
 

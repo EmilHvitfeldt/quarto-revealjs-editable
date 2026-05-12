@@ -1,28 +1,101 @@
 ---
 ---
 
-## Slide 1 - Single table
+## Slide 1 - Single pipe table
 
 | A | B |
 |---|---|
 | 1 | 2 |
 | 3 | 4 |
 
-## Slide 2 - Multiple tables
+## Slide 2 - Multiple pipe tables
 
 | X | Y |
 |---|---|
 | 1 | 2 |
 
+::: {.absolute left=204px top=269px}
 | P | Q |
 |---|---|
 | 9 | 8 |
+:::
 
-## Slide 3 - Table alongside paragraph
+## Slide 3 - Pipe table alongside paragraph
 
 A paragraph next to a table.
 
+::: {.absolute left=143px top=352px}
 | Name | Value |
 |------|-------|
 | foo  | 1     |
 | bar  | 2     |
+:::
+
+## Slide 4 - Grid table
+
+::: {.absolute left=598px top=218px}
++---+---+
+| A | B |
++===+===+
+| 1 | 2 |
++---+---+
+:::
+
+## Slide 5 - HTML table
+
+::: {.absolute left=240px top=184px}
+<table>
+<tr><th>A</th><th>B</th></tr>
+<tr><td>1</td><td>2</td></tr>
+</table>
+:::
+
+## Slide 6 - Captioned table
+
+::: {.absolute left=-138px top=228px}
+| A | B |
+|---|---|
+| 1 | 2 |
+
+: My caption {#tbl-cap}
+:::
+
+## Slide 7 - List table
+
+::: {.absolute left=158px top=349px}
+::: {.list-table}
+  - - A
+    - B
+  - - 1
+    - 2
+:::
+:::
+
+## Slide 8 - Bare grid table
+
+::: {.absolute left=631px top=279px}
++---+---+
+| A | B |
++===+===+
+| 1 | 2 |
++---+---+
+:::
+
+## Slide 9 - Bare HTML table
+
+::: {.absolute left=215px top=358px}
+<table>
+<tr><th>A</th><th>B</th></tr>
+<tr><td>1</td><td>2</td></tr>
+</table>
+:::
+
+## Slide 10 - Bare captioned pipe table
+
+::: {.absolute left=-217px top=369px}
+| A | B |
+|---|---|
+| 1 | 2 |
+
+: My caption {#tbl-cap2}
+:::

@@ -20,12 +20,13 @@ vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 vi.mock('../arrows.js', () => ({ createArrowElement: vi.fn(), setActiveArrow: vi.fn() }));
 
-import { extractPipeTables } from '../modify-mode.js';
+import { extractTables, extractPipeTables } from '../modify-mode.js';
 
-describe('extractPipeTables', () => {
+describe('extractTables — pipe tables', () => {
   it('extracts a single pipe table', () => {
-    const tables = extractPipeTables('## Slide\n\n| A | B |\n|---|---|\n| 1 | 2 |\n');
+    const tables = extractTables('## Slide\n\n| A | B |\n|---|---|\n| 1 | 2 |\n');
     expect(tables).toHaveLength(1);
+    expect(tables[0].kind).toBe('pipe');
     expect(tables[0].headerLine).toBe('| A | B |');
     expect(tables[0].startLine).toBe(2);
     expect(tables[0].endLine).toBe(4);
@@ -33,29 +34,156 @@ describe('extractPipeTables', () => {
 
   it('extracts multiple tables separated by a blank line', () => {
     const src = '## Slide\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n| X | Y |\n|---|---|\n| 9 | 8 |\n';
-    const tables = extractPipeTables(src);
+    const tables = extractTables(src);
     expect(tables).toHaveLength(2);
     expect(tables[0].headerLine).toBe('| A | B |');
     expect(tables[1].headerLine).toBe('| X | Y |');
   });
 
+  it('handles separator with alignment colons', () => {
+    expect(extractTables('## Slide\n\n| A | B |\n|:--|--:|\n| 1 | 2 |\n')).toHaveLength(1);
+  });
+
+  it('requires a separator row to qualify as a pipe table', () => {
+    expect(extractTables('## Slide\n\n| A | B |\n| 1 | 2 |\n')).toHaveLength(0);
+  });
+
   it('ignores tables inside fenced code blocks', () => {
-    const src = '## Slide\n\n```\n| A | B |\n|---|---|\n```\n';
-    expect(extractPipeTables(src)).toHaveLength(0);
+    expect(extractTables('## Slide\n\n```\n| A | B |\n|---|---|\n```\n')).toHaveLength(0);
   });
 
   it('ignores tables already inside a fenced div', () => {
     const src = '## Slide\n\n::: {.absolute left=0px top=0px}\n| A | B |\n|---|---|\n| 1 | 2 |\n:::\n';
-    expect(extractPipeTables(src)).toHaveLength(0);
+    expect(extractTables(src)).toHaveLength(0);
   });
 
-  it('requires a separator row to qualify as a table', () => {
-    const src = '## Slide\n\n| A | B |\n| 1 | 2 |\n';
-    expect(extractPipeTables(src)).toHaveLength(0);
-  });
+});
 
-  it('handles separator with alignment colons', () => {
-    const tables = extractPipeTables('## Slide\n\n| A | B |\n|:--|--:|\n| 1 | 2 |\n');
+describe('extractTables — list tables', () => {
+  it('extracts a list-table fenced div as a single block', () => {
+    const src = '## Slide\n\n::: {.list-table}\n- - A\n  - B\n- - 1\n  - 2\n:::\n';
+    const tables = extractTables(src);
     expect(tables).toHaveLength(1);
+    expect(tables[0].kind).toBe('list');
+    expect(tables[0].startLine).toBe(2);
+    expect(tables[0].endLine).toBe(7);
+    expect(tables[0].headerLine).toBe('- - A');
+  });
+
+  it('keeps the list-table block out of the pipe-table depth filter', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '::: {.list-table}\n' +
+      '- - A\n  - B\n- - 1\n  - 2\n' +
+      ':::\n' +
+      '\n' +
+      '| C | D |\n|---|---|\n| 3 | 4 |\n';
+    const tables = extractTables(src);
+    expect(tables).toHaveLength(2);
+    expect(tables[0].kind).toBe('list');
+    expect(tables[1].kind).toBe('pipe');
+  });
+});
+
+describe('extractTables — grid tables', () => {
+  it('extracts a grid table', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '+-----+-----+\n' +
+      '| A   | B   |\n' +
+      '+=====+=====+\n' +
+      '| 1   | 2   |\n' +
+      '+-----+-----+\n';
+    const tables = extractTables(src);
+    expect(tables).toHaveLength(1);
+    expect(tables[0].kind).toBe('grid');
+    expect(tables[0].headerLine).toBe('| A   | B   |');
+    expect(tables[0].startLine).toBe(2);
+    expect(tables[0].endLine).toBe(6);
+  });
+});
+
+describe('extractTables — HTML tables', () => {
+  it('extracts a multi-line raw HTML table', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '<table>\n' +
+      '  <tr><th>A</th><th>B</th></tr>\n' +
+      '  <tr><td>1</td><td>2</td></tr>\n' +
+      '</table>\n';
+    const tables = extractTables(src);
+    expect(tables).toHaveLength(1);
+    expect(tables[0].kind).toBe('html');
+    expect(tables[0].startLine).toBe(2);
+    expect(tables[0].endLine).toBe(5);
+  });
+
+  it('skips an unclosed HTML table', () => {
+    expect(extractTables('## Slide\n\n<table>\n<tr><td>x</td></tr>\n')).toHaveLength(0);
+  });
+});
+
+describe('extractTables — captions', () => {
+  it('includes a `: caption` line in the table block', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '| A | B |\n' +
+      '|---|---|\n' +
+      '| 1 | 2 |\n' +
+      '\n' +
+      ': My caption {#tbl-id}\n';
+    const tables = extractTables(src);
+    expect(tables).toHaveLength(1);
+    expect(tables[0].endLine).toBe(6);
+  });
+
+  it('includes a `Table:` caption line', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '| A | B |\n' +
+      '|---|---|\n' +
+      '| 1 | 2 |\n' +
+      '\n' +
+      'Table: Demographics\n';
+    const tables = extractTables(src);
+    expect(tables[0].endLine).toBe(6);
+  });
+
+  it('does not consume an adjacent paragraph that is not a caption', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '| A | B |\n' +
+      '|---|---|\n' +
+      '| 1 | 2 |\n' +
+      '\n' +
+      'Just a paragraph\n';
+    const tables = extractTables(src);
+    expect(tables[0].endLine).toBe(4);
+  });
+});
+
+describe('extractPipeTables back-compat', () => {
+  it('returns only pipe tables', () => {
+    const src =
+      '## Slide\n' +
+      '\n' +
+      '| A | B |\n' +
+      '|---|---|\n' +
+      '| 1 | 2 |\n' +
+      '\n' +
+      '+---+---+\n' +
+      '| X | Y |\n' +
+      '+===+===+\n' +
+      '| 1 | 2 |\n' +
+      '+---+---+\n';
+    const onlyPipes = extractPipeTables(src);
+    expect(onlyPipes).toHaveLength(1);
+    expect(onlyPipes[0].kind).toBe('pipe');
   });
 });
