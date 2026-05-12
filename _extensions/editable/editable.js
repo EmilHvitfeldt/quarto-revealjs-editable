@@ -17672,14 +17672,31 @@ ${fence}`;
       const execChunks = extractExecutableChunks(chunk);
       if (execChunks.length === 0)
         return { valid: [], warn: [] };
-      const cells = Array.from(slideEl.children).filter(
-        (el) => el.tagName === "DIV" && el.classList.contains("cell") && !editableRegistry.has(el) && !el.classList.contains("editable-container") && !el.classList.contains("absolute") && !el.closest("div.absolute")
-      );
-      if (cells.length !== execChunks.length)
+      const allCells = [];
+      for (const child of slideEl.children) {
+        if (child.tagName !== "DIV")
+          continue;
+        if (child.classList.contains("cell")) {
+          if (child.classList.contains("absolute"))
+            continue;
+          if (child.closest("div.absolute"))
+            continue;
+          allCells.push(child);
+        } else if (child.classList.contains("editable-container")) {
+          const inner = child.querySelector(":scope > div.cell");
+          if (inner)
+            allCells.push(inner);
+        }
+      }
+      if (allCells.length !== execChunks.length)
         return { valid: [], warn: [] };
       const valid = [];
-      for (let i = 0; i < cells.length; i++) {
-        const cell = cells[i];
+      for (let i = 0; i < allCells.length; i++) {
+        const cell = allCells[i];
+        if (editableRegistry.has(cell))
+          continue;
+        if (cell.closest(".editable-container"))
+          continue;
         if (!cellQualifiesForOutput(cell))
           continue;
         const exec = execChunks[i];

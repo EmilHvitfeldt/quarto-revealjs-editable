@@ -2289,23 +2289,36 @@ ModifyModeClassifier.register({
     const execChunks = extractExecutableChunks(chunk);
     if (execChunks.length === 0) return { valid: [], warn: [] };
 
-    const cells = Array.from(slideEl.children).filter(el =>
-      el.tagName === 'DIV' &&
-      el.classList.contains('cell') &&
-      !editableRegistry.has(el) &&
-      !el.classList.contains('editable-container') &&
-      !el.classList.contains('absolute') &&
-      !el.closest('div.absolute')
-    );
+    // Walk top-level slots in DOM order. A slot is either a `div.cell` direct
+    // child, or an `editable-container` direct child whose first descendant
+    // `div.cell` is an already-activated chunk. This keeps positional indices
+    // stable when the user activates one cell and re-enters modify mode for
+    // its sibling.
+    const allCells = [];
+    for (const child of slideEl.children) {
+      if (child.tagName !== 'DIV') continue;
+      if (child.classList.contains('cell')) {
+        if (child.classList.contains('absolute')) continue;
+        if (child.closest('div.absolute')) continue;
+        allCells.push(child);
+      } else if (child.classList.contains('editable-container')) {
+        const inner = child.querySelector(':scope > div.cell');
+        if (inner) allCells.push(inner);
+      }
+    }
 
     // Counts must agree positionally. If the user has manually written
     // `::: {.cell}` fenced divs alongside real chunks, we can't reliably
     // map DOM cells to source — defer to the Fenced divs classifier.
-    if (cells.length !== execChunks.length) return { valid: [], warn: [] };
+    if (allCells.length !== execChunks.length) return { valid: [], warn: [] };
 
     const valid = [];
-    for (let i = 0; i < cells.length; i++) {
-      const cell = cells[i];
+    for (let i = 0; i < allCells.length; i++) {
+      const cell = allCells[i];
+      // Skip cells that are already activated (wrapped in editable-container)
+      // — they are still positionally counted above to keep indices aligned.
+      if (editableRegistry.has(cell)) continue;
+      if (cell.closest('.editable-container')) continue;
       if (!cellQualifiesForOutput(cell)) continue;
       const exec = execChunks[i];
       cell.dataset.editableModifiedCellIdx = String(i);

@@ -55,6 +55,7 @@ npm run test:e2e
 | `modify-mode-code.qmd`   | Non-executed display code blocks detectable in modify mode | #111 |
 | `modify-mode-code-output.qmd` | Code chunk outputs (`{ojs}`, `{r}`, `{python}`) detectable in modify mode | #113 |
 | `modify-mode-table.qmd` | Pipe tables detectable in modify mode (move only) | #117 |
+| `modify-mode-diagrams.qmd` | Mermaid and Graphviz diagram chunks detectable in modify mode | #114 |
 
 > **Important for contributors:** Every `.spec.js` file that uses a dedicated `.qmd` fixture must have a corresponding `quarto render` step in `run-tests.sh`. CI runs `run-tests.sh` before Playwright — if the render step is missing, all tests in that spec will fail with "Run quarto render ... first".
 
@@ -323,6 +324,17 @@ npm run test:e2e
 | Plain code block alongside OJS cell — both classifiers apply without conflict | Code blocks classifier handles the plain ` ``` `, Code chunk outputs handles the `{ojs}` cell |
 | `echo=true` cell (visible source + output) is classified and wraps whole chunk on save | `sourceCode cell-code` is not `hidden`; serialize wraps the chunk including the `#\| echo: true` option line |
 | Serialize wraps activated cell in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{ojs} ` chunk |
+
+**`e2e/modify-mode-diagrams.spec.js`** - Modify Mode — Diagram chunks (mermaid, dot) (6 tests):
+
+| Test | What it verifies |
+|---|---|
+| Mermaid cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 on a `{mermaid}` slide |
+| Dot cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 on a `{dot}` slide |
+| Multiple diagram chunks on a slide are all classified valid | Both cells get the green ring |
+| Clicking a mermaid cell wraps it in `editable-container` with move+resize only | No Quill editor or font-size controls present |
+| Serialize wraps activated mermaid chunk in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{mermaid} ` chunk |
+| Named mermaid chunk write-back matches by label | `%%\| label: mychart` chunk wrapped on save |
 
 **`e2e/modify-mode-arrows.spec.js`** - Modify Mode — Positioned arrows (7 tests):
 
