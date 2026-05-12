@@ -1,0 +1,34 @@
+---
+---
+
+## Slide 1 - OJS cell output
+
+::: {.absolute left=40px top=493px width=1050px height=77px}
+```{ojs}
+md`**hello** from observable`
+```
+:::
+
+## Slide 2 - Multiple OJS cells
+
+::: {.absolute left=129px top=355px width=1050px height=52px}
+```{ojs}
+1 + 1
+```
+:::
+
+```{ojs}
+2 + 2
+```
+
+## Slide 3 - OJS alongside plain code block
+
+```python
+not_executed = True
+```
+
+::: {.absolute left=14px top=455px width=1050px height=52px}
+```{ojs}
+"observable runs"
+```
+:::
