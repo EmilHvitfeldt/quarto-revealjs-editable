@@ -50,6 +50,7 @@ _extensions/editable/
     ├── arrows.js       # Arrow system and arrow context panel
     ├── images.js       # Image context panel (opacity, radius, fit, flip, replace, reset)
     ├── modify-mode.js  # Modify mode: click-to-make-editable for plain images
+    ├── modify-mode-positioned.js # Shared scaffolding for re-activating saved .absolute-positioned elements
     ├── toolbar.js      # Top bar toolbar
     └── main.js         # Plugin entry point
 ```
@@ -320,6 +321,39 @@ The built-in image classifier's `serialize()` uses `splitIntoSlideChunks()` to s
 **Activation is a one-way transform from inline to absolutely-positioned.** Once saved, the source becomes `text ![](src){.absolute left=Xpx top=Ypx width=Wpx height=Hpx} text`. On the next render the image is no longer inline — Quarto sees `.absolute` and renders it out of flow regardless of its position in the paragraph. The surrounding text remains in the paragraph as a single sentence with no image gap. Modify mode then classifies it under "Positioned images" (the `img.absolute` classifier), not as an inline image. There is no path back to the inline form short of editing the QMD source by hand.
 
 The `{.absolute}` div classifier works similarly but matches the source block by its original position values. At `activate()` time it captures the element's inline `left`/`top`/`width`/`height` into `data-editable-modified-abs-*` attributes before `setupDivWhenReady` overwrites the element's `position` style. `waitForRegistryThenFixPosition()` polls until the element appears in `editableRegistry`, then calls `setState({x, y})` to move the container to the correct position. During `serialize()`, `makeAbsoluteBlockRegex()` builds a regex with four lookaheads (one per original dimension value) to locate the matching `{.absolute ...}` block in the slide chunk regardless of attribute order. Occurrence counters handle the edge case of two divs with identical original positions on the same slide.
+
+### Re-activating Already-Positioned Elements
+
+Once an element has been positioned + saved, modify mode must be able to re-activate it on a future page load. The shared scaffolding for this lives in `src/modify-mode-positioned.js`:
+
+- `getAbsolutePosition(el)` reads `left`/`top`/`width`/`height` from inline styles.
+- `parseAbsoluteFences(chunk)` finds the top-level `::: {.absolute …}` fences in a slide chunk.
+- `findFenceForPositionedElement(chunk, { anchors })` resolves which fence wraps a given inner element. Anchor strategies (`Anchors.byClass`, `byId`, `byPosition`, `byIndex`) are tried in order; the first that yields exactly one match wins, and the returned `anchorKind` records which one fired.
+- `makePositionedClassifier(opts)` is a factory used by `Positioned divs` and `Positioned images` (and, going forward, by per-type re-activation classifiers). It wraps the dataset bookkeeping (`data-editable-modified-abs-*`, `data-editable-modified-slide`), the activate-time `style.left`/`top` clearing and `waitForRegistryThenFixPosition` poll, and the serialize-time DOM-order sort + occurrence-counter dedup + chunk regex replace. The factory returns a classifier definition; `modify-mode.js` calls `ModifyModeClassifier.register(...)` on the returned object to avoid a circular import.
+
+**Wrapper-vs-inner decision.** When a typed element is wrapped in `::: {.absolute …}` (e.g. a paragraph, table, or display equation), the DOM looks like:
+
+```html
+<div class="absolute" style="left:Xpx; top:Ypx; …">
+  <p>…</p>   <!-- the inner semantic element -->
+</div>
+```
+
+There are two plausible activation targets — the outer wrapper or the inner element. The project rule: **activate the inner element; treat the outer `.absolute` wrapper as source-anchor metadata only.** Rationale:
+
+- Keeps `ELEMENT_CAPABILITIES` tag-keyed (`p` → paragraph capabilities, `table` → table capabilities) — no `wrappedKind` dimension on the wrapper.
+- Aligns with how `Positioned images` already works (the `img.absolute` element itself, not a containing div, is what gets activated).
+- The inner element is what the user clicks; surprising if the green ring is on the wrapper bounds.
+
+The wrapper's role is reduced to: locate the source fence to rewrite on save, and supply the original position values to stamp into the inner element's `data-editable-modified-abs-*` dataset.
+
+**Classifier ordering.** Modify-mode classifiers are tried in registration order. To support re-activation, the following ordering is load-bearing:
+
+1. The typed positioned classifiers (`Positioned images`, paragraphs-in-`.absolute`, lists-in-`.absolute`, …) register *first*. They claim their inner element and stamp dataset markers on it.
+2. `Positioned divs` registers next, claiming any remaining `div.absolute` wrapper whose inner element wasn't claimed above.
+3. `Fenced divs` registers last among `.absolute`-aware classifiers, and is tightened to skip any `div.absolute` whose inner is claimed by a typed positioned classifier.
+
+This ordering avoids the overlapping-green-ring problem described in `memory/feedback_modify_mode_overlap.md`: when multiple classifiers could match the same DOM subtree, the more specific (typed) classifier wins by registering earlier, and outer classifiers filter the inner element out as part of their own claim logic. When adding a new typed positioned classifier, **register it before `Positioned divs` and `Fenced divs`**, and add a unit test asserting that registration order.
 
 ### Fenced Div Classifier
 
