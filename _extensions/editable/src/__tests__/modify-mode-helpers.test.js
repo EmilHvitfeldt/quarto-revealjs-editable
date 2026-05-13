@@ -35,6 +35,10 @@ import {
   captureSlideRelativePosition,
   lockNaturalDimensions,
   groupModifiedElementsByChunk,
+  resolveByHeader,
+  resolveByLabel,
+  findTopLevelWrappers,
+  topLevelAncestorIn,
 } from '../modify-mode.js';
 import { splitIntoSlideChunks } from '../serialization.js';
 import { getQmdHeadingIndex, getSlideScale } from '../utils.js';
@@ -355,5 +359,171 @@ describe('groupModifiedElementsByChunk', () => {
     const a = { dataset: {} };
     const { byChunk } = groupModifiedElementsByChunk([a], 'ignored');
     expect(byChunk.get(1)).toEqual([a]);
+  });
+});
+
+describe('resolveByHeader', () => {
+  const sources = [
+    { headerLine: '| A | B |', startLine: 0 },
+    { headerLine: '| C | D |', startLine: 5 },
+    { headerLine: '| E | F |', startLine: 10 },
+  ];
+
+  function el(header, idx) {
+    return { dataset: { hdr: header, idx: String(idx) } };
+  }
+
+  it('prefers the header anchor when it is unique', () => {
+    const resolved = resolveByHeader({
+      chunkEls: [el('| C | D |', 99)],
+      sources,
+      getHeader: (s) => s.headerLine,
+      headerAttr: 'hdr',
+      idxAttr: 'idx',
+    });
+    expect(resolved[0]).toBe(sources[1]);
+  });
+
+  it('falls back to positional index when the header is duplicated', () => {
+    const dupSources = [
+      { headerLine: '| A | B |', startLine: 0 },
+      { headerLine: '| A | B |', startLine: 5 },
+    ];
+    const resolved = resolveByHeader({
+      chunkEls: [el('| A | B |', 1)],
+      sources: dupSources,
+      getHeader: (s) => s.headerLine,
+      headerAttr: 'hdr',
+      idxAttr: 'idx',
+    });
+    expect(resolved[0]).toBe(dupSources[1]);
+  });
+
+  it('falls back to positional index when the header attr is missing', () => {
+    const resolved = resolveByHeader({
+      chunkEls: [{ dataset: { idx: '2' } }],
+      sources,
+      getHeader: (s) => s.headerLine,
+      headerAttr: 'hdr',
+      idxAttr: 'idx',
+    });
+    expect(resolved[0]).toBe(sources[2]);
+  });
+
+  it('returns null when neither anchor resolves', () => {
+    const resolved = resolveByHeader({
+      chunkEls: [{ dataset: { hdr: 'not-in-sources', idx: '99' } }],
+      sources,
+      getHeader: (s) => s.headerLine,
+      headerAttr: 'hdr',
+      idxAttr: 'idx',
+    });
+    expect(resolved[0]).toBeNull();
+  });
+});
+
+describe('resolveByLabel', () => {
+  const sources = [
+    { label: '',         firstCodeLine: 'plot1' },
+    { label: 'named',    firstCodeLine: 'plot2' },
+    { label: 'other',    firstCodeLine: 'plot3' },
+  ];
+  const opts = {
+    getLabel: (s) => s.label,
+    getFirstLine: (s) => s.firstCodeLine,
+    labelAttr: 'lbl',
+    firstLineAttr: 'first',
+    idxAttr: 'idx',
+  };
+
+  it('matches by label when present', () => {
+    const el = { dataset: { lbl: 'named', idx: '0' } };
+    expect(resolveByLabel(el, sources, opts)).toBe(sources[1]);
+  });
+
+  it('falls back to positional when label is empty', () => {
+    const el = { dataset: { lbl: '', idx: '2', first: 'plot3' } };
+    expect(resolveByLabel(el, sources, opts)).toBe(sources[2]);
+  });
+
+  it('rejects positional match if the first-line guard mismatches', () => {
+    const el = { dataset: { lbl: '', idx: '2', first: 'different' } };
+    expect(resolveByLabel(el, sources, opts)).toBeNull();
+  });
+
+  it('accepts positional match when either side has no first-line text', () => {
+    const el = { dataset: { lbl: '', idx: '2', first: '' } };
+    expect(resolveByLabel(el, sources, opts)).toBe(sources[2]);
+  });
+
+  it('returns null when label is unknown and idx is out of range', () => {
+    const el = { dataset: { lbl: 'nope', idx: '99' } };
+    expect(resolveByLabel(el, sources, opts)).toBeNull();
+  });
+});
+
+describe('topLevelAncestorIn / findTopLevelWrappers', () => {
+  beforeEach(() => {
+    // The groupModifiedElementsByChunk suite mutates editableRegistry.has; reset.
+    editableRegistry.has = () => false;
+  });
+
+  function mkNode(tag, classes = []) {
+    return {
+      tagName: tag.toUpperCase(),
+      classList: { contains: (c) => classes.includes(c) },
+      parentElement: null,
+    };
+  }
+
+  function tree() {
+    // section > div(wrapper) > pre
+    // section > pre2 (top-level direct)
+    const slide = mkNode('section');
+    const wrapper = mkNode('div');
+    wrapper.parentElement = slide;
+    const pre = mkNode('pre');
+    pre.parentElement = wrapper;
+    const pre2 = mkNode('pre');
+    pre2.parentElement = slide;
+    slide._children = [wrapper, pre2];
+    wrapper._children = [pre];
+    return { slide, wrapper, pre, pre2 };
+  }
+
+  it('topLevelAncestorIn walks up to the slide-direct child', () => {
+    const { slide, wrapper, pre } = tree();
+    expect(topLevelAncestorIn(slide, pre)).toBe(wrapper);
+  });
+
+  it('topLevelAncestorIn returns el itself when already a direct child', () => {
+    const { slide, pre2 } = tree();
+    expect(topLevelAncestorIn(slide, pre2)).toBe(pre2);
+  });
+
+  it('findTopLevelWrappers dedupes and applies post-filter', () => {
+    const { slide, wrapper, pre, pre2 } = tree();
+    // Stub slideEl.querySelectorAll to return the inner elements we want walked.
+    slide.querySelectorAll = (sel) => sel === 'pre' ? [pre, pre2] : [];
+    const wrappers = findTopLevelWrappers(slide, 'pre');
+    expect(wrappers).toEqual([wrapper, pre2]);
+  });
+
+  it('findTopLevelWrappers honours preFilter (e.g. tables-in-cell skip)', () => {
+    const { slide, wrapper, pre, pre2 } = tree();
+    slide.querySelectorAll = () => [pre, pre2];
+    const wrappers = findTopLevelWrappers(slide, 'pre', {
+      preFilter: (inner) => inner !== pre, // drop the wrapped pre
+    });
+    expect(wrappers).toEqual([pre2]);
+  });
+
+  it('findTopLevelWrappers honours postFilter (e.g. equations require display container)', () => {
+    const { slide, wrapper, pre, pre2 } = tree();
+    slide.querySelectorAll = () => [pre, pre2];
+    const wrappers = findTopLevelWrappers(slide, 'pre', {
+      postFilter: (w) => w === wrapper, // drop pre2 wrapper
+    });
+    expect(wrappers).toEqual([wrapper]);
   });
 });
