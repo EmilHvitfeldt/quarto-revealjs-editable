@@ -359,16 +359,19 @@ npm run test:e2e
 | Serialize replaces inline image src with `.absolute` attributes | Paragraph text preserved, image gains `{.absolute ...}`, paragraph not wrapped in fenced div |
 | Multiple inline images in same paragraph: only the clicked one is modified | One occurrence has `.absolute`, the other keeps original `{width=40px}` |
 
-**`e2e/modify-mode-absolute.spec.js`** - Modify Mode — `{.absolute}` divs (6 tests):
+**`e2e/modify-mode-absolute.spec.js`** - Modify Mode — `{.absolute}` divs (7 tests):
+
+Since issue #140 landed, the fixture's `::: {.absolute …}` wrappers (which render as `<div.absolute><p>…</p></div>`) re-activate via the typed-inner classifier — the inner `<p>` gets the green ring and activation, not the wrapper. The wrapper is hidden after the inner is hoisted out for positioning; the wrapper's `{.absolute …}` block in source is still what gets rewritten on save.
 
 | Test | What it verifies |
 |---|---|
-| `div.absolute` elements get `modify-mode-valid` class | Count > 0 when modify mode entered |
-| Clicking valid `div.absolute` wraps it in editable-container | `.editable-container div.absolute` appears |
-| Container left/top matches original inline style | `container.style.left/top` ≈ original values after position fix |
+| Inner `<p>` elements get `modify-mode-valid` class | `div.absolute > p.modify-mode-valid` count > 0 when modify mode entered |
+| Clicking valid inner `<p>` wraps it in editable-container | `.editable-container` appears after click |
+| Container left/top matches wrapper original inline style | `container.style.left/top` ≈ wrapper's original values after position fix |
 | Serialize updates the correct `{.absolute}` block | Slide 1 updated; slide 2 original values intact |
-| Two `div.absolute` on same slide both get `modify-mode-valid` | Count = 2 on slide 2 |
-| Both divs on slide 2 serialize independently | Two `{.absolute` blocks in slide 2 chunk after activating both |
+| Two `div.absolute` paragraphs on same slide both get `modify-mode-valid` | Count = 2 on slide 2 |
+| Both paragraphs on slide 2 serialize independently | Two `{.absolute` blocks in slide 2 chunk after activating both |
+| Classify ignores `.slide-background.present` (quarto preview regression) | Inner-`<p>` count > 0 even with injected stray `.present` element |
 
 **`e2e/arrows.spec.js`** - Arrow Feature (92 tests):
 

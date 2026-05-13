@@ -71,6 +71,8 @@ Display equations (`$$...$$`, both single- and multi-line) are matched to source
 
 Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
 
+**Re-activating saved positions.** Once an element has been positioned and saved (wrapped in `::: {.absolute …}`), it is re-activatable on the next render — modify mode targets the *inner* semantic element (the `<p>`, `<table>`, `<ul>`, …) and keeps its type-specific capabilities. Paragraphs continue to offer Quill text editing; tables and equations stay move-only; lists, blockquotes, display code, code chunks, and figures keep their first-activation capabilities. On save, the existing `{.absolute …}` block is rewritten in place — no nested wrappers. Wrappers with content that doesn't match a typed inner (e.g. multi-child or raw HTML) continue to re-activate as generic `Positioned divs`.
+
 Positioned arrows from previous saves (`{{< arrow ... position="absolute" >}}` shortcodes rendered via [`quarto-arrows`](https://github.com/EmilHvitfeldt/quarto-arrows)) are activatable too. Click a highlighted arrow to drag and resize it via the standard arrow handles; the source's color, width, head, dash, line, opacity, label, curve, and waypoints are preserved. On save, the matching shortcode is rewritten in-place with the new coordinates. Arrows whose shortcodes use kwargs the editable system doesn't yet round-trip (`bend`, `fragment`, `aria-label`, `class`, `head-fill`, …) get an amber warning ring instead, so their source attributes aren't silently dropped.
 
 ::: {.callout-note}
