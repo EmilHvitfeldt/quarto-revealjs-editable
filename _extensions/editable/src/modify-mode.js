@@ -40,7 +40,7 @@ import {
   elementToText,
   serializeArrowToShortcode,
 } from './serialization.js';
-import { getQmdHeadingIndex, getSlideScale } from './utils.js';
+import { getQmdHeadingIndex, getSlideScale, escapeRegex } from './utils.js';
 import { getColorPalette, getBrandColorOutput } from './colors.js';
 import { setCapabilityOverride } from './capabilities.js';
 import { createArrowElement, setActiveArrow } from './arrows.js';
@@ -408,10 +408,6 @@ ModifyModeClassifier.register({
 // two element types onto that factory.
 // ---------------------------------------------------------------------------
 
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /**
  * Build a regex that matches a {.absolute ...} attribute block containing
  * all four original position values in any order.
@@ -530,28 +526,53 @@ const TYPED_INNER_CONFIGS = [
 ];
 
 /**
- * Lock the element's natural width/height + padding so it doesn't collapse
- * when reparented into the inline-block `editable-container`. Mirrors the
- * pattern used by the list/blockquote first-activation classifiers.
+ * Read an element's position relative to its slide, scaled out of CSS-pixel
+ * space so the numbers match the element-space coordinates that QMD source
+ * uses. Pass `rectSource` to measure from a nested node (e.g. the rendered
+ * math container inside an equation `<p>`) while still anchoring against the
+ * outer element's slide.
+ *
+ * Returns `{ left, top, width, height, scale, slideEl }`.
  */
-function lockNaturalDimensions(el, displayOverride) {
+export function captureSlideRelativePosition(el, { rectSource } = {}) {
   const slideEl = el.closest('section');
   const scale = getSlideScale();
-  const elRect = el.getBoundingClientRect();
+  const rect = (rectSource ?? el).getBoundingClientRect();
   const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-  const naturalW = elRect.width  / scale;
-  const naturalH = elRect.height / scale;
+  return {
+    left:   (rect.left - slideRect.left) / scale,
+    top:    (rect.top  - slideRect.top)  / scale,
+    width:  rect.width  / scale,
+    height: rect.height / scale,
+    scale,
+    slideEl,
+  };
+}
+
+/**
+ * Lock the element's natural width/height + padding so it doesn't collapse
+ * or stretch when reparented into the inline-block `editable-container`.
+ *
+ * Uses `getBoundingClientRect().width / scale` rather than `offsetWidth` to
+ * preserve sub-pixel accuracy — `offsetWidth` truncates to an integer, which
+ * causes inline-block text to wrap when the true content width is fractional
+ * (e.g. 208.28px collapsing to 208px).
+ *
+ * Pass `displayOverride` to set `el.style.display` after locking (tables
+ * pass nothing and set `display:table` after dataset stamping instead).
+ */
+export function lockNaturalDimensions(el, displayOverride) {
+  const scale = getSlideScale();
+  const elRect = el.getBoundingClientRect();
   const cs = window.getComputedStyle(el);
   el.style.paddingLeft   = cs.paddingLeft;
   el.style.paddingRight  = cs.paddingRight;
   el.style.paddingTop    = cs.paddingTop;
   el.style.paddingBottom = cs.paddingBottom;
   el.style.margin        = '0';
-  el.style.width         = naturalW + 'px';
-  el.style.height        = naturalH + 'px';
+  el.style.width         = (elRect.width  / scale) + 'px';
+  el.style.height        = (elRect.height / scale) + 'px';
   if (displayOverride) el.style.display = displayOverride;
-  // Suppress unused warnings — slideRect kept for parity with first-activation path
-  void slideRect;
 }
 
 /**
@@ -1116,6 +1137,50 @@ export function wrapLinesWithAbsoluteFence(lines, block, attrs) {
 }
 
 /**
+ * Sort `els` in place by their `dataset[attrName]` parsed as an integer.
+ * Missing attrs sort as 0. Used by serialize() paths that recover the
+ * classify-time positional index recorded on each element.
+ */
+export function sortByIndexAttr(els, attrName) {
+  els.sort((a, b) =>
+    parseInt(a.dataset[attrName] ?? '0', 10) -
+    parseInt(b.dataset[attrName] ?? '0', 10)
+  );
+}
+
+/**
+ * Iterate `items` from last to first, invoking `fn(item, i)`. Used by
+ * serialize() paths that splice into a `lines` array — iterating in reverse
+ * keeps the indices of earlier items stable across insertions.
+ */
+export function forEachInReverse(items, fn) {
+  for (let i = items.length - 1; i >= 0; i--) fn(items[i], i);
+}
+
+/**
+ * Group registered, modify-mode elements by the QMD chunk that holds their
+ * source. Reads `dataset.editableModifiedSlide` to map each element to a
+ * chunk index. Skips elements not in `editableRegistry` and elements whose
+ * slide maps past the end of the chunk array.
+ *
+ * Returns `{ chunks, byChunk }` — callers mutate `chunks[chunkIndex]` in
+ * place and `return chunks.join('')` at the end.
+ */
+export function groupModifiedElementsByChunk(els, text) {
+  const chunks = splitIntoSlideChunks(text);
+  const byChunk = new Map();
+  for (const el of els) {
+    if (!editableRegistry.has(el)) continue;
+    const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+    const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+    if (chunkIndex >= chunks.length) continue;
+    if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
+    byChunk.get(chunkIndex).push(el);
+  }
+  return { chunks, byChunk };
+}
+
+/**
  * Build the updated fence opening line with absolute position attrs merged in.
  * Preserves existing classes/attrs on the fence and appends the position data.
  */
@@ -1203,12 +1268,7 @@ ModifyModeClassifier.register({
 
     // Capture natural position in slide-space coordinates before setup reparents
     // the element into the absolute editable-container (which starts at 0,0).
-    const slideEl = div.closest('section');
-    const scale = getSlideScale();
-    const divRect   = div.getBoundingClientRect();
-    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-    const origLeft = (divRect.left - slideRect.left) / scale;
-    const origTop  = (divRect.top  - slideRect.top)  / scale;
+    const { left: origLeft, top: origTop } = captureSlideRelativePosition(div);
 
     if (div.dataset.editableModifiedFenceType === 'columns') {
       setCapabilityOverride(div, ['move', 'resize', 'rotate']);
@@ -1231,18 +1291,8 @@ ModifyModeClassifier.register({
     );
     if (divs.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-
     // Group by chunk, then replace fence lines
-    const byChunk = new Map();
-    for (const div of divs) {
-      if (!editableRegistry.has(div)) continue;
-      const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(div);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(divs, text);
 
     for (const [chunkIndex, chunkDivs] of byChunk) {
       // Re-parse once per chunk (source may have been modified by other serializers)
@@ -1398,12 +1448,7 @@ ModifyModeClassifier.register({
 
   activate(p) {
     const slideIndex = Reveal.getState().indexh;
-    const slideEl = p.closest('section');
-    const scale = getSlideScale();
-    const pRect = p.getBoundingClientRect();
-    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-    const origLeft = (pRect.left - slideRect.left) / scale;
-    const origTop  = (pRect.top  - slideRect.top)  / scale;
+    const { left: origLeft, top: origTop } = captureSlideRelativePosition(p);
 
     p.dataset.editableModifiedParagraph = 'true';
     p.dataset.editableModifiedSlide = String(slideIndex);
@@ -1420,32 +1465,18 @@ ModifyModeClassifier.register({
     );
     if (paras.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-
-    const byChunk = new Map();
-    for (const p of paras) {
-      if (!editableRegistry.has(p)) continue;
-      const slideIndex = parseInt(p.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(p);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(paras, text);
 
     for (const [chunkIndex, chunkParas] of byChunk) {
-      chunkParas.sort((a, b) =>
-        parseInt(a.dataset.editableModifiedParagraphIdx ?? '0', 10) -
-        parseInt(b.dataset.editableModifiedParagraphIdx ?? '0', 10)
-      );
+      sortByIndexAttr(chunkParas, 'editableModifiedParagraphIdx');
 
       const paraBlocks = extractParagraphBlocks(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
 
       // Process bottom-to-top so line splices don't shift earlier indices
-      for (let i = chunkParas.length - 1; i >= 0; i--) {
-        const p = chunkParas[i];
+      forEachInReverse(chunkParas, (p) => {
         const paraIdx = parseInt(p.dataset.editableModifiedParagraphIdx ?? '0', 10);
-        if (paraIdx >= paraBlocks.length) continue;
+        if (paraIdx >= paraBlocks.length) return;
 
         const block = paraBlocks[paraIdx];
         const dims = editableRegistry.get(p).toDimensions();
@@ -1463,7 +1494,7 @@ ModifyModeClassifier.register({
           content,
           ':::',
         );
-      }
+      });
 
       chunks[chunkIndex] = lines.join('\n');
     }
@@ -1563,27 +1594,8 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
 
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const slideEl = el.closest('section');
-      const scale = getSlideScale();
-      const elRect = el.getBoundingClientRect();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-      const origLeft = (elRect.left - slideRect.left) / scale;
-      const origTop  = (elRect.top  - slideRect.top)  / scale;
-
-      const cs = window.getComputedStyle(el);
-      // Use getBoundingClientRect (already computed as elRect) for sub-pixel accuracy.
-      // offsetWidth truncates to integer and causes text to wrap when the true
-      // content width is fractional (e.g. 208.28px rounds to 208px).
-      const naturalW = elRect.width / scale;
-      const naturalH = elRect.height / scale;
-      el.style.paddingLeft   = cs.paddingLeft;
-      el.style.paddingRight  = cs.paddingRight;
-      el.style.paddingTop    = cs.paddingTop;
-      el.style.paddingBottom = cs.paddingBottom;
-      el.style.margin        = '0';
-      el.style.width         = naturalW + 'px';
-      el.style.height        = naturalH + 'px';
-      el.style.display       = 'block';
+      const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
+      lockNaturalDimensions(el, 'block');
 
       el.dataset[activeAttr] = 'true';
       el.dataset.editableModifiedSlide = String(slideIndex);
@@ -1600,31 +1612,17 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
       );
       if (els.length === 0) return text;
 
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = new Map();
-
-      for (const el of els) {
-        if (!editableRegistry.has(el)) continue;
-        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length) continue;
-        if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(el);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
 
       for (const [chunkIndex, chunkEls] of byChunk) {
-        chunkEls.sort((a, b) =>
-          parseInt(a.dataset[idxAttr] ?? '0', 10) -
-          parseInt(b.dataset[idxAttr] ?? '0', 10)
-        );
+        sortByIndexAttr(chunkEls, idxAttr);
 
         const blocks = extractBlocksStartingWith(chunks[chunkIndex], testLine);
         const lines = chunks[chunkIndex].split('\n');
 
-        for (let i = chunkEls.length - 1; i >= 0; i--) {
-          const el = chunkEls[i];
+        forEachInReverse(chunkEls, (el) => {
           const elIdx = parseInt(el.dataset[idxAttr] ?? '0', 10);
-          if (elIdx >= blocks.length) continue;
+          if (elIdx >= blocks.length) return;
 
           const block = blocks[elIdx];
           const dims = editableRegistry.get(el).toDimensions();
@@ -1637,7 +1635,7 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
             block.text,
             ':::',
           );
-        }
+        });
 
         chunks[chunkIndex] = lines.join('\n');
       }
@@ -2155,26 +2153,10 @@ ModifyModeClassifier.register({
 
   activate(el) {
     const slideIndex = Reveal.getState().indexh;
-    const slideEl = el.closest('section');
-    const scale = getSlideScale();
-    const elRect = el.getBoundingClientRect();
-    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-    const origLeft = (elRect.left - slideRect.left) / scale;
-    const origTop  = (elRect.top  - slideRect.top)  / scale;
-
+    const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
     // Lock natural dimensions before setup so reparenting into the inline-block
     // editable-container doesn't collapse or stretch the block.
-    const cs = window.getComputedStyle(el);
-    const naturalW = elRect.width / scale;
-    const naturalH = elRect.height / scale;
-    el.style.paddingLeft   = cs.paddingLeft;
-    el.style.paddingRight  = cs.paddingRight;
-    el.style.paddingTop    = cs.paddingTop;
-    el.style.paddingBottom = cs.paddingBottom;
-    el.style.margin        = '0';
-    el.style.width         = naturalW + 'px';
-    el.style.height        = naturalH + 'px';
-    el.style.display       = 'block';
+    lockNaturalDimensions(el, 'block');
 
     el.dataset.editableModifiedCode = 'true';
     el.dataset.editableModifiedSlide = String(slideIndex);
@@ -2193,36 +2175,23 @@ ModifyModeClassifier.register({
     );
     if (els.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-    const byChunk = new Map();
-    for (const el of els) {
-      if (!editableRegistry.has(el)) continue;
-      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(el);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
 
     for (const [chunkIndex, chunkEls] of byChunk) {
-      chunkEls.sort((a, b) =>
-        parseInt(a.dataset.editableModifiedCodeIdx ?? '0', 10) -
-        parseInt(b.dataset.editableModifiedCodeIdx ?? '0', 10)
-      );
+      sortByIndexAttr(chunkEls, 'editableModifiedCodeIdx');
 
       const blocks = extractCodeBlocks(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
 
       // Bottom-to-top so line splices don't shift earlier indices.
-      for (let i = chunkEls.length - 1; i >= 0; i--) {
-        const el = chunkEls[i];
+      forEachInReverse(chunkEls, (el) => {
         const codeIdx = parseInt(el.dataset.editableModifiedCodeIdx ?? '0', 10);
-        if (codeIdx >= blocks.length) continue;
+        if (codeIdx >= blocks.length) return;
 
         // Safety: verify the positional match still names the same code block.
         const expectedFirst = (el.dataset.editableModifiedCodeFirstLine ?? '').trim();
         const actualFirst   = (blocks[codeIdx].firstCodeLine ?? '').trim();
-        if (expectedFirst && actualFirst && expectedFirst !== actualFirst) continue;
+        if (expectedFirst && actualFirst && expectedFirst !== actualFirst) return;
 
         const block = blocks[codeIdx];
         const dims = editableRegistry.get(el).toDimensions();
@@ -2230,7 +2199,7 @@ ModifyModeClassifier.register({
         const attrs = buildAbsoluteAttrString(dims);
 
         wrapLinesWithAbsoluteFence(lines, block, attrs);
-      }
+      });
 
       chunks[chunkIndex] = lines.join('\n');
     }
@@ -2384,26 +2353,10 @@ ModifyModeClassifier.register({
 
   activate(el) {
     const slideIndex = Reveal.getState().indexh;
-    const slideEl = el.closest('section');
-    const scale = getSlideScale();
-    const elRect = el.getBoundingClientRect();
-    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-    const origLeft = (elRect.left - slideRect.left) / scale;
-    const origTop  = (elRect.top  - slideRect.top)  / scale;
-
+    const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
     // Lock natural dimensions before setup; without this, reparenting into the
     // inline-block editable-container collapses the cell width.
-    const cs = window.getComputedStyle(el);
-    const naturalW = elRect.width / scale;
-    const naturalH = elRect.height / scale;
-    el.style.paddingLeft   = cs.paddingLeft;
-    el.style.paddingRight  = cs.paddingRight;
-    el.style.paddingTop    = cs.paddingTop;
-    el.style.paddingBottom = cs.paddingBottom;
-    el.style.margin        = '0';
-    el.style.width         = naturalW + 'px';
-    el.style.height        = naturalH + 'px';
-    el.style.display       = 'block';
+    lockNaturalDimensions(el, 'block');
 
     el.dataset.editableModifiedCell = 'true';
     el.dataset.editableModifiedSlide = String(slideIndex);
@@ -2419,29 +2372,16 @@ ModifyModeClassifier.register({
     );
     if (els.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-    const byChunk = new Map();
-    for (const el of els) {
-      if (!editableRegistry.has(el)) continue;
-      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(el);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
 
     for (const [chunkIndex, chunkEls] of byChunk) {
-      chunkEls.sort((a, b) =>
-        parseInt(a.dataset.editableModifiedCellIdx ?? '0', 10) -
-        parseInt(b.dataset.editableModifiedCellIdx ?? '0', 10)
-      );
+      sortByIndexAttr(chunkEls, 'editableModifiedCellIdx');
 
       const execChunks = extractExecutableChunks(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
 
       // Bottom-to-top so line splices don't shift earlier indices.
-      for (let i = chunkEls.length - 1; i >= 0; i--) {
-        const el = chunkEls[i];
+      forEachInReverse(chunkEls, (el) => {
         const cellLabel = el.dataset.editableModifiedCellLabel || '';
         const cellFirstLine = (el.dataset.editableModifiedCellFirstLine ?? '').trim();
         const cellIdx = parseInt(el.dataset.editableModifiedCellIdx ?? '-1', 10);
@@ -2459,13 +2399,13 @@ ModifyModeClassifier.register({
             target = candidate;
           }
         }
-        if (!target) continue;
+        if (!target) return;
 
         const dims = editableRegistry.get(el).toDimensions();
         const attrs = buildAbsoluteAttrString(dims);
 
         wrapLinesWithAbsoluteFence(lines, target, attrs);
-      }
+      });
 
       chunks[chunkIndex] = lines.join('\n');
     }
@@ -2595,29 +2535,16 @@ ModifyModeClassifier.register({
     );
     if (imgs.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-    const byChunk = new Map();
-    for (const img of imgs) {
-      if (!editableRegistry.has(img)) continue;
-      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(img);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(imgs, text);
 
     for (const [chunkIndex, chunkImgs] of byChunk) {
-      chunkImgs.sort((a, b) =>
-        parseInt(a.dataset.editableModifiedChunkFigExecIdx ?? '0', 10) -
-        parseInt(b.dataset.editableModifiedChunkFigExecIdx ?? '0', 10)
-      );
+      sortByIndexAttr(chunkImgs, 'editableModifiedChunkFigExecIdx');
 
       const execChunks = extractExecutableChunks(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
 
       // Bottom-to-top so splices don't shift earlier line indices.
-      for (let i = chunkImgs.length - 1; i >= 0; i--) {
-        const img = chunkImgs[i];
+      forEachInReverse(chunkImgs, (img) => {
         const label = img.dataset.editableModifiedChunkFigLabel || '';
         const firstLine = (img.dataset.editableModifiedChunkFigFirstLine ?? '').trim();
         const execIdx = parseInt(img.dataset.editableModifiedChunkFigExecIdx ?? '-1', 10);
@@ -2633,13 +2560,13 @@ ModifyModeClassifier.register({
             target = candidate;
           }
         }
-        if (!target) continue;
+        if (!target) return;
 
         const dims = editableRegistry.get(img).toDimensions();
         const attrs = buildAbsoluteAttrString(dims);
 
         wrapLinesWithAbsoluteFence(lines, target, attrs);
-      }
+      });
 
       chunks[chunkIndex] = lines.join('\n');
     }
@@ -2848,24 +2775,9 @@ ModifyModeClassifier.register({
 
   activate(el) {
     const slideIndex = Reveal.getState().indexh;
-    const slideEl = el.closest('section');
-    const scale = getSlideScale();
-    const elRect = el.getBoundingClientRect();
-    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-    const origLeft = (elRect.left - slideRect.left) / scale;
-    const origTop  = (elRect.top  - slideRect.top)  / scale;
-
-    const cs = window.getComputedStyle(el);
-    const naturalW = elRect.width / scale;
-    const naturalH = elRect.height / scale;
+    const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
     const isTable = el.tagName === 'TABLE';
-    el.style.paddingLeft   = cs.paddingLeft;
-    el.style.paddingRight  = cs.paddingRight;
-    el.style.paddingTop    = cs.paddingTop;
-    el.style.paddingBottom = cs.paddingBottom;
-    el.style.margin        = '0';
-    el.style.width         = naturalW + 'px';
-    el.style.height        = naturalH + 'px';
+    lockNaturalDimensions(el);
 
     el.dataset.editableModifiedTable = 'true';
     el.dataset.editableModifiedSlide = String(slideIndex);
@@ -2885,22 +2797,10 @@ ModifyModeClassifier.register({
     );
     if (els.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-    const byChunk = new Map();
-    for (const el of els) {
-      if (!editableRegistry.has(el)) continue;
-      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(el);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
 
     for (const [chunkIndex, chunkEls] of byChunk) {
-      chunkEls.sort((a, b) =>
-        parseInt(a.dataset.editableModifiedTableIdx ?? '0', 10) -
-        parseInt(b.dataset.editableModifiedTableIdx ?? '0', 10)
-      );
+      sortByIndexAttr(chunkEls, 'editableModifiedTableIdx');
 
       const sourceTables = extractTables(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
@@ -3079,19 +2979,12 @@ ModifyModeClassifier.register({
 
   activate(el) {
     const slideIndex = Reveal.getState().indexh;
-    const slideEl = el.closest('section');
-    const scale = getSlideScale();
-    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-
     // Anchor on the rendered math node when available so the container's
     // top edge sits at the visible top of the equation (not the top of the
     // wrapping `<p>`'s margin box, which would shift the equation down).
     const inner = el.querySelector('.MathJax_Display, mjx-container, .katex-display, span.math.display') ?? el;
-    const innerRect = inner.getBoundingClientRect();
-    const origLeft = (innerRect.left - slideRect.left) / scale;
-    const origTop  = (innerRect.top  - slideRect.top)  / scale;
-    const naturalW = innerRect.width  / scale;
-    const naturalH = innerRect.height / scale;
+    const { left: origLeft, top: origTop, width: naturalW, height: naturalH } =
+      captureSlideRelativePosition(el, { rectSource: inner });
 
     el.style.padding = '0';
     el.style.margin  = '0';
@@ -3115,22 +3008,10 @@ ModifyModeClassifier.register({
     );
     if (els.length === 0) return text;
 
-    const chunks = splitIntoSlideChunks(text);
-    const byChunk = new Map();
-    for (const el of els) {
-      if (!editableRegistry.has(el)) continue;
-      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
-      byChunk.get(chunkIndex).push(el);
-    }
+    const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
 
     for (const [chunkIndex, chunkEls] of byChunk) {
-      chunkEls.sort((a, b) =>
-        parseInt(a.dataset.editableModifiedEqIdx ?? '0', 10) -
-        parseInt(b.dataset.editableModifiedEqIdx ?? '0', 10)
-      );
+      sortByIndexAttr(chunkEls, 'editableModifiedEqIdx');
 
       const sourceEqs = extractDisplayEquations(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');

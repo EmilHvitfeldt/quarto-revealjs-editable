@@ -4,7 +4,10 @@ vi.mock('../editable-element.js', () => ({ editableRegistry: { has: () => false,
 vi.mock('../serialization.js', () => ({
   splitIntoSlideChunks: vi.fn(),
 }));
-vi.mock('../utils.js', () => ({ getQmdHeadingIndex: vi.fn() }));
+vi.mock('../utils.js', () => ({
+  getQmdHeadingIndex: vi.fn(),
+  escapeRegex: (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+}));
 
 import {
   parseAbsoluteFences,

@@ -21,7 +21,7 @@
 
 import { editableRegistry } from './editable-element.js';
 import { splitIntoSlideChunks } from './serialization.js';
-import { getQmdHeadingIndex } from './utils.js';
+import { getQmdHeadingIndex, escapeRegex } from './utils.js';
 
 /* eslint-env browser */
 /* global Reveal */
@@ -141,10 +141,6 @@ export const Anchors = {
     test: (_f, i) => i === index,
   }),
 };
-
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /**
  * Poll until `el` appears in `editableRegistry`, then place the wrapping
