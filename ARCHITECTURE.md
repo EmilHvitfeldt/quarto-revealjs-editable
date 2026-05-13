@@ -266,7 +266,7 @@ cd testing && npm run test:e2e
 
 ## Modify Mode
 
-Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images (including inline images embedded in paragraphs), `{.absolute}` images, plain videos, `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), display code blocks (non-executed fenced code), code chunk outputs (executable `{r}`/`{python}`/`{ojs}` chunks producing non-image output), slide titles (`## heading`), and positioned arrows from previous-save shortcodes (`{{< arrow ... position="absolute" >}}`). Additional types can be added via the classifier registry.
+Modify mode (`modify-mode.js`) lets users make plain elements editable at runtime, without requiring `{.editable}` in the source document. Supported element types: plain images (including inline images embedded in paragraphs), `{.absolute}` images, plain videos, plain paragraphs, bullet/ordered lists, blockquotes, tables (pipe, grid, raw HTML, list-table), display equations (`$$…$$`), display code blocks (non-executed fenced code), code chunk outputs (executable `{r}`/`{python}`/`{ojs}` chunks producing non-image output), single-figure code-chunk figures, diagram chunks (`{mermaid}`, `{dot}`), `{.absolute}` divs, fenced divs (classed, id-keyed, callouts, column layouts), slide titles (`## heading`), and positioned arrows from previous-save shortcodes (`{{< arrow ... position="absolute" >}}`). Additional types can be added via the classifier registry.
 
 ### Lifecycle
 

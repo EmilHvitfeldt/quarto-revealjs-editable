@@ -11,7 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-| Modify | Activate plain images, `{.absolute}` images, `{.absolute}` divs, fenced divs, callouts, columns, code blocks, tables, slide titles, or positioned arrows for editing |
+| Modify | Activate plain elements (images, videos, paragraphs, lists, tables, code blocks, equations, fenced divs, slide titles, arrows, …) for editing — see the supported types table below |
 
 ## Adding New Elements
 
@@ -27,7 +27,7 @@ New elements are marked with a dashed border to distinguish them from original c
 
 Not every element needs to be marked with `{.editable}` in advance. Click the **Modify** button in the menu bar to enter modify mode, then click any highlighted element to make it editable on the fly.
 
-Elements that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Click a highlighted element to activate it. Modify mode exits automatically after activation (except for slide titles, which stay in edit mode until you click away or press Enter).
+Elements that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Click a highlighted element to activate it. Modify mode exits automatically after activation (except for slide titles, which stay in edit mode until you click away or press Enter). Press **Escape** at any time to exit modify mode without activating anything; focus returns to the Modify button.
 
 After saving, changes are written back to your `.qmd` file.
 
@@ -48,6 +48,7 @@ Currently supported element types:
 | Table (pipe, grid, HTML, list) | `\| A \| B \|` / `+---+---+` / `<table>…</table>` / `::: {.list-table}` | Move |
 | Display code block | ` ```python ` / ` ``` ` (non-executed) | Move, resize |
 | Code chunk output | ` ```{r} `, ` ```{python} `, ` ```{ojs} ` producing non-image output | Move, resize |
+| Code chunk figure | ` ```{r} ` / ` ```{python} ` chunk producing exactly one `<img>` figure | Move, resize, rotate |
 | Diagram chunk | ` ```{mermaid} `, ` ```{dot} ` (Graphviz) | Move, resize |
 | Display equation | `$$E = mc^2$$` (single- or multi-line) | Move |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
@@ -76,7 +77,7 @@ Slide titles open an inline formatting toolbar (bold, italic, underline, striket
 Positioned arrows from previous saves (`{{< arrow ... position="absolute" >}}` shortcodes rendered via [`quarto-arrows`](https://github.com/EmilHvitfeldt/quarto-arrows)) are activatable too. Click a highlighted arrow to drag and resize it via the standard arrow handles; the source's color, width, head, dash, line, opacity, label, curve, and waypoints are preserved. On save, the matching shortcode is rewritten in-place with the new coordinates. Arrows whose shortcodes use kwargs the editable system doesn't yet round-trip (`bend`, `fragment`, `aria-label`, `class`, `head-fill`, …) get an amber warning ring instead, so their source attributes aren't silently dropped.
 
 ::: {.callout-note}
-Code-generated figures (e.g., plots from R or Python chunks) are not yet supported in modify mode. Non-image chunk outputs — tables, printed text, widgets, OJS — are supported as described above.
+Single-figure code chunks (an `{r}` or `{python}` chunk producing exactly one `<img>`) are activatable as described above. Multi-figure chunks (2+ image outputs) show an amber warning ring and are not yet activatable. Non-image chunk outputs — tables, printed text, widgets, OJS — are supported as described above.
 :::
 
 ## Rich Text Editing
