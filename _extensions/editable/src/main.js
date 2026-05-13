@@ -12,6 +12,7 @@ import { ToolbarRegistry, NewElementRegistry } from './registries.js';
 import { createFloatingToolbar } from './toolbar.js';
 import { addNewArrow, initArrows } from './arrows.js';
 import { setActiveImage } from './images.js';
+import { isInsideActiveEditContext } from './selection.js';
 import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
 import { toggleModifyMode, ModifyModeClassifier, enterModifyMode, exitModifyMode } from './modify-mode.js';
@@ -99,10 +100,7 @@ window.Revealeditable = function () {
         setupUndoRedoKeyboard();
 
         document.addEventListener("click", (e) => {
-          if (!e.target.closest(".editable-container:has(img)") &&
-              !e.target.closest(".editable-toolbar") &&
-              !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])") &&
-              !e.target.closest(".editable-arrow-container")) {
+          if (!isInsideActiveEditContext(e.target)) {
             setActiveImage(null);
           }
         });

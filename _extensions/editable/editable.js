@@ -12350,6 +12350,19 @@ ${escapeText(this.code(index, length))}
     if (deselectArrowFn)
       deselectArrowFn();
   }
+  var ACTIVE_EDIT_CONTEXT_SELECTORS = [
+    ".editable-container:has(img)",
+    ".editable-toolbar",
+    ".editable-container:has(.ql-editor[contenteditable='true'])",
+    ".editable-arrow-container",
+    // h2 currently being edited via modify mode's heading flow.
+    ".editable-heading-active"
+  ];
+  function isInsideActiveEditContext(target) {
+    if (!target || typeof target.closest !== "function")
+      return false;
+    return ACTIVE_EDIT_CONTEXT_SELECTORS.some((sel) => target.closest(sel));
+  }
 
   // src/arrows.js
   var arrowExtensionWarningShown = false;
@@ -18591,7 +18604,7 @@ ${fence}`;
           createFloatingToolbar();
           setupUndoRedoKeyboard();
           document.addEventListener("click", (e) => {
-            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar") && !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])") && !e.target.closest(".editable-arrow-container")) {
+            if (!isInsideActiveEditContext(e.target)) {
               setActiveImage(null);
             }
           });
