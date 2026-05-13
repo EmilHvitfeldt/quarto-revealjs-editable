@@ -17176,7 +17176,10 @@ ${fence}`;
     commitBlock();
     return blocks;
   }
-  function makeListClassifier({ tagName, dataKey, testLine, label }) {
+  function buildBlockSerializeAttrs(dims, { omitHeight = false } = {}) {
+    return omitHeight ? buildAbsoluteAttrString(dims, { include: ["left", "top", "width"] }) : buildAbsoluteAttrString(dims);
+  }
+  function makeListClassifier({ tagName, dataKey, testLine, label, omitHeight = false }) {
     const idxAttr = `editableModified${dataKey}Idx`;
     const activeAttr = `editableModified${dataKey}`;
     return {
@@ -17221,7 +17224,7 @@ ${fence}`;
               return;
             const block = blocks[elIdx];
             const dims = editableRegistry.get(el).toDimensions();
-            const attrs = buildAbsoluteAttrString(dims);
+            const attrs = buildBlockSerializeAttrs(dims, { omitHeight });
             const blockLineCount = block.endLine - block.startLine + 1;
             lines.splice(
               block.startLine,
@@ -17253,7 +17256,11 @@ ${fence}`;
     tagName: "BLOCKQUOTE",
     dataKey: "Blockquote",
     testLine: (line) => /^>/.test(line),
-    label: "Blockquotes"
+    label: "Blockquotes",
+    // The blockquote's left accent bar stretches with the wrapper height by
+    // default. Same pattern as callouts — let content determine height so the
+    // bar hugs the quote text instead of the resize box.
+    omitHeight: true
   }));
   var SUPPORTED_ARROW_KWARGS = /* @__PURE__ */ new Set([
     "from",

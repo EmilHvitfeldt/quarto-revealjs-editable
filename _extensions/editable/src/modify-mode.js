@@ -1616,14 +1616,31 @@ function extractBlocksStartingWith(chunk, testLine) {
 }
 
 /**
+ * Build the `{.absolute …}` attribute string for a list/blockquote/callout-style
+ * block. When `omitHeight` is set, the produced attrs deliberately drop `height`
+ * so the source block can re-render at its natural content height — mirrors the
+ * callout serialization rationale.
+ */
+export function buildBlockSerializeAttrs(dims, { omitHeight = false } = {}) {
+  return omitHeight
+    ? buildAbsoluteAttrString(dims, { include: ['left', 'top', 'width'] })
+    : buildAbsoluteAttrString(dims);
+}
+
+/**
  * Build a classifier for block-level list/blockquote elements.
  * @param {object} opts
  * @param {string} opts.tagName - uppercase tag name: 'UL', 'OL', 'BLOCKQUOTE'
  * @param {string} opts.dataKey - camelCase key used for dataset attrs (e.g. 'Ul')
  * @param {function(string): boolean} opts.testLine - identifies the first line of a source block
  * @param {string} opts.label - label shown in the modify panel
+ * @param {boolean} [opts.omitHeight=false] - drop `height` from the serialized
+ *   `{.absolute …}` block. Same rationale as callouts: when the source block's
+ *   visual height is fully determined by content (e.g. blockquote's left
+ *   accent bar should hug the text, not the wrapper), persisting `height`
+ *   forces a wrapper-sized re-render that doesn't match the intent.
  */
-function makeListClassifier({ tagName, dataKey, testLine, label }) {
+function makeListClassifier({ tagName, dataKey, testLine, label, omitHeight = false }) {
   const idxAttr = `editableModified${dataKey}Idx`;
   const activeAttr = `editableModified${dataKey}`;
 
@@ -1680,7 +1697,7 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
           const block = blocks[elIdx];
           const dims = editableRegistry.get(el).toDimensions();
 
-          const attrs = buildAbsoluteAttrString(dims);
+          const attrs = buildBlockSerializeAttrs(dims, { omitHeight });
 
           const blockLineCount = block.endLine - block.startLine + 1;
           lines.splice(block.startLine, blockLineCount,
@@ -1717,6 +1734,10 @@ ModifyModeClassifier.register(makeListClassifier({
   dataKey: 'Blockquote',
   testLine: (line) => /^>/.test(line),
   label: 'Blockquotes',
+  // The blockquote's left accent bar stretches with the wrapper height by
+  // default. Same pattern as callouts — let content determine height so the
+  // bar hugs the quote text instead of the resize box.
+  omitHeight: true,
 }));
 
 // ---------------------------------------------------------------------------
