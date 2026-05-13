@@ -48,6 +48,7 @@ import { CONFIG } from './config.js';
 import {
   getAbsolutePosition,
   waitForRegistryThenFixPosition,
+  whenInRegistry,
   makePositionedClassifier,
 } from './modify-mode-positioned.js';
 
@@ -1673,6 +1674,18 @@ function makeListClassifier({ tagName, dataKey, testLine, label, omitHeight = fa
       setupDivWhenReady(el);
 
       waitForRegistryThenFixPosition(el, origLeft, origTop);
+
+      // For content-sized elements (blockquote): stop syncing the wrapper
+      // height back to the inner element so the visible bar / content stays
+      // at its natural height during a resize drag. Done after the registry
+      // entry exists, then force the inline height to auto to undo
+      // lockNaturalDimensions' px lock.
+      if (omitHeight) {
+        whenInRegistry(el, (ee) => {
+          ee.syncHeight = false;
+          el.style.height = 'auto';
+        });
+      }
     },
 
     serialize(text) {

@@ -157,6 +157,19 @@ export function waitForRegistryThenFixPosition(el, origLeft, origTop) {
 }
 
 /**
+ * Poll until `el` is registered, then invoke `cb` with the EditableElement.
+ * Use when a classifier needs to mutate the EditableElement (e.g. flip
+ * `syncHeight = false`) immediately after async setup completes.
+ */
+export function whenInRegistry(el, cb) {
+  if (editableRegistry.has(el)) {
+    cb(editableRegistry.get(el));
+  } else {
+    requestAnimationFrame(() => whenInRegistry(el, cb));
+  }
+}
+
+/**
  * Build a ModifyModeClassifier definition for "re-activate an already-positioned
  * element" classifiers. Wraps the boilerplate shared by `Positioned divs` and
  * `Positioned images` (and, post-issue #140, by the per-type re-activation

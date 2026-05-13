@@ -3083,6 +3083,7 @@ var EditableModule = (() => {
       this.element = element;
       this.container = null;
       this.type = element.tagName.toLowerCase();
+      this.syncHeight = true;
       let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
       let height = element.style.height ? parseFloat(element.style.height) : element.offsetHeight;
       if (this.type === "img" && (width === 0 || height === 0)) {
@@ -3143,7 +3144,9 @@ var EditableModule = (() => {
         }
       }
       this.element.style.width = this.state.width + "px";
-      this.element.style.height = this.state.height + "px";
+      if (this.syncHeight) {
+        this.element.style.height = this.state.height + "px";
+      }
       if (this.state.fontSize !== null) {
         this.element.style.fontSize = this.state.fontSize + "px";
       }
@@ -15976,6 +15979,13 @@ ${fence}`;
       requestAnimationFrame(() => waitForRegistryThenFixPosition(el, origLeft, origTop));
     }
   }
+  function whenInRegistry(el, cb) {
+    if (editableRegistry.has(el)) {
+      cb(editableRegistry.get(el));
+    } else {
+      requestAnimationFrame(() => whenInRegistry(el, cb));
+    }
+  }
   function makePositionedClassifier(opts) {
     const {
       label,
@@ -17218,6 +17228,12 @@ ${fence}`;
         setCapabilityOverride(el, ["move", "resize"]);
         setupDivWhenReady(el);
         waitForRegistryThenFixPosition(el, origLeft, origTop);
+        if (omitHeight) {
+          whenInRegistry(el, (ee) => {
+            ee.syncHeight = false;
+            el.style.height = "auto";
+          });
+        }
       },
       serialize(text) {
         const htmlAttr = `data-editable-modified-${dataKey.toLowerCase()}`;
