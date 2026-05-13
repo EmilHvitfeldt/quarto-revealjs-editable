@@ -16517,6 +16517,18 @@ ${fence}`;
   function headingHtmlToMarkdown(html) {
     let text = html;
     text = text.replace(
+      /<span[^>]*style="[^"]*font-weight:\s*(bold|[6-9]\d\d)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, _w, content) => `**${content}**`
+    );
+    text = text.replace(
+      /<span[^>]*style="[^"]*font-style:\s*italic[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, content) => `*${content}*`
+    );
+    text = text.replace(
+      /<span[^>]*style="[^"]*text-decoration:[^"]*line-through[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, content) => `~~${content}~~`
+    );
+    text = text.replace(
       /<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
       (_, colorVal, content) => `[${content}]{style='background-color: ${getBrandColorOutput(colorVal.trim())}'}`
     );

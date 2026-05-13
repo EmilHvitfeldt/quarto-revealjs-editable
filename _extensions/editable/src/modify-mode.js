@@ -739,8 +739,19 @@ export function replaceHeadingTextInChunk(chunk, newText) {
  * @param {string} html
  * @returns {string}
  */
-function headingHtmlToMarkdown(html) {
+export function headingHtmlToMarkdown(html) {
   let text = html;
+
+  // `document.execCommand('bold'|'italic'|'strikeThrough')` in CSS mode (the
+  // default in most browsers) emits `<span style="font-weight: bold">…</span>`
+  // rather than `<b>`/`<i>`/`<s>` tags. Convert those to markdown FIRST so the
+  // span-stripping fallback below doesn't drop the formatting on the floor.
+  text = text.replace(/<span[^>]*style="[^"]*font-weight:\s*(bold|[6-9]\d\d)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, _w, content) => `**${content}**`);
+  text = text.replace(/<span[^>]*style="[^"]*font-style:\s*italic[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, content) => `*${content}*`);
+  text = text.replace(/<span[^>]*style="[^"]*text-decoration:[^"]*line-through[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, content) => `~~${content}~~`);
 
   // Background color spans (must come before foreground to avoid false matches)
   text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,

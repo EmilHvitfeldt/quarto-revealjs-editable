@@ -17,7 +17,40 @@ vi.mock('../colors.js', () => ({ getColorPalette: vi.fn(() => []), getBrandColor
 vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 
-import { replaceHeadingTextInChunk } from '../modify-mode.js';
+import { replaceHeadingTextInChunk, headingHtmlToMarkdown } from '../modify-mode.js';
+
+describe('headingHtmlToMarkdown — CSS-styled inline formatting', () => {
+  // `document.execCommand('bold' | 'italic' | 'underline' | 'strikeThrough')`
+  // emits `<span style="...">` in CSS mode (the default in many browsers),
+  // not `<b>`/`<i>`/`<u>`/`<s>` tags. The previous markdown-conversion only
+  // matched the tag forms, so users typing Bold in the heading toolbar
+  // produced no `**…**` on save.
+
+  it('converts <span style="font-weight: bold"> to **...**', () => {
+    expect(headingHtmlToMarkdown('Hello <span style="font-weight: bold">world</span>'))
+      .toBe('Hello **world**');
+  });
+
+  it('converts <span style="font-weight: 700"> to **...**', () => {
+    expect(headingHtmlToMarkdown('<span style="font-weight: 700">w</span>'))
+      .toBe('**w**');
+  });
+
+  it('converts <span style="font-style: italic"> to *...*', () => {
+    expect(headingHtmlToMarkdown('<span style="font-style: italic">w</span>'))
+      .toBe('*w*');
+  });
+
+  it('converts <span style="text-decoration: line-through"> to ~~...~~', () => {
+    expect(headingHtmlToMarkdown('<span style="text-decoration: line-through">w</span>'))
+      .toBe('~~w~~');
+  });
+
+  it('still handles tag-form <strong>/<em>/<s>', () => {
+    expect(headingHtmlToMarkdown('<strong>a</strong> <em>b</em> <s>c</s>'))
+      .toBe('**a** *b* ~~c~~');
+  });
+});
 
 describe('replaceHeadingTextInChunk', () => {
   it('replaces the heading text on a plain heading', () => {
