@@ -16507,6 +16507,13 @@ ${fence}`;
       };
     }
   }));
+  function replaceHeadingTextInChunk(chunk, newText) {
+    return chunk.replace(/^## [^\n]*/m, (line) => {
+      const attrMatch = line.match(/\s*(\{[^}]*\})\s*$/);
+      const trailing = attrMatch ? ` ${attrMatch[1]}` : "";
+      return `## ${newText}${trailing}`;
+    });
+  }
   function headingHtmlToMarkdown(html) {
     let text = html;
     text = text.replace(
@@ -16719,7 +16726,7 @@ ${fence}`;
         if (chunkIndex >= chunks.length)
           continue;
         const newText = headingHtmlToMarkdown(h2.innerHTML);
-        chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+        chunks[chunkIndex] = replaceHeadingTextInChunk(chunks[chunkIndex], newText);
       }
       return chunks.join("");
     }

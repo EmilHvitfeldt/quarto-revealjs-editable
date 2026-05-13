@@ -720,6 +720,16 @@ ModifyModeClassifier.register(makePositionedClassifier({
 }));
 
 // ---------------------------------------------------------------------------
+// Replace the heading text on the first `## ...` line of a slide chunk,
+// preserving any trailing `{...}` attribute block.
+export function replaceHeadingTextInChunk(chunk, newText) {
+  return chunk.replace(/^## [^\n]*/m, (line) => {
+    const attrMatch = line.match(/\s*(\{[^}]*\})\s*$/);
+    const trailing = attrMatch ? ` ${attrMatch[1]}` : '';
+    return `## ${newText}${trailing}`;
+  });
+}
+
 // Slide title (h2) classifier
 // ---------------------------------------------------------------------------
 
@@ -993,7 +1003,7 @@ ModifyModeClassifier.register({
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       if (chunkIndex >= chunks.length) continue;
       const newText = headingHtmlToMarkdown(h2.innerHTML);
-      chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+      chunks[chunkIndex] = replaceHeadingTextInChunk(chunks[chunkIndex], newText);
     }
 
     return chunks.join('');
