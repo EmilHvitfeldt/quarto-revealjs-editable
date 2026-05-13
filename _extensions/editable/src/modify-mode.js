@@ -3005,6 +3005,27 @@ function isDisplayEquationContainer(el) {
   return true;
 }
 
+// Try each selector individually, in priority order, and return the first
+// match. We can't pass a comma-joined list to querySelector because that
+// returns the first match in DOCUMENT order, which would prefer the outer
+// full-width `span.math.display` source wrapper over an inner inline-block
+// rendered math node (mjx-container / .katex-display). Measuring the outer
+// wrapper makes origLeft collapse to 0 because the wrapper spans the slide.
+const EQUATION_RENDER_SELECTORS = [
+  'mjx-container',
+  '.MathJax_Display',
+  '.katex-display',
+  'span.math.display',
+];
+
+export function pickEquationRenderNode(el, selectors = EQUATION_RENDER_SELECTORS) {
+  for (const sel of selectors) {
+    const hit = el.querySelector(sel);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 ModifyModeClassifier.register({
   label: 'Display equations',
 
@@ -3040,7 +3061,7 @@ ModifyModeClassifier.register({
     // Anchor on the rendered math node when available so the container's
     // top edge sits at the visible top of the equation (not the top of the
     // wrapping `<p>`'s margin box, which would shift the equation down).
-    const inner = el.querySelector('.MathJax_Display, mjx-container, .katex-display, span.math.display') ?? el;
+    const inner = pickEquationRenderNode(el) ?? el;
     const { left: origLeft, top: origTop, width: naturalW, height: naturalH } =
       captureSlideRelativePosition(el, { rectSource: inner });
 

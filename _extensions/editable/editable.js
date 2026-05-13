@@ -18197,6 +18197,20 @@ ${fence}`;
     }
     return true;
   }
+  var EQUATION_RENDER_SELECTORS = [
+    "mjx-container",
+    ".MathJax_Display",
+    ".katex-display",
+    "span.math.display"
+  ];
+  function pickEquationRenderNode(el, selectors = EQUATION_RENDER_SELECTORS) {
+    for (const sel of selectors) {
+      const hit = el.querySelector(sel);
+      if (hit)
+        return hit;
+    }
+    return null;
+  }
   ModifyModeClassifier.register({
     label: "Display equations",
     classify(slideEl) {
@@ -18227,7 +18241,7 @@ ${fence}`;
     },
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const inner = el.querySelector(".MathJax_Display, mjx-container, .katex-display, span.math.display") ?? el;
+      const inner = pickEquationRenderNode(el) ?? el;
       const { left: origLeft, top: origTop, width: naturalW, height: naturalH } = captureSlideRelativePosition(el, { rectSource: inner });
       el.style.padding = "0";
       el.style.margin = "0";
