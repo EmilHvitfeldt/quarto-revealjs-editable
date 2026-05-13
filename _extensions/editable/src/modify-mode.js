@@ -174,8 +174,124 @@ function buildChunkPrefixCounts(imgs) {
   return counts;
 }
 
-ModifyModeClassifier.register({
+/**
+ * Get the effective src of a video element.
+ * Checks the src attribute directly on the element first, then falls back to
+ * the first <source> child (Quarto may render either form).
+ * @param {HTMLVideoElement} video
+ * @returns {string|null}
+ */
+export function getVideoSrc(video) {
+  return video.getAttribute('src') || video.getAttribute('data-src') ||
+    video.querySelector('source')?.getAttribute('src') || null;
+}
+
+function videoSrcInQmdSource(video) {
+  if (!window._input_file) return false;
+  const src = getVideoSrc(video);
+  return !!src && window._input_file.includes(src);
+}
+
+/**
+ * Factory for the Images / Videos classifiers, which share the entire
+ * activate + serialize pipeline (capture src, lazy data-src swap, dataset
+ * stamping, then on save: group by `chunkIndex::src`, sort by DOM order,
+ * regex-replace `](src){attrs}` with occurrence counting).
+ *
+ * Options:
+ *   - `tagName`, `label`, `getSrc`, `setupFn` — the four pieces that differ.
+ *   - `classify(slideEl)` — caller owns the per-element decision so it can
+ *     do things like Images' multi-figure-chunk warn or Videos' controls
+ *     removal.
+ *   - `beforeSetup(el)` — runs at activate-time after dataset stamping and
+ *     before `setupFn`. Used by Videos to clear `max-width` (Reveal sets
+ *     95% on media; resolves against our explicit width post-setup) and to
+ *     opt the activated video out of the pending controls-restore set.
+ *   - `cleanup()` — runs when modify mode exits without activating anything.
+ *     Used by Videos to restore `controls` on classify-time strippings.
+ */
+export function makeMediaClassifier({ tagName, label, getSrc, setupFn, classify, beforeSetup, cleanup }) {
+  return {
+    label,
+    classify,
+    cleanup,
+
+    activate(el) {
+      // Capture src before assigning to el.src, which would resolve to an
+      // absolute URL and break QMD source matching in serialize().
+      const originalSrc = getSrc(el);
+
+      // Ensure lazy-loaded media (data-src only) are fetched before setup
+      // polls for natural dimensions — without this, setup can time out
+      // before Reveal.js swaps data-src → src on its own schedule.
+      if (!el.getAttribute('src') && el.getAttribute('data-src')) {
+        el.src = el.getAttribute('data-src');
+      }
+
+      el.dataset.editableModifiedSrc   = originalSrc;
+      el.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      el.dataset.editableModified      = 'true';
+
+      if (beforeSetup) beforeSetup(el);
+      setupFn(el);
+    },
+
+    serialize(text) {
+      const els = Array.from(
+        document.querySelectorAll(`${tagName}[data-editable-modified="true"]`)
+      );
+      if (els.length === 0) return text;
+
+      const chunks = splitIntoSlideChunks(text);
+
+      // Group by (chunkIndex, originalSrc) to handle duplicate srcs on the
+      // same slide. DOM order within each group maps to QMD occurrence order.
+      const groups = new Map();
+      for (const el of els) {
+        const originalSrc = el.dataset.editableModifiedSrc;
+        if (!originalSrc) continue;
+        if (!editableRegistry.has(el)) continue;
+        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+        if (chunkIndex >= chunks.length) continue;
+        const key = `${chunkIndex}::${originalSrc}`;
+        if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, els: [] });
+        groups.get(key).els.push(el);
+      }
+
+      for (const { chunkIndex, originalSrc, els: groupEls } of groups.values()) {
+        groupEls.sort((a, b) =>
+          a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+        );
+
+        const replacements = groupEls.map(el => {
+          const dims = editableRegistry.get(el).toDimensions();
+          return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+        });
+
+        const regex = new RegExp(`\\]\\(${escapeRegex(originalSrc)}\\)(\\{[^}]*\\})?`, 'g');
+
+        let occurrence = 0;
+        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
+          occurrence < replacements.length ? replacements[occurrence++] : match
+        );
+      }
+
+      return chunks.join('');
+    },
+  };
+}
+
+// Tracks videos whose `controls` attribute was removed during classification
+// so it can be restored when modify mode exits without activating them.
+const _videosWithControlsRemoved = new Set();
+
+ModifyModeClassifier.register(makeMediaClassifier({
+  tagName: 'img',
   label: 'Images',
+  getSrc: getImgSrc,
+  setupFn: setupImageWhenReady,
+
   classify(slideEl) {
     const imgs = Array.from(slideEl.querySelectorAll('img'));
     const prefixCounts = buildChunkPrefixCounts(imgs);
@@ -200,100 +316,14 @@ ModifyModeClassifier.register({
 
     return { valid, warn };
   },
+}));
 
-  activate(img) {
-    // Capture src before setting img.src, which resolves it to an absolute URL
-    // and would break QMD source matching in serialize().
-    const originalSrc = getImgSrc(img);
-
-    // Ensure lazy-loaded images (data-src only) are fetched before setup polls
-    // for naturalWidth/offsetWidth — without this, setupImageWhenReady can time
-    // out before Reveal.js swaps data-src → src on its own schedule.
-    if (!img.getAttribute('src') && img.getAttribute('data-src')) {
-      img.src = img.getAttribute('data-src');
-    }
-
-    img.dataset.editableModifiedSrc   = originalSrc;
-    img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
-    img.dataset.editableModified      = 'true';
-
-    setupImageWhenReady(img);
-  },
-
-  serialize(text) {
-    const imgs = Array.from(
-      document.querySelectorAll('img[data-editable-modified="true"]')
-    );
-    if (imgs.length === 0) return text;
-
-    const chunks = splitIntoSlideChunks(text);
-
-    // Group by (chunkIndex, originalSrc) to handle duplicate srcs on the same slide.
-    // DOM order within each group maps to QMD occurrence order.
-    const groups = new Map();
-    for (const img of imgs) {
-      const originalSrc = img.dataset.editableModifiedSrc;
-      if (!originalSrc) continue;
-      if (!editableRegistry.has(img)) continue;
-      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      const key = `${chunkIndex}::${originalSrc}`;
-      if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, imgs: [] });
-      groups.get(key).imgs.push(img);
-    }
-
-    for (const { chunkIndex, originalSrc, imgs: groupImgs } of groups.values()) {
-      groupImgs.sort((a, b) =>
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
-      );
-
-      const replacements = groupImgs.map(img => {
-        const dims = editableRegistry.get(img).toDimensions();
-        return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
-      });
-
-      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
-
-      let occurrence = 0;
-      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
-        occurrence < replacements.length ? replacements[occurrence++] : match
-      );
-    }
-
-    return chunks.join('');
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Video classifier (built-in)
-// ---------------------------------------------------------------------------
-
-/**
- * Get the effective src of a video element.
- * Checks the src attribute directly on the element first, then falls back to
- * the first <source> child (Quarto may render either form).
- * @param {HTMLVideoElement} video
- * @returns {string|null}
- */
-export function getVideoSrc(video) {
-  return video.getAttribute('src') || video.getAttribute('data-src') ||
-    video.querySelector('source')?.getAttribute('src') || null;
-}
-
-function videoSrcInQmdSource(video) {
-  if (!window._input_file) return false;
-  const src = getVideoSrc(video);
-  return !!src && window._input_file.includes(src);
-}
-
-// Tracks videos whose `controls` attribute was removed during classification
-// so it can be restored when modify mode exits without activating them.
-const _videosWithControlsRemoved = new Set();
-
-ModifyModeClassifier.register({
+ModifyModeClassifier.register(makeMediaClassifier({
+  tagName: 'video',
   label: 'Videos',
+  getSrc: getVideoSrc,
+  setupFn: setupVideoWhenReady,
+
   classify(slideEl) {
     // Restore controls on any videos from a previous classification pass
     // (e.g. the user navigated slides without clicking).
@@ -304,7 +334,6 @@ ModifyModeClassifier.register({
 
     const videos = Array.from(slideEl.querySelectorAll('video'));
     const valid = [];
-    const warn  = [];
 
     for (const video of videos) {
       if (editableRegistry.has(video)) continue;
@@ -323,7 +352,18 @@ ModifyModeClassifier.register({
       _videosWithControlsRemoved.add(video);
     }
 
-    return { valid, warn };
+    return { valid, warn: [] };
+  },
+
+  beforeSetup(video) {
+    // This video is being activated — don't restore its `controls` on cleanup.
+    _videosWithControlsRemoved.delete(video);
+
+    // Reveal.js sets max-width: 95% on media elements. Once inside the
+    // inline-block editable-container, that percentage resolves against the
+    // explicit style.width, shrinking the element further. Clear it first.
+    video.style.maxWidth  = 'none';
+    video.style.maxHeight = 'none';
   },
 
   cleanup() {
@@ -332,73 +372,7 @@ ModifyModeClassifier.register({
     }
     _videosWithControlsRemoved.clear();
   },
-
-  activate(video) {
-    // Don't restore controls on this video — it's now an editable element.
-    _videosWithControlsRemoved.delete(video);
-
-    const originalSrc = getVideoSrc(video);
-
-    if (!video.getAttribute('src') && video.getAttribute('data-src')) {
-      video.src = video.getAttribute('data-src');
-    }
-
-    video.dataset.editableModifiedSrc   = originalSrc;
-    video.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
-    video.dataset.editableModified      = 'true';
-
-    // Reveal.js sets max-width: 95% on media elements. Once inside the
-    // inline-block editable-container, that percentage resolves against the
-    // explicit style.width, shrinking the element further. Clear it first.
-    video.style.maxWidth  = 'none';
-    video.style.maxHeight = 'none';
-
-    setupVideoWhenReady(video);
-  },
-
-  serialize(text) {
-    const videos = Array.from(
-      document.querySelectorAll('video[data-editable-modified="true"]')
-    );
-    if (videos.length === 0) return text;
-
-    const chunks = splitIntoSlideChunks(text);
-
-    const groups = new Map();
-    for (const video of videos) {
-      const originalSrc = video.dataset.editableModifiedSrc;
-      if (!originalSrc) continue;
-      if (!editableRegistry.has(video)) continue;
-      const slideIndex = parseInt(video.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      const key = `${chunkIndex}::${originalSrc}`;
-      if (!groups.has(key)) groups.set(key, { chunkIndex, originalSrc, videos: [] });
-      groups.get(key).videos.push(video);
-    }
-
-    for (const { chunkIndex, originalSrc, videos: groupVideos } of groups.values()) {
-      groupVideos.sort((a, b) =>
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
-      );
-
-      const replacements = groupVideos.map(video => {
-        const dims = editableRegistry.get(video).toDimensions();
-        return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
-      });
-
-      const escapedSrc = originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\]\\(${escapedSrc}\\)(\\{[^}]*\\})?`, 'g');
-
-      let occurrence = 0;
-      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
-        occurrence < replacements.length ? replacements[occurrence++] : match
-      );
-    }
-
-    return chunks.join('');
-  },
-});
+}));
 
 // ---------------------------------------------------------------------------
 // Positioned-element re-activation classifiers
