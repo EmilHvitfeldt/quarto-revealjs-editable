@@ -373,6 +373,10 @@ Since issue #140 landed, the fixture's `::: {.absolute …}` wrappers (which ren
 | Both paragraphs on slide 2 serialize independently | Two `{.absolute` blocks in slide 2 chunk after activating both |
 | Classify ignores `.slide-background.present` (quarto preview regression) | Inner-`<p>` count > 0 even with injected stray `.present` element |
 
+**`e2e/modify-mode-positioned-typed.spec.js`** - Typed positioned re-activation (#140) (30 tests, 2 skipped per browser):
+
+Regression coverage for the typed positioned classifiers added in #140. Uses `manual-positioned-reactivation.qmd` as fixture. For each typed inner type (paragraph, equation, blockquote, bullet/ordered list, display code, code cell, figure, table) the spec runs three checks: ring placement on the inner element (wrapper does NOT get a ring), click → `.editable-container` at the wrapper's original left, and serialize round-trip with the existing `{.absolute …}` block rewritten in place (no nested wrappers). Three control tests cover the multi-child wrapper, the plain non-positioned paragraph fallback, and two-positioned-paragraphs independence. OJS-cell click+save are skipped because OJS rendering is async and frequently reports 0×0 in test environments; the ring-placement check (the most important regression signal) still runs for code cells.
+
 **`e2e/arrows.spec.js`** - Arrow Feature (92 tests):
 
 | Category | Tests | Description |

@@ -16350,7 +16350,7 @@ ${fence}`;
     // grab it and offer Quill editing on LaTeX source.
     {
       label: "equation",
-      selector: "p",
+      selectors: ["p"],
       extraFilter: (el) => !!el.querySelector(":scope > span.math.display"),
       capabilities: ["move"],
       lockDims: true,
@@ -16362,25 +16362,29 @@ ${fence}`;
     // because both selectors would otherwise match the same <p>).
     {
       label: "paragraph",
-      selector: "p",
+      selectors: ["p"],
       extraFilter: (el) => !el.querySelector(":scope > span.math.display"),
       capabilities: null,
       lockDims: false,
       quill: true,
       display: null
     },
-    { label: "blockquote", selector: "blockquote", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    { label: "bullet list", selector: "ul", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    { label: "ordered list", selector: "ol", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    { label: "display code", selector: "pre", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "blockquote", selectors: ["blockquote"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "bullet list", selectors: ["ul"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "ordered list", selectors: ["ol"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
     // Code chunk outputs and code chunk figures both render as `div.cell` —
-    // one entry covers both. Tighter scoping (cell-output-display vs figure)
-    // would require dedicated classifiers; the universal cell handler keeps
-    // re-activation working for either.
-    { label: "code cell", selector: "div.cell", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    // Bare <figure> wrappers outside of executable chunks.
-    { label: "figure", selector: "figure", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    { label: "table", selector: "table", capabilities: ["move"], lockDims: true, quill: false, display: "table" }
+    // one entry covers both. Register BEFORE display code so a positioned
+    // executable chunk doesn't get grabbed by the display-code classifier
+    // (which matches any `div.sourceCode`).
+    { label: "code cell", selectors: ["div.cell"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    // Display code: Quarto wraps the <pre> in `div.code-copy-outer-scaffold`
+    // (when copy button is enabled) or `div.sourceCode` (when not). Match
+    // either as the direct child of the absolute wrapper.
+    { label: "display code", selectors: ["div.code-copy-outer-scaffold", "div.sourceCode"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    // Figures from `![](src){#fig-id}` syntax are wrapped in
+    // `div.quarto-float.quarto-figure` (not a bare <figure>).
+    { label: "figure", selectors: ["div.quarto-figure"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "table", selectors: ["table"], capabilities: ["move"], lockDims: true, quill: false, display: "table" }
   ];
   function lockNaturalDimensions(el, displayOverride) {
     const slideEl = el.closest("section");
@@ -16418,10 +16422,11 @@ ${fence}`;
     };
   }
   for (const cfg of TYPED_INNER_CONFIGS) {
-    const innerTag = cfg.selector.match(/^[a-zA-Z]+/)[0].toLowerCase();
+    const innerTag = cfg.selectors[0].match(/^[a-zA-Z]+/)[0].toLowerCase();
+    const fullSelector = cfg.selectors.map((s) => `div.absolute > ${s}`).join(", ");
     ModifyModeClassifier.register(makePositionedClassifier({
       label: `Positioned ${cfg.label}`,
-      selector: `div.absolute > ${cfg.selector}`,
+      selector: fullSelector,
       // Scope serialize to the typed-claimed dataset stamped at activate time,
       // not just the abs-left dataset — otherwise `Positioned divs` and this
       // classifier would both match a typed inner <div> (e.g. div.cell).

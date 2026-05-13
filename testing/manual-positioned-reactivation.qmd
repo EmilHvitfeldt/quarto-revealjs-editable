@@ -1,0 +1,132 @@
+---
+format:
+  revealjs:
+    self-contained: false
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+---
+
+## How to use
+
+1. Click the toolbar **Modify** button.
+2. On each slide, the *inner* element (the `<p>`, `<table>`, `<ul>`, …) should get a **green ring**, not the surrounding wrapper.
+3. Click the inner element to activate it. Capabilities should match the "Expected" line at the top of each slide.
+4. Drag / resize / edit as appropriate, then **Copy QMD** from the toolbar — the existing `{.absolute …}` block should be rewritten in place, never nested.
+
+Control slides at the end cover fallback paths (generic `Positioned divs` for non-typed wrappers, plain non-positioned elements via first-activation, and multi-instance independence).
+
+## Paragraph (typed)
+
+*Expected:* ring on `<p>` · move + resize + rotate + Quill text editing
+
+::: {.absolute left=100px top=200px width=400px height=80px}
+A positioned paragraph. Activate me and edit my text with Quill.
+:::
+
+## Display equation (typed)
+
+*Expected:* ring on the equation's `<p>` · move only
+
+::: {.absolute left=120px top=200px width=400px height=80px}
+$$E = mc^2$$
+:::
+
+## Blockquote (typed)
+
+*Expected:* ring on `<blockquote>` · move + resize
+
+::: {.absolute left=100px top=200px width=420px height=120px}
+> "The best way to predict the future is to invent it." — Alan Kay
+:::
+
+## Bullet list (typed)
+
+*Expected:* ring on `<ul>` · move + resize
+
+::: {.absolute left=100px top=200px width=400px height=150px}
+- First item
+- Second item
+- Third item
+:::
+
+## Ordered list (typed)
+
+*Expected:* ring on `<ol>` · move + resize
+
+::: {.absolute left=110px top=210px width=400px height=150px}
+1. Step one
+2. Step two
+3. Step three
+:::
+
+## Display code block (typed)
+
+*Expected:* ring on `<pre>` · move + resize
+
+::: {.absolute left=80px top=180px width=500px height=160px}
+```python
+def hello(name):
+    print(f"Hello, {name}!")
+```
+:::
+
+## Code chunk output (typed)
+
+*Expected:* ring on `<div class="cell">` · move + resize
+
+::: {.absolute left=80px top=190px width=500px height=200px}
+```{ojs}
+md`A positioned OJS cell. **bold** and _italic_ rendered output.`
+```
+:::
+
+## Figure (typed)
+
+*Expected:* ring on `<figure>` · move + resize
+
+::: {.absolute left=120px top=160px width=400px height=300px}
+![Caption text](image.png){#fig-positioned}
+:::
+
+## Table (typed)
+
+*Expected:* ring on `<table>` · move only
+
+::: {.absolute left=100px top=170px width=500px height=200px}
+| Col A | Col B | Col C |
+|-------|-------|-------|
+| 1     | 2     | 3     |
+| 4     | 5     | 6     |
+:::
+
+## Control — multi-child positioned wrapper
+
+*Expected:* **each** inner child gets its own ring (typed classifiers operate per-child; activating one inner doesn't affect the others). On save each child's `{.absolute …}` block stays the same — only the activated child moves.
+
+::: {.absolute left=80px top=180px width=500px height=200px}
+First child paragraph.
+
+Second child paragraph.
+:::
+
+Quarto callouts (`:::: {.absolute width=…} ::: {.callout-note} …`) are a pre-existing limitation: the wrapper deliberately omits `height` so the callout can size to content, which means `getAbsolutePosition` can't read all four values. Neither typed nor generic positioned classifiers can re-activate a positioned callout currently — not new in #140.
+
+## Control — plain (non-positioned) paragraph
+
+*Expected:* first-activation Paragraphs classifier still works — ring on `<p>`, Quill on click.
+
+A plain paragraph with no positioning. Modify mode should still pick it up.
+
+## Control — two positioned paragraphs on same slide
+
+*Expected:* both inner `<p>` elements get green rings independently. Activating and saving one must NOT affect the other's `{.absolute …}` block.
+
+::: {.absolute left=80px top=180px width=300px height=80px}
+First positioned paragraph.
+:::
+
+::: {.absolute left=420px top=180px width=300px height=80px}
+Second positioned paragraph.
+:::
