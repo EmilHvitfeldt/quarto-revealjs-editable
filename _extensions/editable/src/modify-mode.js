@@ -461,6 +461,131 @@ function absoluteImgInQmdSource(img, slideIndex) {
   return makeAbsoluteImageRegex(src, pos.left, pos.top, pos.width, pos.height).test(chunk);
 }
 
+// ---------------------------------------------------------------------------
+// Typed-inner positioned classifiers (issue #140)
+//
+// Saved elements wrapped in `::: {.absolute …}` re-activate by targeting the
+// *inner* semantic element (paragraph, list, table, …), not the wrapper. The
+// wrapper's role is reduced to source-anchor metadata + a `data-typed-positioned-claimed`
+// marker that tells the generic `Positioned divs` classifier to skip it.
+//
+// Per-type behavior matches the first-activation classifier where it matters:
+// capability overrides, Quill init for editable text, natural-dimension
+// locking before reparenting. Position is read from the wrapper's inline
+// styles (the inner element doesn't carry the position attrs).
+//
+// Registers BEFORE `Positioned divs` so the typed claim wins. See
+// `ARCHITECTURE.md` — "Re-activating Already-Positioned Elements".
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-inner-tag activation config: capability override, whether to lock
+ * natural dimensions before reparent, whether to attach Quill for text edit,
+ * and the `display:` style to restore after `setupEltStyles` sets `block`
+ * (e.g. tables must stay `display: table`).
+ */
+const TYPED_INNER_CONFIG = {
+  P:          { capabilities: null,              lockDims: false, quill: true,  display: null    },
+  BLOCKQUOTE: { capabilities: ['move','resize'], lockDims: true,  quill: false, display: null    },
+  UL:         { capabilities: ['move','resize'], lockDims: true,  quill: false, display: null    },
+  OL:         { capabilities: ['move','resize'], lockDims: true,  quill: false, display: null    },
+  PRE:        { capabilities: ['move','resize'], lockDims: true,  quill: false, display: null    },
+  FIGURE:     { capabilities: ['move','resize'], lockDims: true,  quill: false, display: null    },
+  TABLE:      { capabilities: ['move'],          lockDims: true,  quill: false, display: 'table' },
+};
+
+/**
+ * Lock the element's natural width/height + padding so it doesn't collapse
+ * when reparented into the inline-block `editable-container`. Mirrors the
+ * pattern used by the list/blockquote first-activation classifiers.
+ */
+function lockNaturalDimensions(el, displayOverride) {
+  const slideEl = el.closest('section');
+  const scale = getSlideScale();
+  const elRect = el.getBoundingClientRect();
+  const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+  const naturalW = elRect.width  / scale;
+  const naturalH = elRect.height / scale;
+  const cs = window.getComputedStyle(el);
+  el.style.paddingLeft   = cs.paddingLeft;
+  el.style.paddingRight  = cs.paddingRight;
+  el.style.paddingTop    = cs.paddingTop;
+  el.style.paddingBottom = cs.paddingBottom;
+  el.style.margin        = '0';
+  el.style.width         = naturalW + 'px';
+  el.style.height        = naturalH + 'px';
+  if (displayOverride) el.style.display = displayOverride;
+  // Suppress unused warnings — slideRect kept for parity with first-activation path
+  void slideRect;
+}
+
+/**
+ * Read position from the wrapping `div.absolute`. Inner elements don't carry
+ * the position attrs themselves — they live on the wrapper. Returns null if
+ * the wrapper is missing or has incomplete position styles.
+ */
+function getPositionFromWrapper(innerEl) {
+  const wrapper = innerEl.parentElement;
+  if (!wrapper || !wrapper.classList || !wrapper.classList.contains('absolute')) return null;
+  return getAbsolutePosition(wrapper);
+}
+
+/**
+ * Build a regex that matches the `{.absolute …}` block in source containing
+ * all four original position values — same shape as the Positioned divs
+ * regex. Re-activated typed elements share the wrapper's source location, so
+ * the rewrite target is identical.
+ */
+function makeTypedFenceRewriteReplacement(_el, dims, ds) {
+  return {
+    regex: makeAbsoluteBlockRegex(
+      parseInt(ds.editableModifiedAbsLeft,   10),
+      parseInt(ds.editableModifiedAbsTop,    10),
+      parseInt(ds.editableModifiedAbsWidth,  10),
+      parseInt(ds.editableModifiedAbsHeight, 10),
+    ),
+    replacement: serializeToQmd(dims),
+  };
+}
+
+for (const [tag, cfg] of Object.entries(TYPED_INNER_CONFIG)) {
+  const lowerTag = tag.toLowerCase();
+  ModifyModeClassifier.register(makePositionedClassifier({
+    label: `Positioned ${lowerTag}`,
+    selector: `div.absolute > ${lowerTag}`,
+    serializeSelector: `${lowerTag}[data-editable-modified-abs-left]`,
+    getPosition: getPositionFromWrapper,
+    matchesSource: (el, _pos, slideIndex) => {
+      const wrapper = el.parentElement;
+      return wrapper ? absoluteDivInQmdSource(wrapper, slideIndex) : false;
+    },
+    onClassifyValid: (el) => {
+      const wrapper = el.parentElement;
+      if (wrapper) wrapper.dataset.typedPositionedClaimed = 'true';
+    },
+    setupFn: setupDivWhenReady,
+    extraActivate: (el) => {
+      if (cfg.lockDims) lockNaturalDimensions(el, cfg.display);
+      if (cfg.capabilities) setCapabilityOverride(el, cfg.capabilities);
+      if (cfg.quill) initializeQuillForElement(el);
+      // Hide the now-empty wrapper for this session; setupDraggableElt reparents
+      // the inner element out of the wrapper, leaving the wrapper visually
+      // present at its original (left, top). Hiding avoids a ghost outline.
+      const wrapper = el.parentElement;
+      if (wrapper && wrapper.classList && wrapper.classList.contains('absolute')) {
+        wrapper.style.display = 'none';
+      }
+    },
+    getReplacement: makeTypedFenceRewriteReplacement,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Generic positioned-div classifier (any remaining div.absolute the typed
+// classifiers above didn't claim — e.g. fenced divs that wrap multiple
+// children, raw HTML, etc.)
+// ---------------------------------------------------------------------------
+
 ModifyModeClassifier.register(makePositionedClassifier({
   label: 'Positioned divs',
   selector: 'div.absolute',
@@ -468,7 +593,8 @@ ModifyModeClassifier.register(makePositionedClassifier({
   extraSkip: (div) =>
     div.classList.contains('editable-container') ||
     div.classList.contains('editable-new') ||
-    div.classList.contains('editable'),
+    div.classList.contains('editable') ||
+    div.dataset.typedPositionedClaimed === 'true',
   matchesSource: (el, _pos, slideIndex) => absoluteDivInQmdSource(el, slideIndex),
   setupFn: setupDivWhenReady,
   getReplacement: (_el, dims, ds) => ({

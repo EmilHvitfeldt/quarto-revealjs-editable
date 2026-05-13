@@ -15972,7 +15972,9 @@ ${fence}`;
       extraDataset,
       extraActivate,
       setupFn,
-      getReplacement
+      getReplacement,
+      getPosition = getAbsolutePosition,
+      onClassifyValid
     } = opts;
     return {
       label,
@@ -15986,7 +15988,7 @@ ${fence}`;
             continue;
           if (extraSkip && extraSkip(el))
             continue;
-          const pos = getAbsolutePosition(el);
+          const pos = getPosition(el);
           if (!pos) {
             warn.push({ el, reason: noPositionReason });
             continue;
@@ -15996,11 +15998,13 @@ ${fence}`;
             continue;
           }
           valid.push(el);
+          if (onClassifyValid)
+            onClassifyValid(el);
         }
         return { valid, warn };
       },
       activate(el) {
-        const pos = getAbsolutePosition(el);
+        const pos = getPosition(el);
         if (!pos)
           return;
         el.dataset.editableModified = "true";
@@ -16340,11 +16344,87 @@ ${fence}`;
       return false;
     return makeAbsoluteImageRegex(src, pos.left, pos.top, pos.width, pos.height).test(chunk);
   }
+  var TYPED_INNER_CONFIG = {
+    P: { capabilities: null, lockDims: false, quill: true, display: null },
+    BLOCKQUOTE: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    UL: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    OL: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    PRE: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    FIGURE: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    TABLE: { capabilities: ["move"], lockDims: true, quill: false, display: "table" }
+  };
+  function lockNaturalDimensions(el, displayOverride) {
+    const slideEl = el.closest("section");
+    const scale = getSlideScale();
+    const elRect = el.getBoundingClientRect();
+    const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+    const naturalW = elRect.width / scale;
+    const naturalH = elRect.height / scale;
+    const cs = window.getComputedStyle(el);
+    el.style.paddingLeft = cs.paddingLeft;
+    el.style.paddingRight = cs.paddingRight;
+    el.style.paddingTop = cs.paddingTop;
+    el.style.paddingBottom = cs.paddingBottom;
+    el.style.margin = "0";
+    el.style.width = naturalW + "px";
+    el.style.height = naturalH + "px";
+    if (displayOverride)
+      el.style.display = displayOverride;
+  }
+  function getPositionFromWrapper(innerEl) {
+    const wrapper = innerEl.parentElement;
+    if (!wrapper || !wrapper.classList || !wrapper.classList.contains("absolute"))
+      return null;
+    return getAbsolutePosition(wrapper);
+  }
+  function makeTypedFenceRewriteReplacement(_el, dims, ds) {
+    return {
+      regex: makeAbsoluteBlockRegex(
+        parseInt(ds.editableModifiedAbsLeft, 10),
+        parseInt(ds.editableModifiedAbsTop, 10),
+        parseInt(ds.editableModifiedAbsWidth, 10),
+        parseInt(ds.editableModifiedAbsHeight, 10)
+      ),
+      replacement: serializeToQmd(dims)
+    };
+  }
+  for (const [tag, cfg] of Object.entries(TYPED_INNER_CONFIG)) {
+    const lowerTag = tag.toLowerCase();
+    ModifyModeClassifier.register(makePositionedClassifier({
+      label: `Positioned ${lowerTag}`,
+      selector: `div.absolute > ${lowerTag}`,
+      serializeSelector: `${lowerTag}[data-editable-modified-abs-left]`,
+      getPosition: getPositionFromWrapper,
+      matchesSource: (el, _pos, slideIndex) => {
+        const wrapper = el.parentElement;
+        return wrapper ? absoluteDivInQmdSource(wrapper, slideIndex) : false;
+      },
+      onClassifyValid: (el) => {
+        const wrapper = el.parentElement;
+        if (wrapper)
+          wrapper.dataset.typedPositionedClaimed = "true";
+      },
+      setupFn: setupDivWhenReady,
+      extraActivate: (el) => {
+        if (cfg.lockDims)
+          lockNaturalDimensions(el, cfg.display);
+        if (cfg.capabilities)
+          setCapabilityOverride(el, cfg.capabilities);
+        if (cfg.quill)
+          initializeQuillForElement(el);
+        const wrapper = el.parentElement;
+        if (wrapper && wrapper.classList && wrapper.classList.contains("absolute")) {
+          wrapper.style.display = "none";
+        }
+      },
+      getReplacement: makeTypedFenceRewriteReplacement
+    }));
+  }
   ModifyModeClassifier.register(makePositionedClassifier({
     label: "Positioned divs",
     selector: "div.absolute",
     serializeSelector: "div[data-editable-modified-abs-left]",
-    extraSkip: (div) => div.classList.contains("editable-container") || div.classList.contains("editable-new") || div.classList.contains("editable"),
+    extraSkip: (div) => div.classList.contains("editable-container") || div.classList.contains("editable-new") || div.classList.contains("editable") || div.dataset.typedPositionedClaimed === "true",
     matchesSource: (el, _pos, slideIndex) => absoluteDivInQmdSource(el, slideIndex),
     setupFn: setupDivWhenReady,
     getReplacement: (_el, dims, ds) => ({

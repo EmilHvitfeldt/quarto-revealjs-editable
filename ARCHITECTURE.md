@@ -347,6 +347,8 @@ There are two plausible activation targets — the outer wrapper or the inner el
 
 The wrapper's role is reduced to: locate the source fence to rewrite on save, and supply the original position values to stamp into the inner element's `data-editable-modified-abs-*` dataset.
 
+**Implementation.** `makePositionedClassifier` accepts two hooks used by typed-inner classifiers: `getPosition(el)` (read position from the wrapper instead of the element itself) and `onClassifyValid(el)` (stamp `data-typed-positioned-claimed="true"` on the wrapper). The generic `Positioned divs` classifier filters wrappers carrying that marker via its `extraSkip` callback. A single config table (`TYPED_INNER_CONFIG` in `modify-mode.js`) drives the per-inner-tag activation differences — capability overrides, Quill init for paragraphs, natural-dimension locking for block elements, and `display: table` restoration for tables. Activation hides the now-empty wrapper (`wrapper.style.display = 'none'`) so its bounds don't ghost the inner element.
+
 **Classifier ordering.** Modify-mode classifiers are tried in registration order. To support re-activation, the following ordering is load-bearing:
 
 1. The typed positioned classifiers (`Positioned images`, paragraphs-in-`.absolute`, lists-in-`.absolute`, …) register *first*. They claim their inner element and stamp dataset markers on it.

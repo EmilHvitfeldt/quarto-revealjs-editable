@@ -178,6 +178,16 @@ export function waitForRegistryThenFixPosition(el, origLeft, origTop) {
  *                            during save (e.g. 'div[data-editable-modified-abs-left]').
  *   extraSkip(el)            Optional. Skip the candidate without a warning
  *                            (used to exclude editable-container etc.).
+ *   getPosition(el) → {left,top,width,height}|null
+ *                            How to read the element's position. Default reads
+ *                            from `el.style` directly. Typed-inner classifiers
+ *                            override to read from the wrapping `div.absolute`
+ *                            instead (the inner element doesn't carry the
+ *                            position attrs).
+ *   onClassifyValid(el)      Optional. Called for each element judged valid.
+ *                            Typed-inner classifiers use it to stamp a marker
+ *                            on the wrapping `div.absolute` so the generic
+ *                            `Positioned divs` classifier can skip it.
  *   matchesSource(el, pos, slideIndex) → bool
  *                            True if the element's source can be located in
  *                            the slide chunk. Determines valid vs warn.
@@ -209,6 +219,8 @@ export function makePositionedClassifier(opts) {
     extraActivate,
     setupFn,
     getReplacement,
+    getPosition = getAbsolutePosition,
+    onClassifyValid,
   } = opts;
 
   return {
@@ -222,19 +234,20 @@ export function makePositionedClassifier(opts) {
       for (const el of candidates) {
         if (editableRegistry.has(el)) continue;
         if (extraSkip && extraSkip(el)) continue;
-        const pos = getAbsolutePosition(el);
+        const pos = getPosition(el);
         if (!pos) { warn.push({ el, reason: noPositionReason }); continue; }
         if (!matchesSource(el, pos, slideIndex)) {
           warn.push({ el, reason: noSourceReason });
           continue;
         }
         valid.push(el);
+        if (onClassifyValid) onClassifyValid(el);
       }
       return { valid, warn };
     },
 
     activate(el) {
-      const pos = getAbsolutePosition(el);
+      const pos = getPosition(el);
       if (!pos) return;
       el.dataset.editableModified          = 'true';
       el.dataset.editableModifiedSlide     = String(Reveal.getState().indexh);
