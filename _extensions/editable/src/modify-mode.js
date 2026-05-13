@@ -72,6 +72,31 @@ export function isModifyModeActive() { return _active; }
 const _warnReasons = new WeakMap();
 
 /**
+ * Saves the original aria-label of warn/valid elements so we can restore
+ * it when exiting modify mode.  A value of `null` means the element had no
+ * aria-label originally (so cleanup should remove the attribute).
+ * @type {WeakMap<Element, string|null>}
+ */
+const _originalAriaLabels = new WeakMap();
+
+function applyAriaLabel(el, label) {
+  if (!_originalAriaLabels.has(el)) {
+    _originalAriaLabels.set(el, el.hasAttribute('aria-label') ? el.getAttribute('aria-label') : null);
+  }
+  el.setAttribute('aria-label', label);
+}
+
+function restoreAriaLabels(root = document) {
+  root.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
+    if (!_originalAriaLabels.has(el)) return;
+    const original = _originalAriaLabels.get(el);
+    if (original === null) el.removeAttribute('aria-label');
+    else el.setAttribute('aria-label', original);
+    _originalAriaLabels.delete(el);
+  });
+}
+
+/**
  * Return the warning reason for an element that was classified as warn,
  * or null if the element is not a warned element.
  * @param {Element} el
@@ -949,6 +974,7 @@ ModifyModeClassifier.register({
       toolbar._cleanup?.();
       toolbar.remove();
       showRightPanel('default');
+      document.querySelector('.toolbar-modify')?.focus();
     }, { once: true });
 
     return true; // exitModifyMode already called above; skip it in onValidElementClick
@@ -3080,6 +3106,7 @@ function classifyElements() {
  * Called on entry and on every slide change.
  */
 function applyClassification() {
+  restoreAriaLabels();
   document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
     el.classList.remove(VALID_CLASS, WARN_CLASS);
   });
@@ -3091,10 +3118,27 @@ function applyClassification() {
 
   valid.forEach(({ el, classifier }) => {
     el.classList.add(VALID_CLASS);
+    const typeLabel = classifier.label ? ` (${classifier.label})` : '';
+    applyAriaLabel(el, `Click to modify${typeLabel}`);
     el.addEventListener('click', (e) => onValidElementClick(e, classifier), { signal });
   });
-  warn.forEach(el => el.classList.add(WARN_CLASS));
+  warn.forEach(el => {
+    el.classList.add(WARN_CLASS);
+    const reason = _warnReasons.get(el);
+    applyAriaLabel(el, reason ? `Cannot modify: ${reason}` : 'Cannot modify');
+  });
 
+  document.addEventListener('keydown', onModifyModeKeyDown, { signal });
+}
+
+function onModifyModeKeyDown(e) {
+  if (e.key !== 'Escape') return;
+  // Don't swallow Escape while the user is editing a heading inline —
+  // that classifier has its own Escape handler to revert the edit.
+  if (document.querySelector('.editable-heading-active')) return;
+  e.preventDefault();
+  exitModifyMode();
+  document.querySelector('.toolbar-modify')?.focus();
 }
 
 /**
@@ -3135,6 +3179,7 @@ export function exitModifyMode({ resetPanel = true } = {}) {
     if (typeof classifier.cleanup === 'function') classifier.cleanup();
   }
 
+  restoreAriaLabels();
   document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
     el.classList.remove(VALID_CLASS, WARN_CLASS);
   });

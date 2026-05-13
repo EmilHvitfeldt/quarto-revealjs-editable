@@ -44,6 +44,33 @@ test.describe('Modify Mode', () => {
     expect(await page.locator('img.modify-mode-valid').count()).toBe(0);
   });
 
+  test('Escape key exits modify mode and restores focus to Modify button', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await page.click('.toolbar-modify');
+    expect(await page.locator('.toolbar-modify.active').count()).toBe(1);
+
+    await page.keyboard.press('Escape');
+
+    expect(await page.locator('.toolbar-modify.active').count()).toBe(0);
+    expect(await page.locator('img.modify-mode-valid').count()).toBe(0);
+    const focused = await page.evaluate(() => document.activeElement?.className ?? '');
+    expect(focused).toContain('toolbar-modify');
+  });
+
+  test('valid elements get aria-label announcing they are clickable', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
+    await page.click('.toolbar-modify');
+
+    const label = await page.locator('img.modify-mode-valid').first().getAttribute('aria-label');
+    expect(label).toMatch(/Click to modify/);
+
+    await page.keyboard.press('Escape');
+    // aria-label should be removed (or restored to original) after exit
+    const stillThere = await page.locator('img[aria-label^="Click to modify"]').count();
+    expect(stillThere).toBe(0);
+  });
+
   test('clicking Modify button again exits modify mode', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
     await page.click('.toolbar-modify');

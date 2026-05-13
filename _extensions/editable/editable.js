@@ -16074,6 +16074,25 @@ ${fence}`;
   var abortController = null;
   var _active = false;
   var _warnReasons = /* @__PURE__ */ new WeakMap();
+  var _originalAriaLabels = /* @__PURE__ */ new WeakMap();
+  function applyAriaLabel(el, label) {
+    if (!_originalAriaLabels.has(el)) {
+      _originalAriaLabels.set(el, el.hasAttribute("aria-label") ? el.getAttribute("aria-label") : null);
+    }
+    el.setAttribute("aria-label", label);
+  }
+  function restoreAriaLabels(root2 = document) {
+    root2.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
+      if (!_originalAriaLabels.has(el))
+        return;
+      const original = _originalAriaLabels.get(el);
+      if (original === null)
+        el.removeAttribute("aria-label");
+      else
+        el.setAttribute("aria-label", original);
+      _originalAriaLabels.delete(el);
+    });
+  }
   var _classifiers = [];
   var ModifyModeClassifier = {
     register(classifier) {
@@ -16683,6 +16702,7 @@ ${fence}`;
         toolbar._cleanup?.();
         toolbar.remove();
         showRightPanel("default");
+        document.querySelector(".toolbar-modify")?.focus();
       }, { once: true });
       return true;
     },
@@ -18244,6 +18264,7 @@ ${fence}`;
     return { valid, warn };
   }
   function applyClassification() {
+    restoreAriaLabels();
     document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
@@ -18253,9 +18274,25 @@ ${fence}`;
     const { valid, warn } = classifyElements();
     valid.forEach(({ el, classifier }) => {
       el.classList.add(VALID_CLASS);
+      const typeLabel = classifier.label ? ` (${classifier.label})` : "";
+      applyAriaLabel(el, `Click to modify${typeLabel}`);
       el.addEventListener("click", (e) => onValidElementClick(e, classifier), { signal });
     });
-    warn.forEach((el) => el.classList.add(WARN_CLASS));
+    warn.forEach((el) => {
+      el.classList.add(WARN_CLASS);
+      const reason = _warnReasons.get(el);
+      applyAriaLabel(el, reason ? `Cannot modify: ${reason}` : "Cannot modify");
+    });
+    document.addEventListener("keydown", onModifyModeKeyDown, { signal });
+  }
+  function onModifyModeKeyDown(e) {
+    if (e.key !== "Escape")
+      return;
+    if (document.querySelector(".editable-heading-active"))
+      return;
+    e.preventDefault();
+    exitModifyMode();
+    document.querySelector(".toolbar-modify")?.focus();
   }
   function buildModifyPanel() {
     const panel = document.querySelector(".toolbar-panel-modify");
@@ -18281,6 +18318,7 @@ ${fence}`;
       if (typeof classifier.cleanup === "function")
         classifier.cleanup();
     }
+    restoreAriaLabels();
     document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
       el.classList.remove(VALID_CLASS, WARN_CLASS);
     });
