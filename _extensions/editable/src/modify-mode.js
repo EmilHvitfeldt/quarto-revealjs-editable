@@ -1427,6 +1427,25 @@ export function extractParagraphBlocks(chunk) {
   return blocks;
 }
 
+// Decide whether a slide child counts as a standalone editable paragraph.
+//
+//  - Skip <p> elements containing <img>: standalone images and inline images
+//    both render as <img> inside <p>, and the image classifier handles them.
+//  - Skip <p> elements containing a display equation: the Display equations
+//    classifier owns those.
+//  - Skip Quarto figure captions (`<p class="caption">` / `<p class="figure-caption">`):
+//    they render as direct slide children alongside the figure and would
+//    otherwise be wrapped in their own `{.absolute}` block, divorcing the
+//    caption from its figure.
+export function isParagraphCandidate(el) {
+  if (el.tagName !== 'P') return false;
+  if (el.classList.contains('caption')) return false;
+  if (el.classList.contains('figure-caption')) return false;
+  if (el.querySelector('img')) return false;
+  if (el.querySelector('span.math.display')) return false;
+  return true;
+}
+
 // Assigns paragraph indices in DOM order without overwriting existing ones.
 // Index stability is required: when classify re-runs after a paragraph is
 // activated, the remaining unactivated paragraphs must keep their original
@@ -1457,13 +1476,7 @@ ModifyModeClassifier.register({
     // overlapping click targets and let the user wrap the image in a fenced div,
     // which produces a much messier write-back than just adding {.absolute} to the
     // image markdown.
-    const allParas = Array.from(slideEl.children).filter(el =>
-      el.tagName === 'P' &&
-      !el.querySelector('img') &&
-      // Standalone display equations are handled by the Display equations
-      // classifier; don't double-claim them as plain paragraphs.
-      !el.querySelector('span.math.display')
-    );
+    const allParas = Array.from(slideEl.children).filter(isParagraphCandidate);
 
     // Index over ALL qualifying paragraphs (including already-activated ones)
     // so indices stay aligned with `extractParagraphBlocks` positions in QMD.

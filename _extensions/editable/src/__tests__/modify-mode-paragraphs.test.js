@@ -17,7 +17,43 @@ vi.mock('../colors.js', () => ({ getColorPalette: vi.fn(() => []), getBrandColor
 vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 
-import { extractParagraphBlocks, assignStableParagraphIndices } from '../modify-mode.js';
+import { extractParagraphBlocks, assignStableParagraphIndices, isParagraphCandidate } from '../modify-mode.js';
+
+// Minimal DOM-ish element for testing the paragraph candidate predicate.
+const makeEl = ({ tagName = 'P', classes = [], descendants = {} } = {}) => ({
+  tagName,
+  classList: { contains: (c) => classes.includes(c) },
+  querySelector: (sel) => descendants[sel] ?? null,
+});
+
+describe('isParagraphCandidate', () => {
+  it('accepts a plain <p>', () => {
+    expect(isParagraphCandidate(makeEl())).toBe(true);
+  });
+
+  it('rejects non-<p> elements', () => {
+    expect(isParagraphCandidate(makeEl({ tagName: 'DIV' }))).toBe(false);
+  });
+
+  it('rejects <p> containing an img', () => {
+    expect(isParagraphCandidate(makeEl({ descendants: { img: {} } }))).toBe(false);
+  });
+
+  it('rejects <p> containing a display equation', () => {
+    expect(isParagraphCandidate(makeEl({ descendants: { 'span.math.display': {} } }))).toBe(false);
+  });
+
+  it('rejects code-chunk fig-cap (<p class="caption">)', () => {
+    // Bug: Quarto renders `fig-cap: "A plot"` as `<p class="caption">A plot</p>`
+    // as a direct slide child, so the Paragraphs classifier was treating it
+    // as a standalone editable paragraph.
+    expect(isParagraphCandidate(makeEl({ classes: ['caption'] }))).toBe(false);
+  });
+
+  it('rejects figure-caption variant class', () => {
+    expect(isParagraphCandidate(makeEl({ classes: ['figure-caption'] }))).toBe(false);
+  });
+});
 
 const makeP = (existingIdx) => ({
   dataset: existingIdx === undefined ? {} : { editableModifiedParagraphIdx: String(existingIdx) },

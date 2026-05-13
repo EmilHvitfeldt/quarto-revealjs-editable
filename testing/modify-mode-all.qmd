@@ -88,11 +88,11 @@ plot(1:10)
 
 ## Positioned image (re-activatable)
 
-![](../image.png){.editable width="200px" style="left: 100px; top: 100px;"}
+![](../image.png){.absolute left=100px top=150px width=200px height=120px}
 
 ## Positioned div (re-activatable)
 
-::: {.editable width="300px" style="left: 200px; top: 150px;"}
+::: {.absolute left=200px top=150px width=300px height=120px}
 Already-positioned editable div.
 :::
 
