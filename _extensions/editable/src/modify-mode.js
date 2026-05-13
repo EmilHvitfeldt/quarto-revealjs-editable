@@ -2075,12 +2075,98 @@ export function extractCodeBlocks(chunk) {
  * Find the topmost ancestor of `el` that is a direct child of `slideEl`.
  * Returns null if `el` is not contained in `slideEl`.
  */
-function topLevelAncestorIn(slideEl, el) {
+export function topLevelAncestorIn(slideEl, el) {
   let node = el;
   while (node && node.parentElement && node.parentElement !== slideEl) {
     node = node.parentElement;
   }
   return node && node.parentElement === slideEl ? node : null;
+}
+
+/**
+ * Find unique top-level wrappers in `slideEl` that contain elements matching
+ * `innerSelector`. Skips wrappers already claimed by modify mode (in the
+ * registry, `editable-container`, or already positioned via `.absolute`).
+ *
+ * Optional `preFilter(innerEl)` filters out inner elements before the walk
+ * (e.g. tables inside `div.cell` chunks belong to a different classifier).
+ * Optional `postFilter(wrapper)` filters out wrappers after dedup (e.g. code
+ * blocks skip `div.cell` wrappers; equations require a display-eq container).
+ */
+/**
+ * Resolve each element in `chunkEls` to a source block using a header-line
+ * anchor, falling back to a positional-index anchor stamped at classify time.
+ *
+ * The header anchor is only used if it's unique within `sources` — if two
+ * sources share the same header line (rare for tables and display equations
+ * but possible), the positional fallback fires. Returns an array parallel
+ * to `chunkEls`, with `null` for elements that couldn't be resolved.
+ *
+ *   getHeader: source → string  (e.g. table → table.headerLine)
+ *   headerAttr: dataset key holding the captured header line
+ *   idxAttr: dataset key holding the positional index
+ */
+export function resolveByHeader({ chunkEls, sources, getHeader, headerAttr, idxAttr }) {
+  const headerCounts = new Map();
+  for (const s of sources) {
+    const h = (getHeader(s) ?? '').trim();
+    headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
+  }
+  return chunkEls.map((el) => {
+    const expected = (el.dataset[headerAttr] ?? '').trim();
+    if (expected && headerCounts.get(expected) === 1) {
+      return sources.find(s => (getHeader(s) ?? '').trim() === expected) ?? null;
+    }
+    const idx = parseInt(el.dataset[idxAttr] ?? '-1', 10);
+    if (idx >= 0 && idx < sources.length) return sources[idx];
+    return null;
+  });
+}
+
+/**
+ * Resolve a single element to a source block by label (named code-chunk
+ * label etc.), falling back to a positional index guarded by a first-line
+ * sanity check.
+ *
+ *   getLabel: source → string  (e.g. execChunk → execChunk.label)
+ *   getFirstLine: source → string  (sanity-check for positional fallback)
+ *   labelAttr / firstLineAttr / idxAttr: dataset keys captured at classify time
+ */
+export function resolveByLabel(el, sources, { getLabel, getFirstLine, labelAttr, firstLineAttr, idxAttr }) {
+  const label = el.dataset[labelAttr] || '';
+  if (label) {
+    const named = sources.find(s => getLabel(s) === label);
+    if (named) return named;
+  }
+  const idx = parseInt(el.dataset[idxAttr] ?? '-1', 10);
+  if (idx >= 0 && idx < sources.length) {
+    const candidate = sources[idx];
+    const expectedFirst = (el.dataset[firstLineAttr] ?? '').trim();
+    const actualFirst   = (getFirstLine(candidate) ?? '').trim();
+    if (!expectedFirst || !actualFirst || expectedFirst === actualFirst) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+export function findTopLevelWrappers(slideEl, innerSelector, { preFilter, postFilter } = {}) {
+  const inners = Array.from(slideEl.querySelectorAll(innerSelector));
+  const wrappers = [];
+  const seen = new Set();
+  for (const inner of inners) {
+    if (preFilter && !preFilter(inner)) continue;
+    const w = topLevelAncestorIn(slideEl, inner);
+    if (!w) continue;
+    if (seen.has(w)) continue;
+    seen.add(w);
+    if (editableRegistry.has(w)) continue;
+    if (w.classList && w.classList.contains('editable-container')) continue;
+    if (isAlreadyPositioned(w)) continue;
+    if (postFilter && !postFilter(w)) continue;
+    wrappers.push(w);
+  }
+  return wrappers;
 }
 
 /**
@@ -2098,25 +2184,15 @@ ModifyModeClassifier.register({
   label: 'Code blocks',
 
   classify(slideEl) {
-    const pres = Array.from(slideEl.querySelectorAll('pre'));
-    if (pres.length === 0) return { valid: [], warn: [] };
-
-    const seen = new Set();
+    // Code-chunk cells (executable {r}/{python}/{ojs}/... blocks) are handled
+    // by the Code chunk outputs classifier; skip them here so we don't
+    // double-claim.
+    const wrappers = findTopLevelWrappers(slideEl, 'pre', {
+      postFilter: (w) => !(w.tagName === 'DIV' && w.classList.contains('cell')),
+    });
     const valid = [];
     let idx = 0;
-
-    for (const pre of pres) {
-      const wrapper = topLevelAncestorIn(slideEl, pre);
-      if (!wrapper) continue;
-      if (seen.has(wrapper)) continue;
-      seen.add(wrapper);
-      if (editableRegistry.has(wrapper)) continue;
-      if (wrapper.classList.contains('editable-container')) continue;
-      if (isAlreadyPositioned(wrapper)) continue;
-      // Code-chunk cells (executable {r}/{python}/{ojs}/... blocks) are handled
-      // by the Code chunk outputs classifier; skip them here so we don't double-claim.
-      if (wrapper.tagName === 'DIV' && wrapper.classList.contains('cell')) continue;
-
+    for (const wrapper of wrappers) {
       wrapper.dataset.editableModifiedCodeIdx = String(idx++);
       wrapper.dataset.editableModifiedCodeFirstLine = getCodeFirstLine(wrapper);
       valid.push(wrapper);
@@ -2356,23 +2432,14 @@ ModifyModeClassifier.register({
 
       // Bottom-to-top so line splices don't shift earlier indices.
       forEachInReverse(chunkEls, (el) => {
-        const cellLabel = el.dataset.editableModifiedCellLabel || '';
-        const cellFirstLine = (el.dataset.editableModifiedCellFirstLine ?? '').trim();
-        const cellIdx = parseInt(el.dataset.editableModifiedCellIdx ?? '-1', 10);
-
         // Prefer match by chunk label (named chunks); fall back to positional.
-        let target = null;
-        if (cellLabel) {
-          target = execChunks.find(c => c.label === cellLabel) ?? null;
-        }
-        if (!target && cellIdx >= 0 && cellIdx < execChunks.length) {
-          const candidate = execChunks[cellIdx];
-          const actualFirst = (candidate.firstCodeLine ?? '').trim();
-          // Verify positional match still names the same chunk.
-          if (!cellFirstLine || !actualFirst || cellFirstLine === actualFirst) {
-            target = candidate;
-          }
-        }
+        const target = resolveByLabel(el, execChunks, {
+          getLabel: (c) => c.label,
+          getFirstLine: (c) => c.firstCodeLine,
+          labelAttr: 'editableModifiedCellLabel',
+          firstLineAttr: 'editableModifiedCellFirstLine',
+          idxAttr: 'editableModifiedCellIdx',
+        });
         if (!target) return;
 
         const dims = editableRegistry.get(el).toDimensions();
@@ -2519,21 +2586,13 @@ ModifyModeClassifier.register({
 
       // Bottom-to-top so splices don't shift earlier line indices.
       forEachInReverse(chunkImgs, (img) => {
-        const label = img.dataset.editableModifiedChunkFigLabel || '';
-        const firstLine = (img.dataset.editableModifiedChunkFigFirstLine ?? '').trim();
-        const execIdx = parseInt(img.dataset.editableModifiedChunkFigExecIdx ?? '-1', 10);
-
-        let target = null;
-        if (label) {
-          target = execChunks.find(c => c.label === label) ?? null;
-        }
-        if (!target && execIdx >= 0 && execIdx < execChunks.length) {
-          const candidate = execChunks[execIdx];
-          const actualFirst = (candidate.firstCodeLine ?? '').trim();
-          if (!firstLine || !actualFirst || firstLine === actualFirst) {
-            target = candidate;
-          }
-        }
+        const target = resolveByLabel(img, execChunks, {
+          getLabel: (c) => c.label,
+          getFirstLine: (c) => c.firstCodeLine,
+          labelAttr: 'editableModifiedChunkFigLabel',
+          firstLineAttr: 'editableModifiedChunkFigFirstLine',
+          idxAttr: 'editableModifiedChunkFigExecIdx',
+        });
         if (!target) return;
 
         const dims = editableRegistry.get(img).toDimensions();
@@ -2717,22 +2776,11 @@ ModifyModeClassifier.register({
     const sourceTables = extractTables(chunk);
     if (sourceTables.length === 0) return { valid: [], warn: [] };
 
-    const tables = Array.from(slideEl.querySelectorAll('table'));
-    const wrappers = [];
-    const seen = new Set();
-    for (const t of tables) {
-      // Tables rendered as the output of an executable code chunk belong
-      // to the code-output classifier.
-      if (t.closest('div.cell')) continue;
-      const w = topLevelAncestorIn(slideEl, t);
-      if (!w) continue;
-      if (seen.has(w)) continue;
-      seen.add(w);
-      if (editableRegistry.has(w)) continue;
-      if (w.classList.contains('editable-container')) continue;
-      if (isAlreadyPositioned(w)) continue;
-      wrappers.push(w);
-    }
+    // Tables rendered as the output of an executable code chunk belong to
+    // the code-output classifier — skip them at the inner level.
+    const wrappers = findTopLevelWrappers(slideEl, 'table', {
+      preFilter: (t) => !t.closest('div.cell'),
+    });
 
     // Positional pairing: bail if counts differ so we don't mis-anchor.
     if (wrappers.length !== sourceTables.length) return { valid: [], warn: [] };
@@ -2779,23 +2827,15 @@ ModifyModeClassifier.register({
       const sourceTables = extractTables(chunks[chunkIndex]);
       const lines = chunks[chunkIndex].split('\n');
 
-      // Resolve target source table per element. Primary anchor: header line
-      // text. If the header is duplicated in the chunk, fall back to the
-      // positional index stamped at classify time.
-      const headerCounts = new Map();
-      for (const t of sourceTables) {
-        const h = (t.headerLine ?? '').trim();
-        headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
-      }
-
-      const resolved = chunkEls.map((el) => {
-        const tableIdx = parseInt(el.dataset.editableModifiedTableIdx ?? '-1', 10);
-        const expectedHeader = (el.dataset.editableModifiedTableHeader ?? '').trim();
-        if (expectedHeader && headerCounts.get(expectedHeader) === 1) {
-          return sourceTables.find(t => (t.headerLine ?? '').trim() === expectedHeader) ?? null;
-        }
-        if (tableIdx >= 0 && tableIdx < sourceTables.length) return sourceTables[tableIdx];
-        return null;
+      // Resolve target source table per element. Primary anchor: header
+      // line text. If the header is duplicated in the chunk, fall back to
+      // the positional index stamped at classify time.
+      const resolved = resolveByHeader({
+        chunkEls,
+        sources: sourceTables,
+        getHeader: (t) => t.headerLine,
+        headerAttr: 'editableModifiedTableHeader',
+        idxAttr: 'editableModifiedTableIdx',
       });
 
       // Build splice plan and apply bottom-to-top so earlier indices aren't shifted.
@@ -2924,20 +2964,9 @@ ModifyModeClassifier.register({
     const sourceEqs = extractDisplayEquations(chunk);
     if (sourceEqs.length === 0) return { valid: [], warn: [] };
 
-    const spans = Array.from(slideEl.querySelectorAll('span.math.display'));
-    const wrappers = [];
-    const seen = new Set();
-    for (const s of spans) {
-      const w = topLevelAncestorIn(slideEl, s);
-      if (!w) continue;
-      if (seen.has(w)) continue;
-      seen.add(w);
-      if (editableRegistry.has(w)) continue;
-      if (w.classList.contains('editable-container')) continue;
-      if (isAlreadyPositioned(w)) continue;
-      if (!isDisplayEquationContainer(w)) continue;
-      wrappers.push(w);
-    }
+    const wrappers = findTopLevelWrappers(slideEl, 'span.math.display', {
+      postFilter: isDisplayEquationContainer,
+    });
 
     if (wrappers.length !== sourceEqs.length) return { valid: [], warn: [] };
 
@@ -2991,22 +3020,13 @@ ModifyModeClassifier.register({
       const lines = chunks[chunkIndex].split('\n');
 
       // Header-anchored resolution with positional fallback (same approach
-      // as Tables): the LaTeX body line is the same source twice would be a
-      // rare collision.
-      const headerCounts = new Map();
-      for (const eq of sourceEqs) {
-        const h = (eq.headerLine ?? '').trim();
-        headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
-      }
-
-      const resolved = chunkEls.map((el) => {
-        const idx = parseInt(el.dataset.editableModifiedEqIdx ?? '-1', 10);
-        const expected = (el.dataset.editableModifiedEqHeader ?? '').trim();
-        if (expected && headerCounts.get(expected) === 1) {
-          return sourceEqs.find(e => (e.headerLine ?? '').trim() === expected) ?? null;
-        }
-        if (idx >= 0 && idx < sourceEqs.length) return sourceEqs[idx];
-        return null;
+      // as Tables); the LaTeX body line repeating in one chunk is rare.
+      const resolved = resolveByHeader({
+        chunkEls,
+        sources: sourceEqs,
+        getHeader: (e) => e.headerLine,
+        headerAttr: 'editableModifiedEqHeader',
+        idxAttr: 'editableModifiedEqIdx',
       });
 
       const plan = chunkEls

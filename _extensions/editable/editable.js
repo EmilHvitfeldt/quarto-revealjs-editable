@@ -17483,6 +17483,66 @@ ${fence}`;
     }
     return node && node.parentElement === slideEl ? node : null;
   }
+  function resolveByHeader({ chunkEls, sources, getHeader, headerAttr, idxAttr }) {
+    const headerCounts = /* @__PURE__ */ new Map();
+    for (const s of sources) {
+      const h = (getHeader(s) ?? "").trim();
+      headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
+    }
+    return chunkEls.map((el) => {
+      const expected = (el.dataset[headerAttr] ?? "").trim();
+      if (expected && headerCounts.get(expected) === 1) {
+        return sources.find((s) => (getHeader(s) ?? "").trim() === expected) ?? null;
+      }
+      const idx = parseInt(el.dataset[idxAttr] ?? "-1", 10);
+      if (idx >= 0 && idx < sources.length)
+        return sources[idx];
+      return null;
+    });
+  }
+  function resolveByLabel(el, sources, { getLabel, getFirstLine, labelAttr, firstLineAttr, idxAttr }) {
+    const label = el.dataset[labelAttr] || "";
+    if (label) {
+      const named = sources.find((s) => getLabel(s) === label);
+      if (named)
+        return named;
+    }
+    const idx = parseInt(el.dataset[idxAttr] ?? "-1", 10);
+    if (idx >= 0 && idx < sources.length) {
+      const candidate = sources[idx];
+      const expectedFirst = (el.dataset[firstLineAttr] ?? "").trim();
+      const actualFirst = (getFirstLine(candidate) ?? "").trim();
+      if (!expectedFirst || !actualFirst || expectedFirst === actualFirst) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+  function findTopLevelWrappers(slideEl, innerSelector, { preFilter, postFilter } = {}) {
+    const inners = Array.from(slideEl.querySelectorAll(innerSelector));
+    const wrappers = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const inner of inners) {
+      if (preFilter && !preFilter(inner))
+        continue;
+      const w = topLevelAncestorIn(slideEl, inner);
+      if (!w)
+        continue;
+      if (seen.has(w))
+        continue;
+      seen.add(w);
+      if (editableRegistry.has(w))
+        continue;
+      if (w.classList && w.classList.contains("editable-container"))
+        continue;
+      if (isAlreadyPositioned(w))
+        continue;
+      if (postFilter && !postFilter(w))
+        continue;
+      wrappers.push(w);
+    }
+    return wrappers;
+  }
   function getCodeFirstLine(wrapper) {
     const code = wrapper.querySelector("pre code") ?? wrapper.querySelector("pre") ?? wrapper;
     const text = code.textContent || "";
@@ -17491,27 +17551,12 @@ ${fence}`;
   ModifyModeClassifier.register({
     label: "Code blocks",
     classify(slideEl) {
-      const pres = Array.from(slideEl.querySelectorAll("pre"));
-      if (pres.length === 0)
-        return { valid: [], warn: [] };
-      const seen = /* @__PURE__ */ new Set();
+      const wrappers = findTopLevelWrappers(slideEl, "pre", {
+        postFilter: (w) => !(w.tagName === "DIV" && w.classList.contains("cell"))
+      });
       const valid = [];
       let idx = 0;
-      for (const pre of pres) {
-        const wrapper = topLevelAncestorIn(slideEl, pre);
-        if (!wrapper)
-          continue;
-        if (seen.has(wrapper))
-          continue;
-        seen.add(wrapper);
-        if (editableRegistry.has(wrapper))
-          continue;
-        if (wrapper.classList.contains("editable-container"))
-          continue;
-        if (isAlreadyPositioned(wrapper))
-          continue;
-        if (wrapper.tagName === "DIV" && wrapper.classList.contains("cell"))
-          continue;
+      for (const wrapper of wrappers) {
         wrapper.dataset.editableModifiedCodeIdx = String(idx++);
         wrapper.dataset.editableModifiedCodeFirstLine = getCodeFirstLine(wrapper);
         valid.push(wrapper);
@@ -17695,20 +17740,13 @@ ${fence}`;
         const execChunks = extractExecutableChunks(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
         forEachInReverse(chunkEls, (el) => {
-          const cellLabel = el.dataset.editableModifiedCellLabel || "";
-          const cellFirstLine = (el.dataset.editableModifiedCellFirstLine ?? "").trim();
-          const cellIdx = parseInt(el.dataset.editableModifiedCellIdx ?? "-1", 10);
-          let target = null;
-          if (cellLabel) {
-            target = execChunks.find((c) => c.label === cellLabel) ?? null;
-          }
-          if (!target && cellIdx >= 0 && cellIdx < execChunks.length) {
-            const candidate = execChunks[cellIdx];
-            const actualFirst = (candidate.firstCodeLine ?? "").trim();
-            if (!cellFirstLine || !actualFirst || cellFirstLine === actualFirst) {
-              target = candidate;
-            }
-          }
+          const target = resolveByLabel(el, execChunks, {
+            getLabel: (c) => c.label,
+            getFirstLine: (c) => c.firstCodeLine,
+            labelAttr: "editableModifiedCellLabel",
+            firstLineAttr: "editableModifiedCellFirstLine",
+            idxAttr: "editableModifiedCellIdx"
+          });
           if (!target)
             return;
           const dims = editableRegistry.get(el).toDimensions();
@@ -17820,20 +17858,13 @@ ${fence}`;
         const execChunks = extractExecutableChunks(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
         forEachInReverse(chunkImgs, (img) => {
-          const label = img.dataset.editableModifiedChunkFigLabel || "";
-          const firstLine = (img.dataset.editableModifiedChunkFigFirstLine ?? "").trim();
-          const execIdx = parseInt(img.dataset.editableModifiedChunkFigExecIdx ?? "-1", 10);
-          let target = null;
-          if (label) {
-            target = execChunks.find((c) => c.label === label) ?? null;
-          }
-          if (!target && execIdx >= 0 && execIdx < execChunks.length) {
-            const candidate = execChunks[execIdx];
-            const actualFirst = (candidate.firstCodeLine ?? "").trim();
-            if (!firstLine || !actualFirst || firstLine === actualFirst) {
-              target = candidate;
-            }
-          }
+          const target = resolveByLabel(img, execChunks, {
+            getLabel: (c) => c.label,
+            getFirstLine: (c) => c.firstCodeLine,
+            labelAttr: "editableModifiedChunkFigLabel",
+            firstLineAttr: "editableModifiedChunkFigFirstLine",
+            idxAttr: "editableModifiedChunkFigExecIdx"
+          });
           if (!target)
             return;
           const dims = editableRegistry.get(img).toDimensions();
@@ -17991,26 +18022,9 @@ ${fence}`;
       const sourceTables = extractTables(chunk);
       if (sourceTables.length === 0)
         return { valid: [], warn: [] };
-      const tables = Array.from(slideEl.querySelectorAll("table"));
-      const wrappers = [];
-      const seen = /* @__PURE__ */ new Set();
-      for (const t of tables) {
-        if (t.closest("div.cell"))
-          continue;
-        const w = topLevelAncestorIn(slideEl, t);
-        if (!w)
-          continue;
-        if (seen.has(w))
-          continue;
-        seen.add(w);
-        if (editableRegistry.has(w))
-          continue;
-        if (w.classList.contains("editable-container"))
-          continue;
-        if (isAlreadyPositioned(w))
-          continue;
-        wrappers.push(w);
-      }
+      const wrappers = findTopLevelWrappers(slideEl, "table", {
+        preFilter: (t) => !t.closest("div.cell")
+      });
       if (wrappers.length !== sourceTables.length)
         return { valid: [], warn: [] };
       const valid = [];
@@ -18046,20 +18060,12 @@ ${fence}`;
         sortByIndexAttr(chunkEls, "editableModifiedTableIdx");
         const sourceTables = extractTables(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
-        const headerCounts = /* @__PURE__ */ new Map();
-        for (const t of sourceTables) {
-          const h = (t.headerLine ?? "").trim();
-          headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
-        }
-        const resolved = chunkEls.map((el) => {
-          const tableIdx = parseInt(el.dataset.editableModifiedTableIdx ?? "-1", 10);
-          const expectedHeader = (el.dataset.editableModifiedTableHeader ?? "").trim();
-          if (expectedHeader && headerCounts.get(expectedHeader) === 1) {
-            return sourceTables.find((t) => (t.headerLine ?? "").trim() === expectedHeader) ?? null;
-          }
-          if (tableIdx >= 0 && tableIdx < sourceTables.length)
-            return sourceTables[tableIdx];
-          return null;
+        const resolved = resolveByHeader({
+          chunkEls,
+          sources: sourceTables,
+          getHeader: (t) => t.headerLine,
+          headerAttr: "editableModifiedTableHeader",
+          idxAttr: "editableModifiedTableIdx"
         });
         const plan = chunkEls.map((el, i) => ({ el, target: resolved[i] })).filter((p) => p.target).sort((a, b) => b.target.startLine - a.target.startLine);
         for (const { el, target } of plan) {
@@ -18162,26 +18168,9 @@ ${fence}`;
       const sourceEqs = extractDisplayEquations(chunk);
       if (sourceEqs.length === 0)
         return { valid: [], warn: [] };
-      const spans = Array.from(slideEl.querySelectorAll("span.math.display"));
-      const wrappers = [];
-      const seen = /* @__PURE__ */ new Set();
-      for (const s of spans) {
-        const w = topLevelAncestorIn(slideEl, s);
-        if (!w)
-          continue;
-        if (seen.has(w))
-          continue;
-        seen.add(w);
-        if (editableRegistry.has(w))
-          continue;
-        if (w.classList.contains("editable-container"))
-          continue;
-        if (isAlreadyPositioned(w))
-          continue;
-        if (!isDisplayEquationContainer(w))
-          continue;
-        wrappers.push(w);
-      }
+      const wrappers = findTopLevelWrappers(slideEl, "span.math.display", {
+        postFilter: isDisplayEquationContainer
+      });
       if (wrappers.length !== sourceEqs.length)
         return { valid: [], warn: [] };
       const valid = [];
@@ -18221,20 +18210,12 @@ ${fence}`;
         sortByIndexAttr(chunkEls, "editableModifiedEqIdx");
         const sourceEqs = extractDisplayEquations(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
-        const headerCounts = /* @__PURE__ */ new Map();
-        for (const eq2 of sourceEqs) {
-          const h = (eq2.headerLine ?? "").trim();
-          headerCounts.set(h, (headerCounts.get(h) ?? 0) + 1);
-        }
-        const resolved = chunkEls.map((el) => {
-          const idx = parseInt(el.dataset.editableModifiedEqIdx ?? "-1", 10);
-          const expected = (el.dataset.editableModifiedEqHeader ?? "").trim();
-          if (expected && headerCounts.get(expected) === 1) {
-            return sourceEqs.find((e) => (e.headerLine ?? "").trim() === expected) ?? null;
-          }
-          if (idx >= 0 && idx < sourceEqs.length)
-            return sourceEqs[idx];
-          return null;
+        const resolved = resolveByHeader({
+          chunkEls,
+          sources: sourceEqs,
+          getHeader: (e) => e.headerLine,
+          headerAttr: "editableModifiedEqHeader",
+          idxAttr: "editableModifiedEqIdx"
         });
         const plan = chunkEls.map((el, i) => ({ el, target: resolved[i] })).filter((p) => p.target).sort((a, b) => b.target.startLine - a.target.startLine);
         for (const { el, target } of plan) {
