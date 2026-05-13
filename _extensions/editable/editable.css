@@ -440,10 +440,6 @@ h2.editable-heading-active {
   cursor: text;
 }
 
-h2[data-editable-modified-heading="true"] {
-  box-shadow: var(--editable-modify-activated-shadow);
-}
-
 /* Modify mode panel */
 .toolbar-panel-modify {
   display: flex;
