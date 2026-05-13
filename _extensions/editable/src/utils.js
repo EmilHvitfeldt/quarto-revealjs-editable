@@ -15,6 +15,14 @@ export function round(n) {
 }
 
 /**
+ * Escape regex metacharacters in a string so it can be embedded literally
+ * in a `new RegExp(...)` pattern.
+ */
+export function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Log a debug message (only when DEBUG mode is enabled).
  * @param {...any} args - Arguments to log
  */

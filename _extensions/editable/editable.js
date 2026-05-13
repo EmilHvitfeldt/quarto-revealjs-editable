@@ -2995,6 +2995,9 @@ var EditableModule = (() => {
   function round(n) {
     return Math.round(n * 10) / 10;
   }
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
   function debug(...args) {
     if (typeof window !== "undefined" && window.EDITABLE_DEBUG) {
       console.debug("[editable]", ...args);
@@ -16293,9 +16296,6 @@ ${fence}`;
       return chunks.join("");
     }
   });
-  function escapeRegex(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
   function makeAbsoluteBlockRegex(left, top, width, height) {
     const vals = [
       `left=${Math.round(left)}px`,
@@ -16386,21 +16386,31 @@ ${fence}`;
     { label: "figure", selectors: ["div.quarto-figure"], capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
     { label: "table", selectors: ["table"], capabilities: ["move"], lockDims: true, quill: false, display: "table" }
   ];
-  function lockNaturalDimensions(el, displayOverride) {
+  function captureSlideRelativePosition(el, { rectSource } = {}) {
     const slideEl = el.closest("section");
     const scale = getSlideScale();
-    const elRect = el.getBoundingClientRect();
+    const rect = (rectSource ?? el).getBoundingClientRect();
     const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-    const naturalW = elRect.width / scale;
-    const naturalH = elRect.height / scale;
+    return {
+      left: (rect.left - slideRect.left) / scale,
+      top: (rect.top - slideRect.top) / scale,
+      width: rect.width / scale,
+      height: rect.height / scale,
+      scale,
+      slideEl
+    };
+  }
+  function lockNaturalDimensions(el, displayOverride) {
+    const scale = getSlideScale();
+    const elRect = el.getBoundingClientRect();
     const cs = window.getComputedStyle(el);
     el.style.paddingLeft = cs.paddingLeft;
     el.style.paddingRight = cs.paddingRight;
     el.style.paddingTop = cs.paddingTop;
     el.style.paddingBottom = cs.paddingBottom;
     el.style.margin = "0";
-    el.style.width = naturalW + "px";
-    el.style.height = naturalH + "px";
+    el.style.width = elRect.width / scale + "px";
+    el.style.height = elRect.height / scale + "px";
     if (displayOverride)
       el.style.display = displayOverride;
   }
@@ -16830,6 +16840,31 @@ ${fence}`;
     lines.splice(block.endLine + 1, 0, ":::");
     lines.splice(block.startLine, 0, `::: {${attrs}}`);
   }
+  function sortByIndexAttr(els, attrName) {
+    els.sort(
+      (a, b) => parseInt(a.dataset[attrName] ?? "0", 10) - parseInt(b.dataset[attrName] ?? "0", 10)
+    );
+  }
+  function forEachInReverse(items, fn) {
+    for (let i = items.length - 1; i >= 0; i--)
+      fn(items[i], i);
+  }
+  function groupModifiedElementsByChunk(els, text) {
+    const chunks = splitIntoSlideChunks(text);
+    const byChunk = /* @__PURE__ */ new Map();
+    for (const el of els) {
+      if (!editableRegistry.has(el))
+        continue;
+      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length)
+        continue;
+      if (!byChunk.has(chunkIndex))
+        byChunk.set(chunkIndex, []);
+      byChunk.get(chunkIndex).push(el);
+    }
+    return { chunks, byChunk };
+  }
   function buildFenceLineWithAbsolute(originalLine, dims) {
     const match2 = originalLine.match(/^(:{3,})\s*(?:\{([^}]*)\})?\s*$/);
     if (!match2)
@@ -16890,12 +16925,7 @@ ${fence}`;
       const slideIndex = Reveal.getState().indexh;
       div.dataset.editableModifiedFence = "true";
       div.dataset.editableModifiedSlide = String(slideIndex);
-      const slideEl = div.closest("section");
-      const scale = getSlideScale();
-      const divRect = div.getBoundingClientRect();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-      const origLeft = (divRect.left - slideRect.left) / scale;
-      const origTop = (divRect.top - slideRect.top) / scale;
+      const { left: origLeft, top: origTop } = captureSlideRelativePosition(div);
       if (div.dataset.editableModifiedFenceType === "columns") {
         setCapabilityOverride(div, ["move", "resize", "rotate"]);
         const naturalWidth = div.offsetWidth;
@@ -16914,19 +16944,7 @@ ${fence}`;
       );
       if (divs.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const div of divs) {
-        if (!editableRegistry.has(div))
-          continue;
-        const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(div);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(divs, text);
       for (const [chunkIndex, chunkDivs] of byChunk) {
         const fencedOpens = parseFencedDivOpens(chunks[chunkIndex]);
         const ops = [];
@@ -17034,12 +17052,7 @@ ${fence}`;
     },
     activate(p) {
       const slideIndex = Reveal.getState().indexh;
-      const slideEl = p.closest("section");
-      const scale = getSlideScale();
-      const pRect = p.getBoundingClientRect();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-      const origLeft = (pRect.left - slideRect.left) / scale;
-      const origTop = (pRect.top - slideRect.top) / scale;
+      const { left: origLeft, top: origTop } = captureSlideRelativePosition(p);
       p.dataset.editableModifiedParagraph = "true";
       p.dataset.editableModifiedSlide = String(slideIndex);
       initializeQuillForElement(p);
@@ -17052,30 +17065,15 @@ ${fence}`;
       );
       if (paras.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const p of paras) {
-        if (!editableRegistry.has(p))
-          continue;
-        const slideIndex = parseInt(p.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(p);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(paras, text);
       for (const [chunkIndex, chunkParas] of byChunk) {
-        chunkParas.sort(
-          (a, b) => parseInt(a.dataset.editableModifiedParagraphIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedParagraphIdx ?? "0", 10)
-        );
+        sortByIndexAttr(chunkParas, "editableModifiedParagraphIdx");
         const paraBlocks = extractParagraphBlocks(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
-        for (let i = chunkParas.length - 1; i >= 0; i--) {
-          const p = chunkParas[i];
+        forEachInReverse(chunkParas, (p) => {
           const paraIdx = parseInt(p.dataset.editableModifiedParagraphIdx ?? "0", 10);
           if (paraIdx >= paraBlocks.length)
-            continue;
+            return;
           const block = paraBlocks[paraIdx];
           const dims = editableRegistry.get(p).toDimensions();
           const content = p.querySelector(".ql-editor") ? elementToText(p) : block.text;
@@ -17088,7 +17086,7 @@ ${fence}`;
             content,
             ":::"
           );
-        }
+        });
         chunks[chunkIndex] = lines.join("\n");
       }
       return chunks.join("");
@@ -17169,23 +17167,8 @@ ${fence}`;
       },
       activate(el) {
         const slideIndex = Reveal.getState().indexh;
-        const slideEl = el.closest("section");
-        const scale = getSlideScale();
-        const elRect = el.getBoundingClientRect();
-        const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-        const origLeft = (elRect.left - slideRect.left) / scale;
-        const origTop = (elRect.top - slideRect.top) / scale;
-        const cs = window.getComputedStyle(el);
-        const naturalW = elRect.width / scale;
-        const naturalH = elRect.height / scale;
-        el.style.paddingLeft = cs.paddingLeft;
-        el.style.paddingRight = cs.paddingRight;
-        el.style.paddingTop = cs.paddingTop;
-        el.style.paddingBottom = cs.paddingBottom;
-        el.style.margin = "0";
-        el.style.width = naturalW + "px";
-        el.style.height = naturalH + "px";
-        el.style.display = "block";
+        const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
+        lockNaturalDimensions(el, "block");
         el.dataset[activeAttr] = "true";
         el.dataset.editableModifiedSlide = String(slideIndex);
         setCapabilityOverride(el, ["move", "resize"]);
@@ -17199,30 +17182,15 @@ ${fence}`;
         );
         if (els.length === 0)
           return text;
-        const chunks = splitIntoSlideChunks(text);
-        const byChunk = /* @__PURE__ */ new Map();
-        for (const el of els) {
-          if (!editableRegistry.has(el))
-            continue;
-          const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
-          const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-          if (chunkIndex >= chunks.length)
-            continue;
-          if (!byChunk.has(chunkIndex))
-            byChunk.set(chunkIndex, []);
-          byChunk.get(chunkIndex).push(el);
-        }
+        const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
         for (const [chunkIndex, chunkEls] of byChunk) {
-          chunkEls.sort(
-            (a, b) => parseInt(a.dataset[idxAttr] ?? "0", 10) - parseInt(b.dataset[idxAttr] ?? "0", 10)
-          );
+          sortByIndexAttr(chunkEls, idxAttr);
           const blocks = extractBlocksStartingWith(chunks[chunkIndex], testLine);
           const lines = chunks[chunkIndex].split("\n");
-          for (let i = chunkEls.length - 1; i >= 0; i--) {
-            const el = chunkEls[i];
+          forEachInReverse(chunkEls, (el) => {
             const elIdx = parseInt(el.dataset[idxAttr] ?? "0", 10);
             if (elIdx >= blocks.length)
-              continue;
+              return;
             const block = blocks[elIdx];
             const dims = editableRegistry.get(el).toDimensions();
             const attrs = buildAbsoluteAttrString(dims);
@@ -17234,7 +17202,7 @@ ${fence}`;
               block.text,
               ":::"
             );
-          }
+          });
           chunks[chunkIndex] = lines.join("\n");
         }
         return chunks.join("");
@@ -17588,23 +17556,8 @@ ${fence}`;
     },
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const slideEl = el.closest("section");
-      const scale = getSlideScale();
-      const elRect = el.getBoundingClientRect();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-      const origLeft = (elRect.left - slideRect.left) / scale;
-      const origTop = (elRect.top - slideRect.top) / scale;
-      const cs = window.getComputedStyle(el);
-      const naturalW = elRect.width / scale;
-      const naturalH = elRect.height / scale;
-      el.style.paddingLeft = cs.paddingLeft;
-      el.style.paddingRight = cs.paddingRight;
-      el.style.paddingTop = cs.paddingTop;
-      el.style.paddingBottom = cs.paddingBottom;
-      el.style.margin = "0";
-      el.style.width = naturalW + "px";
-      el.style.height = naturalH + "px";
-      el.style.display = "block";
+      const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
+      lockNaturalDimensions(el, "block");
       el.dataset.editableModifiedCode = "true";
       el.dataset.editableModifiedSlide = String(slideIndex);
       setCapabilityOverride(el, ["move", "resize"]);
@@ -17617,39 +17570,24 @@ ${fence}`;
       );
       if (els.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const el of els) {
-        if (!editableRegistry.has(el))
-          continue;
-        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(el);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
       for (const [chunkIndex, chunkEls] of byChunk) {
-        chunkEls.sort(
-          (a, b) => parseInt(a.dataset.editableModifiedCodeIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedCodeIdx ?? "0", 10)
-        );
+        sortByIndexAttr(chunkEls, "editableModifiedCodeIdx");
         const blocks = extractCodeBlocks(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
-        for (let i = chunkEls.length - 1; i >= 0; i--) {
-          const el = chunkEls[i];
+        forEachInReverse(chunkEls, (el) => {
           const codeIdx = parseInt(el.dataset.editableModifiedCodeIdx ?? "0", 10);
           if (codeIdx >= blocks.length)
-            continue;
+            return;
           const expectedFirst = (el.dataset.editableModifiedCodeFirstLine ?? "").trim();
           const actualFirst = (blocks[codeIdx].firstCodeLine ?? "").trim();
           if (expectedFirst && actualFirst && expectedFirst !== actualFirst)
-            continue;
+            return;
           const block = blocks[codeIdx];
           const dims = editableRegistry.get(el).toDimensions();
           const attrs = buildAbsoluteAttrString(dims);
           wrapLinesWithAbsoluteFence(lines, block, attrs);
-        }
+        });
         chunks[chunkIndex] = lines.join("\n");
       }
       return chunks.join("");
@@ -17773,23 +17711,8 @@ ${fence}`;
     },
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const slideEl = el.closest("section");
-      const scale = getSlideScale();
-      const elRect = el.getBoundingClientRect();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-      const origLeft = (elRect.left - slideRect.left) / scale;
-      const origTop = (elRect.top - slideRect.top) / scale;
-      const cs = window.getComputedStyle(el);
-      const naturalW = elRect.width / scale;
-      const naturalH = elRect.height / scale;
-      el.style.paddingLeft = cs.paddingLeft;
-      el.style.paddingRight = cs.paddingRight;
-      el.style.paddingTop = cs.paddingTop;
-      el.style.paddingBottom = cs.paddingBottom;
-      el.style.margin = "0";
-      el.style.width = naturalW + "px";
-      el.style.height = naturalH + "px";
-      el.style.display = "block";
+      const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
+      lockNaturalDimensions(el, "block");
       el.dataset.editableModifiedCell = "true";
       el.dataset.editableModifiedSlide = String(slideIndex);
       setCapabilityOverride(el, ["move", "resize"]);
@@ -17802,27 +17725,12 @@ ${fence}`;
       );
       if (els.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const el of els) {
-        if (!editableRegistry.has(el))
-          continue;
-        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(el);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
       for (const [chunkIndex, chunkEls] of byChunk) {
-        chunkEls.sort(
-          (a, b) => parseInt(a.dataset.editableModifiedCellIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedCellIdx ?? "0", 10)
-        );
+        sortByIndexAttr(chunkEls, "editableModifiedCellIdx");
         const execChunks = extractExecutableChunks(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
-        for (let i = chunkEls.length - 1; i >= 0; i--) {
-          const el = chunkEls[i];
+        forEachInReverse(chunkEls, (el) => {
           const cellLabel = el.dataset.editableModifiedCellLabel || "";
           const cellFirstLine = (el.dataset.editableModifiedCellFirstLine ?? "").trim();
           const cellIdx = parseInt(el.dataset.editableModifiedCellIdx ?? "-1", 10);
@@ -17838,11 +17746,11 @@ ${fence}`;
             }
           }
           if (!target)
-            continue;
+            return;
           const dims = editableRegistry.get(el).toDimensions();
           const attrs = buildAbsoluteAttrString(dims);
           wrapLinesWithAbsoluteFence(lines, target, attrs);
-        }
+        });
         chunks[chunkIndex] = lines.join("\n");
       }
       return chunks.join("");
@@ -17942,27 +17850,12 @@ ${fence}`;
       );
       if (imgs.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const img of imgs) {
-        if (!editableRegistry.has(img))
-          continue;
-        const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(img);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(imgs, text);
       for (const [chunkIndex, chunkImgs] of byChunk) {
-        chunkImgs.sort(
-          (a, b) => parseInt(a.dataset.editableModifiedChunkFigExecIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedChunkFigExecIdx ?? "0", 10)
-        );
+        sortByIndexAttr(chunkImgs, "editableModifiedChunkFigExecIdx");
         const execChunks = extractExecutableChunks(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
-        for (let i = chunkImgs.length - 1; i >= 0; i--) {
-          const img = chunkImgs[i];
+        forEachInReverse(chunkImgs, (img) => {
           const label = img.dataset.editableModifiedChunkFigLabel || "";
           const firstLine = (img.dataset.editableModifiedChunkFigFirstLine ?? "").trim();
           const execIdx = parseInt(img.dataset.editableModifiedChunkFigExecIdx ?? "-1", 10);
@@ -17978,11 +17871,11 @@ ${fence}`;
             }
           }
           if (!target)
-            continue;
+            return;
           const dims = editableRegistry.get(img).toDimensions();
           const attrs = buildAbsoluteAttrString(dims);
           wrapLinesWithAbsoluteFence(lines, target, attrs);
-        }
+        });
         chunks[chunkIndex] = lines.join("\n");
       }
       return chunks.join("");
@@ -18167,23 +18060,9 @@ ${fence}`;
     },
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const slideEl = el.closest("section");
-      const scale = getSlideScale();
-      const elRect = el.getBoundingClientRect();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
-      const origLeft = (elRect.left - slideRect.left) / scale;
-      const origTop = (elRect.top - slideRect.top) / scale;
-      const cs = window.getComputedStyle(el);
-      const naturalW = elRect.width / scale;
-      const naturalH = elRect.height / scale;
+      const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
       const isTable = el.tagName === "TABLE";
-      el.style.paddingLeft = cs.paddingLeft;
-      el.style.paddingRight = cs.paddingRight;
-      el.style.paddingTop = cs.paddingTop;
-      el.style.paddingBottom = cs.paddingBottom;
-      el.style.margin = "0";
-      el.style.width = naturalW + "px";
-      el.style.height = naturalH + "px";
+      lockNaturalDimensions(el);
       el.dataset.editableModifiedTable = "true";
       el.dataset.editableModifiedSlide = String(slideIndex);
       setCapabilityOverride(el, ["move"]);
@@ -18198,23 +18077,9 @@ ${fence}`;
       );
       if (els.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const el of els) {
-        if (!editableRegistry.has(el))
-          continue;
-        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(el);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
       for (const [chunkIndex, chunkEls] of byChunk) {
-        chunkEls.sort(
-          (a, b) => parseInt(a.dataset.editableModifiedTableIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedTableIdx ?? "0", 10)
-        );
+        sortByIndexAttr(chunkEls, "editableModifiedTableIdx");
         const sourceTables = extractTables(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
         const headerCounts = /* @__PURE__ */ new Map();
@@ -18366,15 +18231,8 @@ ${fence}`;
     },
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const slideEl = el.closest("section");
-      const scale = getSlideScale();
-      const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
       const inner = el.querySelector(".MathJax_Display, mjx-container, .katex-display, span.math.display") ?? el;
-      const innerRect = inner.getBoundingClientRect();
-      const origLeft = (innerRect.left - slideRect.left) / scale;
-      const origTop = (innerRect.top - slideRect.top) / scale;
-      const naturalW = innerRect.width / scale;
-      const naturalH = innerRect.height / scale;
+      const { left: origLeft, top: origTop, width: naturalW, height: naturalH } = captureSlideRelativePosition(el, { rectSource: inner });
       el.style.padding = "0";
       el.style.margin = "0";
       el.style.width = naturalW + "px";
@@ -18394,23 +18252,9 @@ ${fence}`;
       );
       if (els.length === 0)
         return text;
-      const chunks = splitIntoSlideChunks(text);
-      const byChunk = /* @__PURE__ */ new Map();
-      for (const el of els) {
-        if (!editableRegistry.has(el))
-          continue;
-        const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? "0", 10);
-        const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-        if (chunkIndex >= chunks.length)
-          continue;
-        if (!byChunk.has(chunkIndex))
-          byChunk.set(chunkIndex, []);
-        byChunk.get(chunkIndex).push(el);
-      }
+      const { chunks, byChunk } = groupModifiedElementsByChunk(els, text);
       for (const [chunkIndex, chunkEls] of byChunk) {
-        chunkEls.sort(
-          (a, b) => parseInt(a.dataset.editableModifiedEqIdx ?? "0", 10) - parseInt(b.dataset.editableModifiedEqIdx ?? "0", 10)
-        );
+        sortByIndexAttr(chunkEls, "editableModifiedEqIdx");
         const sourceEqs = extractDisplayEquations(chunks[chunkIndex]);
         const lines = chunks[chunkIndex].split("\n");
         const headerCounts = /* @__PURE__ */ new Map();

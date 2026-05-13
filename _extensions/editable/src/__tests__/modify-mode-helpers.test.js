@@ -15,7 +15,11 @@ vi.mock('../serialization.js', () => ({
   elementToText: vi.fn(),
   serializeArrowToShortcode: vi.fn(),
 }));
-vi.mock('../utils.js', () => ({ getQmdHeadingIndex: vi.fn(), getSlideScale: vi.fn() }));
+vi.mock('../utils.js', () => ({
+  getQmdHeadingIndex: vi.fn(),
+  getSlideScale: vi.fn(),
+  escapeRegex: (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+}));
 vi.mock('../colors.js', () => ({ getColorPalette: vi.fn(() => []), getBrandColorOutput: vi.fn() }));
 vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
@@ -26,7 +30,15 @@ import {
   findPositionedAncestor,
   buildAbsoluteAttrString,
   wrapLinesWithAbsoluteFence,
+  sortByIndexAttr,
+  forEachInReverse,
+  captureSlideRelativePosition,
+  lockNaturalDimensions,
+  groupModifiedElementsByChunk,
 } from '../modify-mode.js';
+import { splitIntoSlideChunks } from '../serialization.js';
+import { getQmdHeadingIndex, getSlideScale } from '../utils.js';
+import { editableRegistry } from '../editable-element.js';
 
 // Tiny fake-element factory: only models classList.contains + closest, which
 // is everything the helpers under test inspect. Saves us from needing jsdom.
@@ -153,5 +165,195 @@ describe('wrapLinesWithAbsoluteFence', () => {
     const ret = wrapLinesWithAbsoluteFence(lines, { startLine: 0, endLine: 0 }, '.absolute');
     expect(ret).toBeUndefined();
     expect(lines).toEqual(['::: {.absolute}', 'x', ':::']);
+  });
+});
+
+describe('sortByIndexAttr', () => {
+  it('sorts elements ascending by parsed dataset integer', () => {
+    const els = [
+      { dataset: { idx: '2' } },
+      { dataset: { idx: '0' } },
+      { dataset: { idx: '10' } },
+      { dataset: { idx: '1' } },
+    ];
+    sortByIndexAttr(els, 'idx');
+    expect(els.map(e => e.dataset.idx)).toEqual(['0', '1', '2', '10']);
+  });
+
+  it('treats missing attr as 0', () => {
+    const els = [
+      { dataset: { idx: '3' } },
+      { dataset: {} },
+      { dataset: { idx: '1' } },
+    ];
+    sortByIndexAttr(els, 'idx');
+    expect(els.map(e => e.dataset.idx ?? 'missing')).toEqual(['missing', '1', '3']);
+  });
+});
+
+describe('forEachInReverse', () => {
+  it('invokes fn from last to first', () => {
+    const seen = [];
+    forEachInReverse(['a', 'b', 'c'], (item, i) => seen.push([item, i]));
+    expect(seen).toEqual([['c', 2], ['b', 1], ['a', 0]]);
+  });
+
+  it('keeps splice indices stable when used to mutate a parallel array', () => {
+    const lines = ['L0', 'L1', 'L2', 'L3'];
+    const items = [{ at: 0 }, { at: 2 }];
+    forEachInReverse(items, ({ at }) => lines.splice(at, 1, 'X', 'Y'));
+    // Both splices should land at their original positions, not shifted by
+    // earlier inserts.
+    expect(lines).toEqual(['X', 'Y', 'L1', 'X', 'Y', 'L3']);
+  });
+
+  it('handles empty arrays without invoking fn', () => {
+    const fn = vi.fn();
+    forEachInReverse([], fn);
+    expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe('captureSlideRelativePosition', () => {
+  beforeEach(() => {
+    getSlideScale.mockReset();
+    getSlideScale.mockReturnValue(2);
+  });
+
+  function elWith({ rect, slideRect, inner }) {
+    const slide = slideRect
+      ? { getBoundingClientRect: () => slideRect, _tag: 'section', classList: { contains: () => false } }
+      : null;
+    const el = {
+      getBoundingClientRect: () => rect,
+      _tag: 'div',
+      classList: { contains: () => false },
+      closest: (sel) => (sel === 'section' ? slide : null),
+    };
+    if (inner) el._inner = inner;
+    return el;
+  }
+
+  it('returns scaled slide-relative position', () => {
+    const el = elWith({
+      rect: { left: 200, top: 300, width: 400, height: 200 },
+      slideRect: { left: 100, top: 100 },
+    });
+    const out = captureSlideRelativePosition(el);
+    expect(out.left).toBe(50);    // (200 - 100) / 2
+    expect(out.top).toBe(100);    // (300 - 100) / 2
+    expect(out.width).toBe(200);  // 400 / 2
+    expect(out.height).toBe(100); // 200 / 2
+    expect(out.scale).toBe(2);
+  });
+
+  it('falls back to {0,0} slideRect when there is no section ancestor', () => {
+    const el = elWith({
+      rect: { left: 50, top: 80, width: 100, height: 40 },
+      slideRect: null,
+    });
+    const out = captureSlideRelativePosition(el);
+    expect(out.left).toBe(25);
+    expect(out.top).toBe(40);
+  });
+
+  it('measures from rectSource when provided (equation inner-math anchor)', () => {
+    const inner = {
+      getBoundingClientRect: () => ({ left: 250, top: 350, width: 80, height: 30 }),
+    };
+    const el = elWith({
+      rect: { left: 200, top: 300, width: 400, height: 200 },
+      slideRect: { left: 100, top: 100 },
+    });
+    const out = captureSlideRelativePosition(el, { rectSource: inner });
+    expect(out.left).toBe(75);   // (250 - 100) / 2
+    expect(out.top).toBe(125);   // (350 - 100) / 2
+    expect(out.width).toBe(40);
+    expect(out.height).toBe(15);
+  });
+});
+
+describe('lockNaturalDimensions', () => {
+  beforeEach(() => {
+    getSlideScale.mockReset();
+    getSlideScale.mockReturnValue(2);
+    // jsdom-free getComputedStyle stub
+    if (typeof globalThis.window === 'undefined') globalThis.window = {};
+    globalThis.window.getComputedStyle = () => ({
+      paddingLeft: '4px',
+      paddingRight: '4px',
+      paddingTop: '2px',
+      paddingBottom: '2px',
+    });
+  });
+
+  it('writes scaled width/height and copied padding, zeroes margin', () => {
+    const style = {};
+    const el = {
+      getBoundingClientRect: () => ({ width: 400, height: 200 }),
+      style,
+    };
+    lockNaturalDimensions(el);
+    expect(style.width).toBe('200px');
+    expect(style.height).toBe('100px');
+    expect(style.paddingLeft).toBe('4px');
+    expect(style.paddingTop).toBe('2px');
+    expect(style.margin).toBe('0');
+    expect(style.display).toBeUndefined();
+  });
+
+  it('sets display when displayOverride is passed', () => {
+    const style = {};
+    const el = {
+      getBoundingClientRect: () => ({ width: 100, height: 50 }),
+      style,
+    };
+    lockNaturalDimensions(el, 'block');
+    expect(style.display).toBe('block');
+  });
+});
+
+describe('groupModifiedElementsByChunk', () => {
+  beforeEach(() => {
+    splitIntoSlideChunks.mockReset();
+    getQmdHeadingIndex.mockReset();
+    splitIntoSlideChunks.mockReturnValue(['preamble', '## A\n', '## B\n', '## C\n']);
+    // slide index N → chunk N+1 (i.e. getQmdHeadingIndex(N) === N)
+    getQmdHeadingIndex.mockImplementation((n) => n);
+    // Pretend all elements are in the registry.
+    editableRegistry.has = () => true;
+  });
+
+  function modEl(slide) {
+    return { dataset: { editableModifiedSlide: String(slide) } };
+  }
+
+  it('groups elements by their source-chunk index', () => {
+    const a = modEl(0); // chunk 1
+    const b = modEl(0); // chunk 1
+    const c = modEl(1); // chunk 2
+    const { chunks, byChunk } = groupModifiedElementsByChunk([a, b, c], 'ignored');
+    expect(chunks).toHaveLength(4);
+    expect(byChunk.get(1)).toEqual([a, b]);
+    expect(byChunk.get(2)).toEqual([c]);
+  });
+
+  it('skips elements not in editableRegistry', () => {
+    editableRegistry.has = (el) => el !== 'orphan';
+    const a = modEl(0);
+    const { byChunk } = groupModifiedElementsByChunk(['orphan', a], 'ignored');
+    expect(byChunk.get(1)).toEqual([a]);
+  });
+
+  it('skips elements whose chunk index runs past the chunk array', () => {
+    const a = modEl(99);
+    const { byChunk } = groupModifiedElementsByChunk([a], 'ignored');
+    expect(byChunk.size).toBe(0);
+  });
+
+  it('treats missing slide attr as slide 0', () => {
+    const a = { dataset: {} };
+    const { byChunk } = groupModifiedElementsByChunk([a], 'ignored');
+    expect(byChunk.get(1)).toEqual([a]);
   });
 });
