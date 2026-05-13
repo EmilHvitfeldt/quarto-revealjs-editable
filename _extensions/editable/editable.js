@@ -16344,15 +16344,44 @@ ${fence}`;
       return false;
     return makeAbsoluteImageRegex(src, pos.left, pos.top, pos.width, pos.height).test(chunk);
   }
-  var TYPED_INNER_CONFIG = {
-    P: { capabilities: null, lockDims: false, quill: true, display: null },
-    BLOCKQUOTE: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    UL: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    OL: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    PRE: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    FIGURE: { capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
-    TABLE: { capabilities: ["move"], lockDims: true, quill: false, display: "table" }
-  };
+  var TYPED_INNER_CONFIGS = [
+    // Equations live as <p><span class="math display">...</span></p>. Match the
+    // paragraph form first so the generic paragraph classifier below doesn't
+    // grab it and offer Quill editing on LaTeX source.
+    {
+      label: "equation",
+      selector: "p",
+      extraFilter: (el) => !!el.querySelector(":scope > span.math.display"),
+      capabilities: ["move"],
+      lockDims: true,
+      quill: false,
+      display: null
+    },
+    // Generic paragraph — explicitly excludes math-only paragraphs so the
+    // equation entry above wins (registration order matters within this array
+    // because both selectors would otherwise match the same <p>).
+    {
+      label: "paragraph",
+      selector: "p",
+      extraFilter: (el) => !el.querySelector(":scope > span.math.display"),
+      capabilities: null,
+      lockDims: false,
+      quill: true,
+      display: null
+    },
+    { label: "blockquote", selector: "blockquote", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "bullet list", selector: "ul", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "ordered list", selector: "ol", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "display code", selector: "pre", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    // Code chunk outputs and code chunk figures both render as `div.cell` —
+    // one entry covers both. Tighter scoping (cell-output-display vs figure)
+    // would require dedicated classifiers; the universal cell handler keeps
+    // re-activation working for either.
+    { label: "code cell", selector: "div.cell", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    // Bare <figure> wrappers outside of executable chunks.
+    { label: "figure", selector: "figure", capabilities: ["move", "resize"], lockDims: true, quill: false, display: null },
+    { label: "table", selector: "table", capabilities: ["move"], lockDims: true, quill: false, display: "table" }
+  ];
   function lockNaturalDimensions(el, displayOverride) {
     const slideEl = el.closest("section");
     const scale = getSlideScale();
@@ -16388,21 +16417,28 @@ ${fence}`;
       replacement: serializeToQmd(dims)
     };
   }
-  for (const [tag, cfg] of Object.entries(TYPED_INNER_CONFIG)) {
-    const lowerTag = tag.toLowerCase();
+  for (const cfg of TYPED_INNER_CONFIGS) {
+    const innerTag = cfg.selector.match(/^[a-zA-Z]+/)[0].toLowerCase();
     ModifyModeClassifier.register(makePositionedClassifier({
-      label: `Positioned ${lowerTag}`,
-      selector: `div.absolute > ${lowerTag}`,
-      serializeSelector: `${lowerTag}[data-editable-modified-abs-left]`,
+      label: `Positioned ${cfg.label}`,
+      selector: `div.absolute > ${cfg.selector}`,
+      // Scope serialize to the typed-claimed dataset stamped at activate time,
+      // not just the abs-left dataset — otherwise `Positioned divs` and this
+      // classifier would both match a typed inner <div> (e.g. div.cell).
+      serializeSelector: `${innerTag}[data-editable-modified-typed-inner="true"]`,
       getPosition: getPositionFromWrapper,
       matchesSource: (el, _pos, slideIndex) => {
         const wrapper = el.parentElement;
         return wrapper ? absoluteDivInQmdSource(wrapper, slideIndex) : false;
       },
+      extraSkip: cfg.extraFilter ? (el) => !cfg.extraFilter(el) : void 0,
       onClassifyValid: (el) => {
         const wrapper = el.parentElement;
         if (wrapper)
           wrapper.dataset.typedPositionedClaimed = "true";
+      },
+      extraDataset: (el) => {
+        el.dataset.editableModifiedTypedInner = "true";
       },
       setupFn: setupDivWhenReady,
       extraActivate: (el) => {
@@ -16423,7 +16459,9 @@ ${fence}`;
   ModifyModeClassifier.register(makePositionedClassifier({
     label: "Positioned divs",
     selector: "div.absolute",
-    serializeSelector: "div[data-editable-modified-abs-left]",
+    // Scope to wrappers only (`.absolute`) so a typed-inner <div> (e.g.
+    // `div.cell` activated via the typed classifier above) isn't double-rewritten.
+    serializeSelector: "div.absolute[data-editable-modified-abs-left]",
     extraSkip: (div) => div.classList.contains("editable-container") || div.classList.contains("editable-new") || div.classList.contains("editable") || div.dataset.typedPositionedClaimed === "true",
     matchesSource: (el, _pos, slideIndex) => absoluteDivInQmdSource(el, slideIndex),
     setupFn: setupDivWhenReady,
