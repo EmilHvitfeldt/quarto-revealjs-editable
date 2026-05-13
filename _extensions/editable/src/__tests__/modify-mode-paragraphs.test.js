@@ -17,7 +17,38 @@ vi.mock('../colors.js', () => ({ getColorPalette: vi.fn(() => []), getBrandColor
 vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 
-import { extractParagraphBlocks } from '../modify-mode.js';
+import { extractParagraphBlocks, assignStableParagraphIndices } from '../modify-mode.js';
+
+const makeP = (existingIdx) => ({
+  dataset: existingIdx === undefined ? {} : { editableModifiedParagraphIdx: String(existingIdx) },
+});
+
+describe('assignStableParagraphIndices', () => {
+  it('assigns 0..n on fresh paragraphs', () => {
+    const ps = [makeP(), makeP(), makeP()];
+    assignStableParagraphIndices(ps);
+    expect(ps.map(p => p.dataset.editableModifiedParagraphIdx)).toEqual(['0', '1', '2']);
+  });
+
+  it('does not overwrite existing indices', () => {
+    const ps = [makeP(0), makeP(), makeP()];
+    assignStableParagraphIndices(ps);
+    expect(ps.map(p => p.dataset.editableModifiedParagraphIdx)).toEqual(['0', '1', '2']);
+  });
+
+  it('indices stay stable across multiple classify passes', () => {
+    // Simulates the bug: after activating p0, classify re-runs over [p0, p1].
+    // p1 must keep idx 1, not be reset to 0.
+    const p0 = makeP();
+    const p1 = makeP();
+    assignStableParagraphIndices([p0, p1]);
+    expect(p1.dataset.editableModifiedParagraphIdx).toBe('1');
+    // re-run (e.g. user toggles modify mode again)
+    assignStableParagraphIndices([p0, p1]);
+    expect(p0.dataset.editableModifiedParagraphIdx).toBe('0');
+    expect(p1.dataset.editableModifiedParagraphIdx).toBe('1');
+  });
+});
 
 describe('extractParagraphBlocks', () => {
   it('extracts a single paragraph', () => {

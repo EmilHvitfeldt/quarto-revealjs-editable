@@ -17025,20 +17025,36 @@ ${fence}`;
     commitBlock();
     return blocks;
   }
+  function assignStableParagraphIndices(paragraphs) {
+    const used = /* @__PURE__ */ new Set();
+    for (const p of paragraphs) {
+      const existing = p.dataset.editableModifiedParagraphIdx;
+      if (existing !== void 0)
+        used.add(parseInt(existing, 10));
+    }
+    let next = 0;
+    for (const p of paragraphs) {
+      if (p.dataset.editableModifiedParagraphIdx !== void 0)
+        continue;
+      while (used.has(next))
+        next++;
+      p.dataset.editableModifiedParagraphIdx = String(next);
+      used.add(next);
+      next++;
+    }
+  }
   ModifyModeClassifier.register({
     label: "Paragraphs",
     classify(slideEl) {
-      const candidates = Array.from(slideEl.children).filter(
-        (el) => el.tagName === "P" && !editableRegistry.has(el) && !isAlreadyPositioned(el) && !el.querySelector("img") && // Standalone display equations are handled by the Display equations
+      const allParas = Array.from(slideEl.children).filter(
+        (el) => el.tagName === "P" && !el.querySelector("img") && // Standalone display equations are handled by the Display equations
         // classifier; don't double-claim them as plain paragraphs.
         !el.querySelector("span.math.display")
       );
-      const valid = [];
-      let idx = 0;
-      for (const p of candidates) {
-        p.dataset.editableModifiedParagraphIdx = String(idx++);
-        valid.push(p);
-      }
+      assignStableParagraphIndices(allParas);
+      const valid = allParas.filter(
+        (p) => !editableRegistry.has(p) && !isAlreadyPositioned(p)
+      );
       return { valid, warn: [] };
     },
     activate(p) {
