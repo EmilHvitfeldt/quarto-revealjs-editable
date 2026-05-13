@@ -45,6 +45,11 @@ import { getColorPalette, getBrandColorOutput } from './colors.js';
 import { setCapabilityOverride } from './capabilities.js';
 import { createArrowElement, setActiveArrow } from './arrows.js';
 import { CONFIG } from './config.js';
+import {
+  getAbsolutePosition,
+  waitForRegistryThenFixPosition,
+  makePositionedClassifier,
+} from './modify-mode-positioned.js';
 
 const VALID_CLASS = 'modify-mode-valid';
 const WARN_CLASS  = 'modify-mode-warn';
@@ -180,8 +185,7 @@ ModifyModeClassifier.register({
 
     for (const img of imgs) {
       if (editableRegistry.has(img)) continue;
-      if (img.classList.contains('absolute')) continue;
-      if (img.closest('div.absolute')) continue;
+      if (isAlreadyPositioned(img)) continue;
       const src = getImgSrc(img);
       if (!src) continue;
       const prefix = getChunkPrefix(src);
@@ -304,8 +308,7 @@ ModifyModeClassifier.register({
 
     for (const video of videos) {
       if (editableRegistry.has(video)) continue;
-      if (video.classList.contains('absolute')) continue;
-      if (video.closest('div.absolute')) continue;
+      if (isAlreadyPositioned(video)) continue;
       const src = getVideoSrc(video);
       if (!src) continue;
       if (videoSrcInQmdSource(video)) {
@@ -398,25 +401,15 @@ ModifyModeClassifier.register({
 });
 
 // ---------------------------------------------------------------------------
-// {.absolute} div classifier helpers
+// Positioned-element re-activation classifiers
+//
+// The shared boilerplate (dataset bookkeeping, activate-time setup, chunk
+// regex replace) lives in modify-mode-positioned.js. This section wires the
+// two element types onto that factory.
 // ---------------------------------------------------------------------------
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Read left/top/width/height from a div.absolute's inline styles.
- * Returns null if any value is missing (element can't be matched to source).
- */
-function getAbsolutePosition(el) {
-  const s = el.style;
-  const left   = s.left   ? parseFloat(s.left)   : null;
-  const top    = s.top    ? parseFloat(s.top)     : null;
-  const width  = s.width  ? parseFloat(s.width)  : null;
-  const height = s.height ? parseFloat(s.height) : null;
-  if (left === null || top === null || width === null || height === null) return null;
-  return { left, top, width, height };
 }
 
 /**
@@ -434,119 +427,6 @@ function makeAbsoluteBlockRegex(left, top, width, height) {
   return new RegExp(`\\{${lookaheads}\\.absolute[^}]*\\}`, 'g');
 }
 
-/** Return true if the div's position can be matched to a {.absolute} block in source. */
-function absoluteDivInQmdSource(div, slideIndex) {
-  if (!window._input_file) return false;
-  const pos = getAbsolutePosition(div);
-  if (!pos) return false;
-  const chunks = splitIntoSlideChunks(window._input_file);
-  const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
-  if (!chunk) return false;
-  return makeAbsoluteBlockRegex(pos.left, pos.top, pos.width, pos.height).test(chunk);
-}
-
-/**
- * Poll until the element appears in editableRegistry, then set its container
- * position to the original left/top values captured before setup ran.
- * Needed because setupEltStyles sets position:relative on the element, clearing
- * the effective absolute position; the container must receive it instead.
- */
-function waitForRegistryThenFixPosition(el, origLeft, origTop) {
-  if (editableRegistry.has(el)) {
-    editableRegistry.get(el).setState({ x: origLeft, y: origTop });
-  } else {
-    requestAnimationFrame(() => waitForRegistryThenFixPosition(el, origLeft, origTop));
-  }
-}
-
-// {.absolute} div classifier
-ModifyModeClassifier.register({
-  label: 'Positioned divs',
-  classify(slideEl) {
-    const slideIndex = Reveal.getState().indexh;
-    const divs = Array.from(slideEl.querySelectorAll('div.absolute'));
-    const valid = [];
-    const warn  = [];
-    for (const div of divs) {
-      if (editableRegistry.has(div)) continue;
-      if (div.classList.contains('editable-container')) continue;
-      if (div.classList.contains('editable-new')) continue;
-      if (div.classList.contains('editable')) continue;
-      const pos = getAbsolutePosition(div);
-      if (!pos) {
-        warn.push({ el: div, reason: 'No inline position — cannot match to source' });
-        continue;
-      }
-      if (!absoluteDivInQmdSource(div, slideIndex)) {
-        warn.push({ el: div, reason: 'Cannot locate matching {.absolute} block in source' });
-        continue;
-      }
-      valid.push(div);
-    }
-    return { valid, warn };
-  },
-
-  activate(el) {
-    const pos = getAbsolutePosition(el);
-    if (!pos) return;
-    el.dataset.editableModified          = 'true';
-    el.dataset.editableModifiedSlide     = String(Reveal.getState().indexh);
-    el.dataset.editableModifiedAbsLeft   = String(Math.round(pos.left));
-    el.dataset.editableModifiedAbsTop    = String(Math.round(pos.top));
-    el.dataset.editableModifiedAbsWidth  = String(Math.round(pos.width));
-    el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
-    // Clear left/top before setup: setupEltStyles sets position:relative, so
-    // any remaining left/top inline styles would act as relative offsets and
-    // double-count the position when the container is placed.
-    el.style.left = '';
-    el.style.top  = '';
-    setupDivWhenReady(el);
-    waitForRegistryThenFixPosition(el, pos.left, pos.top);
-  },
-
-  serialize(text) {
-    const divs = Array.from(
-      document.querySelectorAll('div[data-editable-modified-abs-left]')
-    );
-    if (divs.length === 0) return text;
-    const chunks = splitIntoSlideChunks(text);
-    const groups = new Map();
-    for (const div of divs) {
-      if (!editableRegistry.has(div)) continue;
-      const slideIndex = parseInt(div.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!groups.has(chunkIndex)) groups.set(chunkIndex, []);
-      groups.get(chunkIndex).push(div);
-    }
-    for (const [chunkIndex, groupDivs] of groups) {
-      groupDivs.sort((a, b) =>
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
-      );
-      const occurrenceCounters = new Map();
-      for (const div of groupDivs) {
-        const origLeft   = parseInt(div.dataset.editableModifiedAbsLeft,   10);
-        const origTop    = parseInt(div.dataset.editableModifiedAbsTop,    10);
-        const origWidth  = parseInt(div.dataset.editableModifiedAbsWidth,  10);
-        const origHeight = parseInt(div.dataset.editableModifiedAbsHeight, 10);
-        const sig = `${origLeft},${origTop},${origWidth},${origHeight}`;
-        const targetOccurrence = occurrenceCounters.get(sig) ?? 0;
-        occurrenceCounters.set(sig, targetOccurrence + 1);
-        const regex = makeAbsoluteBlockRegex(origLeft, origTop, origWidth, origHeight);
-        const dims  = editableRegistry.get(div).toDimensions();
-        const replacement = serializeToQmd(dims);
-        let occurrence = 0;
-        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) => {
-          if (occurrence++ === targetOccurrence) return replacement;
-          return match;
-        });
-      }
-    }
-    return chunks.join('');
-  },
-});
-
-// {.absolute} image classifier
 function makeAbsoluteImageRegex(src, left, top, width, height) {
   const escapedSrc = escapeRegex(src);
   const vals = [
@@ -557,6 +437,16 @@ function makeAbsoluteImageRegex(src, left, top, width, height) {
   ];
   const lookaheads = vals.map(v => `(?=[^}]*${escapeRegex(v)})`).join('');
   return new RegExp(`\\]\\(${escapedSrc}\\)\\{${lookaheads}\\.absolute[^}]*\\}`, 'g');
+}
+
+function absoluteDivInQmdSource(div, slideIndex) {
+  if (!window._input_file) return false;
+  const pos = getAbsolutePosition(div);
+  if (!pos) return false;
+  const chunks = splitIntoSlideChunks(window._input_file);
+  const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
+  if (!chunk) return false;
+  return makeAbsoluteBlockRegex(pos.left, pos.top, pos.width, pos.height).test(chunk);
 }
 
 function absoluteImgInQmdSource(img, slideIndex) {
@@ -571,86 +461,243 @@ function absoluteImgInQmdSource(img, slideIndex) {
   return makeAbsoluteImageRegex(src, pos.left, pos.top, pos.width, pos.height).test(chunk);
 }
 
-ModifyModeClassifier.register({
-  label: 'Positioned images',
-  classify(slideEl) {
-    const slideIndex = Reveal.getState().indexh;
-    const imgs = Array.from(slideEl.querySelectorAll('img.absolute'));
-    const valid = [];
-    const warn  = [];
-    for (const img of imgs) {
-      if (editableRegistry.has(img)) continue;
-      const pos = getAbsolutePosition(img);
-      if (!pos) {
-        warn.push({ el: img, reason: 'No inline position — cannot match to source' });
-        continue;
-      }
-      if (!absoluteImgInQmdSource(img, slideIndex)) {
-        warn.push({ el: img, reason: 'Cannot locate matching {.absolute} block in source' });
-        continue;
-      }
-      valid.push(img);
-    }
-    return { valid, warn };
-  },
+// ---------------------------------------------------------------------------
+// Typed-inner positioned classifiers (issue #140)
+//
+// Saved elements wrapped in `::: {.absolute …}` re-activate by targeting the
+// *inner* semantic element (paragraph, list, table, …), not the wrapper. The
+// wrapper's role is reduced to source-anchor metadata + a `data-typed-positioned-claimed`
+// marker that tells the generic `Positioned divs` classifier to skip it.
+//
+// Per-type behavior matches the first-activation classifier where it matters:
+// capability overrides, Quill init for editable text, natural-dimension
+// locking before reparenting. Position is read from the wrapper's inline
+// styles (the inner element doesn't carry the position attrs).
+//
+// Registers BEFORE `Positioned divs` so the typed claim wins. See
+// `ARCHITECTURE.md` — "Re-activating Already-Positioned Elements".
+// ---------------------------------------------------------------------------
 
-  activate(el) {
-    const pos = getAbsolutePosition(el);
-    if (!pos) return;
-    el.dataset.editableModifiedAbsLeft   = String(Math.round(pos.left));
-    el.dataset.editableModifiedAbsTop    = String(Math.round(pos.top));
-    el.dataset.editableModifiedAbsWidth  = String(Math.round(pos.width));
-    el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
-    el.dataset.editableModifiedAbsSrc    = getImgSrc(el) ?? '';
-    el.dataset.editableModifiedSlide     = String(Reveal.getState().indexh);
+/**
+ * Per-inner-type activation config. Each entry registers a typed positioned
+ * classifier targeting `div.absolute > <selector>`.
+ *
+ *   label         Suffix for "Positioned …" classifier label.
+ *   selector      CSS selector relative to the wrapper (e.g. 'p', 'div.cell').
+ *   extraFilter   Optional predicate to refine matches (e.g. paragraphs that
+ *                 are NOT just a math equation wrapper). Receives the inner
+ *                 element; return false to skip.
+ *   capabilities  setCapabilityOverride argument; null to leave defaults.
+ *   lockDims      Whether to lock natural width/height before reparent.
+ *   quill         Whether to attach Quill rich-text editing.
+ *   display       CSS `display` value to restore (e.g. 'table' for tables).
+ */
+const TYPED_INNER_CONFIGS = [
+  // Equations live as <p><span class="math display">...</span></p>. Match the
+  // paragraph form first so the generic paragraph classifier below doesn't
+  // grab it and offer Quill editing on LaTeX source.
+  {
+    label: 'equation',
+    selectors: ['p'],
+    extraFilter: (el) => !!el.querySelector(':scope > span.math.display'),
+    capabilities: ['move'], lockDims: true, quill: false, display: null,
+  },
+  // Generic paragraph — explicitly excludes math-only paragraphs so the
+  // equation entry above wins (registration order matters within this array
+  // because both selectors would otherwise match the same <p>).
+  {
+    label: 'paragraph',
+    selectors: ['p'],
+    extraFilter: (el) => !el.querySelector(':scope > span.math.display'),
+    capabilities: null, lockDims: false, quill: true, display: null,
+  },
+  { label: 'blockquote', selectors: ['blockquote'], capabilities: ['move','resize'], lockDims: true, quill: false, display: null },
+  { label: 'bullet list',  selectors: ['ul'], capabilities: ['move','resize'], lockDims: true, quill: false, display: null },
+  { label: 'ordered list', selectors: ['ol'], capabilities: ['move','resize'], lockDims: true, quill: false, display: null },
+  // Code chunk outputs and code chunk figures both render as `div.cell` —
+  // one entry covers both. Register BEFORE display code so a positioned
+  // executable chunk doesn't get grabbed by the display-code classifier
+  // (which matches any `div.sourceCode`).
+  { label: 'code cell',    selectors: ['div.cell'], capabilities: ['move','resize'], lockDims: true, quill: false, display: null },
+  // Display code: Quarto wraps the <pre> in `div.code-copy-outer-scaffold`
+  // (when copy button is enabled) or `div.sourceCode` (when not). Match
+  // either as the direct child of the absolute wrapper.
+  { label: 'display code', selectors: ['div.code-copy-outer-scaffold', 'div.sourceCode'], capabilities: ['move','resize'], lockDims: true, quill: false, display: null },
+  // Figures from `![](src){#fig-id}` syntax are wrapped in
+  // `div.quarto-float.quarto-figure` (not a bare <figure>).
+  { label: 'figure',       selectors: ['div.quarto-figure'], capabilities: ['move','resize'], lockDims: true, quill: false, display: null },
+  { label: 'table',        selectors: ['table'],             capabilities: ['move'],          lockDims: true, quill: false, display: 'table' },
+];
+
+/**
+ * Lock the element's natural width/height + padding so it doesn't collapse
+ * when reparented into the inline-block `editable-container`. Mirrors the
+ * pattern used by the list/blockquote first-activation classifiers.
+ */
+function lockNaturalDimensions(el, displayOverride) {
+  const slideEl = el.closest('section');
+  const scale = getSlideScale();
+  const elRect = el.getBoundingClientRect();
+  const slideRect = slideEl ? slideEl.getBoundingClientRect() : { left: 0, top: 0 };
+  const naturalW = elRect.width  / scale;
+  const naturalH = elRect.height / scale;
+  const cs = window.getComputedStyle(el);
+  el.style.paddingLeft   = cs.paddingLeft;
+  el.style.paddingRight  = cs.paddingRight;
+  el.style.paddingTop    = cs.paddingTop;
+  el.style.paddingBottom = cs.paddingBottom;
+  el.style.margin        = '0';
+  el.style.width         = naturalW + 'px';
+  el.style.height        = naturalH + 'px';
+  if (displayOverride) el.style.display = displayOverride;
+  // Suppress unused warnings — slideRect kept for parity with first-activation path
+  void slideRect;
+}
+
+/**
+ * Read position from the wrapping `div.absolute`. Inner elements don't carry
+ * the position attrs themselves — they live on the wrapper. Returns null if
+ * the wrapper is missing or has incomplete position styles.
+ */
+function getPositionFromWrapper(innerEl) {
+  const wrapper = innerEl.parentElement;
+  if (!wrapper || !wrapper.classList || !wrapper.classList.contains('absolute')) return null;
+  return getAbsolutePosition(wrapper);
+}
+
+/**
+ * Build a regex that matches the `{.absolute …}` block in source containing
+ * all four original position values — same shape as the Positioned divs
+ * regex. Re-activated typed elements share the wrapper's source location, so
+ * the rewrite target is identical.
+ */
+function makeTypedFenceRewriteReplacement(_el, dims, ds) {
+  return {
+    regex: makeAbsoluteBlockRegex(
+      parseInt(ds.editableModifiedAbsLeft,   10),
+      parseInt(ds.editableModifiedAbsTop,    10),
+      parseInt(ds.editableModifiedAbsWidth,  10),
+      parseInt(ds.editableModifiedAbsHeight, 10),
+    ),
+    replacement: serializeToQmd(dims),
+  };
+}
+
+for (const cfg of TYPED_INNER_CONFIGS) {
+  // Tag of the inner element (used as serializeSelector base). The selectors
+  // may be more specific than a tag (e.g. `div.cell`) — derive the tag from
+  // the first selector's leading word.
+  const innerTag = cfg.selectors[0].match(/^[a-zA-Z]+/)[0].toLowerCase();
+  const fullSelector = cfg.selectors.map((s) => `div.absolute > ${s}`).join(', ');
+  ModifyModeClassifier.register(makePositionedClassifier({
+    label: `Positioned ${cfg.label}`,
+    selector: fullSelector,
+    // Scope serialize to the typed-claimed dataset stamped at activate time,
+    // not just the abs-left dataset — otherwise `Positioned divs` and this
+    // classifier would both match a typed inner <div> (e.g. div.cell).
+    serializeSelector: `${innerTag}[data-editable-modified-typed-inner="true"]`,
+    getPosition: getPositionFromWrapper,
+    matchesSource: (el, _pos, slideIndex) => {
+      const wrapper = el.parentElement;
+      return wrapper ? absoluteDivInQmdSource(wrapper, slideIndex) : false;
+    },
+    extraSkip: cfg.extraFilter ? (el) => !cfg.extraFilter(el) : undefined,
+    onClassifyValid: (el) => {
+      const wrapper = el.parentElement;
+      if (wrapper) wrapper.dataset.typedPositionedClaimed = 'true';
+    },
+    extraDataset: (el) => {
+      el.dataset.editableModifiedTypedInner = 'true';
+    },
+    setupFn: setupDivWhenReady,
+    extraActivate: (el) => {
+      // Hoist the inner element out of its `div.absolute` wrapper BEFORE setup
+      // runs. setupDraggableElt inserts an .editable-container around the inner
+      // in-place; if the wrapper is left positioned around the container, the
+      // container's `position: absolute` compounds with the wrapper's position
+      // and renders at the wrong spot. Moving the inner up makes the container
+      // a direct child of the slide section, where its absolute position is
+      // relative to the slide (correct). The now-empty wrapper is hidden so it
+      // doesn't ghost the inner element.
+      const wrapper = el.parentElement;
+      if (wrapper && wrapper.classList && wrapper.classList.contains('absolute')) {
+        const wrapperParent = wrapper.parentNode;
+        if (wrapperParent) {
+          wrapperParent.insertBefore(el, wrapper);
+          wrapper.style.display = 'none';
+        }
+      }
+      if (cfg.lockDims) lockNaturalDimensions(el, cfg.display);
+      if (cfg.capabilities) setCapabilityOverride(el, cfg.capabilities);
+      if (cfg.quill) initializeQuillForElement(el);
+    },
+    getReplacement: makeTypedFenceRewriteReplacement,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Generic positioned-div classifier (any remaining div.absolute the typed
+// classifiers above didn't claim — e.g. fenced divs that wrap multiple
+// children, raw HTML, etc.)
+// ---------------------------------------------------------------------------
+
+ModifyModeClassifier.register(makePositionedClassifier({
+  label: 'Positioned divs',
+  selector: 'div.absolute',
+  // Scope to wrappers only (`.absolute`) so a typed-inner <div> (e.g.
+  // `div.cell` activated via the typed classifier above) isn't double-rewritten.
+  serializeSelector: 'div.absolute[data-editable-modified-abs-left]',
+  extraSkip: (div) =>
+    div.classList.contains('editable-container') ||
+    div.classList.contains('editable-new') ||
+    div.classList.contains('editable') ||
+    div.dataset.typedPositionedClaimed === 'true',
+  matchesSource: (el, _pos, slideIndex) => absoluteDivInQmdSource(el, slideIndex),
+  setupFn: setupDivWhenReady,
+  getReplacement: (_el, dims, ds) => ({
+    regex: makeAbsoluteBlockRegex(
+      parseInt(ds.editableModifiedAbsLeft,   10),
+      parseInt(ds.editableModifiedAbsTop,    10),
+      parseInt(ds.editableModifiedAbsWidth,  10),
+      parseInt(ds.editableModifiedAbsHeight, 10),
+    ),
+    replacement: serializeToQmd(dims),
+  }),
+}));
+
+ModifyModeClassifier.register(makePositionedClassifier({
+  label: 'Positioned images',
+  selector: 'img.absolute',
+  serializeSelector: 'img[data-editable-modified-abs-src]',
+  matchesSource: (el, _pos, slideIndex) => absoluteImgInQmdSource(el, slideIndex),
+  extraDataset: (el) => {
+    el.dataset.editableModifiedAbsSrc = getImgSrc(el) ?? '';
+  },
+  extraActivate: (el) => {
     if (!el.getAttribute('src') && el.getAttribute('data-src')) {
       el.src = el.getAttribute('data-src');
     }
-    el.style.left = '';
-    el.style.top  = '';
     // Remove percentage-based max-width/max-height (Reveal.js sets max-width:95%).
     // Once inside the inline-block editable-container, those % values would resolve
     // against the container width, shrinking the image.
     el.style.maxWidth  = 'none';
     el.style.maxHeight = 'none';
-    setupImageWhenReady(el);
-    waitForRegistryThenFixPosition(el, pos.left, pos.top);
   },
-
-  serialize(text) {
-    const imgs = Array.from(
-      document.querySelectorAll('img[data-editable-modified-abs-src]')
-    );
-    if (imgs.length === 0) return text;
-    const chunks = splitIntoSlideChunks(text);
-    const groups = new Map();
-    for (const img of imgs) {
-      if (!editableRegistry.has(img)) continue;
-      const slideIndex = parseInt(img.dataset.editableModifiedSlide ?? '0', 10);
-      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
-      if (chunkIndex >= chunks.length) continue;
-      if (!groups.has(chunkIndex)) groups.set(chunkIndex, []);
-      groups.get(chunkIndex).push(img);
-    }
-    for (const [chunkIndex, groupImgs] of groups) {
-      groupImgs.sort((a, b) =>
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
-      );
-      for (const img of groupImgs) {
-        const src        = img.dataset.editableModifiedAbsSrc;
-        const origLeft   = parseInt(img.dataset.editableModifiedAbsLeft,   10);
-        const origTop    = parseInt(img.dataset.editableModifiedAbsTop,    10);
-        const origWidth  = parseInt(img.dataset.editableModifiedAbsWidth,  10);
-        const origHeight = parseInt(img.dataset.editableModifiedAbsHeight, 10);
-        const regex = makeAbsoluteImageRegex(src, origLeft, origTop, origWidth, origHeight);
-        const dims  = editableRegistry.get(img).toDimensions();
-        const replacement = `](${src}){.absolute left=${dims.left}px top=${dims.top}px width=${dims.width}px height=${dims.height}px}`;
-        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, replacement);
-      }
-    }
-    return chunks.join('');
+  setupFn: setupImageWhenReady,
+  getReplacement: (_el, dims, ds) => {
+    const src = ds.editableModifiedAbsSrc;
+    return {
+      regex: makeAbsoluteImageRegex(
+        src,
+        parseInt(ds.editableModifiedAbsLeft,   10),
+        parseInt(ds.editableModifiedAbsTop,    10),
+        parseInt(ds.editableModifiedAbsWidth,  10),
+        parseInt(ds.editableModifiedAbsHeight, 10),
+      ),
+      replacement: `](${src}){.absolute left=${dims.left}px top=${dims.top}px width=${dims.width}px height=${dims.height}px}`,
+    };
   },
-});
+}));
 
 // ---------------------------------------------------------------------------
 // Slide title (h2) classifier
@@ -1021,6 +1068,54 @@ function getFencedDivIdentifier(div) {
 }
 
 /**
+ * Returns true if `el` is itself `.absolute` or is nested inside a `div.absolute`.
+ * Centralises the duplicated `.absolute`-filter pattern used by classifiers
+ * to skip elements that are already positioned.
+ */
+export function isAlreadyPositioned(el) {
+  if (!el) return false;
+  if (el.classList && el.classList.contains('absolute')) return true;
+  return !!(el.closest && el.closest('div.absolute'));
+}
+
+/**
+ * Returns the nearest `.absolute` ancestor (or `el` itself if it has the
+ * class), or `null`. Used by the issue-#140 re-activation classifiers to
+ * locate the positioning wrapper around an inner element.
+ */
+export function findPositionedAncestor(el) {
+  if (!el || !el.closest) return null;
+  return el.closest('.absolute');
+}
+
+/**
+ * Build the inner attr string for a `.absolute` fence/wrapper, e.g.
+ *   `.absolute left=10px top=20px width=300px height=200px style="transform: rotate(5deg);"`
+ *
+ * `include` is an explicit list of position keys to emit. Callers opt out
+ * by omitting keys (callouts drop `height`; tables/equations drop `width`
+ * and `height`). The default includes all four.
+ */
+export function buildAbsoluteAttrString(dims, { include = ['left', 'top', 'width', 'height'] } = {}) {
+  const posAttrs = include.map(k => `${k}=${Math.round(dims[k])}px`);
+  const styleAttrs = [];
+  if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+  let out = `.absolute ${posAttrs.join(' ')}`;
+  if (styleAttrs.length) out += ` style="${styleAttrs.join(' ')}"`;
+  return out;
+}
+
+/**
+ * Wrap `lines[block.startLine .. block.endLine]` with a `::: {attrs}` / `:::`
+ * fence pair, in place. Splices bottom-first so earlier indices aren't
+ * invalidated.
+ */
+export function wrapLinesWithAbsoluteFence(lines, block, attrs) {
+  lines.splice(block.endLine + 1, 0, ':::');
+  lines.splice(block.startLine, 0, `::: {${attrs}}`);
+}
+
+/**
  * Build the updated fence opening line with absolute position attrs merged in.
  * Preserves existing classes/attrs on the fence and appends the position data.
  */
@@ -1031,19 +1126,8 @@ function buildFenceLineWithAbsolute(originalLine, dims) {
   const fence = match[1];
   const existingAttrs = (match[2] || '').trim();
 
-  const posAttrs = [
-    `left=${Math.round(dims.left)}px`,
-    `top=${Math.round(dims.top)}px`,
-    `width=${Math.round(dims.width)}px`,
-    `height=${Math.round(dims.height)}px`,
-  ];
-
-  const styleAttrs = [];
-  if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-
-  let newAttrs = existingAttrs ? `${existingAttrs} ` : '';
-  newAttrs += `.absolute ${posAttrs.join(' ')}`;
-  if (styleAttrs.length > 0) newAttrs += ` style="${styleAttrs.join(' ')}"`;
+  const attrStr = buildAbsoluteAttrString(dims);
+  const newAttrs = existingAttrs ? `${existingAttrs} ${attrStr}` : attrStr;
 
   return `${fence} {${newAttrs}}`;
 }
@@ -1069,7 +1153,7 @@ ModifyModeClassifier.register({
       !el.classList.contains('editable-container') &&
       !el.classList.contains('editable-new') &&
       !el.classList.contains('editable') &&
-      !el.classList.contains('absolute')
+      !isAlreadyPositioned(el)
     );
 
     const valid = [];
@@ -1191,15 +1275,7 @@ ModifyModeClassifier.register({
           // The block-level callout fills container width automatically; saving an explicit
           // height would cause a mismatch since the callout renders at content height after
           // re-render regardless of the wrapper's height.
-          const posAttrs = [
-            `left=${Math.round(dims.left)}px`,
-            `top=${Math.round(dims.top)}px`,
-            `width=${Math.round(dims.width)}px`,
-          ];
-          const styleAttrs = [];
-          if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-          let wrapAttrs = `.absolute ${posAttrs.join(' ')}`;
-          if (styleAttrs.length > 0) wrapAttrs += ` style="${styleAttrs.join(' ')}"`;
+          const wrapAttrs = buildAbsoluteAttrString(dims, { include: ['left', 'top', 'width'] });
 
           lines.splice(openEntry.closeLineIndex + 1, 0, '::::');
           lines.splice(openEntry.lineIndex, 0, `:::: {${wrapAttrs}}`);
@@ -1304,7 +1380,7 @@ ModifyModeClassifier.register({
     const candidates = Array.from(slideEl.children).filter(el =>
       el.tagName === 'P' &&
       !editableRegistry.has(el) &&
-      !el.classList.contains('absolute') &&
+      !isAlreadyPositioned(el) &&
       !el.querySelector('img') &&
       // Standalone display equations are handled by the Display equations
       // classifier; don't double-claim them as plain paragraphs.
@@ -1379,16 +1455,7 @@ ModifyModeClassifier.register({
           ? elementToText(p)
           : block.text;
 
-        const posAttrs = [
-          `left=${Math.round(dims.left)}px`,
-          `top=${Math.round(dims.top)}px`,
-          `width=${Math.round(dims.width)}px`,
-          `height=${Math.round(dims.height)}px`,
-        ];
-        const styleAttrs = [];
-        if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-        let attrs = `.absolute ${posAttrs.join(' ')}`;
-        if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+        const attrs = buildAbsoluteAttrString(dims);
 
         const blockLineCount = block.endLine - block.startLine + 1;
         lines.splice(block.startLine, blockLineCount,
@@ -1483,7 +1550,7 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
       const candidates = Array.from(slideEl.children).filter(el =>
         el.tagName === tagName &&
         !editableRegistry.has(el) &&
-        !el.classList.contains('absolute')
+        !isAlreadyPositioned(el)
       );
       const valid = [];
       let idx = 0;
@@ -1562,16 +1629,7 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
           const block = blocks[elIdx];
           const dims = editableRegistry.get(el).toDimensions();
 
-          const posAttrs = [
-            `left=${Math.round(dims.left)}px`,
-            `top=${Math.round(dims.top)}px`,
-            `width=${Math.round(dims.width)}px`,
-            `height=${Math.round(dims.height)}px`,
-          ];
-          const styleAttrs = [];
-          if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-          let attrs = `.absolute ${posAttrs.join(' ')}`;
-          if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+          const attrs = buildAbsoluteAttrString(dims);
 
           const blockLineCount = block.endLine - block.startLine + 1;
           lines.splice(block.startLine, blockLineCount,
@@ -2082,8 +2140,7 @@ ModifyModeClassifier.register({
       seen.add(wrapper);
       if (editableRegistry.has(wrapper)) continue;
       if (wrapper.classList.contains('editable-container')) continue;
-      if (wrapper.classList.contains('absolute')) continue;
-      if (wrapper.closest('div.absolute')) continue;
+      if (isAlreadyPositioned(wrapper)) continue;
       // Code-chunk cells (executable {r}/{python}/{ojs}/... blocks) are handled
       // by the Code chunk outputs classifier; skip them here so we don't double-claim.
       if (wrapper.tagName === 'DIV' && wrapper.classList.contains('cell')) continue;
@@ -2170,19 +2227,9 @@ ModifyModeClassifier.register({
         const block = blocks[codeIdx];
         const dims = editableRegistry.get(el).toDimensions();
 
-        const posAttrs = [
-          `left=${Math.round(dims.left)}px`,
-          `top=${Math.round(dims.top)}px`,
-          `width=${Math.round(dims.width)}px`,
-          `height=${Math.round(dims.height)}px`,
-        ];
-        const styleAttrs = [];
-        if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-        let attrs = `.absolute ${posAttrs.join(' ')}`;
-        if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+        const attrs = buildAbsoluteAttrString(dims);
 
-        lines.splice(block.endLine + 1, 0, ':::');
-        lines.splice(block.startLine, 0, `::: {${attrs}}`);
+        wrapLinesWithAbsoluteFence(lines, block, attrs);
       }
 
       chunks[chunkIndex] = lines.join('\n');
@@ -2304,8 +2351,7 @@ ModifyModeClassifier.register({
     for (const child of slideEl.children) {
       if (child.tagName !== 'DIV') continue;
       if (child.classList.contains('cell')) {
-        if (child.classList.contains('absolute')) continue;
-        if (child.closest('div.absolute')) continue;
+        if (isAlreadyPositioned(child)) continue;
         allCells.push(child);
       } else if (child.classList.contains('editable-container')) {
         const inner = child.querySelector(':scope > div.cell');
@@ -2416,19 +2462,9 @@ ModifyModeClassifier.register({
         if (!target) continue;
 
         const dims = editableRegistry.get(el).toDimensions();
-        const posAttrs = [
-          `left=${Math.round(dims.left)}px`,
-          `top=${Math.round(dims.top)}px`,
-          `width=${Math.round(dims.width)}px`,
-          `height=${Math.round(dims.height)}px`,
-        ];
-        const styleAttrs = [];
-        if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-        let attrs = `.absolute ${posAttrs.join(' ')}`;
-        if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+        const attrs = buildAbsoluteAttrString(dims);
 
-        lines.splice(target.endLine + 1, 0, ':::');
-        lines.splice(target.startLine, 0, `::: {${attrs}}`);
+        wrapLinesWithAbsoluteFence(lines, target, attrs);
       }
 
       chunks[chunkIndex] = lines.join('\n');
@@ -2473,8 +2509,7 @@ ModifyModeClassifier.register({
     const candidates = [];
     for (const img of imgs) {
       if (editableRegistry.has(img)) continue;
-      if (img.classList.contains('absolute')) continue;
-      if (img.closest('div.absolute')) continue;
+      if (isAlreadyPositioned(img)) continue;
       const src = getImgSrc(img);
       if (!src) continue;
       const prefix = getChunkPrefix(src);
@@ -2601,19 +2636,9 @@ ModifyModeClassifier.register({
         if (!target) continue;
 
         const dims = editableRegistry.get(img).toDimensions();
-        const posAttrs = [
-          `left=${Math.round(dims.left)}px`,
-          `top=${Math.round(dims.top)}px`,
-          `width=${Math.round(dims.width)}px`,
-          `height=${Math.round(dims.height)}px`,
-        ];
-        const styleAttrs = [];
-        if (dims.rotation) styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-        let attrs = `.absolute ${posAttrs.join(' ')}`;
-        if (styleAttrs.length) attrs += ` style="${styleAttrs.join(' ')}"`;
+        const attrs = buildAbsoluteAttrString(dims);
 
-        lines.splice(target.endLine + 1, 0, ':::');
-        lines.splice(target.startLine, 0, `::: {${attrs}}`);
+        wrapLinesWithAbsoluteFence(lines, target, attrs);
       }
 
       chunks[chunkIndex] = lines.join('\n');
@@ -2804,8 +2829,7 @@ ModifyModeClassifier.register({
       seen.add(w);
       if (editableRegistry.has(w)) continue;
       if (w.classList.contains('editable-container')) continue;
-      if (w.classList.contains('absolute')) continue;
-      if (w.closest('div.absolute')) continue;
+      if (isAlreadyPositioned(w)) continue;
       wrappers.push(w);
     }
 
@@ -2908,9 +2932,8 @@ ModifyModeClassifier.register({
 
       for (const { el, target } of plan) {
         const dims = editableRegistry.get(el).toDimensions();
-        const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
-        lines.splice(target.endLine + 1, 0, ':::');
-        lines.splice(target.startLine, 0, `::: {${attrs}}`);
+        const attrs = buildAbsoluteAttrString(dims, { include: ['left', 'top'] });
+        wrapLinesWithAbsoluteFence(lines, target, attrs);
       }
 
       chunks[chunkIndex] = lines.join('\n');
@@ -3037,8 +3060,7 @@ ModifyModeClassifier.register({
       seen.add(w);
       if (editableRegistry.has(w)) continue;
       if (w.classList.contains('editable-container')) continue;
-      if (w.classList.contains('absolute')) continue;
-      if (w.closest('div.absolute')) continue;
+      if (isAlreadyPositioned(w)) continue;
       if (!isDisplayEquationContainer(w)) continue;
       wrappers.push(w);
     }
@@ -3139,9 +3161,8 @@ ModifyModeClassifier.register({
 
       for (const { el, target } of plan) {
         const dims = editableRegistry.get(el).toDimensions();
-        const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
-        lines.splice(target.endLine + 1, 0, ':::');
-        lines.splice(target.startLine, 0, `::: {${attrs}}`);
+        const attrs = buildAbsoluteAttrString(dims, { include: ['left', 'top'] });
+        wrapLinesWithAbsoluteFence(lines, target, attrs);
       }
 
       chunks[chunkIndex] = lines.join('\n');

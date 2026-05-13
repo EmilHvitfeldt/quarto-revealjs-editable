@@ -184,6 +184,21 @@ To support a new HTML element type (e.g., `video.editable`):
 
 ---
 
+## Adding a Positioned (Re-activation) Classifier Checklist
+
+When a typed element gets saved it ends up wrapped in `::: {.absolute …}` (or carrying `{.absolute}` itself). To let modify mode re-activate that saved form, add a *positioned* classifier alongside the first-activation one. Read the "Re-activating Already-Positioned Elements" section in `ARCHITECTURE.md` first.
+
+- [ ] Activate the **inner element**, not the `div.absolute` wrapper — the wrapper is source-anchor metadata only. This is the project-wide rule; see `ARCHITECTURE.md`.
+- [ ] Build the classifier with `makePositionedClassifier(...)` from `src/modify-mode-positioned.js` and register it via `ModifyModeClassifier.register(...)`.
+- [ ] **Register before `Positioned divs` and `Fenced divs`.** Outer classifiers filter out inner elements claimed by typed positioned classifiers; that filtering only works if the typed classifier registered first.
+- [ ] Use `findFenceForPositionedElement` with appropriate `Anchors` to locate the wrapping fence in the slide chunk. Prefer identity anchors (`byId`, `byClass`, type-specific) over `byPosition`/`byIndex` so caption edits and reordering don't break the match.
+- [ ] In the first-activation classifier's `classify()`, drop any inline `.absolute` filter — now redundant since `isAlreadyPositioned(el)` is the canonical check and the typed positioned classifier claims the wrapper first.
+- [ ] Add an E2E fixture in `testing/` rendering an already-positioned instance, and add the `quarto render` call for that fixture to `testing/run-tests.sh` (CI runs this before Playwright; missing render steps have caused repeated failures).
+- [ ] Add a unit test asserting the registration order: the typed positioned classifier is registered before `Positioned divs` and `Fenced divs`.
+- [ ] Update `NEWS.md`, `README.md`, and `docs/features.qmd` (re-activation is a user-visible feature).
+
+---
+
 ## Code Style Guidelines
 
 - Use `const` for constants, `let` for variables that change

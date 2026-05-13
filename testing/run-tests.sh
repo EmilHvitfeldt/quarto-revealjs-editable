@@ -470,6 +470,7 @@ run_render_test "Test 33: Modify mode code chunk output rendering" "modify-mode-
 run_render_test "Test 34: Modify mode table rendering" "modify-mode-table.qmd" "inject"
 run_render_test "Test 35: Modify mode diagram chunk rendering" "modify-mode-diagrams.qmd" "inject"
 run_render_test "Test 36: Modify mode display equation rendering" "modify-mode-equations.qmd" "inject"
+run_render_test "Test 37: Modify mode typed positioned re-activation (#140)" "manual-positioned-reactivation.qmd" "inject"
 
 echo ""
 if [ $FAILED -eq 0 ]; then
