@@ -16004,9 +16004,7 @@ ${fence}`;
       for (const img of imgs) {
         if (editableRegistry.has(img))
           continue;
-        if (img.classList.contains("absolute"))
-          continue;
-        if (img.closest("div.absolute"))
+        if (isAlreadyPositioned(img))
           continue;
         const src = getImgSrc(img);
         if (!src)
@@ -16097,9 +16095,7 @@ ${fence}`;
       for (const video of videos) {
         if (editableRegistry.has(video))
           continue;
-        if (video.classList.contains("absolute"))
-          continue;
-        if (video.closest("div.absolute"))
+        if (isAlreadyPositioned(video))
           continue;
         const src = getVideoSrc(video);
         if (!src)
@@ -16709,25 +16705,35 @@ ${fence}`;
       return { key: `#${div.id}`, type: "id-keyed" };
     return { key: null, type: "classless" };
   }
+  function isAlreadyPositioned(el) {
+    if (!el)
+      return false;
+    if (el.classList && el.classList.contains("absolute"))
+      return true;
+    return !!(el.closest && el.closest("div.absolute"));
+  }
+  function buildAbsoluteAttrString(dims, { include = ["left", "top", "width", "height"] } = {}) {
+    const posAttrs = include.map((k) => `${k}=${Math.round(dims[k])}px`);
+    const styleAttrs = [];
+    if (dims.rotation)
+      styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
+    let out = `.absolute ${posAttrs.join(" ")}`;
+    if (styleAttrs.length)
+      out += ` style="${styleAttrs.join(" ")}"`;
+    return out;
+  }
+  function wrapLinesWithAbsoluteFence(lines, block, attrs) {
+    lines.splice(block.endLine + 1, 0, ":::");
+    lines.splice(block.startLine, 0, `::: {${attrs}}`);
+  }
   function buildFenceLineWithAbsolute(originalLine, dims) {
     const match2 = originalLine.match(/^(:{3,})\s*(?:\{([^}]*)\})?\s*$/);
     if (!match2)
       return originalLine;
     const fence = match2[1];
     const existingAttrs = (match2[2] || "").trim();
-    const posAttrs = [
-      `left=${Math.round(dims.left)}px`,
-      `top=${Math.round(dims.top)}px`,
-      `width=${Math.round(dims.width)}px`,
-      `height=${Math.round(dims.height)}px`
-    ];
-    const styleAttrs = [];
-    if (dims.rotation)
-      styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-    let newAttrs = existingAttrs ? `${existingAttrs} ` : "";
-    newAttrs += `.absolute ${posAttrs.join(" ")}`;
-    if (styleAttrs.length > 0)
-      newAttrs += ` style="${styleAttrs.join(" ")}"`;
+    const attrStr = buildAbsoluteAttrString(dims);
+    const newAttrs = existingAttrs ? `${existingAttrs} ${attrStr}` : attrStr;
     return `${fence} {${newAttrs}}`;
   }
   ModifyModeClassifier.register({
@@ -16745,7 +16751,7 @@ ${fence}`;
       if (fencedOpens.length === 0)
         return { valid: [], warn: [] };
       const candidates = Array.from(slideEl.children).filter(
-        (el) => el.tagName === "DIV" && !editableRegistry.has(el) && !el.classList.contains("editable-container") && !el.classList.contains("editable-new") && !el.classList.contains("editable") && !el.classList.contains("absolute")
+        (el) => el.tagName === "DIV" && !editableRegistry.has(el) && !el.classList.contains("editable-container") && !el.classList.contains("editable-new") && !el.classList.contains("editable") && !isAlreadyPositioned(el)
       );
       const valid = [];
       const warn = [];
@@ -16835,17 +16841,7 @@ ${fence}`;
         const lines = chunks[chunkIndex].split("\n");
         for (const { openEntry, dims, isCallout } of ops) {
           if (isCallout && openEntry.closeLineIndex >= 0) {
-            const posAttrs = [
-              `left=${Math.round(dims.left)}px`,
-              `top=${Math.round(dims.top)}px`,
-              `width=${Math.round(dims.width)}px`
-            ];
-            const styleAttrs = [];
-            if (dims.rotation)
-              styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-            let wrapAttrs = `.absolute ${posAttrs.join(" ")}`;
-            if (styleAttrs.length > 0)
-              wrapAttrs += ` style="${styleAttrs.join(" ")}"`;
+            const wrapAttrs = buildAbsoluteAttrString(dims, { include: ["left", "top", "width"] });
             lines.splice(openEntry.closeLineIndex + 1, 0, "::::");
             lines.splice(openEntry.lineIndex, 0, `:::: {${wrapAttrs}}`);
           } else {
@@ -16920,7 +16916,7 @@ ${fence}`;
     label: "Paragraphs",
     classify(slideEl) {
       const candidates = Array.from(slideEl.children).filter(
-        (el) => el.tagName === "P" && !editableRegistry.has(el) && !el.classList.contains("absolute") && !el.querySelector("img") && // Standalone display equations are handled by the Display equations
+        (el) => el.tagName === "P" && !editableRegistry.has(el) && !isAlreadyPositioned(el) && !el.querySelector("img") && // Standalone display equations are handled by the Display equations
         // classifier; don't double-claim them as plain paragraphs.
         !el.querySelector("span.math.display")
       );
@@ -16979,18 +16975,7 @@ ${fence}`;
           const block = paraBlocks[paraIdx];
           const dims = editableRegistry.get(p).toDimensions();
           const content = p.querySelector(".ql-editor") ? elementToText(p) : block.text;
-          const posAttrs = [
-            `left=${Math.round(dims.left)}px`,
-            `top=${Math.round(dims.top)}px`,
-            `width=${Math.round(dims.width)}px`,
-            `height=${Math.round(dims.height)}px`
-          ];
-          const styleAttrs = [];
-          if (dims.rotation)
-            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-          let attrs = `.absolute ${posAttrs.join(" ")}`;
-          if (styleAttrs.length)
-            attrs += ` style="${styleAttrs.join(" ")}"`;
+          const attrs = buildAbsoluteAttrString(dims);
           const blockLineCount = block.endLine - block.startLine + 1;
           lines.splice(
             block.startLine,
@@ -17068,7 +17053,7 @@ ${fence}`;
       label,
       classify(slideEl) {
         const candidates = Array.from(slideEl.children).filter(
-          (el) => el.tagName === tagName && !editableRegistry.has(el) && !el.classList.contains("absolute")
+          (el) => el.tagName === tagName && !editableRegistry.has(el) && !isAlreadyPositioned(el)
         );
         const valid = [];
         let idx = 0;
@@ -17136,18 +17121,7 @@ ${fence}`;
               continue;
             const block = blocks[elIdx];
             const dims = editableRegistry.get(el).toDimensions();
-            const posAttrs = [
-              `left=${Math.round(dims.left)}px`,
-              `top=${Math.round(dims.top)}px`,
-              `width=${Math.round(dims.width)}px`,
-              `height=${Math.round(dims.height)}px`
-            ];
-            const styleAttrs = [];
-            if (dims.rotation)
-              styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-            let attrs = `.absolute ${posAttrs.join(" ")}`;
-            if (styleAttrs.length)
-              attrs += ` style="${styleAttrs.join(" ")}"`;
+            const attrs = buildAbsoluteAttrString(dims);
             const blockLineCount = block.endLine - block.startLine + 1;
             lines.splice(
               block.startLine,
@@ -17498,9 +17472,7 @@ ${fence}`;
           continue;
         if (wrapper.classList.contains("editable-container"))
           continue;
-        if (wrapper.classList.contains("absolute"))
-          continue;
-        if (wrapper.closest("div.absolute"))
+        if (isAlreadyPositioned(wrapper))
           continue;
         if (wrapper.tagName === "DIV" && wrapper.classList.contains("cell"))
           continue;
@@ -17571,20 +17543,8 @@ ${fence}`;
             continue;
           const block = blocks[codeIdx];
           const dims = editableRegistry.get(el).toDimensions();
-          const posAttrs = [
-            `left=${Math.round(dims.left)}px`,
-            `top=${Math.round(dims.top)}px`,
-            `width=${Math.round(dims.width)}px`,
-            `height=${Math.round(dims.height)}px`
-          ];
-          const styleAttrs = [];
-          if (dims.rotation)
-            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-          let attrs = `.absolute ${posAttrs.join(" ")}`;
-          if (styleAttrs.length)
-            attrs += ` style="${styleAttrs.join(" ")}"`;
-          lines.splice(block.endLine + 1, 0, ":::");
-          lines.splice(block.startLine, 0, `::: {${attrs}}`);
+          const attrs = buildAbsoluteAttrString(dims);
+          wrapLinesWithAbsoluteFence(lines, block, attrs);
         }
         chunks[chunkIndex] = lines.join("\n");
       }
@@ -17679,9 +17639,7 @@ ${fence}`;
         if (child.tagName !== "DIV")
           continue;
         if (child.classList.contains("cell")) {
-          if (child.classList.contains("absolute"))
-            continue;
-          if (child.closest("div.absolute"))
+          if (isAlreadyPositioned(child))
             continue;
           allCells.push(child);
         } else if (child.classList.contains("editable-container")) {
@@ -17778,20 +17736,8 @@ ${fence}`;
           if (!target)
             continue;
           const dims = editableRegistry.get(el).toDimensions();
-          const posAttrs = [
-            `left=${Math.round(dims.left)}px`,
-            `top=${Math.round(dims.top)}px`,
-            `width=${Math.round(dims.width)}px`,
-            `height=${Math.round(dims.height)}px`
-          ];
-          const styleAttrs = [];
-          if (dims.rotation)
-            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-          let attrs = `.absolute ${posAttrs.join(" ")}`;
-          if (styleAttrs.length)
-            attrs += ` style="${styleAttrs.join(" ")}"`;
-          lines.splice(target.endLine + 1, 0, ":::");
-          lines.splice(target.startLine, 0, `::: {${attrs}}`);
+          const attrs = buildAbsoluteAttrString(dims);
+          wrapLinesWithAbsoluteFence(lines, target, attrs);
         }
         chunks[chunkIndex] = lines.join("\n");
       }
@@ -17818,9 +17764,7 @@ ${fence}`;
       for (const img of imgs) {
         if (editableRegistry.has(img))
           continue;
-        if (img.classList.contains("absolute"))
-          continue;
-        if (img.closest("div.absolute"))
+        if (isAlreadyPositioned(img))
           continue;
         const src = getImgSrc(img);
         if (!src)
@@ -17932,20 +17876,8 @@ ${fence}`;
           if (!target)
             continue;
           const dims = editableRegistry.get(img).toDimensions();
-          const posAttrs = [
-            `left=${Math.round(dims.left)}px`,
-            `top=${Math.round(dims.top)}px`,
-            `width=${Math.round(dims.width)}px`,
-            `height=${Math.round(dims.height)}px`
-          ];
-          const styleAttrs = [];
-          if (dims.rotation)
-            styleAttrs.push(`transform: rotate(${Math.round(dims.rotation)}deg);`);
-          let attrs = `.absolute ${posAttrs.join(" ")}`;
-          if (styleAttrs.length)
-            attrs += ` style="${styleAttrs.join(" ")}"`;
-          lines.splice(target.endLine + 1, 0, ":::");
-          lines.splice(target.startLine, 0, `::: {${attrs}}`);
+          const attrs = buildAbsoluteAttrString(dims);
+          wrapLinesWithAbsoluteFence(lines, target, attrs);
         }
         chunks[chunkIndex] = lines.join("\n");
       }
@@ -18114,9 +18046,7 @@ ${fence}`;
           continue;
         if (w.classList.contains("editable-container"))
           continue;
-        if (w.classList.contains("absolute"))
-          continue;
-        if (w.closest("div.absolute"))
+        if (isAlreadyPositioned(w))
           continue;
         wrappers.push(w);
       }
@@ -18201,9 +18131,8 @@ ${fence}`;
         const plan = chunkEls.map((el, i) => ({ el, target: resolved[i] })).filter((p) => p.target).sort((a, b) => b.target.startLine - a.target.startLine);
         for (const { el, target } of plan) {
           const dims = editableRegistry.get(el).toDimensions();
-          const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
-          lines.splice(target.endLine + 1, 0, ":::");
-          lines.splice(target.startLine, 0, `::: {${attrs}}`);
+          const attrs = buildAbsoluteAttrString(dims, { include: ["left", "top"] });
+          wrapLinesWithAbsoluteFence(lines, target, attrs);
         }
         chunks[chunkIndex] = lines.join("\n");
       }
@@ -18314,9 +18243,7 @@ ${fence}`;
           continue;
         if (w.classList.contains("editable-container"))
           continue;
-        if (w.classList.contains("absolute"))
-          continue;
-        if (w.closest("div.absolute"))
+        if (isAlreadyPositioned(w))
           continue;
         if (!isDisplayEquationContainer(w))
           continue;
@@ -18400,9 +18327,8 @@ ${fence}`;
         const plan = chunkEls.map((el, i) => ({ el, target: resolved[i] })).filter((p) => p.target).sort((a, b) => b.target.startLine - a.target.startLine);
         for (const { el, target } of plan) {
           const dims = editableRegistry.get(el).toDimensions();
-          const attrs = `.absolute left=${Math.round(dims.left)}px top=${Math.round(dims.top)}px`;
-          lines.splice(target.endLine + 1, 0, ":::");
-          lines.splice(target.startLine, 0, `::: {${attrs}}`);
+          const attrs = buildAbsoluteAttrString(dims, { include: ["left", "top"] });
+          wrapLinesWithAbsoluteFence(lines, target, attrs);
         }
         chunks[chunkIndex] = lines.join("\n");
       }
