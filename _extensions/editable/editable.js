@@ -16442,16 +16442,20 @@ ${fence}`;
       },
       setupFn: setupDivWhenReady,
       extraActivate: (el) => {
+        const wrapper = el.parentElement;
+        if (wrapper && wrapper.classList && wrapper.classList.contains("absolute")) {
+          const wrapperParent = wrapper.parentNode;
+          if (wrapperParent) {
+            wrapperParent.insertBefore(el, wrapper);
+            wrapper.style.display = "none";
+          }
+        }
         if (cfg.lockDims)
           lockNaturalDimensions(el, cfg.display);
         if (cfg.capabilities)
           setCapabilityOverride(el, cfg.capabilities);
         if (cfg.quill)
           initializeQuillForElement(el);
-        const wrapper = el.parentElement;
-        if (wrapper && wrapper.classList && wrapper.classList.contains("absolute")) {
-          wrapper.style.display = "none";
-        }
       },
       getReplacement: makeTypedFenceRewriteReplacement
     }));

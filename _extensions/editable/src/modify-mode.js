@@ -606,16 +606,25 @@ for (const cfg of TYPED_INNER_CONFIGS) {
     },
     setupFn: setupDivWhenReady,
     extraActivate: (el) => {
+      // Hoist the inner element out of its `div.absolute` wrapper BEFORE setup
+      // runs. setupDraggableElt inserts an .editable-container around the inner
+      // in-place; if the wrapper is left positioned around the container, the
+      // container's `position: absolute` compounds with the wrapper's position
+      // and renders at the wrong spot. Moving the inner up makes the container
+      // a direct child of the slide section, where its absolute position is
+      // relative to the slide (correct). The now-empty wrapper is hidden so it
+      // doesn't ghost the inner element.
+      const wrapper = el.parentElement;
+      if (wrapper && wrapper.classList && wrapper.classList.contains('absolute')) {
+        const wrapperParent = wrapper.parentNode;
+        if (wrapperParent) {
+          wrapperParent.insertBefore(el, wrapper);
+          wrapper.style.display = 'none';
+        }
+      }
       if (cfg.lockDims) lockNaturalDimensions(el, cfg.display);
       if (cfg.capabilities) setCapabilityOverride(el, cfg.capabilities);
       if (cfg.quill) initializeQuillForElement(el);
-      // Hide the now-empty wrapper for this session; setupDraggableElt reparents
-      // the inner element out of the wrapper, leaving the wrapper visually
-      // present at its original (left, top). Hiding avoids a ghost outline.
-      const wrapper = el.parentElement;
-      if (wrapper && wrapper.classList && wrapper.classList.contains('absolute')) {
-        wrapper.style.display = 'none';
-      }
     },
     getReplacement: makeTypedFenceRewriteReplacement,
   }));
