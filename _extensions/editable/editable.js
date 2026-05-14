@@ -16292,6 +16292,12 @@ ${fence}`;
     },
     beforeSetup(video) {
       _videosWithControlsRemoved.delete(video);
+      const scale = getSlideScale();
+      const rect = video.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        video.style.width = rect.width / scale + "px";
+        video.style.height = rect.height / scale + "px";
+      }
       video.style.maxWidth = "none";
       video.style.maxHeight = "none";
     },

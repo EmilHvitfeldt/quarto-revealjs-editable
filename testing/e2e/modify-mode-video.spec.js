@@ -61,4 +61,68 @@ test.describe('Modify Mode - Video', () => {
     const panelText = await panel.innerText();
     expect(panelText.trim()).toBe('');
   });
+
+  test('activated video keeps its rendered size (no jump to natural mp4 dimensions)', async ({ page }) => {
+    await setupPage(page, 'modify-mode-video.html');
+    await navigateToSlide(page, 2);
+
+    // Capture the video's rendered size BEFORE activation
+    const before = await page.evaluate(() => {
+      const v = document.querySelector('section.present:not(.slide-background) video');
+      const r = v.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    });
+
+    await page.click('.toolbar-modify');
+    await page.locator('video.modify-mode-valid').first().click();
+    await page.waitForSelector('.editable-container video', { timeout: 3000 });
+
+    const after = await page.evaluate(() => {
+      const v = document.querySelector('.editable-container video');
+      const r = v.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    });
+
+    // Allow ±2px tolerance; size must not jump to natural mp4 dimensions.
+    expect(Math.abs(after.w - before.w), `before=${JSON.stringify(before)} after=${JSON.stringify(after)}`).toBeLessThan(2);
+    expect(Math.abs(after.h - before.h), `before=${JSON.stringify(before)} after=${JSON.stringify(after)}`).toBeLessThan(2);
+  });
+
+  test('video stays visible during drag-to-reposition', async ({ page }) => {
+    await setupPage(page, 'modify-mode-video.html');
+    await navigateToSlide(page, 2);
+    await page.click('.toolbar-modify');
+    await page.locator('video.modify-mode-valid').first().click();
+    await page.waitForSelector('.editable-container video', { timeout: 3000 });
+
+    const video = page.locator('.editable-container video').first();
+    const box = await video.boundingBox();
+    if (!box) throw new Error('Video has no bounding box after activation');
+
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 50, startY + 30, { steps: 5 });
+
+    const midState = await video.evaluate((v) => {
+      const cs = getComputedStyle(v);
+      const rect = v.getBoundingClientRect();
+      return {
+        visibility: cs.visibility,
+        opacity: cs.opacity,
+        display: cs.display,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+
+    await page.mouse.up();
+
+    expect(midState.visibility, JSON.stringify(midState)).not.toBe('hidden');
+    expect(parseFloat(midState.opacity), JSON.stringify(midState)).toBeGreaterThan(0);
+    expect(midState.display, JSON.stringify(midState)).not.toBe('none');
+    expect(midState.width, JSON.stringify(midState)).toBeGreaterThan(0);
+    expect(midState.height, JSON.stringify(midState)).toBeGreaterThan(0);
+  });
 });

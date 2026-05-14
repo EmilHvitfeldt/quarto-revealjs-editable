@@ -385,9 +385,21 @@ ModifyModeClassifier.register(makeMediaClassifier({
     // This video is being activated — don't restore its `controls` on cleanup.
     _videosWithControlsRemoved.delete(video);
 
+    // Capture the currently rendered (max-width: 95% capped) size BEFORE
+    // clearing the constraint, so the activated video preserves the user's
+    // visible dimensions instead of jumping to the raw natural video size,
+    // which can be much larger than the slide (e.g. 1920×1080 mp4).
+    const scale = getSlideScale();
+    const rect = video.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      video.style.width  = (rect.width  / scale) + 'px';
+      video.style.height = (rect.height / scale) + 'px';
+    }
+
     // Reveal.js sets max-width: 95% on media elements. Once inside the
     // inline-block editable-container, that percentage resolves against the
-    // explicit style.width, shrinking the element further. Clear it first.
+    // explicit style.width, shrinking the element further. Clear it now that
+    // we have explicit dimensions.
     video.style.maxWidth  = 'none';
     video.style.maxHeight = 'none';
   },
