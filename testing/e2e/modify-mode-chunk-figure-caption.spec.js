@@ -4,13 +4,14 @@ const path = require('path');
 const fs = require('fs');
 const { TESTING_DIR, setupPage, navigateToSlide } = require('./test-helpers');
 
-test.describe('Modify Mode - Chunk figure caption bundling', () => {
-  test.beforeAll(async () => {
-    const htmlPath = path.join(TESTING_DIR, 'chunk-figures.html');
-    if (!fs.existsSync(htmlPath)) {
-      throw new Error('Run quarto render testing/chunk-figures.qmd first');
-    }
-  });
+// chunk-figures.qmd executes R chunks. Locally `quarto render chunk-figures.qmd`
+// produces the HTML this spec needs. In CI (no R toolchain) the file won't
+// exist, so we skip the suite rather than fail.
+const HAS_FIXTURE = fs.existsSync(path.join(TESTING_DIR, 'chunk-figures.html'));
+
+test.describe(HAS_FIXTURE ? 'Modify Mode - Chunk figure caption bundling'
+                          : 'Modify Mode - Chunk figure caption bundling (skipped: chunk-figures.html not rendered)', () => {
+  test.skip(!HAS_FIXTURE, 'chunk-figures.html missing — run `quarto render testing/chunk-figures.qmd` (requires R) to enable');
 
   test('activating a code-chunk figure with fig-cap moves the caption inside the editable-container', async ({ page }) => {
     await setupPage(page, 'chunk-figures.html');
