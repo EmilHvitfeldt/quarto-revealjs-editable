@@ -18326,9 +18326,17 @@ ${fence}`;
   }
   var EQUATION_RENDER_SELECTORS = [
     "mjx-container",
+    // MathJax v3 rendered
+    ".katex",
+    // KaTeX rendered glyphs (.katex-display wraps it)
+    ".MathJax_Display .MathJax",
+    // MathJax v2 rendered glyphs inside centering wrapper
     ".MathJax_Display",
+    // MathJax v2 centering wrapper (fallback)
     ".katex-display",
+    // KaTeX centering wrapper (fallback)
     "span.math.display"
+    // Source wrapper (last resort)
   ];
   function pickEquationRenderNode(el, selectors = EQUATION_RENDER_SELECTORS) {
     for (const sel of selectors) {

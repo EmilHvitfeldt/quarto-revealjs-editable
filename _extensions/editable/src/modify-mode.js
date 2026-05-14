@@ -3169,11 +3169,25 @@ function isDisplayEquationContainer(el) {
 // full-width `span.math.display` source wrapper over an inner inline-block
 // rendered math node (mjx-container / .katex-display). Measuring the outer
 // wrapper makes origLeft collapse to 0 because the wrapper spans the slide.
+// Priority: the actual rendered glyphs first (centered, narrow), then the
+// engine-specific centering wrapper, then the source span as last resort.
+//
+// MathJax v2 wraps the rendered glyphs in `<span class="MathJax">` inside
+// `<div class="MathJax_Display">`. The `_Display` wrapper is full content
+// width (display: block; text-align: center) — measuring it gives the
+// slide-left edge, not where the math is *visible*. The inner `.MathJax`
+// glyphs span is the user-visible math.
+//
+// MathJax v3 / KaTeX render the visible math at the container/inline-block
+// element; their "display" wrapper is the same as the visible node, so
+// either selector works.
 const EQUATION_RENDER_SELECTORS = [
-  'mjx-container',
-  '.MathJax_Display',
-  '.katex-display',
-  'span.math.display',
+  'mjx-container',          // MathJax v3 rendered
+  '.katex',                 // KaTeX rendered glyphs (.katex-display wraps it)
+  '.MathJax_Display .MathJax', // MathJax v2 rendered glyphs inside centering wrapper
+  '.MathJax_Display',       // MathJax v2 centering wrapper (fallback)
+  '.katex-display',         // KaTeX centering wrapper (fallback)
+  'span.math.display',      // Source wrapper (last resort)
 ];
 
 export function pickEquationRenderNode(el, selectors = EQUATION_RENDER_SELECTORS) {

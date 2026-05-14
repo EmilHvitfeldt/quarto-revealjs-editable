@@ -61,6 +61,31 @@ describe('pickEquationRenderNode', () => {
     const el = makeEl({ 'span.math.display': mathSpan });
     expect(pickEquationRenderNode(el)).toBe(mathSpan);
   });
+
+  it('prefers .MathJax_Display .MathJax (visible glyphs) over .MathJax_Display (centering wrapper)', () => {
+    // MathJax v2 renders the glyphs in `<span class="MathJax">` inside the
+    // full-width `<div class="MathJax_Display">`. Measuring _Display gives
+    // the slide-left edge (= 0 in element-space); measuring the inner
+    // .MathJax span gives the actual visible math position, which is what
+    // we need for round-trip save.
+    const glyphs = { tag: 'span.MathJax' };
+    const wrapper = { tag: 'div.MathJax_Display' };
+    const el = makeEl({
+      '.MathJax_Display .MathJax': glyphs,
+      '.MathJax_Display': wrapper,
+    });
+    expect(pickEquationRenderNode(el)).toBe(glyphs);
+  });
+
+  it('prefers .katex (visible glyphs) over .katex-display (centering wrapper)', () => {
+    const glyphs = { tag: 'span.katex' };
+    const wrapper = { tag: 'span.katex-display' };
+    const el = makeEl({
+      '.katex': glyphs,
+      '.katex-display': wrapper,
+    });
+    expect(pickEquationRenderNode(el)).toBe(glyphs);
+  });
 });
 
 describe('extractDisplayEquations', () => {
