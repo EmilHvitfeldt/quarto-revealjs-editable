@@ -33,3 +33,18 @@ Element 1
 ::: {.editable}
 Element 2
 :::
+
+## Try Modify Mode
+
+Nothing on this slide is pre-marked. Click **Modify** in the menu bar, then click any element below to make it editable on the fly.
+
+This paragraph, the list, and the table are all activatable.
+
+- First item
+- Second item
+- Third item
+
+| Column A | Column B |
+|----------|----------|
+| 1        | 2        |
+| 3        | 4        |
