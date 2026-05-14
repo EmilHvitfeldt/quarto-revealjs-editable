@@ -13,7 +13,15 @@ vi.mock('../serialization.js', () => ({
   elementToText: vi.fn(),
 }));
 vi.mock('../utils.js', () => ({ getQmdHeadingIndex: vi.fn(), getSlideScale: vi.fn() }));
-vi.mock('../colors.js', () => ({ getColorPalette: vi.fn(() => []), getBrandColorOutput: vi.fn() }));
+vi.mock('../colors.js', () => ({
+  getColorPalette: vi.fn(() => []),
+  // Mimic real implementation: brand-named colors return a placeholder token.
+  getBrandColorOutput: vi.fn((color) => {
+    const map = { '#ff0000': 'coral', '#008080': 'teal' };
+    const name = map[color.toLowerCase()];
+    return name ? `__BRAND_SHORTCODE_${name}__` : color;
+  }),
+}));
 vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 
@@ -59,6 +67,16 @@ describe('headingHtmlToMarkdown — CSS-styled inline formatting', () => {
   it('converts <span style="text-decoration: underline"> to [text]{.underline}', () => {
     expect(headingHtmlToMarkdown('<span style="text-decoration: underline">w</span>'))
       .toBe('[w]{.underline}');
+  });
+
+  it('resolves brand color placeholder to {{< brand color name >}} shortcode', () => {
+    expect(headingHtmlToMarkdown('<span style="color: #ff0000">title</span>'))
+      .toBe("[title]{style='color: {{< brand color coral >}}'}");
+  });
+
+  it('resolves brand background color placeholder to shortcode', () => {
+    expect(headingHtmlToMarkdown('<span style="background-color: #008080">title</span>'))
+      .toBe("[title]{style='background-color: {{< brand color teal >}}'}");
   });
 });
 

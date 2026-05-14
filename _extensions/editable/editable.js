@@ -16571,7 +16571,7 @@ ${fence}`;
       /<span[^>]*style="[^"]*text-decoration:[^"]*underline[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
       (_, content) => `[${content}]{.underline}`
     );
-    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, "[$1]{.underline}").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, "[$1]{.underline}").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/__BRAND_SHORTCODE_(\w+)__/g, "{{< brand color $1 >}}").trim();
   }
   function buildColorPicker(execCmd, title, pickerClass, presetColors) {
     let savedRange = null;

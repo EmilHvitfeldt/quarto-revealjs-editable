@@ -788,6 +788,8 @@ export function headingHtmlToMarkdown(html) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    // Resolve brand color placeholders inserted by getBrandColorOutput.
+    .replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}')
     .trim();
 }
 
