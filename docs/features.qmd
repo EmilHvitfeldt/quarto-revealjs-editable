@@ -4,14 +4,14 @@ title: "Features"
 
 ## Menu Bar
 
-A fixed menu bar appears at the top of the presentation with quick access to common actions:
+A fixed menu bar appears at the top of the presentation with quick access to common actions. **Modify** is the primary way to make elements editable — see the [Modify Mode](#modify-mode) section below for details.
 
 | Button | Action                                              |
 |--------|-----------------------------------------------------|
+| Modify | Activate plain elements (images, videos, paragraphs, lists, tables, code blocks, equations, fenced divs, slide titles, arrows, …) for editing — see the supported types table below |
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
 | Add    | Opens submenu with Text, Slide, and Arrow options   |
-| Modify | Activate plain elements (images, videos, paragraphs, lists, tables, code blocks, equations, fenced divs, slide titles, arrows, …) for editing — see the supported types table below |
 
 ## Adding New Elements
 
