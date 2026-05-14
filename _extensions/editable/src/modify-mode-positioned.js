@@ -270,6 +270,14 @@ export function makePositionedClassifier(opts) {
       // double-count the position once the container is placed.
       el.style.left = '';
       el.style.top  = '';
+      // Lock width/height from the source position BEFORE extraActivate
+      // (which may hoist the element out of a width-constrained wrapper).
+      // Otherwise setupEltStyles captures the post-hoist `offsetWidth`,
+      // which is the unconstrained flow width — much wider than the source
+      // `width=Xpx`. This applies to typed-inner re-activation where the
+      // inner element has no width style of its own.
+      if (!el.style.width)  el.style.width  = pos.width  + 'px';
+      if (!el.style.height) el.style.height = pos.height + 'px';
       if (extraActivate) extraActivate(el);
       setupFn(el);
       waitForRegistryThenFixPosition(el, pos.left, pos.top);

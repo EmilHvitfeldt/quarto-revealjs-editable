@@ -23,6 +23,7 @@ const TYPED_CASES = [
     slideIndex: 1,
     innerSelector: 'div.absolute > p',
     originalLeft: 100,
+    originalWidth: 400,
   },
   {
     label: 'display equation',
@@ -142,6 +143,20 @@ test.describe('Modify Mode — typed positioned re-activation (#140)', () => {
         return parseFloat(c.style.left);
       });
       expect(containerLeft).toBeCloseTo(c.originalLeft, 0);
+
+      // Width must be preserved from the source wrapper. Before the fix,
+      // typed-inner elements lost their wrapper's `width=Xpx` on activation —
+      // the inner was hoisted out and then captured the unconstrained flow
+      // width by setupEltStyles. Read the wrapper width via originalWidth
+      // when defined on the case.
+      if (c.originalWidth) {
+        const innerWidth = await page.evaluate(() => {
+          const el = document.querySelector('.editable-container > *');
+          if (!el) return null;
+          return parseFloat(el.style.width);
+        });
+        expect(innerWidth, `expected width ~${c.originalWidth}, got ${innerWidth}`).toBeCloseTo(c.originalWidth, 0);
+      }
     });
 
     (c.skipActivate ? test.skip : test)(`${c.label}: serialize rewrites existing fence in place`, async ({ page }) => {

@@ -16043,6 +16043,10 @@ ${fence}`;
           extraDataset(el);
         el.style.left = "";
         el.style.top = "";
+        if (!el.style.width)
+          el.style.width = pos.width + "px";
+        if (!el.style.height)
+          el.style.height = pos.height + "px";
         if (extraActivate)
           extraActivate(el);
         setupFn(el);
