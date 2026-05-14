@@ -22,7 +22,30 @@ vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForEle
 // for co-existence, then testing list extraction indirectly through a re-export.
 // For direct testing we inline equivalent logic here.
 
-import { extractParagraphBlocks } from '../modify-mode.js';
+import { extractParagraphBlocks, buildBlockSerializeAttrs } from '../modify-mode.js';
+
+describe('buildBlockSerializeAttrs', () => {
+  const dims = { left: 10, top: 20, width: 100, height: 200 };
+
+  it('includes all four attrs by default', () => {
+    const out = buildBlockSerializeAttrs(dims);
+    expect(out).toContain('left=10px');
+    expect(out).toContain('top=20px');
+    expect(out).toContain('width=100px');
+    expect(out).toContain('height=200px');
+  });
+
+  it('omits height when omitHeight is true (callout/blockquote pattern)', () => {
+    // Blockquotes (and callouts) shouldn't persist `height` — the visual
+    // bar / content should determine its own height. Saving an explicit
+    // height re-renders with the bar stretched to the wrapper.
+    const out = buildBlockSerializeAttrs(dims, { omitHeight: true });
+    expect(out).toContain('left=10px');
+    expect(out).toContain('top=20px');
+    expect(out).toContain('width=100px');
+    expect(out).not.toContain('height=');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Helper: replicate extractBlocksStartingWith logic for testing

@@ -48,6 +48,7 @@ import { CONFIG } from './config.js';
 import {
   getAbsolutePosition,
   waitForRegistryThenFixPosition,
+  whenInRegistry,
   makePositionedClassifier,
 } from './modify-mode-positioned.js';
 
@@ -384,9 +385,21 @@ ModifyModeClassifier.register(makeMediaClassifier({
     // This video is being activated — don't restore its `controls` on cleanup.
     _videosWithControlsRemoved.delete(video);
 
+    // Capture the currently rendered (max-width: 95% capped) size BEFORE
+    // clearing the constraint, so the activated video preserves the user's
+    // visible dimensions instead of jumping to the raw natural video size,
+    // which can be much larger than the slide (e.g. 1920×1080 mp4).
+    const scale = getSlideScale();
+    const rect = video.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      video.style.width  = (rect.width  / scale) + 'px';
+      video.style.height = (rect.height / scale) + 'px';
+    }
+
     // Reveal.js sets max-width: 95% on media elements. Once inside the
     // inline-block editable-container, that percentage resolves against the
-    // explicit style.width, shrinking the element further. Clear it first.
+    // explicit style.width, shrinking the element further. Clear it now that
+    // we have explicit dimensions.
     video.style.maxWidth  = 'none';
     video.style.maxHeight = 'none';
   },
@@ -720,6 +733,16 @@ ModifyModeClassifier.register(makePositionedClassifier({
 }));
 
 // ---------------------------------------------------------------------------
+// Replace the heading text on the first `## ...` line of a slide chunk,
+// preserving any trailing `{...}` attribute block.
+export function replaceHeadingTextInChunk(chunk, newText) {
+  return chunk.replace(/^## [^\n]*/m, (line) => {
+    const attrMatch = line.match(/\s*(\{[^}]*\})\s*$/);
+    const trailing = attrMatch ? ` ${attrMatch[1]}` : '';
+    return `## ${newText}${trailing}`;
+  });
+}
+
 // Slide title (h2) classifier
 // ---------------------------------------------------------------------------
 
@@ -729,8 +752,19 @@ ModifyModeClassifier.register(makePositionedClassifier({
  * @param {string} html
  * @returns {string}
  */
-function headingHtmlToMarkdown(html) {
+export function headingHtmlToMarkdown(html) {
   let text = html;
+
+  // `document.execCommand('bold'|'italic'|'strikeThrough')` in CSS mode (the
+  // default in most browsers) emits `<span style="font-weight: bold">…</span>`
+  // rather than `<b>`/`<i>`/`<s>` tags. Convert those to markdown FIRST so the
+  // span-stripping fallback below doesn't drop the formatting on the floor.
+  text = text.replace(/<span[^>]*style="[^"]*font-weight:\s*(bold|[6-9]\d\d)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, _w, content) => `**${content}**`);
+  text = text.replace(/<span[^>]*style="[^"]*font-style:\s*italic[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, content) => `*${content}*`);
+  text = text.replace(/<span[^>]*style="[^"]*text-decoration:[^"]*line-through[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, content) => `~~${content}~~`);
 
   // Background color spans (must come before foreground to avoid false matches)
   text = text.replace(/<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
@@ -747,11 +781,16 @@ function headingHtmlToMarkdown(html) {
   text = text.replace(/<font[^>]*\bcolor="([^"]+)"[^>]*>([\s\S]*?)<\/font>/gi,
     (_, colorVal, content) => `[${content}]{style='color: ${getBrandColorOutput(colorVal.trim())}'}`);
 
+  // Underline span form (some browsers may emit this)
+  text = text.replace(/<span[^>]*style="[^"]*text-decoration:[^"]*underline[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, content) => `[${content}]{.underline}`);
+
   return text
     .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**')
     .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**')
     .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*')
     .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '*$1*')
+    .replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '[$1]{.underline}')
     .replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, '~~$1~~')
     .replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, '~~$1~~')
     .replace(/<[^>]+>/g, '')
@@ -761,6 +800,8 @@ function headingHtmlToMarkdown(html) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    // Resolve brand color placeholders inserted by getBrandColorOutput.
+    .replace(/__BRAND_SHORTCODE_(\w+)__/g, '{{< brand color $1 >}}')
     .trim();
 }
 
@@ -876,18 +917,69 @@ function buildColorPicker(execCmd, title, pickerClass, presetColors) {
   return picker;
 }
 
+/**
+ * Toggle inline formatting (wrap/unwrap) for the current selection inside `root`.
+ * Wraps the selected range in a `<tag>` element, or unwraps if the selection
+ * is entirely inside an existing `<tag>` ancestor. This bypasses
+ * `document.execCommand` which mis-handles bold inside an already-bold context
+ * (e.g. <h2>) by emitting `<span style="font-weight: normal">`, and which
+ * inconsistently emits CSS-styled spans for underline depending on the browser.
+ */
+function toggleInlineWrap(root, tag) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+  if (!root.contains(range.commonAncestorContainer)) return;
+
+  // Detect existing wrapper ancestor of this tag fully containing the selection.
+  const findWrapper = (node) => {
+    while (node && node !== root) {
+      if (node.nodeType === 1 && node.tagName && node.tagName.toLowerCase() === tag) return node;
+      node = node.parentNode;
+    }
+    return null;
+  };
+  const startWrap = findWrapper(range.startContainer);
+  const endWrap = findWrapper(range.endContainer);
+
+  if (startWrap && startWrap === endWrap) {
+    // Unwrap: move children out of the wrapper, then remove it.
+    const wrapper = startWrap;
+    const parent = wrapper.parentNode;
+    while (wrapper.firstChild) parent.insertBefore(wrapper.firstChild, wrapper);
+    parent.removeChild(wrapper);
+    parent.normalize();
+    return;
+  }
+
+  // Wrap: extract contents, wrap in new element, reinsert.
+  const wrapper = document.createElement(tag);
+  try {
+    wrapper.appendChild(range.extractContents());
+    range.insertNode(wrapper);
+    // Restore selection around the new wrapper contents
+    const newRange = document.createRange();
+    newRange.selectNodeContents(wrapper);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  } catch (_) {
+    // Selection spans non-wrappable boundaries; ignore.
+  }
+}
+
 function buildHeadingToolbar(h2) {
   const toolbar = document.createElement('div');
   toolbar.className = 'heading-edit-toolbar quill-toolbar-container ql-toolbar ql-snow';
 
   const buttons = [
-    { command: 'bold',          label: 'B', title: 'Bold',          style: 'font-weight:bold' },
-    { command: 'italic',        label: 'I', title: 'Italic',        style: 'font-style:italic' },
-    { command: 'underline',     label: 'U', title: 'Underline',     style: 'text-decoration:underline' },
-    { command: 'strikeThrough', label: 'S', title: 'Strikethrough', style: 'text-decoration:line-through' },
+    { tag: 'b', label: 'B', title: 'Bold',          style: 'font-weight:bold' },
+    { tag: 'i', label: 'I', title: 'Italic',        style: 'font-style:italic' },
+    { tag: 'u', label: 'U', title: 'Underline',     style: 'text-decoration:underline' },
+    { tag: 's', label: 'S', title: 'Strikethrough', style: 'text-decoration:line-through' },
   ];
 
-  for (const { command, label, title, style } of buttons) {
+  for (const { tag, label, title, style } of buttons) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = label;
@@ -895,7 +987,7 @@ function buildHeadingToolbar(h2) {
     btn.style.cssText = style;
     btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      document.execCommand(command);
+      toggleInlineWrap(h2, tag);
     });
     toolbar.appendChild(btn);
   }
@@ -993,7 +1085,7 @@ ModifyModeClassifier.register({
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       if (chunkIndex >= chunks.length) continue;
       const newText = headingHtmlToMarkdown(h2.innerHTML);
-      chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+      chunks[chunkIndex] = replaceHeadingTextInChunk(chunks[chunkIndex], newText);
     }
 
     return chunks.join('');
@@ -1417,6 +1509,48 @@ export function extractParagraphBlocks(chunk) {
   return blocks;
 }
 
+// Decide whether a slide child counts as a standalone editable paragraph.
+//
+//  - Skip <p> elements containing <img>: standalone images and inline images
+//    both render as <img> inside <p>, and the image classifier handles them.
+//  - Skip <p> elements containing a display equation: the Display equations
+//    classifier owns those.
+//  - Skip Quarto figure captions (`<p class="caption">` / `<p class="figure-caption">`):
+//    they render as direct slide children alongside the figure and would
+//    otherwise be wrapped in their own `{.absolute}` block, divorcing the
+//    caption from its figure.
+export function isParagraphCandidate(el) {
+  if (el.tagName !== 'P') return false;
+  if (el.classList.contains('caption')) return false;
+  if (el.classList.contains('figure-caption')) return false;
+  if (el.querySelector('img')) return false;
+  if (el.querySelector('span.math.display')) return false;
+  // `{{< arrow >}}` without the arrows filter / `position="absolute"` renders
+  // as `<p><svg>…</svg></p>`. Skip so it isn't turned into a text region.
+  if (el.querySelector('svg')) return false;
+  return true;
+}
+
+// Assigns paragraph indices in DOM order without overwriting existing ones.
+// Index stability is required: when classify re-runs after a paragraph is
+// activated, the remaining unactivated paragraphs must keep their original
+// positional indices so they still align with the QMD `paraBlocks` array.
+export function assignStableParagraphIndices(paragraphs) {
+  const used = new Set();
+  for (const p of paragraphs) {
+    const existing = p.dataset.editableModifiedParagraphIdx;
+    if (existing !== undefined) used.add(parseInt(existing, 10));
+  }
+  let next = 0;
+  for (const p of paragraphs) {
+    if (p.dataset.editableModifiedParagraphIdx !== undefined) continue;
+    while (used.has(next)) next++;
+    p.dataset.editableModifiedParagraphIdx = String(next);
+    used.add(next);
+    next++;
+  }
+}
+
 ModifyModeClassifier.register({
   label: 'Paragraphs',
 
@@ -1427,22 +1561,15 @@ ModifyModeClassifier.register({
     // overlapping click targets and let the user wrap the image in a fenced div,
     // which produces a much messier write-back than just adding {.absolute} to the
     // image markdown.
-    const candidates = Array.from(slideEl.children).filter(el =>
-      el.tagName === 'P' &&
-      !editableRegistry.has(el) &&
-      !isAlreadyPositioned(el) &&
-      !el.querySelector('img') &&
-      // Standalone display equations are handled by the Display equations
-      // classifier; don't double-claim them as plain paragraphs.
-      !el.querySelector('span.math.display')
-    );
+    const allParas = Array.from(slideEl.children).filter(isParagraphCandidate);
 
-    const valid = [];
-    let idx = 0;
-    for (const p of candidates) {
-      p.dataset.editableModifiedParagraphIdx = String(idx++);
-      valid.push(p);
-    }
+    // Index over ALL qualifying paragraphs (including already-activated ones)
+    // so indices stay aligned with `extractParagraphBlocks` positions in QMD.
+    assignStableParagraphIndices(allParas);
+
+    const valid = allParas.filter(p =>
+      !editableRegistry.has(p) && !isAlreadyPositioned(p)
+    );
     return { valid, warn: [] };
   },
 
@@ -1563,14 +1690,31 @@ function extractBlocksStartingWith(chunk, testLine) {
 }
 
 /**
+ * Build the `{.absolute …}` attribute string for a list/blockquote/callout-style
+ * block. When `omitHeight` is set, the produced attrs deliberately drop `height`
+ * so the source block can re-render at its natural content height — mirrors the
+ * callout serialization rationale.
+ */
+export function buildBlockSerializeAttrs(dims, { omitHeight = false } = {}) {
+  return omitHeight
+    ? buildAbsoluteAttrString(dims, { include: ['left', 'top', 'width'] })
+    : buildAbsoluteAttrString(dims);
+}
+
+/**
  * Build a classifier for block-level list/blockquote elements.
  * @param {object} opts
  * @param {string} opts.tagName - uppercase tag name: 'UL', 'OL', 'BLOCKQUOTE'
  * @param {string} opts.dataKey - camelCase key used for dataset attrs (e.g. 'Ul')
  * @param {function(string): boolean} opts.testLine - identifies the first line of a source block
  * @param {string} opts.label - label shown in the modify panel
+ * @param {boolean} [opts.omitHeight=false] - drop `height` from the serialized
+ *   `{.absolute …}` block. Same rationale as callouts: when the source block's
+ *   visual height is fully determined by content (e.g. blockquote's left
+ *   accent bar should hug the text, not the wrapper), persisting `height`
+ *   forces a wrapper-sized re-render that doesn't match the intent.
  */
-function makeListClassifier({ tagName, dataKey, testLine, label }) {
+function makeListClassifier({ tagName, dataKey, testLine, label, omitHeight = false }) {
   const idxAttr = `editableModified${dataKey}Idx`;
   const activeAttr = `editableModified${dataKey}`;
 
@@ -1603,6 +1747,18 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
       setupDivWhenReady(el);
 
       waitForRegistryThenFixPosition(el, origLeft, origTop);
+
+      // For content-sized elements (blockquote): stop syncing the wrapper
+      // height back to the inner element so the visible bar / content stays
+      // at its natural height during a resize drag. Done after the registry
+      // entry exists, then force the inline height to auto to undo
+      // lockNaturalDimensions' px lock.
+      if (omitHeight) {
+        whenInRegistry(el, (ee) => {
+          ee.syncHeight = false;
+          el.style.height = 'auto';
+        });
+      }
     },
 
     serialize(text) {
@@ -1627,7 +1783,7 @@ function makeListClassifier({ tagName, dataKey, testLine, label }) {
           const block = blocks[elIdx];
           const dims = editableRegistry.get(el).toDimensions();
 
-          const attrs = buildAbsoluteAttrString(dims);
+          const attrs = buildBlockSerializeAttrs(dims, { omitHeight });
 
           const blockLineCount = block.endLine - block.startLine + 1;
           lines.splice(block.startLine, blockLineCount,
@@ -1664,6 +1820,10 @@ ModifyModeClassifier.register(makeListClassifier({
   dataKey: 'Blockquote',
   testLine: (line) => /^>/.test(line),
   label: 'Blockquotes',
+  // The blockquote's left accent bar stretches with the wrapper height by
+  // default. Same pattern as callouts — let content determine height so the
+  // bar hugs the quote text instead of the resize box.
+  omitHeight: true,
 }));
 
 // ---------------------------------------------------------------------------
@@ -2490,6 +2650,21 @@ ModifyModeClassifier.register({
 // `::: {.absolute ...}` fenced div. Multi-figure chunks are warned by the
 // Images classifier and skipped here.
 
+/**
+ * Find the `<p class="caption">` Quarto renders as a sibling of a code-chunk
+ * figure's `<img>`. Returns null if there is no immediate caption neighbour
+ * (e.g. `fig-cap` wasn't set, or another classifier already moved it).
+ */
+export function findChunkFigureCaption(img) {
+  let n = img.nextElementSibling;
+  // Skip whitespace-only text isn't an issue (we use nextElementSibling).
+  if (n && n.tagName === 'P' &&
+      (n.classList.contains('caption') || n.classList.contains('figure-caption'))) {
+    return n;
+  }
+  return null;
+}
+
 ModifyModeClassifier.register({
   label: 'Code chunk figures',
 
@@ -2593,7 +2768,19 @@ ModifyModeClassifier.register({
     img.dataset.editableModifiedSrc = originalSrc;
     img.dataset.editableModifiedChunkFig = 'true';
     img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+
+    // Quarto renders the `fig-cap:` as a sibling `<p class="caption">` next
+    // to the img. Bundle it into the editable-container after setup so the
+    // caption tracks the figure during drag/resize.
+    const caption = findChunkFigureCaption(img);
     setupImageWhenReady(img);
+    if (caption) {
+      whenInRegistry(img, (editable) => {
+        if (!editable.container.contains(caption)) {
+          editable.container.appendChild(caption);
+        }
+      });
+    }
   },
 
   serialize(text) {
@@ -2976,6 +3163,41 @@ function isDisplayEquationContainer(el) {
   return true;
 }
 
+// Try each selector individually, in priority order, and return the first
+// match. We can't pass a comma-joined list to querySelector because that
+// returns the first match in DOCUMENT order, which would prefer the outer
+// full-width `span.math.display` source wrapper over an inner inline-block
+// rendered math node (mjx-container / .katex-display). Measuring the outer
+// wrapper makes origLeft collapse to 0 because the wrapper spans the slide.
+// Priority: the actual rendered glyphs first (centered, narrow), then the
+// engine-specific centering wrapper, then the source span as last resort.
+//
+// MathJax v2 wraps the rendered glyphs in `<span class="MathJax">` inside
+// `<div class="MathJax_Display">`. The `_Display` wrapper is full content
+// width (display: block; text-align: center) — measuring it gives the
+// slide-left edge, not where the math is *visible*. The inner `.MathJax`
+// glyphs span is the user-visible math.
+//
+// MathJax v3 / KaTeX render the visible math at the container/inline-block
+// element; their "display" wrapper is the same as the visible node, so
+// either selector works.
+const EQUATION_RENDER_SELECTORS = [
+  'mjx-container',          // MathJax v3 rendered
+  '.katex',                 // KaTeX rendered glyphs (.katex-display wraps it)
+  '.MathJax_Display .MathJax', // MathJax v2 rendered glyphs inside centering wrapper
+  '.MathJax_Display',       // MathJax v2 centering wrapper (fallback)
+  '.katex-display',         // KaTeX centering wrapper (fallback)
+  'span.math.display',      // Source wrapper (last resort)
+];
+
+export function pickEquationRenderNode(el, selectors = EQUATION_RENDER_SELECTORS) {
+  for (const sel of selectors) {
+    const hit = el.querySelector(sel);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 ModifyModeClassifier.register({
   label: 'Display equations',
 
@@ -3011,7 +3233,7 @@ ModifyModeClassifier.register({
     // Anchor on the rendered math node when available so the container's
     // top edge sits at the visible top of the equation (not the top of the
     // wrapping `<p>`'s margin box, which would shift the equation down).
-    const inner = el.querySelector('.MathJax_Display, mjx-container, .katex-display, span.math.display') ?? el;
+    const inner = pickEquationRenderNode(el) ?? el;
     const { left: origLeft, top: origTop, width: naturalW, height: naturalH } =
       captureSlideRelativePosition(el, { rectSource: inner });
 

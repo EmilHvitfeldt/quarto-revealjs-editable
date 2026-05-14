@@ -25,6 +25,14 @@ export class EditableElement {
     this.container = null;
     /** @type {string} Element type ("img" or "div") */
     this.type = element.tagName.toLowerCase();
+    /**
+     * Whether `syncToDOM` writes `element.style.height`. Set to false for
+     * content-sized elements (blockquote/callout-style) where the visible
+     * height must follow the inner content, not the wrapper. `state.height`
+     * is still tracked for resize feedback / serialization.
+     * @type {boolean}
+     */
+    this.syncHeight = true;
 
     // Prefer pre-set inline style (sub-pixel accurate) over offsetWidth (integer-truncated).
     let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
@@ -98,7 +106,9 @@ export class EditableElement {
     }
 
     this.element.style.width = this.state.width + "px";
-    this.element.style.height = this.state.height + "px";
+    if (this.syncHeight) {
+      this.element.style.height = this.state.height + "px";
+    }
 
     if (this.state.fontSize !== null) {
       this.element.style.fontSize = this.state.fontSize + "px";

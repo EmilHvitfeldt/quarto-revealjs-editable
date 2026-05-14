@@ -17,7 +17,82 @@ vi.mock('../colors.js', () => ({ getColorPalette: vi.fn(() => []), getBrandColor
 vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 
-import { extractParagraphBlocks } from '../modify-mode.js';
+import { extractParagraphBlocks, assignStableParagraphIndices, isParagraphCandidate } from '../modify-mode.js';
+
+// Minimal DOM-ish element for testing the paragraph candidate predicate.
+const makeEl = ({ tagName = 'P', classes = [], descendants = {} } = {}) => ({
+  tagName,
+  classList: { contains: (c) => classes.includes(c) },
+  querySelector: (sel) => descendants[sel] ?? null,
+});
+
+describe('isParagraphCandidate', () => {
+  it('accepts a plain <p>', () => {
+    expect(isParagraphCandidate(makeEl())).toBe(true);
+  });
+
+  it('rejects non-<p> elements', () => {
+    expect(isParagraphCandidate(makeEl({ tagName: 'DIV' }))).toBe(false);
+  });
+
+  it('rejects <p> containing an img', () => {
+    expect(isParagraphCandidate(makeEl({ descendants: { img: {} } }))).toBe(false);
+  });
+
+  it('rejects <p> containing a display equation', () => {
+    expect(isParagraphCandidate(makeEl({ descendants: { 'span.math.display': {} } }))).toBe(false);
+  });
+
+  it('rejects code-chunk fig-cap (<p class="caption">)', () => {
+    // Bug: Quarto renders `fig-cap: "A plot"` as `<p class="caption">A plot</p>`
+    // as a direct slide child, so the Paragraphs classifier was treating it
+    // as a standalone editable paragraph.
+    expect(isParagraphCandidate(makeEl({ classes: ['caption'] }))).toBe(false);
+  });
+
+  it('rejects figure-caption variant class', () => {
+    expect(isParagraphCandidate(makeEl({ classes: ['figure-caption'] }))).toBe(false);
+  });
+
+  it('rejects <p> wrapping an svg (e.g. an arrow shortcode)', () => {
+    // Bug: a `{{< arrow >}}` without the arrows filter or `position="absolute"`
+    // renders as `<p><svg>...</svg></p>`. Without this check the Paragraphs
+    // classifier turns the arrow into a content-editable text region the
+    // moment the user clicks Modify on the slide.
+    expect(isParagraphCandidate(makeEl({ descendants: { svg: {} } }))).toBe(false);
+  });
+});
+
+const makeP = (existingIdx) => ({
+  dataset: existingIdx === undefined ? {} : { editableModifiedParagraphIdx: String(existingIdx) },
+});
+
+describe('assignStableParagraphIndices', () => {
+  it('assigns 0..n on fresh paragraphs', () => {
+    const ps = [makeP(), makeP(), makeP()];
+    assignStableParagraphIndices(ps);
+    expect(ps.map(p => p.dataset.editableModifiedParagraphIdx)).toEqual(['0', '1', '2']);
+  });
+
+  it('does not overwrite existing indices', () => {
+    const ps = [makeP(0), makeP(), makeP()];
+    assignStableParagraphIndices(ps);
+    expect(ps.map(p => p.dataset.editableModifiedParagraphIdx)).toEqual(['0', '1', '2']);
+  });
+
+  it('indices stay stable across multiple classify passes', () => {
+    // Simulates the bug: after activating p0, classify re-runs over [p0, p1].
+    // p1 must keep idx 1, not be reset to 0.
+    const p0 = makeP();
+    const p1 = makeP();
+    assignStableParagraphIndices([p0, p1]);
+    expect(p1.dataset.editableModifiedParagraphIdx).toBe('1');
+    // re-run (e.g. user toggles modify mode again)
+    assignStableParagraphIndices([p0, p1]);
+    expect(p0.dataset.editableModifiedParagraphIdx).toBe('0');
+    expect(p1.dataset.editableModifiedParagraphIdx).toBe('1');
+  });
+});
 
 describe('extractParagraphBlocks', () => {
   it('extracts a single paragraph', () => {

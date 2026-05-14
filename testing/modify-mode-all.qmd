@@ -1,0 +1,119 @@
+---
+title: "Modify Mode — All Classifiers"
+format:
+  revealjs:
+    output-file: modify-mode-all.html
+filters:
+  - editable
+  - arrows
+---
+
+## Slide titles {data-modify-test="titles"}
+
+This slide's `##` heading should be classifiable.
+
+Body paragraph for context.
+
+## Paragraphs
+
+A standalone paragraph that modify mode should recognise.
+
+Another paragraph on the same slide.
+
+## Bullet lists
+
+- Apple
+- Banana
+- Cherry
+
+## Ordered lists
+
+1. First
+2. Second
+3. Third
+
+## Blockquotes
+
+> A blockquote that modify mode should be able to activate.
+
+## Inline image
+
+![](../image.png)
+
+## Inline video
+
+![](../demo-text.mp4)
+
+## Fenced divs
+
+::: {.my-fenced}
+Content inside a classed fenced div.
+:::
+
+::: {#my-id-div}
+Content keyed by id.
+:::
+
+## Display equations
+
+$$E = mc^2$$
+
+$$a^2 + b^2 = c^2$$
+
+## Tables
+
+| Col A | Col B |
+|-------|-------|
+| 1     | 2     |
+| 3     | 4     |
+
+## Code block (highlighted)
+
+```python
+x = 1
+print(x)
+```
+
+## Code chunk output
+
+```{r}
+#| label: chunk-out
+1 + 1
+```
+
+## Code chunk figure
+
+```{r}
+#| label: chunk-fig
+#| fig-cap: "A plot"
+plot(1:10)
+```
+
+## Positioned image (re-activatable)
+
+![](../image.png){.absolute left=100px top=150px width=200px height=120px}
+
+## Positioned div (re-activatable)
+
+::: {.absolute left=200px top=150px width=300px height=120px}
+Already-positioned editable div.
+:::
+
+## Positioned arrow (re-activatable)
+
+{{< arrow from="100,100" to="400,300" position="absolute" >}}
+
+## Mixed slide
+
+A paragraph.
+
+- list item one
+- list item two
+
+> a quote
+
+```python
+y = 2
+```
+
+![](../image.png)

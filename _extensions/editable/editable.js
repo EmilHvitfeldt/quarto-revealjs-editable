@@ -3083,6 +3083,7 @@ var EditableModule = (() => {
       this.element = element;
       this.container = null;
       this.type = element.tagName.toLowerCase();
+      this.syncHeight = true;
       let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
       let height = element.style.height ? parseFloat(element.style.height) : element.offsetHeight;
       if (this.type === "img" && (width === 0 || height === 0)) {
@@ -3143,7 +3144,9 @@ var EditableModule = (() => {
         }
       }
       this.element.style.width = this.state.width + "px";
-      this.element.style.height = this.state.height + "px";
+      if (this.syncHeight) {
+        this.element.style.height = this.state.height + "px";
+      }
       if (this.state.fontSize !== null) {
         this.element.style.fontSize = this.state.fontSize + "px";
       }
@@ -12350,6 +12353,19 @@ ${escapeText(this.code(index, length))}
     if (deselectArrowFn)
       deselectArrowFn();
   }
+  var ACTIVE_EDIT_CONTEXT_SELECTORS = [
+    ".editable-container:has(img)",
+    ".editable-toolbar",
+    ".editable-container:has(.ql-editor[contenteditable='true'])",
+    ".editable-arrow-container",
+    // h2 currently being edited via modify mode's heading flow.
+    ".editable-heading-active"
+  ];
+  function isInsideActiveEditContext(target) {
+    if (!target || typeof target.closest !== "function")
+      return false;
+    return ACTIVE_EDIT_CONTEXT_SELECTORS.some((sel) => target.closest(sel));
+  }
 
   // src/arrows.js
   var arrowExtensionWarningShown = false;
@@ -15963,6 +15979,13 @@ ${fence}`;
       requestAnimationFrame(() => waitForRegistryThenFixPosition(el, origLeft, origTop));
     }
   }
+  function whenInRegistry(el, cb) {
+    if (editableRegistry.has(el)) {
+      cb(editableRegistry.get(el));
+    } else {
+      requestAnimationFrame(() => whenInRegistry(el, cb));
+    }
+  }
   function makePositionedClassifier(opts) {
     const {
       label,
@@ -16020,6 +16043,10 @@ ${fence}`;
           extraDataset(el);
         el.style.left = "";
         el.style.top = "";
+        if (!el.style.width)
+          el.style.width = pos.width + "px";
+        if (!el.style.height)
+          el.style.height = pos.height + "px";
         if (extraActivate)
           extraActivate(el);
         setupFn(el);
@@ -16269,6 +16296,12 @@ ${fence}`;
     },
     beforeSetup(video) {
       _videosWithControlsRemoved.delete(video);
+      const scale = getSlideScale();
+      const rect = video.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        video.style.width = rect.width / scale + "px";
+        video.style.height = rect.height / scale + "px";
+      }
       video.style.maxWidth = "none";
       video.style.maxHeight = "none";
     },
@@ -16507,8 +16540,27 @@ ${fence}`;
       };
     }
   }));
+  function replaceHeadingTextInChunk(chunk, newText) {
+    return chunk.replace(/^## [^\n]*/m, (line) => {
+      const attrMatch = line.match(/\s*(\{[^}]*\})\s*$/);
+      const trailing = attrMatch ? ` ${attrMatch[1]}` : "";
+      return `## ${newText}${trailing}`;
+    });
+  }
   function headingHtmlToMarkdown(html) {
     let text = html;
+    text = text.replace(
+      /<span[^>]*style="[^"]*font-weight:\s*(bold|[6-9]\d\d)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, _w, content) => `**${content}**`
+    );
+    text = text.replace(
+      /<span[^>]*style="[^"]*font-style:\s*italic[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, content) => `*${content}*`
+    );
+    text = text.replace(
+      /<span[^>]*style="[^"]*text-decoration:[^"]*line-through[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, content) => `~~${content}~~`
+    );
     text = text.replace(
       /<span[^>]*style="[^"]*background-color:\s*([^;"]+)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
       (_, colorVal, content) => `[${content}]{style='background-color: ${getBrandColorOutput(colorVal.trim())}'}`
@@ -16525,7 +16577,11 @@ ${fence}`;
       /<font[^>]*\bcolor="([^"]+)"[^>]*>([\s\S]*?)<\/font>/gi,
       (_, colorVal, content) => `[${content}]{style='color: ${getBrandColorOutput(colorVal.trim())}'}`
     );
-    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+    text = text.replace(
+      /<span[^>]*style="[^"]*text-decoration:[^"]*underline[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, content) => `[${content}]{.underline}`
+    );
+    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, "[$1]{.underline}").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/__BRAND_SHORTCODE_(\w+)__/g, "{{< brand color $1 >}}").trim();
   }
   function buildColorPicker(execCmd, title, pickerClass, presetColors) {
     let savedRange = null;
@@ -16617,16 +16673,55 @@ ${fence}`;
     });
     return picker;
   }
+  function toggleInlineWrap(root2, tag) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0)
+      return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed)
+      return;
+    if (!root2.contains(range.commonAncestorContainer))
+      return;
+    const findWrapper = (node) => {
+      while (node && node !== root2) {
+        if (node.nodeType === 1 && node.tagName && node.tagName.toLowerCase() === tag)
+          return node;
+        node = node.parentNode;
+      }
+      return null;
+    };
+    const startWrap = findWrapper(range.startContainer);
+    const endWrap = findWrapper(range.endContainer);
+    if (startWrap && startWrap === endWrap) {
+      const wrapper2 = startWrap;
+      const parent = wrapper2.parentNode;
+      while (wrapper2.firstChild)
+        parent.insertBefore(wrapper2.firstChild, wrapper2);
+      parent.removeChild(wrapper2);
+      parent.normalize();
+      return;
+    }
+    const wrapper = document.createElement(tag);
+    try {
+      wrapper.appendChild(range.extractContents());
+      range.insertNode(wrapper);
+      const newRange = document.createRange();
+      newRange.selectNodeContents(wrapper);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } catch (_) {
+    }
+  }
   function buildHeadingToolbar(h2) {
     const toolbar = document.createElement("div");
     toolbar.className = "heading-edit-toolbar quill-toolbar-container ql-toolbar ql-snow";
     const buttons = [
-      { command: "bold", label: "B", title: "Bold", style: "font-weight:bold" },
-      { command: "italic", label: "I", title: "Italic", style: "font-style:italic" },
-      { command: "underline", label: "U", title: "Underline", style: "text-decoration:underline" },
-      { command: "strikeThrough", label: "S", title: "Strikethrough", style: "text-decoration:line-through" }
+      { tag: "b", label: "B", title: "Bold", style: "font-weight:bold" },
+      { tag: "i", label: "I", title: "Italic", style: "font-style:italic" },
+      { tag: "u", label: "U", title: "Underline", style: "text-decoration:underline" },
+      { tag: "s", label: "S", title: "Strikethrough", style: "text-decoration:line-through" }
     ];
-    for (const { command, label, title, style } of buttons) {
+    for (const { tag, label, title, style } of buttons) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = label;
@@ -16634,7 +16729,7 @@ ${fence}`;
       btn.style.cssText = style;
       btn.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        document.execCommand(command);
+        toggleInlineWrap(h2, tag);
       });
       toolbar.appendChild(btn);
     }
@@ -16719,7 +16814,7 @@ ${fence}`;
         if (chunkIndex >= chunks.length)
           continue;
         const newText = headingHtmlToMarkdown(h2.innerHTML);
-        chunks[chunkIndex] = chunks[chunkIndex].replace(/^## .*/m, `## ${newText}`);
+        chunks[chunkIndex] = replaceHeadingTextInChunk(chunks[chunkIndex], newText);
       }
       return chunks.join("");
     }
@@ -17018,20 +17113,47 @@ ${fence}`;
     commitBlock();
     return blocks;
   }
+  function isParagraphCandidate(el) {
+    if (el.tagName !== "P")
+      return false;
+    if (el.classList.contains("caption"))
+      return false;
+    if (el.classList.contains("figure-caption"))
+      return false;
+    if (el.querySelector("img"))
+      return false;
+    if (el.querySelector("span.math.display"))
+      return false;
+    if (el.querySelector("svg"))
+      return false;
+    return true;
+  }
+  function assignStableParagraphIndices(paragraphs) {
+    const used = /* @__PURE__ */ new Set();
+    for (const p of paragraphs) {
+      const existing = p.dataset.editableModifiedParagraphIdx;
+      if (existing !== void 0)
+        used.add(parseInt(existing, 10));
+    }
+    let next = 0;
+    for (const p of paragraphs) {
+      if (p.dataset.editableModifiedParagraphIdx !== void 0)
+        continue;
+      while (used.has(next))
+        next++;
+      p.dataset.editableModifiedParagraphIdx = String(next);
+      used.add(next);
+      next++;
+    }
+  }
   ModifyModeClassifier.register({
     label: "Paragraphs",
     classify(slideEl) {
-      const candidates = Array.from(slideEl.children).filter(
-        (el) => el.tagName === "P" && !editableRegistry.has(el) && !isAlreadyPositioned(el) && !el.querySelector("img") && // Standalone display equations are handled by the Display equations
-        // classifier; don't double-claim them as plain paragraphs.
-        !el.querySelector("span.math.display")
+      const allParas = Array.from(slideEl.children).filter(isParagraphCandidate);
+      assignStableParagraphIndices(allParas);
+      const valid = allParas.filter(
+        (p) => !editableRegistry.has(p) && !isAlreadyPositioned(p)
       );
-      const valid = [];
-      let idx = 0;
-      for (const p of candidates) {
-        p.dataset.editableModifiedParagraphIdx = String(idx++);
-        valid.push(p);
-      }
       return { valid, warn: [] };
     },
     activate(p) {
@@ -17132,7 +17254,10 @@ ${fence}`;
     commitBlock();
     return blocks;
   }
-  function makeListClassifier({ tagName, dataKey, testLine, label }) {
+  function buildBlockSerializeAttrs(dims, { omitHeight = false } = {}) {
+    return omitHeight ? buildAbsoluteAttrString(dims, { include: ["left", "top", "width"] }) : buildAbsoluteAttrString(dims);
+  }
+  function makeListClassifier({ tagName, dataKey, testLine, label, omitHeight = false }) {
     const idxAttr = `editableModified${dataKey}Idx`;
     const activeAttr = `editableModified${dataKey}`;
     return {
@@ -17158,6 +17283,12 @@ ${fence}`;
         setCapabilityOverride(el, ["move", "resize"]);
         setupDivWhenReady(el);
         waitForRegistryThenFixPosition(el, origLeft, origTop);
+        if (omitHeight) {
+          whenInRegistry(el, (ee) => {
+            ee.syncHeight = false;
+            el.style.height = "auto";
+          });
+        }
       },
       serialize(text) {
         const htmlAttr = `data-editable-modified-${dataKey.toLowerCase()}`;
@@ -17177,7 +17308,7 @@ ${fence}`;
               return;
             const block = blocks[elIdx];
             const dims = editableRegistry.get(el).toDimensions();
-            const attrs = buildAbsoluteAttrString(dims);
+            const attrs = buildBlockSerializeAttrs(dims, { omitHeight });
             const blockLineCount = block.endLine - block.startLine + 1;
             lines.splice(
               block.startLine,
@@ -17209,7 +17340,11 @@ ${fence}`;
     tagName: "BLOCKQUOTE",
     dataKey: "Blockquote",
     testLine: (line) => /^>/.test(line),
-    label: "Blockquotes"
+    label: "Blockquotes",
+    // The blockquote's left accent bar stretches with the wrapper height by
+    // default. Same pattern as callouts — let content determine height so the
+    // bar hugs the quote text instead of the resize box.
+    omitHeight: true
   }));
   var SUPPORTED_ARROW_KWARGS = /* @__PURE__ */ new Set([
     "from",
@@ -17778,6 +17913,13 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function findChunkFigureCaption(img) {
+    let n = img.nextElementSibling;
+    if (n && n.tagName === "P" && (n.classList.contains("caption") || n.classList.contains("figure-caption"))) {
+      return n;
+    }
+    return null;
+  }
   ModifyModeClassifier.register({
     label: "Code chunk figures",
     classify(slideEl) {
@@ -17864,7 +18006,15 @@ ${fence}`;
       img.dataset.editableModifiedSrc = originalSrc;
       img.dataset.editableModifiedChunkFig = "true";
       img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      const caption = findChunkFigureCaption(img);
       setupImageWhenReady(img);
+      if (caption) {
+        whenInRegistry(img, (editable) => {
+          if (!editable.container.contains(caption)) {
+            editable.container.appendChild(caption);
+          }
+        });
+      }
     },
     serialize(text) {
       const imgs = Array.from(
@@ -18174,6 +18324,28 @@ ${fence}`;
     }
     return true;
   }
+  var EQUATION_RENDER_SELECTORS = [
+    "mjx-container",
+    // MathJax v3 rendered
+    ".katex",
+    // KaTeX rendered glyphs (.katex-display wraps it)
+    ".MathJax_Display .MathJax",
+    // MathJax v2 rendered glyphs inside centering wrapper
+    ".MathJax_Display",
+    // MathJax v2 centering wrapper (fallback)
+    ".katex-display",
+    // KaTeX centering wrapper (fallback)
+    "span.math.display"
+    // Source wrapper (last resort)
+  ];
+  function pickEquationRenderNode(el, selectors = EQUATION_RENDER_SELECTORS) {
+    for (const sel of selectors) {
+      const hit = el.querySelector(sel);
+      if (hit)
+        return hit;
+    }
+    return null;
+  }
   ModifyModeClassifier.register({
     label: "Display equations",
     classify(slideEl) {
@@ -18204,7 +18376,7 @@ ${fence}`;
     },
     activate(el) {
       const slideIndex = Reveal.getState().indexh;
-      const inner = el.querySelector(".MathJax_Display, mjx-container, .katex-display, span.math.display") ?? el;
+      const inner = pickEquationRenderNode(el) ?? el;
       const { left: origLeft, top: origTop, width: naturalW, height: naturalH } = captureSlideRelativePosition(el, { rectSource: inner });
       el.style.padding = "0";
       el.style.margin = "0";
@@ -18526,7 +18698,7 @@ ${fence}`;
           createFloatingToolbar();
           setupUndoRedoKeyboard();
           document.addEventListener("click", (e) => {
-            if (!e.target.closest(".editable-container:has(img)") && !e.target.closest(".editable-toolbar") && !e.target.closest(".editable-container:has(.ql-editor[contenteditable='true'])") && !e.target.closest(".editable-arrow-container")) {
+            if (!isInsideActiveEditContext(e.target)) {
               setActiveImage(null);
             }
           });
