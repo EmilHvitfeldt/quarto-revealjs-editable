@@ -17071,6 +17071,8 @@ ${fence}`;
       return false;
     if (el.querySelector("span.math.display"))
       return false;
+    if (el.querySelector("svg"))
+      return false;
     return true;
   }
   function assignStableParagraphIndices(paragraphs) {

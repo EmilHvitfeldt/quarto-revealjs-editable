@@ -1455,6 +1455,9 @@ export function isParagraphCandidate(el) {
   if (el.classList.contains('figure-caption')) return false;
   if (el.querySelector('img')) return false;
   if (el.querySelector('span.math.display')) return false;
+  // `{{< arrow >}}` without the arrows filter / `position="absolute"` renders
+  // as `<p><svg>…</svg></p>`. Skip so it isn't turned into a text region.
+  if (el.querySelector('svg')) return false;
   return true;
 }
 

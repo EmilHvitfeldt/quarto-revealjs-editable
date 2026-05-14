@@ -53,6 +53,14 @@ describe('isParagraphCandidate', () => {
   it('rejects figure-caption variant class', () => {
     expect(isParagraphCandidate(makeEl({ classes: ['figure-caption'] }))).toBe(false);
   });
+
+  it('rejects <p> wrapping an svg (e.g. an arrow shortcode)', () => {
+    // Bug: a `{{< arrow >}}` without the arrows filter or `position="absolute"`
+    // renders as `<p><svg>...</svg></p>`. Without this check the Paragraphs
+    // classifier turns the arrow into a content-editable text region the
+    // moment the user clicks Modify on the slide.
+    expect(isParagraphCandidate(makeEl({ descendants: { svg: {} } }))).toBe(false);
+  });
 });
 
 const makeP = (existingIdx) => ({

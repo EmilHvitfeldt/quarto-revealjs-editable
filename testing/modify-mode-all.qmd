@@ -3,6 +3,9 @@ title: "Modify Mode — All Classifiers"
 format:
   revealjs:
     output-file: modify-mode-all.html
+filters:
+  - editable
+  - arrows
 ---
 
 ## Slide titles {data-modify-test="titles"}
@@ -98,7 +101,7 @@ Already-positioned editable div.
 
 ## Positioned arrow (re-activatable)
 
-{{< arrow from="100,100" to="400,300" >}}
+{{< arrow from="100,100" to="400,300" position="absolute" >}}
 
 ## Mixed slide
 
