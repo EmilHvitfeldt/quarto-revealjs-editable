@@ -8,32 +8,6 @@ filters:
   - arrows
 ---
 
-## Try Moving This Image
-
-Drag the image to reposition it.
-
-![](image.png){.editable width="200"}
-
-## Edit This Text
-
-Click the edit button to open the rich text editor.
-
-::: {.editable}
-**Try editing me!**
-
-You can make text *italic*, **bold**, or ~~strikethrough~~.
-:::
-
-## Multiple Elements
-
-::: {.editable}
-Element 1
-:::
-
-::: {.editable}
-Element 2
-:::
-
 ## Try Modify Mode
 
 Nothing on this slide is pre-marked. Click **Modify** in the menu bar, then click any element below to make it editable on the fly.
@@ -48,3 +22,31 @@ This paragraph, the list, and the table are all activatable.
 |----------|----------|
 | 1        | 2        |
 | 3        | 4        |
+
+## Try Moving This Image
+
+This image was pre-marked with the `.editable` class in the source (`![](image.png){.editable width="200"}`), so it is active immediately — drag it to reposition.
+
+![](image.png){.editable width="200"}
+
+## Edit This Text
+
+This text block was pre-marked with `::: {.editable}` in the source, so it is active immediately. Click the edit button to open the rich text editor.
+
+::: {.editable}
+**Try editing me!**
+
+You can make text *italic*, **bold**, or ~~strikethrough~~.
+:::
+
+## Multiple Elements
+
+Both blocks below were pre-marked with `::: {.editable}` in the source.
+
+::: {.editable}
+Element 1
+:::
+
+::: {.editable}
+Element 2
+:::
