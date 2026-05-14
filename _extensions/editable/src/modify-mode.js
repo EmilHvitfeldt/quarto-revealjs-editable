@@ -2650,6 +2650,21 @@ ModifyModeClassifier.register({
 // `::: {.absolute ...}` fenced div. Multi-figure chunks are warned by the
 // Images classifier and skipped here.
 
+/**
+ * Find the `<p class="caption">` Quarto renders as a sibling of a code-chunk
+ * figure's `<img>`. Returns null if there is no immediate caption neighbour
+ * (e.g. `fig-cap` wasn't set, or another classifier already moved it).
+ */
+export function findChunkFigureCaption(img) {
+  let n = img.nextElementSibling;
+  // Skip whitespace-only text isn't an issue (we use nextElementSibling).
+  if (n && n.tagName === 'P' &&
+      (n.classList.contains('caption') || n.classList.contains('figure-caption'))) {
+    return n;
+  }
+  return null;
+}
+
 ModifyModeClassifier.register({
   label: 'Code chunk figures',
 
@@ -2753,7 +2768,19 @@ ModifyModeClassifier.register({
     img.dataset.editableModifiedSrc = originalSrc;
     img.dataset.editableModifiedChunkFig = 'true';
     img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+
+    // Quarto renders the `fig-cap:` as a sibling `<p class="caption">` next
+    // to the img. Bundle it into the editable-container after setup so the
+    // caption tracks the figure during drag/resize.
+    const caption = findChunkFigureCaption(img);
     setupImageWhenReady(img);
+    if (caption) {
+      whenInRegistry(img, (editable) => {
+        if (!editable.container.contains(caption)) {
+          editable.container.appendChild(caption);
+        }
+      });
+    }
   },
 
   serialize(text) {

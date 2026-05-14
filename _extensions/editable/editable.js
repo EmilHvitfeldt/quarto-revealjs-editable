@@ -17909,6 +17909,13 @@ ${fence}`;
       return chunks.join("");
     }
   });
+  function findChunkFigureCaption(img) {
+    let n = img.nextElementSibling;
+    if (n && n.tagName === "P" && (n.classList.contains("caption") || n.classList.contains("figure-caption"))) {
+      return n;
+    }
+    return null;
+  }
   ModifyModeClassifier.register({
     label: "Code chunk figures",
     classify(slideEl) {
@@ -17995,7 +18002,15 @@ ${fence}`;
       img.dataset.editableModifiedSrc = originalSrc;
       img.dataset.editableModifiedChunkFig = "true";
       img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      const caption = findChunkFigureCaption(img);
       setupImageWhenReady(img);
+      if (caption) {
+        whenInRegistry(img, (editable) => {
+          if (!editable.container.contains(caption)) {
+            editable.container.appendChild(caption);
+          }
+        });
+      }
     },
     serialize(text) {
       const imgs = Array.from(

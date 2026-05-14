@@ -19,7 +19,7 @@ vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 vi.mock('../arrows.js', () => ({ createArrowElement: vi.fn(), setActiveArrow: vi.fn() }));
 
-import { extractCodeBlocks } from '../modify-mode.js';
+import { extractCodeBlocks, findChunkFigureCaption } from '../modify-mode.js';
 
 describe('extractCodeBlocks', () => {
   it('extracts a single highlighted code block', () => {
@@ -68,5 +68,42 @@ describe('extractCodeBlocks', () => {
     );
     expect(blocks).toHaveLength(1);
     expect(blocks[0].firstCodeLine).toBe('z = 1');
+  });
+});
+
+describe('findChunkFigureCaption', () => {
+  // No jsdom in this test suite — fake the minimal element shape the helper
+  // inspects (`nextElementSibling`, `tagName`, `classList.contains`).
+  function makeImg(next) {
+    return { nextElementSibling: next };
+  }
+  function makeEl(tag, classes = [], text = '') {
+    return {
+      tagName: tag.toUpperCase(),
+      classList: { contains: (c) => classes.includes(c) },
+      textContent: text,
+    };
+  }
+
+  it('returns the immediate <p class="caption"> sibling', () => {
+    const cap = makeEl('p', ['caption'], 'A plot');
+    expect(findChunkFigureCaption(makeImg(cap))).toBe(cap);
+  });
+
+  it('returns the immediate <p class="figure-caption"> sibling', () => {
+    const cap = makeEl('p', ['figure-caption'], 'Caption');
+    expect(findChunkFigureCaption(makeImg(cap))).toBe(cap);
+  });
+
+  it('returns null when next sibling is a non-caption <p>', () => {
+    expect(findChunkFigureCaption(makeImg(makeEl('p', [], 'regular')))).toBeNull();
+  });
+
+  it('returns null when next sibling is not a <p>', () => {
+    expect(findChunkFigureCaption(makeImg(makeEl('div', ['caption'])))).toBeNull();
+  });
+
+  it('returns null when img has no next element sibling', () => {
+    expect(findChunkFigureCaption(makeImg(null))).toBeNull();
   });
 });
