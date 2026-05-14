@@ -39,7 +39,7 @@ Another paragraph on the same slide.
 
 ## Inline video
 
-{{< video ../demo-text.mp4 >}}
+![](../demo-text.mp4)
 
 ## Fenced divs
 
