@@ -2,7 +2,7 @@
 title: "Editable Extension for Quarto Revealjs"
 ---
 
-This Revealjs plugin allows the repositioning, resizing, and rotating of images and text divs directly in the previewed slides.
+This Revealjs plugin lets you edit slide elements — images, videos, text, tables, code, equations, titles, arrows, and more — directly in the rendered presentation. Move, resize, rotate, restyle, and save changes back to your `.qmd` source.
 
 ## Try It Out
 
@@ -22,6 +22,7 @@ Or [open in a new tab](example.html){target="_blank"} for the full experience.
 
 ## Key Features
 
+- **Modify mode** — click any element on a rendered slide to make it editable, no source markup required
 - **Move** elements by dragging them to reposition
 - **Resize** elements using corner handles (hold Shift to preserve aspect ratio)
 - **Rotate** elements using the orange circular handle (hold Shift to snap to 15° increments)
@@ -48,7 +49,9 @@ filters:
   - editable
 ```
 
-Mark elements as editable:
+Render normally, then click the **Modify** button in the menu bar to make any element on the current slide editable. No source markup required.
+
+Optionally, pre-mark elements with `{.editable}` to have them active immediately without entering modify mode first:
 
 ```markdown
 ![](image.png){.editable}
