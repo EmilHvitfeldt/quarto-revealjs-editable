@@ -145,6 +145,57 @@ test.describe('Modify Mode', () => {
     expect(await page.locator('.toolbar-modify.active').count()).toBe(0);
   });
 
+  test('bold formatting in h2 heading serializes to **text**', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
+    await page.click('.toolbar-modify');
+    await page.locator('h2.modify-mode-valid').click();
+
+    // Replace heading with known text, select the word "bold"
+    await page.locator('h2[contenteditable="true"]').evaluate((h2) => {
+      h2.focus();
+      h2.textContent = 'hello bold world';
+      const range = document.createRange();
+      const tn = h2.firstChild;
+      range.setStart(tn, 6); range.setEnd(tn, 10);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+    });
+    // Trigger Bold via the heading toolbar (mousedown handler)
+    await page.locator('.heading-edit-toolbar button[title="Bold"]').dispatchEvent('mousedown');
+
+    const innerHTML = await page.locator('h2[contenteditable="true"]').evaluate(h2 => h2.innerHTML);
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const chunks = qmd.split(/(?=^## )/m);
+    const slide1 = chunks.find(c => /hello/i.test(c)) ?? '';
+    expect.soft(innerHTML, `innerHTML after bold: ${innerHTML}`).toContain('bold');
+    expect(slide1, `innerHTML=${innerHTML}\nslide=${slide1}`).toMatch(/\*\*bold\*\*/);
+  });
+
+  test('underline formatting in h2 heading serializes to [text]{.underline}', async ({ page }) => {
+    await setupPage(page, 'modify-mode.html');
+    await navigateToSlide(page, 1);
+    await page.click('.toolbar-modify');
+    await page.locator('h2.modify-mode-valid').click();
+
+    await page.locator('h2[contenteditable="true"]').evaluate((h2) => {
+      h2.focus();
+      h2.textContent = 'hello uline world';
+      const range = document.createRange();
+      const tn = h2.firstChild;
+      range.setStart(tn, 6); range.setEnd(tn, 11);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+    });
+    await page.locator('.heading-edit-toolbar button[title="Underline"]').dispatchEvent('mousedown');
+
+    const innerHTML = await page.locator('h2[contenteditable="true"]').evaluate(h2 => h2.innerHTML);
+    const qmd = await page.evaluate(() => getTransformedQmd());
+    const chunks = qmd.split(/(?=^## )/m);
+    const slide1 = chunks.find(c => /hello/i.test(c)) ?? '';
+    expect(slide1, `innerHTML=${innerHTML}\nslide=${slide1}`).toMatch(/\[uline\]\{\.underline\}/);
+  });
+
   test('editing h2 title serializes back to QMD', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
     await navigateToSlide(page, 1);

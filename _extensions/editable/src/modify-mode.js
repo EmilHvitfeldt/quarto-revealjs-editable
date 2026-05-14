@@ -769,11 +769,16 @@ export function headingHtmlToMarkdown(html) {
   text = text.replace(/<font[^>]*\bcolor="([^"]+)"[^>]*>([\s\S]*?)<\/font>/gi,
     (_, colorVal, content) => `[${content}]{style='color: ${getBrandColorOutput(colorVal.trim())}'}`);
 
+  // Underline span form (some browsers may emit this)
+  text = text.replace(/<span[^>]*style="[^"]*text-decoration:[^"]*underline[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+    (_, content) => `[${content}]{.underline}`);
+
   return text
     .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**')
     .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**')
     .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*')
     .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '*$1*')
+    .replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '[$1]{.underline}')
     .replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, '~~$1~~')
     .replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, '~~$1~~')
     .replace(/<[^>]+>/g, '')
@@ -898,18 +903,69 @@ function buildColorPicker(execCmd, title, pickerClass, presetColors) {
   return picker;
 }
 
+/**
+ * Toggle inline formatting (wrap/unwrap) for the current selection inside `root`.
+ * Wraps the selected range in a `<tag>` element, or unwraps if the selection
+ * is entirely inside an existing `<tag>` ancestor. This bypasses
+ * `document.execCommand` which mis-handles bold inside an already-bold context
+ * (e.g. <h2>) by emitting `<span style="font-weight: normal">`, and which
+ * inconsistently emits CSS-styled spans for underline depending on the browser.
+ */
+function toggleInlineWrap(root, tag) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+  if (!root.contains(range.commonAncestorContainer)) return;
+
+  // Detect existing wrapper ancestor of this tag fully containing the selection.
+  const findWrapper = (node) => {
+    while (node && node !== root) {
+      if (node.nodeType === 1 && node.tagName && node.tagName.toLowerCase() === tag) return node;
+      node = node.parentNode;
+    }
+    return null;
+  };
+  const startWrap = findWrapper(range.startContainer);
+  const endWrap = findWrapper(range.endContainer);
+
+  if (startWrap && startWrap === endWrap) {
+    // Unwrap: move children out of the wrapper, then remove it.
+    const wrapper = startWrap;
+    const parent = wrapper.parentNode;
+    while (wrapper.firstChild) parent.insertBefore(wrapper.firstChild, wrapper);
+    parent.removeChild(wrapper);
+    parent.normalize();
+    return;
+  }
+
+  // Wrap: extract contents, wrap in new element, reinsert.
+  const wrapper = document.createElement(tag);
+  try {
+    wrapper.appendChild(range.extractContents());
+    range.insertNode(wrapper);
+    // Restore selection around the new wrapper contents
+    const newRange = document.createRange();
+    newRange.selectNodeContents(wrapper);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  } catch (_) {
+    // Selection spans non-wrappable boundaries; ignore.
+  }
+}
+
 function buildHeadingToolbar(h2) {
   const toolbar = document.createElement('div');
   toolbar.className = 'heading-edit-toolbar quill-toolbar-container ql-toolbar ql-snow';
 
   const buttons = [
-    { command: 'bold',          label: 'B', title: 'Bold',          style: 'font-weight:bold' },
-    { command: 'italic',        label: 'I', title: 'Italic',        style: 'font-style:italic' },
-    { command: 'underline',     label: 'U', title: 'Underline',     style: 'text-decoration:underline' },
-    { command: 'strikeThrough', label: 'S', title: 'Strikethrough', style: 'text-decoration:line-through' },
+    { tag: 'b', label: 'B', title: 'Bold',          style: 'font-weight:bold' },
+    { tag: 'i', label: 'I', title: 'Italic',        style: 'font-style:italic' },
+    { tag: 'u', label: 'U', title: 'Underline',     style: 'text-decoration:underline' },
+    { tag: 's', label: 'S', title: 'Strikethrough', style: 'text-decoration:line-through' },
   ];
 
-  for (const { command, label, title, style } of buttons) {
+  for (const { tag, label, title, style } of buttons) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = label;
@@ -917,7 +973,7 @@ function buildHeadingToolbar(h2) {
     btn.style.cssText = style;
     btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      document.execCommand(command);
+      toggleInlineWrap(h2, tag);
     });
     toolbar.appendChild(btn);
   }

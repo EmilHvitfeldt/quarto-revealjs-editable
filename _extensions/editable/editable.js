@@ -16567,7 +16567,11 @@ ${fence}`;
       /<font[^>]*\bcolor="([^"]+)"[^>]*>([\s\S]*?)<\/font>/gi,
       (_, colorVal, content) => `[${content}]{style='color: ${getBrandColorOutput(colorVal.trim())}'}`
     );
-    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+    text = text.replace(
+      /<span[^>]*style="[^"]*text-decoration:[^"]*underline[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+      (_, content) => `[${content}]{.underline}`
+    );
+    return text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**").replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**").replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*").replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*").replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, "[$1]{.underline}").replace(/<s[^>]*>([\s\S]*?)<\/s>/gi, "~~$1~~").replace(/<strike[^>]*>([\s\S]*?)<\/strike>/gi, "~~$1~~").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
   }
   function buildColorPicker(execCmd, title, pickerClass, presetColors) {
     let savedRange = null;
@@ -16659,16 +16663,55 @@ ${fence}`;
     });
     return picker;
   }
+  function toggleInlineWrap(root2, tag) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0)
+      return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed)
+      return;
+    if (!root2.contains(range.commonAncestorContainer))
+      return;
+    const findWrapper = (node) => {
+      while (node && node !== root2) {
+        if (node.nodeType === 1 && node.tagName && node.tagName.toLowerCase() === tag)
+          return node;
+        node = node.parentNode;
+      }
+      return null;
+    };
+    const startWrap = findWrapper(range.startContainer);
+    const endWrap = findWrapper(range.endContainer);
+    if (startWrap && startWrap === endWrap) {
+      const wrapper2 = startWrap;
+      const parent = wrapper2.parentNode;
+      while (wrapper2.firstChild)
+        parent.insertBefore(wrapper2.firstChild, wrapper2);
+      parent.removeChild(wrapper2);
+      parent.normalize();
+      return;
+    }
+    const wrapper = document.createElement(tag);
+    try {
+      wrapper.appendChild(range.extractContents());
+      range.insertNode(wrapper);
+      const newRange = document.createRange();
+      newRange.selectNodeContents(wrapper);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } catch (_) {
+    }
+  }
   function buildHeadingToolbar(h2) {
     const toolbar = document.createElement("div");
     toolbar.className = "heading-edit-toolbar quill-toolbar-container ql-toolbar ql-snow";
     const buttons = [
-      { command: "bold", label: "B", title: "Bold", style: "font-weight:bold" },
-      { command: "italic", label: "I", title: "Italic", style: "font-style:italic" },
-      { command: "underline", label: "U", title: "Underline", style: "text-decoration:underline" },
-      { command: "strikeThrough", label: "S", title: "Strikethrough", style: "text-decoration:line-through" }
+      { tag: "b", label: "B", title: "Bold", style: "font-weight:bold" },
+      { tag: "i", label: "I", title: "Italic", style: "font-style:italic" },
+      { tag: "u", label: "U", title: "Underline", style: "text-decoration:underline" },
+      { tag: "s", label: "S", title: "Strikethrough", style: "text-decoration:line-through" }
     ];
-    for (const { command, label, title, style } of buttons) {
+    for (const { tag, label, title, style } of buttons) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = label;
@@ -16676,7 +16719,7 @@ ${fence}`;
       btn.style.cssText = style;
       btn.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        document.execCommand(command);
+        toggleInlineWrap(h2, tag);
       });
       toolbar.appendChild(btn);
     }

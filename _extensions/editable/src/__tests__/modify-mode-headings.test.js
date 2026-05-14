@@ -50,6 +50,16 @@ describe('headingHtmlToMarkdown — CSS-styled inline formatting', () => {
     expect(headingHtmlToMarkdown('<strong>a</strong> <em>b</em> <s>c</s>'))
       .toBe('**a** *b* ~~c~~');
   });
+
+  it('converts <u> to [text]{.underline}', () => {
+    expect(headingHtmlToMarkdown('hello <u>under</u> world'))
+      .toBe('hello [under]{.underline} world');
+  });
+
+  it('converts <span style="text-decoration: underline"> to [text]{.underline}', () => {
+    expect(headingHtmlToMarkdown('<span style="text-decoration: underline">w</span>'))
+      .toBe('[w]{.underline}');
+  });
 });
 
 describe('replaceHeadingTextInChunk', () => {
