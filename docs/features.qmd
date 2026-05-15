@@ -54,32 +54,6 @@ Currently supported element types:
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
 | Positioned arrow | `{{< arrow ... position="absolute" >}}` | Move, resize (full styling preserved) |
 
-Plain paragraphs are matched by their position among top-level paragraphs on the slide (Nth paragraph in the DOM = Nth paragraph block in source). On save, the paragraph is wrapped in a `::: {.absolute ...}` fenced div. If the text was edited with the Quill editor, the new content is written back; otherwise the original QMD source text is preserved as-is.
-
-Plain images and videos are inserted directly in a slide without positional attributes. Inline images embedded mid-paragraph (`text ![](src) text`) work the same way as plain images — the same `](src)` write-back regex matches both. Activating an inline image pulls it out of the text flow, so the surrounding paragraph text reflows around the now-absolutely-positioned image. **Activation is a one-way transform**: once saved with `.absolute` attrs, the image is no longer inline on re-render — Quarto positions it out of flow and the paragraph reads as one continuous sentence. Going back to the inline form requires editing the source `.qmd` by hand. `{.absolute}` images and divs carry `left=`, `top=`, `width=`, and `height=` attributes and are matched back to the source using those values.
-
-Fenced divs (classed, id-keyed, callouts, and column layouts) are matched by their class or id within each slide's source chunk, with positional indexing as a fallback for keyless divs. On save, the opening fence line gains `.absolute` positional attrs. Callout blocks are wrapped in an outer `:::: {.absolute ...}` div instead, since Quarto's callout renderer does not forward positional attrs from the callout fence itself.
-
-Tables in pipe, grid, raw-HTML, and list-table syntax are matched to their source by the first (header) row of the table within the slide chunk; if the same header row appears more than once, matching falls back to position. A trailing Pandoc caption line (`: caption {#tbl-id}` or `Table: caption`) is included in the wrapped block so the caption stays anchored to the table. On save, the entire table block is wrapped in `::: {.absolute left=Xpx top=Ypx}\n…\n:::` (for list tables, the outer `.absolute` fence wraps the existing `::: {.list-table}` block). Resize and rotate are intentionally not provided — table width is determined by content and column definitions, not a CSS dimension on a wrapper. Computational tables produced by executable chunks are handled by the code-chunk-output path.
-
-Non-executed display code blocks (` ```python `, ` ``` ` with no language, etc.) are matched to their source by position among the top-level code fences on the slide, anchored to the first non-empty line of code content. On save, the entire fenced code block is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Text editing is not provided — the source remains literal code.
-
-Executable code chunks that render non-image output — HTML tables, printed stdout, interactive widgets, and Observable JS (` ```{ojs} `) — are activatable as a single block (the `<div class="cell">` wrapping the chunk's code and output). Named chunks are matched to source by `#| label:` or fence-token label; unnamed chunks are matched positionally. On save, the entire chunk (fence to fence) is wrapped in `::: {.absolute left=Xpx top=Ypx width=Wpx height=Hpx}\n…\n:::`. Chunks producing only images aren't activatable through this path — the figure itself is the meaningful target.
-
-Diagram chunks (` ```{mermaid} ` and ` ```{dot} `) follow the same path. Their SVG output is rendered into the same `<div class="cell">` wrapper, so they are matched, activated, and written back identically to other executable chunks — named by `#| label:` or fence-token label, otherwise positionally.
-
-Display equations (`$$...$$`, both single- and multi-line) are matched to source by the LaTeX body line, with positional fallback when the same line appears more than once. Equations inside fenced code blocks or other `:::` fenced divs are skipped. On save, the entire `$$...$$` block is wrapped in `::: {.absolute left=Xpx top=Ypx}\n…\n:::`. Resize, rotate, and text editing are intentionally not provided — equation size is set by the LaTeX content and the content itself is raw LaTeX, not prose.
-
-Slide titles open an inline formatting toolbar (bold, italic, underline, strikethrough, text color, background color) when clicked. The title can be re-activated to edit again after clicking away.
-
-**Re-activating saved positions.** Once an element has been positioned and saved (wrapped in `::: {.absolute …}`), it is re-activatable on the next render — modify mode targets the *inner* semantic element (the `<p>`, `<table>`, `<ul>`, …) and keeps its type-specific capabilities. Paragraphs continue to offer Quill text editing; tables and equations stay move-only; lists, blockquotes, display code, code chunks, and figures keep their first-activation capabilities. On save, the existing `{.absolute …}` block is rewritten in place — no nested wrappers. Wrappers with content that doesn't match a typed inner (e.g. multi-child or raw HTML) continue to re-activate as generic `Positioned divs`.
-
-Positioned arrows from previous saves (`{{< arrow ... position="absolute" >}}` shortcodes rendered via [`quarto-arrows`](https://github.com/EmilHvitfeldt/quarto-arrows)) are activatable too. Click a highlighted arrow to drag and resize it via the standard arrow handles; the source's color, width, head, dash, line, opacity, label, curve, and waypoints are preserved. On save, the matching shortcode is rewritten in-place with the new coordinates. Arrows whose shortcodes use kwargs the editable system doesn't yet round-trip (`bend`, `fragment`, `aria-label`, `class`, `head-fill`, …) get an amber warning ring instead, so their source attributes aren't silently dropped.
-
-::: {.callout-note}
-Single-figure code chunks (an `{r}` or `{python}` chunk producing exactly one `<img>`) are activatable as described above. Multi-figure chunks (2+ image outputs) show an amber warning ring and are not yet activatable. Non-image chunk outputs — tables, printed text, widgets, OJS — are supported as described above.
-:::
-
 ## Rich Text Editing
 
 Click the edit button on any editable text element to open the Quill rich text editor with a formatting toolbar:
