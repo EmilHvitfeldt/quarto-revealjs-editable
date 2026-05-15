@@ -22,7 +22,7 @@ test.describe('Modify Mode — Code blocks', () => {
     expect(wrapperValid).toBe(1);
   });
 
-  test('plain (no-language) pre is clickable and shows green ring', async ({ page }) => {
+  test('plain (no-language) pre is clickable and shows green outline', async ({ page }) => {
     await setupPage(page, 'modify-mode-code.html');
     // indexh=1 = Slide 2 - Plain code block
     await navigateToSlide(page, 1);
@@ -31,7 +31,7 @@ test.describe('Modify Mode — Code blocks', () => {
     const valid = await page.locator('pre.modify-mode-valid').count();
     expect(valid).toBe(1);
 
-    // The green-ring box-shadow must actually render (regression guard for the
+    // The green-outline box-shadow must actually render (regression guard for the
     // CSS selector list — pre was missing from it).
     const boxShadow = await page.locator('pre.modify-mode-valid').first()
       .evaluate(el => window.getComputedStyle(el).boxShadow);

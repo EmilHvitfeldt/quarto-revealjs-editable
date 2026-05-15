@@ -12,7 +12,7 @@ test.describe('Modify Mode - Video', () => {
     }
   });
 
-  test('clicking Modify highlights valid videos with green ring', async ({ page }) => {
+  test('clicking Modify highlights valid videos with green outline', async ({ page }) => {
     await setupPage(page, 'modify-mode-video.html');
     await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
