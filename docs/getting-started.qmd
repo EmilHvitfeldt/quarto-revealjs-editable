@@ -89,10 +89,11 @@ Note: In this demo, the Save button will download a file. With `quarto preview`,
 
 Once you are happy with the layout, save using one of these methods:
 
-- **Menu Bar**: Click the Save button in the menu bar at the top
-- **Menu**: Press M, go to Tools, click "Save Edits"
+- **Save button**: Click the Save button in the menu bar at the top. This prompts you to save a file — choose the same folder you are working in to overwrite the document.
+- **Copy button**: Click the Copy button in the menu bar to copy the updated QMD to your clipboard, then paste it into your source file. Useful if you want to review changes before overwriting, or if your browser's save dialog isn't convenient.
+- **Menu**: Press M, go to Tools, click "Save Edits".
 
-This will prompt you to save a file. Choose the same folder you are working in to overwrite the document. Re-render, and the elements should be locked in place.
+Re-render after saving, and the elements should be locked in place.
 
 ## Example
 
