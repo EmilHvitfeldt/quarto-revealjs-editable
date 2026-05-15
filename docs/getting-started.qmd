@@ -95,31 +95,6 @@ Once you are happy with the layout, save using one of these methods:
 
 Re-render after saving, and the elements should be locked in place.
 
-## Example
-
-Here is a minimal example document. You can also leave `.editable` off entirely and use modify mode to activate elements after rendering.
-
-```markdown
----
-title: "Editable Demo"
-format: revealjs
-revealjs-plugins:
-  - editable
-filters:
-  - editable
----
-
-## Slide with Editable Image
-
-![](image.png){.editable}
-
-## Slide with Editable Text
-
-::: {.editable}
-This text can be moved, resized, and rotated!
-:::
-```
-
 ## Preparing for Final Presentation
 
 Once you're done editing and want to present your final slides without the editing UI:
