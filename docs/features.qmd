@@ -27,7 +27,7 @@ New elements are marked with a dashed border to distinguish them from original c
 
 Not every element needs to be marked with `{.editable}` in advance. Click the **Modify** button in the menu bar to enter modify mode, then click any highlighted element to make it editable on the fly.
 
-Elements that can be made editable are highlighted with a **green ring** as soon as you enter modify mode. Click a highlighted element to activate it. Modify mode exits automatically after activation (except for slide titles, which stay in edit mode until you click away or press Enter). Press **Escape** at any time to exit modify mode without activating anything; focus returns to the Modify button.
+Elements that can be made editable are highlighted with a **green outline** as soon as you enter modify mode. Click a highlighted element to activate it. Modify mode exits automatically after activation (except for slide titles, which stay in edit mode until you click away or press Enter). Press **Escape** at any time to exit modify mode without activating anything; focus returns to the Modify button.
 
 After saving, changes are written back to your `.qmd` file.
 

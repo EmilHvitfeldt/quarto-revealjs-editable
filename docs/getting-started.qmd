@@ -31,7 +31,7 @@ filters:
 
 ### Using Modify Mode (recommended)
 
-You don't need to mark anything in your source. Render the deck normally, then click the **Modify** button in the menu bar at the top of the presentation. Every element on the current slide that can be made editable is highlighted with a green ring — click one to activate it. Press **Escape** to exit modify mode without activating anything.
+You don't need to mark anything in your source. Render the deck normally, then click the **Modify** button in the menu bar at the top of the presentation. Every element on the current slide that can be made editable is highlighted with a green outline — click one to activate it. Press **Escape** to exit modify mode without activating anything.
 
 Modify mode supports images, videos, paragraphs, lists, tables, code blocks, code chunks, diagrams, equations, slide titles, callouts, columns, fenced divs, and arrows. See the [supported types table](features.qmd#modify-mode) for the full list.
 
