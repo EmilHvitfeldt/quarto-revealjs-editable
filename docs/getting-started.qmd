@@ -29,15 +29,21 @@ filters:
 
 ## Making Elements Editable
 
-### Images
+### Using Modify Mode (recommended)
+
+You don't need to mark anything in your source. Render the deck normally, then click the **Modify** button in the menu bar at the top of the presentation. Every element on the current slide that can be made editable is highlighted with a green outline — click one to activate it. Press **Escape** to exit modify mode without activating anything.
+
+Modify mode supports images, videos, paragraphs, lists, tables, code blocks, code chunks, diagrams, equations, slide titles, callouts, columns, fenced divs, and arrows. See the [supported types table](features.qmd#modify-mode) for the full list.
+
+### Pre-marking elements with `.editable`
+
+If you already know an element will be edited, you can add the `.editable` class to make it active immediately on render — no need to enter modify mode first. This is fully supported alongside modify mode.
 
 Add the `.editable` class to any image:
 
 ```markdown
 ![](image.png){.editable}
 ```
-
-### Text Blocks
 
 Wrap text in a fenced div with the `.editable` class:
 
@@ -61,7 +67,7 @@ The extension will completely rewrite the `{}` attributes when saving, so any cu
 
 ## Interacting with Elements
 
-Once you have re-rendered the slides, each element with the `.editable` class becomes interactive:
+Once you have re-rendered the slides, each editable element (whether activated via modify mode or pre-marked with `.editable`) becomes interactive:
 
 - **Move**: Drag the element to reposition it
 - **Resize**: Use the corner handles (hold Shift to preserve aspect ratio)
@@ -83,35 +89,11 @@ Note: In this demo, the Save button will download a file. With `quarto preview`,
 
 Once you are happy with the layout, save using one of these methods:
 
-- **Menu Bar**: Click the Save button in the menu bar at the top
-- **Menu**: Press M, go to Tools, click "Save Edits"
+- **Save button**: Click the Save button in the menu bar at the top. This prompts you to save a file — choose the same folder you are working in to overwrite the document.
+- **Copy button**: Click the Copy button in the menu bar to copy the updated QMD to your clipboard, then paste it into your source file. Useful if you want to review changes before overwriting, or if your browser's save dialog isn't convenient.
+- **Menu**: Press M, go to Tools, click "Save Edits".
 
-This will prompt you to save a file. Choose the same folder you are working in to overwrite the document. Re-render, and the elements should be locked in place.
-
-## Example
-
-Here is a minimal example document:
-
-```markdown
----
-title: "Editable Demo"
-format: revealjs
-revealjs-plugins:
-  - editable
-filters:
-  - editable
----
-
-## Slide with Editable Image
-
-![](image.png){.editable}
-
-## Slide with Editable Text
-
-::: {.editable}
-This text can be moved, resized, and rotated!
-:::
-```
+Re-render after saving, and the elements should be locked in place.
 
 ## Preparing for Final Presentation
 

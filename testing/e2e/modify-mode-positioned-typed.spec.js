@@ -11,7 +11,7 @@ const { TESTING_DIR, setupPage, navigateToSlide } = require('./test-helpers');
 //   slideIndex      — Reveal.getIndices().h for the slide (first H2 is 0,
 //                     no title slide in this fixture).
 //   innerSelector   — selector for the inner element relative to slide root;
-//                     this is the element we expect to get the green ring.
+//                     this is the element we expect to get the green outline.
 //   originalLeft    — `left=` value in the wrapper's QMD source, used to
 //                     assert position after activation.
 //

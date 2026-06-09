@@ -321,7 +321,7 @@ npm run test:e2e
 |---|---|
 | OJS cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 |
 | Cell has move+resize but not text-editing capabilities | No `.ql-editor` or font-size controls in the container |
-| Multiple cells on a slide are all classified valid | Both `div.cell` cells get the green ring |
+| Multiple cells on a slide are all classified valid | Both `div.cell` cells get the green outline |
 | Plain code block alongside OJS cell — both classifiers apply without conflict | Code blocks classifier handles the plain ` ``` `, Code chunk outputs handles the `{ojs}` cell |
 | `echo=true` cell (visible source + output) is classified and wraps whole chunk on save | `sourceCode cell-code` is not `hidden`; serialize wraps the chunk including the `#\| echo: true` option line |
 | Serialize wraps activated cell in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{ojs} ` chunk |
@@ -332,7 +332,7 @@ npm run test:e2e
 |---|---|
 | Mermaid cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 on a `{mermaid}` slide |
 | Dot cell gets `modify-mode-valid` class | `div.cell.modify-mode-valid` count = 1 on a `{dot}` slide |
-| Multiple diagram chunks on a slide are all classified valid | Both cells get the green ring |
+| Multiple diagram chunks on a slide are all classified valid | Both cells get the green outline |
 | Clicking a mermaid cell wraps it in `editable-container` with move+resize only | No Quill editor or font-size controls present |
 | Serialize wraps activated mermaid chunk in fenced div with absolute position | `::: {.absolute …}` surrounds the original ` ```{mermaid} ` chunk |
 | Named mermaid chunk write-back matches by label | `%%\| label: mychart` chunk wrapped on save |
@@ -342,7 +342,7 @@ npm run test:e2e
 | Test | What it verifies |
 |---|---|
 | Positioned arrows on slide get `modify-mode-valid` | Count = number of `position="absolute"` arrows in source |
-| Inline arrows (no `position="absolute"`) are not classified | Inline `{{< arrow >}}` does not produce a green ring |
+| Inline arrows (no `position="absolute"`) are not classified | Inline `{{< arrow >}}` does not produce a green outline |
 | Arrows with unsupported kwargs (`bend`, etc.) are warn-classified | `modify-mode-warn` ring; not clickable |
 | Clicking a valid arrow makes it editable | `.editable-arrow-container.active` with handles appears |
 | Arrow style panel shows source values after activation | `toolbar-panel-arrow` visible; width/color inputs reflect source kwargs |
@@ -361,7 +361,7 @@ npm run test:e2e
 
 **`e2e/modify-mode-absolute.spec.js`** - Modify Mode — `{.absolute}` divs (7 tests):
 
-Since issue #140 landed, the fixture's `::: {.absolute …}` wrappers (which render as `<div.absolute><p>…</p></div>`) re-activate via the typed-inner classifier — the inner `<p>` gets the green ring and activation, not the wrapper. The wrapper is hidden after the inner is hoisted out for positioning; the wrapper's `{.absolute …}` block in source is still what gets rewritten on save.
+Since issue #140 landed, the fixture's `::: {.absolute …}` wrappers (which render as `<div.absolute><p>…</p></div>`) re-activate via the typed-inner classifier — the inner `<p>` gets the green outline and activation, not the wrapper. The wrapper is hidden after the inner is hoisted out for positioning; the wrapper's `{.absolute …}` block in source is still what gets rewritten on save.
 
 | Test | What it verifies |
 |---|---|

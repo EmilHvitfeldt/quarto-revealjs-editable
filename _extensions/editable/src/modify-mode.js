@@ -3,8 +3,8 @@
  * Activated via the toolbar "Modify" button.
  *
  * Elements are classified into three buckets:
- *   valid        — element a classifier says can be modified; green ring
- *   warn         — element a classifier says to warn about; amber ring, not clickable
+ *   valid        — element a classifier says can be modified; green outline
+ *   warn         — element a classifier says to warn about; amber outline, not clickable
  *   (ignored)    — already editable or not recognised by any classifier
  *
  * ## Adding a new element type
@@ -1028,7 +1028,7 @@ ModifyModeClassifier.register({
     h2.dataset.editableModifiedOriginalHtml = h2.innerHTML;
     h2.classList.add('editable-heading-active');
 
-    // Exit modify mode visually (green rings gone, button inactive) but keep
+    // Exit modify mode visually (green outlines gone, button inactive) but keep
     // the text panel so the formatting toolbar can be shown immediately after.
     exitModifyMode({ resetPanel: false });
 

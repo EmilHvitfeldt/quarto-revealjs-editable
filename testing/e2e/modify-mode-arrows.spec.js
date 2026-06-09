@@ -53,7 +53,7 @@ test.describe('Modify Mode — arrows from previous save', () => {
     await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');
 
-    // No green-ringed arrow div (the inline arrow has no positioned wrapper).
+    // No green-outlined arrow div (the inline arrow has no positioned wrapper).
     const validArrows = await page.locator('div[style*="position: absolute"].modify-mode-valid').count();
     expect(validArrows).toBe(0);
   });

@@ -1,21 +1,52 @@
 ---
-title: "editable Example"
-format:
-  revealjs: default
+title: "Interactive Demo"
+format: revealjs
 revealjs-plugins:
   - editable
 filters:
   - editable
+  - arrows
 ---
 
-## In the morning
+## Try Modify Mode
 
-![](image.png){.absolute width=519.9px height=575px left=0px top=89px}
+Nothing on this slide is pre-marked. Click **Modify** in the menu bar, then click any element below to make it editable on the fly.
 
-::: {.absolute width=490px height=156px left=572px top=128px}
-I think that I shall never **see**
+This paragraph, the list, and the table are all activatable.
 
-A poem lovely as a [tree]{style='color: rgb(0, 138, 0)'}.
+- First item
+- Second item
+- Third item
 
-From “Trees” by Joyce Kilmer
+| Column A | Column B |
+|----------|----------|
+| 1        | 2        |
+| 3        | 4        |
+
+## Try Moving This Image
+
+This image was pre-marked with the `.editable` class in the source (`![](image.png){.editable width="200"}`), so it is active immediately — drag it to reposition.
+
+![](image.png){.editable width="200"}
+
+## Edit This Text
+
+This text block was pre-marked with `::: {.editable}` in the source, so it is active immediately. Click the edit button to open the rich text editor.
+
+::: {.editable}
+**Try editing me!**
+
+You can make text *italic*, **bold**, or ~~strikethrough~~.
+:::
+
+## Multiple Elements
+
+Both blocks below were pre-marked with `::: {.editable}` in the source.
+
+::: {.editable}
+Element 1
+:::
+
+::: {.editable}
+Element 2
 :::

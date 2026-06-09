@@ -10,6 +10,7 @@ Editable elements support keyboard navigation for accessibility and efficient ed
 |---------------|---------------------------------------------------|
 | Tab           | Focus an editable element (controls will appear)  |
 | Shift + Tab   | Exit and return to normal slide navigation        |
+| Escape        | Exit modify mode without activating; focus returns to the Modify button |
 
 ## Moving Elements
 

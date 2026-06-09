@@ -72,8 +72,8 @@ README.md            # User-facing documentation
 
 ### Modify Mode
 Activated via the toolbar "Modify" button. Lets the user click plain (non-editable) elements on the current slide to make them editable. Elements are classified by a `ModifyModeClassifier` registry into:
-- **valid** — green ring, clickable to activate
-- **warn** — amber ring, not clickable (e.g. element inside a figure with siblings)
+- **valid** — green outline, clickable to activate
+- **warn** — amber outline, not clickable (e.g. element inside a figure with siblings)
 - **ignored** — already editable or unrecognised
 
 Use `ModifyModeClassifier.register()` to add support for new element types.

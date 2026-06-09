@@ -19,7 +19,7 @@ test.describe('Modify Mode', () => {
     await expect(btn).not.toBeDisabled();
   });
 
-  test('clicking Modify highlights valid images with green ring', async ({ page }) => {
+  test('clicking Modify highlights valid images with green outline', async ({ page }) => {
     await setupPage(page, 'modify-mode.html');
     await navigateToSlide(page, 1);
     await page.click('.toolbar-modify');

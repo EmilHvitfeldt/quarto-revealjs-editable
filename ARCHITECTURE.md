@@ -272,8 +272,8 @@ Modify mode (`modify-mode.js`) lets users make plain elements editable at runtim
 
 The toolbar "Modify" button calls `toggleModifyMode()`. When entering modify mode:
 1. All registered classifiers run against the current slide (`classify(slideEl)`)
-2. **Valid** elements receive the `modify-mode-valid` CSS class (green ring) and a click listener
-3. **Warn** elements receive `modify-mode-warn` (amber ring, not clickable); their reason string is stored in `_warnReasons` and readable via `getWarnReason(el)`
+2. **Valid** elements receive the `modify-mode-valid` CSS class (green outline) and a click listener
+3. **Warn** elements receive `modify-mode-warn` (amber outline, not clickable); their reason string is stored in `_warnReasons` and readable via `getWarnReason(el)`
 4. A `slidechanged` listener re-runs classification on every slide navigation so rings stay current
 
 When the user clicks a valid element, `activate(el)` is called. If `activate` returns a truthy value, modify mode stays active (the classifier manages its own exit — e.g. the slide title classifier keeps the toolbar open until the user clicks away). Otherwise `exitModifyMode()` is called immediately.
@@ -287,8 +287,8 @@ New element types are added by calling `ModifyModeClassifier.register(classifier
   // Required — inspect the current slide and return which elements to highlight
   classify(slideEl) {
     return {
-      valid: [el, ...],                            // green ring, clickable
-      warn:  [{ el, reason: "why not" }, ...]      // amber ring, tooltip text
+      valid: [el, ...],                            // green outline, clickable
+      warn:  [{ el, reason: "why not" }, ...]      // amber outline, tooltip text
     };
   },
 
@@ -343,7 +343,7 @@ There are two plausible activation targets — the outer wrapper or the inner el
 
 - Keeps `ELEMENT_CAPABILITIES` tag-keyed (`p` → paragraph capabilities, `table` → table capabilities) — no `wrappedKind` dimension on the wrapper.
 - Aligns with how `Positioned images` already works (the `img.absolute` element itself, not a containing div, is what gets activated).
-- The inner element is what the user clicks; surprising if the green ring is on the wrapper bounds.
+- The inner element is what the user clicks; surprising if the green outline is on the wrapper bounds.
 
 The wrapper's role is reduced to: locate the source fence to rewrite on save, and supply the original position values to stamp into the inner element's `data-editable-modified-abs-*` dataset.
 
@@ -355,7 +355,7 @@ The wrapper's role is reduced to: locate the source fence to rewrite on save, an
 2. `Positioned divs` registers next, claiming any remaining `div.absolute` wrapper whose inner element wasn't claimed above.
 3. `Fenced divs` registers last among `.absolute`-aware classifiers, and is tightened to skip any `div.absolute` whose inner is claimed by a typed positioned classifier.
 
-This ordering avoids the overlapping-green-ring problem described in `memory/feedback_modify_mode_overlap.md`: when multiple classifiers could match the same DOM subtree, the more specific (typed) classifier wins by registering earlier, and outer classifiers filter the inner element out as part of their own claim logic. When adding a new typed positioned classifier, **register it before `Positioned divs` and `Fenced divs`**, and add a unit test asserting that registration order.
+This ordering avoids the overlapping-green-outline problem described in `memory/feedback_modify_mode_overlap.md`: when multiple classifiers could match the same DOM subtree, the more specific (typed) classifier wins by registering earlier, and outer classifiers filter the inner element out as part of their own claim logic. When adding a new typed positioned classifier, **register it before `Positioned divs` and `Fenced divs`**, and add a unit test asserting that registration order.
 
 ### Fenced Div Classifier
 

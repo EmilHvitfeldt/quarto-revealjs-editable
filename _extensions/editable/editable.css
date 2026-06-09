@@ -384,7 +384,7 @@
   opacity: 0.85;
 }
 
-/* Modify mode: valid elements get a persistent green ring */
+/* Modify mode: valid elements get a persistent green outline */
 .modify-mode img.modify-mode-valid,
 .modify-mode video.modify-mode-valid,
 .modify-mode div.absolute.modify-mode-valid,
