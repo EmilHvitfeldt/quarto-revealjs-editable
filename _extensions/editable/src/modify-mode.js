@@ -514,15 +514,31 @@ ModifyModeClassifier.register({
       groupEls.sort((a, b) =>
         a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
       );
-      const replacements = groupEls.map(el =>
-        serializeShapeAttrs(editableRegistry.get(el).toDimensions())
+      const replacements = groupEls.map(el => {
+        const attrs = serializeShapeAttrs(editableRegistry.get(el).toDimensions());
+        // Only rewrite the fence body when the text was actually edited, so
+        // unedited shapes preserve their original (possibly formatted) content.
+        let body = null;
+        if (el.dataset.editableShapeTextDirty === 'true') {
+          const content = el.querySelector('.shape-content');
+          body = content ? elementToText(content) : '';
+        }
+        return { attrs, body };
+      });
+
+      // Match the whole fenced block for this shape class: opening fence +
+      // attribute block, the body, and the matching closing fence.
+      const regex = new RegExp(
+        `(:{3,})[ \\t]*\\{[^}]*\\.shape-${escapeRegex(shapeType)}\\b[^}]*\\}([\\s\\S]*?)(\\n\\1)`,
+        'g'
       );
-      // Match the opening fence attribute block carrying this shape class.
-      const regex = new RegExp(`\\{[^}]*\\.shape-${escapeRegex(shapeType)}\\b[^}]*\\}`, 'g');
       let occurrence = 0;
-      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
-        occurrence < replacements.length ? replacements[occurrence++] : match
-      );
+      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match, fence, origBody, closing) => {
+        if (occurrence >= replacements.length) return match;
+        const { attrs, body } = replacements[occurrence++];
+        const newBody = body === null ? origBody : `\n${body}`;
+        return `${fence} ${attrs}${newBody}${closing}`;
+      });
     }
 
     return chunks.join('');

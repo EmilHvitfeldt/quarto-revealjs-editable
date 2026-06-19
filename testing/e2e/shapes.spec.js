@@ -148,4 +148,54 @@ test.describe('Shapes Feature', () => {
     expect(qmd).toMatch(/\.shape-callout-round/);
     expect(qmd).toMatch(/direction="2[5-8]\d"/);
   });
+
+  test('typing text into an added shape serializes into the fence body', async ({ page }) => {
+    await openShapePicker(page);
+    await pickShape(page, 'Hexagon');
+
+    await page.evaluate(() => {
+      const wrapper = document.querySelector('.shape-wrapper.editable-new');
+      const content = wrapper.querySelector('.shape-content');
+      wrapper.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      content.textContent = 'Hello shape';
+      content.dispatchEvent(new Event('input', { bubbles: true }));
+      content.blur();
+    });
+
+    const qmd = await page.evaluate(() => window.getTransformedQmd());
+    expect(qmd).toMatch(/\.shape-hexagon/);
+    expect(qmd).toContain('Hello shape');
+  });
+
+  test('editing text on an authored shape via modify mode round-trips', async ({ page }) => {
+    await navigateToSlide(page, 1);
+    await page.evaluate(() => {
+      const btn = document.querySelector('.toolbar-modify');
+      if (btn) btn.click();
+    });
+    await page.waitForSelector('.shape-wrapper.modify-mode-valid', { state: 'attached' });
+    await page.evaluate(() => {
+      const bubble = [...document.querySelectorAll('.shape-wrapper.modify-mode-valid')]
+        .find((el) => [...el.classList].includes('shape-speech-bubble'));
+      if (bubble) bubble.click();
+    });
+    await page.waitForFunction(() =>
+      document.querySelector('.shape-wrapper[data-editable-modified="true"]')
+    );
+
+    await page.evaluate(() => {
+      const wrapper = document.querySelector('.shape-wrapper[data-editable-modified="true"]');
+      const content = wrapper.querySelector('.shape-content');
+      wrapper.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      content.textContent = 'Goodbye';
+      content.dispatchEvent(new Event('input', { bubbles: true }));
+      content.blur();
+    });
+
+    const qmd = await page.evaluate(() => window.getTransformedQmd());
+    expect(qmd).toMatch(/\.shape-speech-bubble/);
+    expect(qmd).toContain('Goodbye');
+    // The original "Hi" body line should have been replaced.
+    expect(qmd).not.toMatch(/\n\s*Hi\s*\n/);
+  });
 });

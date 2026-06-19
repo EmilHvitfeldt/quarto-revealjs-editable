@@ -44,6 +44,8 @@ export const Capabilities = {
       const startDrag = (e) => {
         // Don't start drag if element is in edit mode
         if (element.contentEditable === "true") return;
+        // Don't start drag when editing inner content (e.g. a shape's text)
+        if (e.target.closest && e.target.closest('[contenteditable="true"]')) return;
         // Check if Quill editor is in edit mode
         const quillData = quillInstances.get(element);
         if (quillData && quillData.isEditing) return;

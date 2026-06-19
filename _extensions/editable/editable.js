@@ -14758,6 +14758,49 @@ ${escapeText(this.code(index, length))}
         showRightPanel("default");
     }
   }
+  function enableShapeTextEditing(shapeEl) {
+    const content = shapeEl.querySelector(".shape-content");
+    if (!content)
+      return;
+    shapeEl.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startShapeTextEdit(shapeEl, content);
+    });
+  }
+  function startShapeTextEdit(shapeEl, content) {
+    if (content.getAttribute("contenteditable") === "true")
+      return;
+    pushUndoState();
+    content.setAttribute("contenteditable", "true");
+    content.classList.add("shape-content-editing");
+    content.focus();
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const onInput = () => {
+      shapeEl.dataset.editableShapeTextDirty = "true";
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        content.blur();
+      }
+    };
+    const finish = () => {
+      content.removeAttribute("contenteditable");
+      content.classList.remove("shape-content-editing");
+      content.removeEventListener("blur", finish);
+      content.removeEventListener("keydown", onKey);
+      content.removeEventListener("input", onInput);
+    };
+    content.addEventListener("input", onInput);
+    content.addEventListener("keydown", onKey);
+    content.addEventListener("blur", finish);
+  }
   function updateShapeStylePanel(shapeEl) {
     const editableEl = editableRegistry.get(shapeEl);
     if (!editableEl)
@@ -15488,6 +15531,8 @@ ${escapeText(this.code(index, length))}
         const startDrag = (e) => {
           if (element.contentEditable === "true")
             return;
+          if (e.target.closest && e.target.closest('[contenteditable="true"]'))
+            return;
           const quillData = quillInstances.get(element);
           if (quillData && quillData.isEditing)
             return;
@@ -16041,6 +16086,7 @@ ${escapeText(this.code(index, length))}
     }
     if (elementType === "shape") {
       container.addEventListener("mousedown", () => setActiveShape(elt));
+      enableShapeTextEditing(elt);
     }
   }
   function createEltContainer(elt) {
@@ -17228,15 +17274,28 @@ ${fence}`;
         groupEls.sort(
           (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
         );
-        const replacements = groupEls.map(
-          (el) => serializeShapeAttrs(editableRegistry.get(el).toDimensions())
+        const replacements = groupEls.map((el) => {
+          const attrs = serializeShapeAttrs(editableRegistry.get(el).toDimensions());
+          let body = null;
+          if (el.dataset.editableShapeTextDirty === "true") {
+            const content = el.querySelector(".shape-content");
+            body = content ? elementToText(content) : "";
+          }
+          return { attrs, body };
+        });
+        const regex = new RegExp(
+          `(:{3,})[ \\t]*\\{[^}]*\\.shape-${escapeRegex(shapeType)}\\b[^}]*\\}([\\s\\S]*?)(\\n\\1)`,
+          "g"
         );
-        const regex = new RegExp(`\\{[^}]*\\.shape-${escapeRegex(shapeType)}\\b[^}]*\\}`, "g");
         let occurrence = 0;
-        chunks[chunkIndex] = chunks[chunkIndex].replace(
-          regex,
-          (match2) => occurrence < replacements.length ? replacements[occurrence++] : match2
-        );
+        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match2, fence, origBody, closing) => {
+          if (occurrence >= replacements.length)
+            return match2;
+          const { attrs, body } = replacements[occurrence++];
+          const newBody = body === null ? origBody : `
+${body}`;
+          return `${fence} ${attrs}${newBody}${closing}`;
+        });
       }
       return chunks.join("");
     }

@@ -326,7 +326,7 @@ When a shape is selected, the menu bar switches to show the shape panel:
 - **Width**: Stroke width (default, S, M, L, XL)
 - **Direction**: For callouts and speech bubbles, the direction the pointer faces (up, right, down, left, or a diagonal). A round handle also appears on the shape's edge — drag it to aim the pointer at any angle.
 
-Shapes move, resize, and rotate with the usual handles. You can also use **Modify mode** to activate shapes you authored directly in source.
+Shapes move, resize, and rotate with the usual handles. **Double-click** a shape to edit the plain text inside it; the text is saved as the fenced div's body. You can also use **Modify mode** to activate shapes you authored directly in source.
 
 ### Saved Format
 

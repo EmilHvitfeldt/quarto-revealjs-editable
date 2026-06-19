@@ -1802,6 +1802,14 @@ button.arrow-toolbar-smooth.active {
   flex-direction: row;
 }
 
+/* Plain-text editing of a shape's content (double-click to edit) */
+.shape-content-editing {
+  outline: 2px dashed var(--editable-accent-color, #007cba);
+  outline-offset: 2px;
+  cursor: text;
+  min-width: 1ch;
+}
+
 /* Draggable pointer-direction handle for callout shapes */
 .shape-direction-handle {
   position: absolute;

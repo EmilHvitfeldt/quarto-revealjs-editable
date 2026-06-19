@@ -145,6 +145,52 @@ export function setActiveShape(shapeEl) {
 }
 
 /**
+ * Enable double-click plain-text editing of a shape's `.shape-content`.
+ * Text edits are written back to the QMD fence body on save.
+ * @param {HTMLElement} shapeEl - The `.shape-wrapper` element
+ */
+export function enableShapeTextEditing(shapeEl) {
+  const content = shapeEl.querySelector(".shape-content");
+  if (!content) return;
+  shapeEl.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startShapeTextEdit(shapeEl, content);
+  });
+}
+
+function startShapeTextEdit(shapeEl, content) {
+  if (content.getAttribute("contenteditable") === "true") return;
+  pushUndoState();
+  content.setAttribute("contenteditable", "true");
+  content.classList.add("shape-content-editing");
+  content.focus();
+
+  // Place the caret at the end of any existing text.
+  const range = document.createRange();
+  range.selectNodeContents(content);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  const onInput = () => { shapeEl.dataset.editableShapeTextDirty = "true"; };
+  const onKey = (ev) => {
+    if (ev.key === "Escape") { ev.preventDefault(); content.blur(); }
+  };
+  const finish = () => {
+    content.removeAttribute("contenteditable");
+    content.classList.remove("shape-content-editing");
+    content.removeEventListener("blur", finish);
+    content.removeEventListener("keydown", onKey);
+    content.removeEventListener("input", onInput);
+  };
+  content.addEventListener("input", onInput);
+  content.addEventListener("keydown", onKey);
+  content.addEventListener("blur", finish);
+}
+
+/**
  * Sync all panel controls to the current state of shapeEl.
  * @param {HTMLElement} shapeEl
  */

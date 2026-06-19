@@ -10,7 +10,7 @@ import { initializeQuillForElement } from './quill.js';
 import { NewElementRegistry, ControlRegistry } from './registries.js';
 import { getCapabilitiesFor } from './capabilities.js';
 import { setActiveImage } from './images.js';
-import { setActiveShape } from './shapes.js';
+import { setActiveShape, enableShapeTextEditing } from './shapes.js';
 import { renderShapeSvg, SHAPE_GROUPS } from './shape-svg.js';
 
 /**
@@ -273,6 +273,7 @@ export function setupDraggableElt(elt) {
   }
   if (elementType === "shape") {
     container.addEventListener("mousedown", () => setActiveShape(elt));
+    enableShapeTextEditing(elt);
   }
 }
 
