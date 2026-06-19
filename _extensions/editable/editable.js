@@ -3335,24 +3335,58 @@ var EditableModule = (() => {
         { name: "rectangle", label: "Rectangle" },
         { name: "rounded-square", label: "Rounded square" },
         { name: "oval", label: "Oval" },
+        { name: "semicircle", label: "Semicircle" },
+        { name: "pie", label: "Pie" },
+        { name: "wedge", label: "Wedge" },
+        { name: "arc", label: "Arc" },
+        { name: "block-arc", label: "Block arc" },
+        { name: "donut", label: "Donut" },
+        { name: "frame", label: "Frame" }
+      ]
+    },
+    {
+      group: "Polygons",
+      items: [
         { name: "triangle", label: "Triangle" },
         { name: "diamond", label: "Diamond" },
         { name: "pentagon", label: "Pentagon" },
         { name: "hexagon", label: "Hexagon" },
-        { name: "octagon", label: "Octagon" }
+        { name: "heptagon", label: "Heptagon" },
+        { name: "octagon", label: "Octagon" },
+        { name: "decagon", label: "Decagon" },
+        { name: "dodecagon", label: "Dodecagon" },
+        { name: "parallelogram", label: "Parallelogram" },
+        { name: "trapezoid", label: "Trapezoid" }
       ]
     },
     {
-      group: "Stars & symbols",
+      group: "Stars",
       items: [
+        { name: "star-4", label: "4-point star" },
         { name: "star", label: "Star" },
         { name: "star-6", label: "6-point star" },
-        { name: "starburst", label: "Starburst" },
+        { name: "star-8", label: "8-point star" },
+        { name: "star-10", label: "10-point star" },
+        { name: "star-12", label: "12-point star" },
+        { name: "star-16", label: "16-point star" },
+        { name: "star-24", label: "24-point star" },
+        { name: "star-32", label: "32-point star" },
+        { name: "sun", label: "Sun" },
+        { name: "starburst", label: "Starburst" }
+      ]
+    },
+    {
+      group: "Nature & symbols",
+      items: [
         { name: "heart", label: "Heart" },
         { name: "moon", label: "Moon" },
         { name: "cloud", label: "Cloud" },
         { name: "lightning", label: "Lightning" },
-        { name: "teardrop", label: "Teardrop" }
+        { name: "teardrop", label: "Teardrop" },
+        { name: "wave", label: "Wave" },
+        { name: "double-wave", label: "Double wave" },
+        { name: "no-symbol", label: "No symbol" },
+        { name: "smiley", label: "Smiley" }
       ]
     },
     {
@@ -3360,8 +3394,11 @@ var EditableModule = (() => {
       items: [
         { name: "arrow", label: "Arrow" },
         { name: "arrow-double", label: "Double arrow" },
-        { name: "chevron", label: "Chevron" },
-        { name: "pentagon-arrow", label: "Pentagon arrow" }
+        { name: "notched-arrow", label: "Notched arrow" },
+        { name: "pentagon-arrow", label: "Pentagon arrow" },
+        { name: "arrow-striped", label: "Striped arrow" },
+        { name: "arrow-bent", label: "Bent arrow" },
+        { name: "chevron", label: "Chevron" }
       ]
     },
     {
@@ -3374,6 +3411,62 @@ var EditableModule = (() => {
         { name: "callout-thought", label: "Thought" },
         { name: "callout-cloud", label: "Cloud callout" },
         { name: "callout-explosion", label: "Explosion" }
+      ]
+    },
+    {
+      group: "Flowchart",
+      items: [
+        { name: "terminator", label: "Terminator" },
+        { name: "cylinder", label: "Cylinder" },
+        { name: "document", label: "Document" },
+        { name: "manual-input", label: "Manual input" },
+        { name: "delay", label: "Delay" },
+        { name: "display", label: "Display" },
+        { name: "stored-data", label: "Stored data" },
+        { name: "summing-junction", label: "Summing junction" },
+        { name: "off-page", label: "Off-page" }
+      ]
+    },
+    {
+      group: "Blocks & banners",
+      items: [
+        { name: "cross", label: "Cross" },
+        { name: "shield", label: "Shield" },
+        { name: "folded-corner", label: "Folded corner" },
+        { name: "diagonal-stripe", label: "Diagonal stripe" },
+        { name: "scroll", label: "Scroll" },
+        { name: "wavy-flag", label: "Wavy flag" },
+        { name: "ribbon", label: "Ribbon" }
+      ]
+    },
+    {
+      group: "3D",
+      items: [
+        { name: "cube", label: "Cube" },
+        { name: "cylinder-3d", label: "Cylinder (3D)" },
+        { name: "cone", label: "Cone" },
+        { name: "pyramid", label: "Pyramid" }
+      ]
+    },
+    {
+      group: "Math",
+      items: [
+        { name: "minus", label: "Minus" },
+        { name: "multiply", label: "Multiply" },
+        { name: "divide", label: "Divide" },
+        { name: "equals", label: "Equals" },
+        { name: "not-equal", label: "Not equal" }
+      ]
+    },
+    {
+      group: "Brackets",
+      items: [
+        { name: "bracket-left", label: "Left bracket" },
+        { name: "bracket-right", label: "Right bracket" },
+        { name: "brace-left", label: "Left brace" },
+        { name: "brace-right", label: "Right brace" },
+        { name: "paren-left", label: "Left paren" },
+        { name: "paren-right", label: "Right paren" }
       ]
     }
   ];

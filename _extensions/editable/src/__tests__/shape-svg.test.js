@@ -6,6 +6,7 @@ import {
   isCallout,
   isKnownShape,
   SHAPES,
+  CALLOUTS,
   SHAPE_TYPES,
 } from "../shape-svg.js";
 
@@ -85,6 +86,15 @@ describe("picker metadata", () => {
     for (const t of SHAPE_TYPES) {
       expect(isKnownShape(t.name)).toBe(true);
     }
+  });
+
+  it("lists every shape in the catalog exactly once", () => {
+    const catalog = new Set([...Object.keys(SHAPES), ...Object.keys(CALLOUTS)]);
+    const listed = SHAPE_TYPES.map((t) => t.name);
+    // No duplicates in the picker.
+    expect(new Set(listed).size).toBe(listed.length);
+    // Every catalog shape is exposed, and nothing unknown is listed.
+    expect(new Set(listed)).toEqual(catalog);
   });
 
   it("marks callout types as direction-aware", () => {
