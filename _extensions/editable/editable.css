@@ -42,6 +42,7 @@
   --editable-arrow-control-handle-size: 10px;
   --editable-arrow-waypoint-handle-size: 10px;
   --editable-toolbar-add-arrow-color: #6f42c1;
+  --editable-toolbar-add-shape-color: #d63384;
 }
 
 /* Container for editable elements */
@@ -1107,6 +1108,10 @@ h2.editable-heading-active {
 /* Arrow submenu item color */
 .editable-toolbar-submenu-item.toolbar-add-arrow {
   background-color: var(--editable-toolbar-add-arrow-color);
+}
+
+.editable-toolbar-submenu-item.toolbar-add-shape {
+  background-color: var(--editable-toolbar-add-shape-color);
 }
 
 /* =============================================================================
