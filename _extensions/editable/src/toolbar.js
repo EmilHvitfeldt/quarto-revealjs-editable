@@ -12,6 +12,7 @@
 
 import { ToolbarRegistry } from './registries.js';
 import { createImageStyleControls } from './images.js';
+import { createShapeStyleControls } from './shapes.js';
 
 /** @type {HTMLElement|null} The right-zone container */
 let rightZoneEl = null;
@@ -108,6 +109,13 @@ export function createFloatingToolbar() {
   imagePanel.style.display = "none";
   imagePanel.appendChild(createImageStyleControls());
   rightZone.appendChild(imagePanel);
+
+  // Shape panel: shown when a shape element is selected
+  const shapePanel = document.createElement("div");
+  shapePanel.className = "toolbar-panel toolbar-panel-shape";
+  shapePanel.style.display = "none";
+  shapePanel.appendChild(createShapeStyleControls());
+  rightZone.appendChild(shapePanel);
 
   // Text panel: holds the active Quill toolbar when a div is in edit mode
   const textPanel = document.createElement("div");

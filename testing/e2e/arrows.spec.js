@@ -74,7 +74,7 @@ test.describe('Arrow Feature', () => {
         return Array.from(items).map(item => item.className);
       });
 
-      expect(submenuItems.length).toBe(3); // Text, Slide, Arrow
+      expect(submenuItems.length).toBe(4); // Text, Slide, Arrow, Shape
       expect(submenuItems.some(c => c.includes('toolbar-add-arrow'))).toBe(true);
     });
 

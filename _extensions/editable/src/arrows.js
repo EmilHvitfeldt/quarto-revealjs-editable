@@ -10,7 +10,7 @@ import { getColorPalette, rgbToHex } from './colors.js';
 import { NewElementRegistry } from './registries.js';
 import { pushUndoState, registerRestoreArrowDOM } from './undo.js';
 import { showRightPanel } from './toolbar.js';
-import { registerDeselectArrow, deselectImage } from './selection.js';
+import { registerDeselectArrow, deselectImage, deselectShape } from './selection.js';
 
 /** @type {boolean} Whether the arrow extension warning has been shown this session */
 let arrowExtensionWarningShown = false;
@@ -191,6 +191,7 @@ export function setActiveArrow(arrowData) {
   }
   if (arrowData && arrowData !== activeArrow) {
     deselectImage();
+    deselectShape();
   }
 
   activeArrow = arrowData;

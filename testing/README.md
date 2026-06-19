@@ -46,6 +46,7 @@ npm run test:e2e
 | `multiple-elements.qmd`  | Multiple images and divs in one document  | -             |
 | `colons-in-content.qmd`  | Content with colons (regex fix)           | -             |
 | `bare-syntax.qmd`        | Both `::: editable` and `::: {.editable}` | -             |
+| `shapes.qmd`             | quarto-shapes shapes render and are editable (add picker + modify mode) | - |
 | `space in name.qmd`      | Filenames with spaces handled correctly   | -             |
 | `modify-mode-absolute.qmd` | `{.absolute}` divs detectable in modify mode | #119       |
 | `modify-mode-absolute-img.qmd` | `{.absolute}` images detectable in modify mode | #122   |
@@ -85,7 +86,13 @@ npm run test:e2e
 
 ### E2E Test Files
 
-**Total: 247 E2E tests across 8 spec files**
+**`e2e/shapes.spec.js`** - Shape add/modify (3 tests):
+
+| Test | What it verifies |
+|---|---|
+| Add a shape from the picker | `.shape-wrapper.editable-new` created; shape panel becomes visible |
+| Serialize an added shape | `getTransformedQmd()` contains `.shape-* .absolute` fence with `fill=` and size |
+| Modify mode reactivates a shape | Authored `.shape-wrapper` is classified valid in modify mode |
 
 **`e2e/image-panel.spec.js`** - Image context panel (14 tests):
 

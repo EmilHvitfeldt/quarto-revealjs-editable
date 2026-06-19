@@ -178,6 +178,12 @@ To support a new HTML element type (e.g., `video.editable`):
 
 - [ ] Update `getEditableElements()` query selector
 - [ ] Add entry to `ELEMENT_CAPABILITIES` with appropriate capabilities
+- [ ] If the type is not a bare tag name (e.g. `shape` for `.shape-wrapper` divs), map it in the `EditableElement` constructor and in `setupDraggableElt`
+- [ ] Add any new `state` fields + `syncToDOM`/`syncFromDOM`/`toDimensions` handling
+- [ ] Add `PropertySerializers` entries or a dedicated attribute builder (e.g. `serializeShapeAttrs`)
+- [ ] For added-in-browser elements: add a `NewElementRegistry.addX`/`newX` array, an `insertNewX` serializer, and wire it into `getTransformedQmd()` (`io.js`)
+- [ ] For a context style panel: follow the `images.js`/`shapes.js` pattern (set-active + `showRightPanel`), add the panel container in `toolbar.js`, and register cross-deselect in `selection.js`
+- [ ] Register a `ModifyModeClassifier` so existing elements can be activated
 - [ ] Update Lua filter if special handling needed (`_extensions/editable/editable.lua`)
 - [ ] Add test file for new element type
 - [ ] Update documentation

@@ -1,0 +1,55 @@
+/* shapes.css */
+
+.shape-wrapper {
+  position: relative;
+  display: inline-block;
+  width: var(--shape-size, 8rem);
+  height: var(--shape-size, 8rem);
+  transform: rotate(var(--shape-rotate, 0deg));
+}
+
+.shape-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.shape-path {
+  fill:         var(--shape-fill, currentColor);
+  stroke:       var(--shape-stroke, none);
+  stroke-width: var(--shape-stroke-width, 3);
+}
+
+.shape-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sizing */
+.shape-sm   { --shape-size: 4rem; }
+.shape-md   { --shape-size: 8rem; }
+.shape-lg   { --shape-size: 14rem; }
+.shape-full { --shape-size: 100%; }
+
+/* Centering — needs block display for auto margins to take effect */
+.shape-center { display: block; margin-inline: auto; }
+
+/* Rotation */
+.shape-rotate-45  { --shape-rotate: 45deg; }
+.shape-rotate-90  { --shape-rotate: 90deg; }
+.shape-rotate-135 { --shape-rotate: 135deg; }
+.shape-rotate-180 { --shape-rotate: 180deg; }
+.shape-rotate-225 { --shape-rotate: 225deg; }
+.shape-rotate-270 { --shape-rotate: 270deg; }
+.shape-rotate-315 { --shape-rotate: 315deg; }
+
+/* Fill and stroke colors are set via the fill= and stroke= attributes,
+   which the filter turns into inline --shape-fill / --shape-stroke values. */
+
+/* Stroke width */
+.shape-stroke-sm { --shape-stroke-width: 1; }
+.shape-stroke-md { --shape-stroke-width: 3; }
+.shape-stroke-lg { --shape-stroke-width: 6; }
+.shape-stroke-xl { --shape-stroke-width: 10; }

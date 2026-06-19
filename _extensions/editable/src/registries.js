@@ -181,6 +181,9 @@ export const NewElementRegistry = {
   /** @type {Array<Object>} Arrow data objects */
   newArrows: [],
 
+  /** @type {Array<{element: HTMLElement, slideIndex: number, newSlideRef: Object|null}>} */
+  newShapes: [],
+
   /**
    * Add a new text div to tracking.
    * @param {HTMLElement} div - The div element
@@ -225,6 +228,20 @@ export const NewElementRegistry = {
   },
 
   /**
+   * Add a new shape to tracking.
+   * @param {HTMLElement} shapeEl - The `.shape-wrapper` element
+   * @param {number} slideIndex - Index of the slide containing the shape
+   * @param {Object|null} [newSlideRef=null] - Reference to newSlides entry if on a new slide
+   */
+  addShape(shapeEl, slideIndex, newSlideRef = null) {
+    this.newShapes.push({
+      element: shapeEl,
+      slideIndex: slideIndex,
+      newSlideRef: newSlideRef,
+    });
+  },
+
+  /**
    * Count new slides inserted before a given index (for offset calculation).
    * @param {number} index - The slide index
    * @returns {number} Count of new slides before this index
@@ -240,6 +257,7 @@ export const NewElementRegistry = {
     this.newDivs = [];
     this.newSlides = [];
     this.newArrows = [];
+    this.newShapes = [];
   },
 
   /**
@@ -247,7 +265,8 @@ export const NewElementRegistry = {
    * @returns {boolean} True if any new elements exist
    */
   hasNewElements() {
-    return this.newDivs.length > 0 || this.newSlides.length > 0 || this.newArrows.length > 0;
+    return this.newDivs.length > 0 || this.newSlides.length > 0 ||
+      this.newArrows.length > 0 || this.newShapes.length > 0;
   },
 };
 

@@ -25,6 +25,11 @@ export const CONFIG = {
   NEW_TEXT_HEIGHT: 50,
   NEW_SLIDE_HEADING: "## New Slide",
 
+  // Shape defaults
+  NEW_SHAPE_TYPE: "circle",
+  NEW_SHAPE_SIZE: 160,
+  NEW_SHAPE_FILL: "#4DADAD",
+
   // Arrow defaults
   NEW_ARROW_LENGTH: 150,
   ARROW_HANDLE_SIZE: 12,

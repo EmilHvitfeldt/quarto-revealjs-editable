@@ -13,6 +13,7 @@ import {
   insertNewSlides,
   insertNewDivs,
   insertNewArrows,
+  insertNewShapes,
 } from './serialization.js';
 import { ModifyModeClassifier } from './modify-mode.js';
 
@@ -49,6 +50,7 @@ export function getTransformedQmd() {
   content = contentWithSlides;
   content = insertNewDivs(content);
   content = insertNewArrows(content);
+  content = insertNewShapes(content);
 
   const dimensions = extractEditableEltDimensions();
   content = updateTextDivs(content);

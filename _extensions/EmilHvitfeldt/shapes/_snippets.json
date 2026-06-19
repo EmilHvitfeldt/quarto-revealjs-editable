@@ -1,0 +1,29 @@
+{
+  "Shape div": {
+    "prefix": "shapes:shape",
+    "body": [
+      "::: {.shape-${1|circle,square,triangle,hexagon,star,heart,diamond,cloud,arrow,pentagon,moon,lightning,octagon|} fill=\"${2:blue}\"}",
+      "$0",
+      ":::"
+    ],
+    "description": "Insert a div styled as a filled shape."
+  },
+  "Shape div (outline)": {
+    "prefix": "shapes:shape-outline",
+    "body": [
+      "::: {.shape-${1|circle,square,triangle,hexagon,star,heart,diamond,cloud,arrow,pentagon,moon,lightning,octagon|} fill=\"none\" stroke=\"${2:red}\" .shape-stroke-${3|sm,md,lg,xl|}}",
+      "$0",
+      ":::"
+    ],
+    "description": "Insert a div styled as an outlined shape with a custom stroke width."
+  },
+  "Shape div (sized & rotated)": {
+    "prefix": "shapes:shape-full",
+    "body": [
+      "::: {.shape-${1|circle,square,triangle,hexagon,star,heart,diamond,cloud,arrow,pentagon,moon,lightning,octagon|} fill=\"${2:blue}\" .shape-${3|sm,md,lg,full|} .shape-rotate-${4|45,90,135,180,225,270,315|}}",
+      "$0",
+      ":::"
+    ],
+    "description": "Insert a shape div with a size preset and rotation."
+  }
+}

@@ -9,12 +9,16 @@
 let deselectImageFn = null;
 /** @type {Function|null} */
 let deselectArrowFn = null;
+/** @type {Function|null} */
+let deselectShapeFn = null;
 
 export function registerDeselectImage(fn) { deselectImageFn = fn; }
 export function registerDeselectArrow(fn) { deselectArrowFn = fn; }
+export function registerDeselectShape(fn) { deselectShapeFn = fn; }
 
 export function deselectImage() { if (deselectImageFn) deselectImageFn(); }
 export function deselectArrow() { if (deselectArrowFn) deselectArrowFn(); }
+export function deselectShape() { if (deselectShapeFn) deselectShapeFn(); }
 
 /**
  * Selectors for places where a click should NOT trigger a global "deselect
@@ -25,6 +29,8 @@ export function deselectArrow() { if (deselectArrowFn) deselectArrowFn(); }
  */
 const ACTIVE_EDIT_CONTEXT_SELECTORS = [
   '.editable-container:has(img)',
+  '.editable-container:has(.shape-wrapper)',
+  '.shape-picker-popover',
   '.editable-toolbar',
   ".editable-container:has(.ql-editor[contenteditable='true'])",
   '.editable-arrow-container',

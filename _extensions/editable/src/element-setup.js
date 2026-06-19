@@ -10,6 +10,8 @@ import { initializeQuillForElement } from './quill.js';
 import { NewElementRegistry, ControlRegistry } from './registries.js';
 import { getCapabilitiesFor } from './capabilities.js';
 import { setActiveImage } from './images.js';
+import { setActiveShape } from './shapes.js';
+import { renderShapeSvg, SHAPE_GROUPS } from './shape-svg.js';
 
 /**
  * Add a new editable text element to the current slide.
@@ -56,6 +58,124 @@ export async function addNewTextElement() {
 
   debug("Added new text element to slide", slideIndex);
   return newDiv;
+}
+
+/**
+ * Add a new shape (quarto-shapes `.shape-wrapper`) to the current slide.
+ * Renders the SVG client-side so it shows immediately, then wraps it as an
+ * editable element and tracks it for serialization.
+ * @param {string} [shapeType=CONFIG.NEW_SHAPE_TYPE] - Shape name (e.g. "hexagon").
+ * @returns {HTMLElement|null} The new shape wrapper element or null.
+ */
+export function addNewShapeElement(shapeType = CONFIG.NEW_SHAPE_TYPE) {
+  const currentSlide = getCurrentSlide();
+  if (!currentSlide) {
+    console.warn("No current slide found");
+    return null;
+  }
+
+  const size = CONFIG.NEW_SHAPE_SIZE;
+  const wrapper = document.createElement("div");
+  wrapper.className = `shape-wrapper shape-${shapeType} editable-new`;
+  wrapper.style.width = size + "px";
+  wrapper.style.height = size + "px";
+  wrapper.style.setProperty("--shape-fill", CONFIG.NEW_SHAPE_FILL);
+  wrapper.innerHTML =
+    renderShapeSvg(shapeType, { direction: "down" }) +
+    '<div class="shape-content"></div>';
+
+  currentSlide.appendChild(wrapper);
+  setupDraggableElt(wrapper);
+
+  const slideIndex = getCurrentSlideIndex();
+  const isOnNewSlide = currentSlide.classList.contains("editable-new-slide");
+
+  if (isOnNewSlide) {
+    const newSlideEntry = NewElementRegistry.newSlides.find((s) => s.element === currentSlide);
+    NewElementRegistry.addShape(wrapper, slideIndex, newSlideEntry || null);
+  } else {
+    const qmdHeadingIndex = getQmdHeadingIndex(slideIndex);
+    const originalSlideIndex = qmdHeadingIndex - NewElementRegistry.countNewSlidesBefore(qmdHeadingIndex);
+    NewElementRegistry.addShape(wrapper, originalSlideIndex, null);
+  }
+
+  const editableElt = editableRegistry.get(wrapper);
+  if (editableElt) {
+    editableElt.state.fill = CONFIG.NEW_SHAPE_FILL;
+    const slideWidth = currentSlide.offsetWidth || CONFIG.DEFAULT_SLIDE_WIDTH;
+    const slideHeight = currentSlide.offsetHeight || CONFIG.DEFAULT_SLIDE_HEIGHT;
+    editableElt.setState({
+      x: (slideWidth - size) / 2,
+      y: (slideHeight - size) / 2,
+    });
+    setActiveShape(wrapper);
+  }
+
+  debug("Added new shape to slide", slideIndex);
+  return wrapper;
+}
+
+/** @type {HTMLElement|null} The open shape picker popover, if any. */
+let shapePickerEl = null;
+
+/** Close the shape picker popover if it is open. */
+export function closeShapePicker() {
+  if (shapePickerEl) {
+    shapePickerEl.remove();
+    shapePickerEl = null;
+    document.removeEventListener("click", onShapePickerOutsideClick, true);
+  }
+}
+
+function onShapePickerOutsideClick(e) {
+  if (shapePickerEl && !shapePickerEl.contains(e.target) &&
+      !e.target.closest(".toolbar-add-shape")) {
+    closeShapePicker();
+  }
+}
+
+/**
+ * Open a grid popover of shape previews; clicking one inserts that shape on the
+ * current slide. Toggles closed if already open.
+ */
+export function openShapePicker() {
+  if (shapePickerEl) {
+    closeShapePicker();
+    return;
+  }
+
+  const popover = document.createElement("div");
+  popover.className = "shape-picker-popover";
+  popover.setAttribute("role", "menu");
+  popover.setAttribute("aria-label", "Choose a shape");
+
+  for (const group of SHAPE_GROUPS) {
+    const heading = document.createElement("div");
+    heading.className = "shape-picker-group";
+    heading.textContent = group.group;
+    popover.appendChild(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "shape-picker-grid";
+    for (const item of group.items) {
+      const btn = document.createElement("button");
+      btn.className = "shape-picker-item";
+      btn.title = item.label;
+      btn.setAttribute("aria-label", item.label);
+      btn.innerHTML = renderShapeSvg(item.name, { direction: "down" });
+      btn.addEventListener("click", () => {
+        addNewShapeElement(item.name);
+        closeShapePicker();
+      });
+      grid.appendChild(btn);
+    }
+    popover.appendChild(grid);
+  }
+
+  document.body.appendChild(popover);
+  shapePickerEl = popover;
+  // Defer so the click that opened it doesn't immediately close it.
+  setTimeout(() => document.addEventListener("click", onShapePickerOutsideClick, true), 0);
 }
 
 /**
@@ -128,7 +248,9 @@ export function setupDraggableElt(elt) {
     cachedScale: 1,
   };
 
-  const elementType = elt.tagName.toLowerCase();
+  const elementType = elt.classList.contains("shape-wrapper")
+    ? "shape"
+    : elt.tagName.toLowerCase();
   const capabilities = getCapabilitiesFor(elementType, elt);
 
   capabilities.forEach((cap) => { if (cap.init) cap.init(context); });
@@ -148,6 +270,9 @@ export function setupDraggableElt(elt) {
 
   if (elementType === "img") {
     container.addEventListener("mousedown", () => setActiveImage(elt));
+  }
+  if (elementType === "shape") {
+    container.addEventListener("mousedown", () => setActiveShape(elt));
   }
 }
 

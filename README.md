@@ -47,10 +47,11 @@ Once rendered, editable elements (whether activated via modify mode or pre-marke
 ## Features
 
 - Modify mode: click any element on a rendered slide to make it editable
-- Menu bar for quick actions (save, copy, add text, add slide, add arrow)
+- Menu bar for quick actions (save, copy, add text, add slide, add arrow, add shape)
 - Rich text editing with formatting (bold, italic, colors, alignment)
 - Image controls panel: opacity, border radius, crop, flip H/V, replace image, reset
 - Arrow support with straight and curved (Bezier) arrows (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows))
+- Shape support: add shapes from a picker and edit type, fill, stroke, and callout direction (requires [quarto-shapes](https://github.com/EmilHvitfeldt/quarto-shapes))
 - Brand color support via `_brand.yml`
 - Keyboard navigation for accessibility
 - Undo/Redo support

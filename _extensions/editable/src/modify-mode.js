@@ -39,7 +39,9 @@ import {
   serializeToQmd,
   elementToText,
   serializeArrowToShortcode,
+  serializeShapeAttrs,
 } from './serialization.js';
+import { getShapeType } from './editable-element.js';
 import { getQmdHeadingIndex, getSlideScale, escapeRegex } from './utils.js';
 import { getColorPalette, getBrandColorOutput } from './colors.js';
 import { setCapabilityOverride } from './capabilities.js';
@@ -411,6 +413,121 @@ ModifyModeClassifier.register(makeMediaClassifier({
     _videosWithControlsRemoved.clear();
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Shape classifier (quarto-shapes .shape-wrapper divs)
+//
+// Authored shapes render as `<div class="shape-wrapper shape-<type> ...">`.
+// In modify mode the user clicks one to make it editable; on save we rewrite
+// its `{ ... .shape-<type> ... }` attribute block in the QMD with the new
+// position/size/fill/stroke/direction.
+// ---------------------------------------------------------------------------
+
+/** All fence attribute blocks carrying a given shape class in a slide chunk. */
+function shapeBlocksInChunk(shapeType, slideIndex) {
+  if (!window._input_file || !shapeType) return [];
+  const chunks = splitIntoSlideChunks(window._input_file);
+  const chunk = chunks[getQmdHeadingIndex(slideIndex) + 1];
+  if (!chunk) return [];
+  const regex = new RegExp(`\\{[^}]*\\.shape-${escapeRegex(shapeType)}\\b[^}]*\\}`, 'g');
+  return chunk.match(regex) || [];
+}
+
+/** True if the slide's QMD chunk contains a fence carrying this shape class. */
+function shapeInQmdSource(shapeType, slideIndex) {
+  return shapeBlocksInChunk(shapeType, slideIndex).length > 0;
+}
+
+/**
+ * Recover the `direction=` of an authored callout from the QMD source. The
+ * rendered `.shape-wrapper` bakes direction into the SVG path and carries no
+ * `direction` attribute, so it cannot be read back from the DOM. Matches the
+ * fence by the shape's occurrence order among same-type shapes on the slide.
+ * @returns {string|null}
+ */
+function getShapeDirectionFromSource(el, shapeType, slideIndex) {
+  const blocks = shapeBlocksInChunk(shapeType, slideIndex);
+  if (blocks.length === 0) return null;
+  const section = el.closest('section');
+  const sameType = section
+    ? Array.from(section.querySelectorAll('.shape-wrapper')).filter(s => getShapeType(s) === shapeType)
+    : [el];
+  const occurrence = Math.max(0, sameType.indexOf(el));
+  const block = blocks[occurrence];
+  if (!block) return null;
+  const m = block.match(/\bdirection=("?)([^"\s}]+)\1/);
+  return m ? m[2] : null;
+}
+
+ModifyModeClassifier.register({
+  label: 'Shapes',
+
+  classify(slideEl) {
+    const slideIndex = Reveal.getState().indexh;
+    const shapes = Array.from(slideEl.querySelectorAll('.shape-wrapper'));
+    const valid = [];
+    for (const shape of shapes) {
+      if (editableRegistry.has(shape)) continue;
+      if (isAlreadyPositioned(shape)) continue;
+      const type = getShapeType(shape);
+      if (type && shapeInQmdSource(type, slideIndex)) valid.push(shape);
+    }
+    return { valid, warn: [] };
+  },
+
+  activate(el) {
+    const slideIndex = Reveal.getState().indexh;
+    const shapeType = getShapeType(el);
+    el.dataset.editableModifiedShape = shapeType || '';
+    el.dataset.editableModifiedSlide = String(slideIndex);
+    el.dataset.editableModified = 'true';
+    // Direction is baked into the rendered SVG, so recover it from source and
+    // stamp it for the EditableElement constructor to read into state.
+    const dir = getShapeDirectionFromSource(el, shapeType, slideIndex);
+    if (dir != null) el.dataset.editableShapeDirection = dir;
+    setupDivWhenReady(el);
+  },
+
+  serialize(text) {
+    const els = Array.from(
+      document.querySelectorAll('.shape-wrapper[data-editable-modified="true"]')
+    );
+    if (els.length === 0) return text;
+
+    const chunks = splitIntoSlideChunks(text);
+
+    // Group by (chunkIndex, shapeType); DOM order maps to QMD occurrence order.
+    const groups = new Map();
+    for (const el of els) {
+      if (!editableRegistry.has(el)) continue;
+      const shapeType = el.dataset.editableModifiedShape;
+      if (!shapeType) continue;
+      const slideIndex = parseInt(el.dataset.editableModifiedSlide ?? '0', 10);
+      const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
+      if (chunkIndex >= chunks.length) continue;
+      const key = `${chunkIndex}::${shapeType}`;
+      if (!groups.has(key)) groups.set(key, { chunkIndex, shapeType, els: [] });
+      groups.get(key).els.push(el);
+    }
+
+    for (const { chunkIndex, shapeType, els: groupEls } of groups.values()) {
+      groupEls.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+      const replacements = groupEls.map(el =>
+        serializeShapeAttrs(editableRegistry.get(el).toDimensions())
+      );
+      // Match the opening fence attribute block carrying this shape class.
+      const regex = new RegExp(`\\{[^}]*\\.shape-${escapeRegex(shapeType)}\\b[^}]*\\}`, 'g');
+      let occurrence = 0;
+      chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
+        occurrence < replacements.length ? replacements[occurrence++] : match
+      );
+    }
+
+    return chunks.join('');
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Positioned-element re-activation classifiers

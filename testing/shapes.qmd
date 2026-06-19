@@ -1,0 +1,19 @@
+---
+format: revealjs
+filters:
+  - editable
+  - shapes
+---
+
+## Add shapes here
+
+Use the toolbar Add → Shape picker to add shapes to this slide.
+
+## Authored shapes
+
+::: {.shape-hexagon fill="#4DADAD"}
+:::
+
+::: {.shape-speech-bubble fill="#42526C" direction="up"}
+Hi
+:::

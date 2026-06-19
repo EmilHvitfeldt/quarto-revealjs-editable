@@ -7,7 +7,7 @@
 import { pushUndoState } from './undo.js';
 import { editableRegistry } from './editable-element.js';
 import { showRightPanel } from './toolbar.js';
-import { registerDeselectImage, deselectArrow } from './selection.js';
+import { registerDeselectImage, deselectArrow, deselectShape } from './selection.js';
 import { getActiveArrow } from './arrows.js';
 
 /** @type {HTMLElement|null} The currently active image element */
@@ -89,6 +89,7 @@ export function setActiveImage(imgEl) {
   }
   if (imgEl && imgEl !== activeImage) {
     deselectArrow();
+    deselectShape();
   }
   activeImage = imgEl;
   if (imgEl) {

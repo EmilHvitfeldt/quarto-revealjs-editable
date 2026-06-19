@@ -379,6 +379,72 @@ export function serializeArrowToShortcode(arrow) {
 }
 
 /**
+ * Build the attribute fence (`{.shape-* .absolute ...}`) for a shape from a
+ * dimensions object produced by EditableElement.toDimensions().
+ * Emits quarto-shapes syntax: the shape class, .absolute positioning, position
+ * attributes, fill/stroke attributes, an optional stroke-width class, optional
+ * rotation as an inline transform, and direction= for callouts.
+ * @param {Object} dims
+ * @returns {string}
+ */
+export function serializeShapeAttrs(dims) {
+  const classes = [];
+  if (dims.shapeType) classes.push(`.shape-${dims.shapeType}`);
+  classes.push(".absolute");
+  if (dims.strokeWidth) classes.push(`.shape-stroke-${dims.strokeWidth}`);
+
+  const attrs = [
+    `left=${round(dims.left)}px`,
+    `top=${round(dims.top)}px`,
+    `width=${round(dims.width)}px`,
+    `height=${round(dims.height)}px`,
+  ];
+  if (dims.fill) attrs.push(`fill="${getBrandColorOutput(dims.fill)}"`);
+  if (dims.stroke) attrs.push(`stroke="${getBrandColorOutput(dims.stroke)}"`);
+  if (dims.direction != null) attrs.push(`direction="${dims.direction}"`);
+
+  let str = `{${classes.join(" ")} ${attrs.join(" ")}`;
+  if (dims.rotation) {
+    str += ` style="transform: rotate(${round(dims.rotation)}deg);"`;
+  }
+  str += "}";
+  return str;
+}
+
+/**
+ * Build the QMD lines for a tracked new shape (blank line, opening fence with
+ * attributes, content, closing fence).
+ * @param {{element: HTMLElement}} shapeInfo
+ * @returns {string[]}
+ */
+function buildShapeBlock(shapeInfo) {
+  const editableElt = editableRegistry.get(shapeInfo.element);
+  if (!editableElt) return [];
+  const dims = editableElt.toDimensions();
+  const attrStr = serializeShapeAttrs(dims);
+  const contentEl = shapeInfo.element.querySelector(".shape-content");
+  const content = contentEl ? elementToText(contentEl) : "";
+  const fence = getFenceForContent(content);
+  return ["", `${fence} ${attrStr}`, content, fence];
+}
+
+/**
+ * Insert new shapes into QMD content (for shapes on original slides).
+ * @param {string} text - QMD content
+ * @returns {string} Updated QMD content
+ */
+export function insertNewShapes(text) {
+  const items = NewElementRegistry.newShapes.filter((s) => !s.newSlideRef);
+  return insertContentBySlide(text, items, (shapesForSlide) => {
+    const newContent = [];
+    for (const shapeInfo of shapesForSlide) {
+      newContent.push(...buildShapeBlock(shapeInfo));
+    }
+    return newContent;
+  });
+}
+
+/**
  * Extract dimensions from all original editable elements.
  * @returns {Object[]} Array of dimension objects for serialization
  */
@@ -445,6 +511,17 @@ export function insertNewSlides(text) {
         arrowsByNewSlide.set(arrowInfo.newSlideRef, []);
       }
       arrowsByNewSlide.get(arrowInfo.newSlideRef).push(arrowInfo);
+    }
+  }
+
+  // Build a map of new slides to their associated shapes
+  const shapesByNewSlide = new Map();
+  for (const shapeInfo of NewElementRegistry.newShapes) {
+    if (shapeInfo.newSlideRef) {
+      if (!shapesByNewSlide.has(shapeInfo.newSlideRef)) {
+        shapesByNewSlide.set(shapeInfo.newSlideRef, []);
+      }
+      shapesByNewSlide.get(shapeInfo.newSlideRef).push(shapeInfo);
     }
   }
 
@@ -543,6 +620,11 @@ export function insertNewSlides(text) {
         newSlideContent.push("");
       }
 
+      const shapesForThisSlide = shapesByNewSlide.get(newSlide) || [];
+      for (const shapeInfo of shapesForThisSlide) {
+        newSlideContent.push(...buildShapeBlock(shapeInfo));
+      }
+
       slideLinePositions.set(newSlide, baseInsertLineIndex + 1);
 
       lines.splice(baseInsertLineIndex, 0, ...newSlideContent);
@@ -557,7 +639,8 @@ export function insertNewSlides(text) {
     const totalLinesAdded = orderedSlides.reduce((sum, slide) => {
       const divs = divsByNewSlide.get(slide) || [];
       const arrows = arrowsByNewSlide.get(slide) || [];
-      return sum + 3 + divs.length * 4 + arrows.length * 3;
+      const shapes = shapesByNewSlide.get(slide) || [];
+      return sum + 3 + divs.length * 4 + arrows.length * 3 + shapes.length * 4;
     }, 0);
 
     for (let j = 0; j < slideHeadingLines.length; j++) {

@@ -6,6 +6,8 @@ All notable changes to the quarto-revealjs-editable extension will be documented
 
 ### Added
 
+- **Shapes** — add and edit [`quarto-shapes`](https://github.com/EmilHvitfeldt/quarto-shapes) shapes directly in the browser. Click **Add → Shape** in the toolbar to open a picker of shape previews (circles, polygons, stars, arrows, callouts, …) and drop one onto the current slide. Selecting a shape opens a shape panel for changing its type, fill, stroke color, stroke width, and — for callouts and speech bubbles — the pointer direction (via presets or a draggable handle on the shape's edge that aims the pointer at any angle). Shapes move, resize, and rotate like other elements, and can also be activated through **Modify mode** to reposition or restyle shapes you authored in source. On save they are written back as `::: {.shape-* .absolute …}` fenced divs. Requires the `quarto-shapes` extension to be installed and listed in your document's `filters`.
+
 - **Modify mode** — a new way to make existing elements editable in the browser without marking them with `{.editable}` in source. Click the **Modify** button in the menu bar, then click any highlighted element on the current slide to activate it; on save, the change is written back to your `.qmd` as `{.absolute …}` positioning. Elements that can't be activated (e.g. multi-figure code chunks) show an amber warning ring with a reason.
 
   *Supported element types* (first-time activation):

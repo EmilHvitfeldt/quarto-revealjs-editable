@@ -93,6 +93,11 @@ Capabilities are modular behaviors attached to elements. Each capability has a c
 Element types map to capabilities via `ELEMENT_CAPABILITIES`:
 - `img` → move, resize, rotate
 - `div` → move, resize, rotate, fontControls, editText
+- `shape` → move, resize, rotate (quarto-shapes `.shape-wrapper` divs; styling via the shape panel)
+
+The element type is normally the lowercased tag name, except a div carrying the
+`shape-wrapper` class resolves to type `shape` (see the `EditableElement`
+constructor and `setupDraggableElt`).
 
 ### Registry Pattern
 
@@ -100,7 +105,7 @@ Three registries manage extensible behaviors:
 
 1. **ControlRegistry** - UI buttons shown on elements (font size, alignment, edit mode)
 2. **ToolbarRegistry** - Top bar toolbar actions (save, copy, add)
-3. **NewElementRegistry** - Tracks dynamically added elements/slides/arrows
+3. **NewElementRegistry** - Tracks dynamically added elements/slides/arrows/shapes
 
 ### Serialization
 
@@ -110,10 +115,21 @@ The serialization system converts element state to QMD format:
    - `type: "attr"` → goes in attribute list (e.g., `width=100px`)
    - `type: "style"` → goes in style attribute (e.g., `style="left: 50px"`)
 
+   For shapes, `serializeShapeAttrs(dims)` builds the full `{.shape-* .absolute …}`
+   attribute block: the shape class, `.absolute`, position attributes,
+   `fill=`/`stroke=` attributes, a `.shape-stroke-*` width class, an inline
+   `transform: rotate()` for rotation, and `direction=` for callouts.
+
+   The shape SVG itself is regenerated in the browser by `src/shape-svg.js`, a
+   JS port of `quarto-shapes`' `shapes.lua` (static path catalog plus parametric
+   callout geometry). `EditableElement.syncShapeToDOM()` calls
+   `renderShapeSvg()` whenever the shape type or callout direction changes.
+
 2. **Save Flow**:
    - Insert new slides (with associated elements)
    - Insert new divs on original slides
    - Insert new arrows
+   - Insert new shapes (`::: {.shape-* .absolute …}` fenced divs)
    - Update text content (HTML → Quarto markdown)
    - Replace `{.editable}` with `{.absolute ...}` attributes
    - Replace plain images made editable via modify mode (`applyModifiedSerializers`)

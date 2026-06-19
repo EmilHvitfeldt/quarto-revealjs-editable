@@ -1,0 +1,230 @@
+$schema: https://m.canouil.dev/quarto-wizard/assets/schema/v2/extension-schema.json
+
+attributes:
+  _any:
+    fill:
+      type: string
+      description: "Interior color of the shape (any CSS color, or \"none\" for no fill)."
+      completion:
+        type: color
+    stroke:
+      type: string
+      description: "Outline color of the shape (any CSS color)."
+      completion:
+        type: color
+    size:
+      type: string
+      description: "Custom size as any CSS length (e.g. \"3cm\", \"200px\"); overrides the .shape-{sm,md,lg,full} classes."
+    direction:
+      type: string
+      description: "Direction a callout/speech-bubble pointer faces, as a compass angle in degrees (0=up, 90=right, 180=down, 270=left) or a keyword. Default \"down\". Applies to .shape-callout-round, .shape-callout-oval, .shape-callout-rounded, and .shape-speech-bubble."
+      completion:
+        values: ["down", "up", "left", "right"]
+
+classes:
+  shape-arc:
+    description: "Render the div as a arc shape."
+  shape-arrow:
+    description: "Render the div as a arrow shape."
+  shape-arrow-bent:
+    description: "Render the div as a arrow bent shape."
+  shape-arrow-double:
+    description: "Render the div as a arrow double shape."
+  shape-arrow-striped:
+    description: "Render the div as a arrow striped shape."
+  shape-block-arc:
+    description: "Render the div as a block arc shape."
+  shape-brace-left:
+    description: "Render the div as a brace left shape."
+  shape-brace-right:
+    description: "Render the div as a brace right shape."
+  shape-bracket-left:
+    description: "Render the div as a bracket left shape."
+  shape-bracket-right:
+    description: "Render the div as a bracket right shape."
+  shape-callout-cloud:
+    description: "Render the div as a callout cloud shape."
+  shape-callout-explosion:
+    description: "Render the div as a callout explosion shape."
+  shape-callout-oval:
+    description: "Render the div as a callout oval shape."
+  shape-callout-round:
+    description: "Render the div as a callout round shape."
+  shape-callout-rounded:
+    description: "Render the div as a callout rounded shape."
+  shape-callout-thought:
+    description: "Render the div as a callout thought shape."
+  shape-chevron:
+    description: "Render the div as a chevron shape."
+  shape-circle:
+    description: "Render the div as a circle shape."
+  shape-cloud:
+    description: "Render the div as a cloud shape."
+  shape-cone:
+    description: "Render the div as a cone shape."
+  shape-cross:
+    description: "Render the div as a cross shape."
+  shape-cube:
+    description: "Render the div as a cube shape."
+  shape-cylinder:
+    description: "Render the div as a cylinder shape."
+  shape-cylinder-3d:
+    description: "Render the div as a cylinder 3d shape."
+  shape-decagon:
+    description: "Render the div as a decagon shape."
+  shape-delay:
+    description: "Render the div as a delay shape."
+  shape-diagonal-stripe:
+    description: "Render the div as a diagonal stripe shape."
+  shape-diamond:
+    description: "Render the div as a diamond shape."
+  shape-display:
+    description: "Render the div as a display shape."
+  shape-divide:
+    description: "Render the div as a divide shape."
+  shape-document:
+    description: "Render the div as a document shape."
+  shape-dodecagon:
+    description: "Render the div as a dodecagon shape."
+  shape-donut:
+    description: "Render the div as a donut shape."
+  shape-double-wave:
+    description: "Render the div as a double wave shape."
+  shape-equals:
+    description: "Render the div as a equals shape."
+  shape-folded-corner:
+    description: "Render the div as a folded corner shape."
+  shape-frame:
+    description: "Render the div as a frame shape."
+  shape-heart:
+    description: "Render the div as a heart shape."
+  shape-heptagon:
+    description: "Render the div as a heptagon shape."
+  shape-hexagon:
+    description: "Render the div as a hexagon shape."
+  shape-lightning:
+    description: "Render the div as a lightning shape."
+  shape-manual-input:
+    description: "Render the div as a manual input shape."
+  shape-minus:
+    description: "Render the div as a minus shape."
+  shape-moon:
+    description: "Render the div as a moon shape."
+  shape-multiply:
+    description: "Render the div as a multiply shape."
+  shape-no-symbol:
+    description: "Render the div as a no symbol shape."
+  shape-not-equal:
+    description: "Render the div as a not equal shape."
+  shape-notched-arrow:
+    description: "Render the div as a notched arrow shape."
+  shape-octagon:
+    description: "Render the div as a octagon shape."
+  shape-off-page:
+    description: "Render the div as a off page shape."
+  shape-oval:
+    description: "Render the div as a oval shape."
+  shape-parallelogram:
+    description: "Render the div as a parallelogram shape."
+  shape-paren-left:
+    description: "Render the div as a paren left shape."
+  shape-paren-right:
+    description: "Render the div as a paren right shape."
+  shape-pentagon:
+    description: "Render the div as a pentagon shape."
+  shape-pentagon-arrow:
+    description: "Render the div as a pentagon arrow shape."
+  shape-pie:
+    description: "Render the div as a pie shape."
+  shape-pyramid:
+    description: "Render the div as a pyramid shape."
+  shape-rectangle:
+    description: "Render the div as a rectangle shape."
+  shape-ribbon:
+    description: "Render the div as a ribbon shape."
+  shape-rounded-square:
+    description: "Render the div as a rounded square shape."
+  shape-scroll:
+    description: "Render the div as a scroll shape."
+  shape-semicircle:
+    description: "Render the div as a semicircle shape."
+  shape-shield:
+    description: "Render the div as a shield shape."
+  shape-smiley:
+    description: "Render the div as a smiley shape."
+  shape-speech-bubble:
+    description: "Render the div as a speech bubble shape."
+  shape-square:
+    description: "Render the div as a square shape."
+  shape-star:
+    description: "Render the div as a star shape."
+  shape-star-10:
+    description: "Render the div as a star 10 shape."
+  shape-star-12:
+    description: "Render the div as a star 12 shape."
+  shape-star-16:
+    description: "Render the div as a star 16 shape."
+  shape-star-24:
+    description: "Render the div as a star 24 shape."
+  shape-star-32:
+    description: "Render the div as a star 32 shape."
+  shape-star-4:
+    description: "Render the div as a star 4 shape."
+  shape-star-6:
+    description: "Render the div as a star 6 shape."
+  shape-star-8:
+    description: "Render the div as a star 8 shape."
+  shape-starburst:
+    description: "Render the div as a starburst shape."
+  shape-stored-data:
+    description: "Render the div as a stored data shape."
+  shape-summing-junction:
+    description: "Render the div as a summing junction shape."
+  shape-sun:
+    description: "Render the div as a sun shape."
+  shape-teardrop:
+    description: "Render the div as a teardrop shape."
+  shape-terminator:
+    description: "Render the div as a terminator shape."
+  shape-trapezoid:
+    description: "Render the div as a trapezoid shape."
+  shape-triangle:
+    description: "Render the div as a triangle shape."
+  shape-wave:
+    description: "Render the div as a wave shape."
+  shape-wavy-flag:
+    description: "Render the div as a wavy flag shape."
+  shape-wedge:
+    description: "Render the div as a wedge shape."
+  shape-sm:
+    description: "Small size preset."
+  shape-md:
+    description: "Medium size preset."
+  shape-lg:
+    description: "Large size preset."
+  shape-full:
+    description: "Fill the available width."
+  shape-center:
+    description: "Center the shape horizontally."
+  shape-stroke-sm:
+    description: "Thin stroke width."
+  shape-stroke-md:
+    description: "Medium stroke width."
+  shape-stroke-lg:
+    description: "Thick stroke width."
+  shape-stroke-xl:
+    description: "Extra-thick stroke width."
+  shape-rotate-45:
+    description: "Rotate the shape 45 degrees."
+  shape-rotate-90:
+    description: "Rotate the shape 90 degrees."
+  shape-rotate-135:
+    description: "Rotate the shape 135 degrees."
+  shape-rotate-180:
+    description: "Rotate the shape 180 degrees."
+  shape-rotate-225:
+    description: "Rotate the shape 225 degrees."
+  shape-rotate-270:
+    description: "Rotate the shape 270 degrees."
+  shape-rotate-315:
+    description: "Rotate the shape 315 degrees."

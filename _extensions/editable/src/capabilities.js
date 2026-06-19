@@ -478,6 +478,9 @@ export const ELEMENT_CAPABILITIES = {
   video: ["move", "resize", "rotate"],
   div: ["move", "resize", "rotate", "fontControls", "editText"],
   p: ["move", "resize", "rotate", "fontControls", "editText"],
+  // Shapes (quarto-shapes .shape-wrapper divs) are positioned graphics: move,
+  // resize, rotate. Fill/stroke/type/direction are edited via the shape panel.
+  shape: ["move", "resize", "rotate"],
 };
 
 /** Per-element capability overrides set before setup (e.g., columns → move only). */

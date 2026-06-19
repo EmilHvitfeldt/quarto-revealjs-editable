@@ -13,7 +13,8 @@ import { createFloatingToolbar } from './toolbar.js';
 import { addNewArrow, initArrows } from './arrows.js';
 import { setActiveImage } from './images.js';
 import { isInsideActiveEditContext } from './selection.js';
-import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady } from './element-setup.js';
+import { addNewTextElement, addNewSlide, setupImageWhenReady, setupDivWhenReady, openShapePicker } from './element-setup.js';
+import { setActiveShape } from './shapes.js';
 import { getTransformedQmd, saveMovedElts, copyQmdToClipboard, readIndexQmd } from './io.js';
 import { toggleModifyMode, ModifyModeClassifier, enterModifyMode, exitModifyMode } from './modify-mode.js';
 import { addSaveMenuButton } from './menu.js';
@@ -58,6 +59,7 @@ ToolbarRegistry.register("add", {
     { icon: "📝", label: "Text", title: "Add editable text to current slide", className: "toolbar-add-text", onClick: () => addNewTextElement() },
     { icon: "🖼️", label: "Slide", title: "Add new slide after current", className: "toolbar-add-slide", onClick: () => addNewSlide() },
     { icon: "➡️", label: "Arrow", title: "Add arrow to current slide", className: "toolbar-add-arrow", onClick: () => addNewArrow() },
+    { icon: "⬟", label: "Shape", title: "Add a shape to current slide", className: "toolbar-add-shape", onClick: () => openShapePicker() },
   ],
 });
 
@@ -102,6 +104,7 @@ window.Revealeditable = function () {
         document.addEventListener("click", (e) => {
           if (!isInsideActiveEditContext(e.target)) {
             setActiveImage(null);
+            setActiveShape(null);
           }
         });
       });

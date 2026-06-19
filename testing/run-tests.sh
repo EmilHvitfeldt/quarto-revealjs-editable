@@ -453,6 +453,7 @@ check_brand_colors "Test 21: Brand color injection" "brand-colors.html"
 echo ""
 echo "--- Arrow Tests ---"
 run_render_test "Test 22: Arrows rendering" "arrows.qmd" "inject"
+run_render_test "Test 22b: Shapes rendering" "shapes.qmd" "inject"
 
 echo ""
 echo "--- Modify Mode Tests ---"

@@ -10,6 +10,25 @@
  */
 export const editableRegistry = new Map();
 
+import { renderShapeSvg, isCallout, isKnownShape } from './shape-svg.js';
+
+/** Map quarto-shapes stroke-width class suffix → CSS stroke-width value. */
+const SHAPE_STROKE_WIDTHS = { sm: 1, md: 3, lg: 6, xl: 10 };
+
+/**
+ * Read the `shape-<name>` type from a `.shape-wrapper` element's class list.
+ * Ignores modifier classes (shape-sm, shape-stroke-md, shape-rotate-45, …).
+ * @param {HTMLElement} el
+ * @returns {string|null}
+ */
+export function getShapeType(el) {
+  for (const cls of el.classList) {
+    const m = cls.match(/^shape-(.+)$/);
+    if (m && isKnownShape(m[1])) return m[1];
+  }
+  return null;
+}
+
 /**
  * Wraps a DOM element with editable capabilities.
  * Manages state synchronization between internal state and DOM.
@@ -23,8 +42,10 @@ export class EditableElement {
     this.element = element;
     /** @type {HTMLElement|null} The wrapper container for positioning */
     this.container = null;
-    /** @type {string} Element type ("img" or "div") */
-    this.type = element.tagName.toLowerCase();
+    /** @type {string} Element type ("img", "div", "video", or "shape") */
+    this.type = element.classList?.contains("shape-wrapper")
+      ? "shape"
+      : element.tagName.toLowerCase();
     /**
      * Whether `syncToDOM` writes `element.style.height`. Set to false for
      * content-sized elements (blockquote/callout-style) where the visible
@@ -65,7 +86,26 @@ export class EditableElement {
       cropLeft: 0,
       flipH: false,
       flipV: false,
+      // Shape-specific properties
+      shapeType: null,
+      fill: null,
+      stroke: null,
+      strokeWidth: null, // "sm" | "md" | "lg" | "xl"
+      direction: null,   // callout pointer direction (keyword or degrees)
     };
+
+    if (this.type === "shape") {
+      this.state.shapeType = getShapeType(element);
+      // Direction is baked into the rendered SVG and absent from the DOM, so
+      // modify mode stamps it from the QMD source for round-tripping.
+      if (element.dataset?.editableShapeDirection) {
+        this.state.direction = element.dataset.editableShapeDirection;
+      }
+      // Tracks what SVG is currently rendered, so syncToDOM only regenerates
+      // the inner <svg> when the type or direction actually changes.
+      this._renderedShape = this.state.shapeType;
+      this._renderedDirection = null;
+    }
   }
 
   /**
@@ -130,6 +170,53 @@ export class EditableElement {
         ? `scaleX(${scaleX}) scaleY(${scaleY})`
         : "";
     }
+
+    if (this.type === "shape") {
+      this.syncShapeToDOM();
+    }
+  }
+
+  /**
+   * Apply shape styling to the `.shape-wrapper` element and regenerate the
+   * inner `<svg>` when the shape type or callout direction has changed.
+   * Fill/stroke/stroke-width are written as the same CSS custom properties
+   * quarto-shapes' stylesheet reads, so the live preview matches the saved
+   * output.
+   */
+  syncShapeToDOM() {
+    const s = this.state;
+
+    // Fill / stroke colors → CSS custom properties (empty string clears them).
+    this.element.style.setProperty("--shape-fill", s.fill || "");
+    this.element.style.setProperty("--shape-stroke", s.stroke || "");
+    this.element.style.setProperty(
+      "--shape-stroke-width",
+      s.strokeWidth && SHAPE_STROKE_WIDTHS[s.strokeWidth] != null
+        ? String(SHAPE_STROKE_WIDTHS[s.strokeWidth])
+        : ""
+    );
+
+    // Keep the shape-<type> class in sync with state.shapeType.
+    if (s.shapeType) {
+      for (const cls of [...this.element.classList]) {
+        const m = cls.match(/^shape-(.+)$/);
+        if (m && isKnownShape(m[1]) && m[1] !== s.shapeType) {
+          this.element.classList.remove(cls);
+        }
+      }
+      this.element.classList.add(`shape-${s.shapeType}`);
+    }
+
+    // Regenerate the SVG only when type or direction changed.
+    const direction = isCallout(s.shapeType) ? s.direction : null;
+    if (s.shapeType && (this._renderedShape !== s.shapeType || this._renderedDirection !== direction)) {
+      const svg = this.element.querySelector(".shape-svg");
+      if (svg) {
+        svg.outerHTML = renderShapeSvg(s.shapeType, { direction });
+      }
+      this._renderedShape = s.shapeType;
+      this._renderedDirection = direction;
+    }
   }
 
   /**
@@ -186,6 +273,18 @@ export class EditableElement {
       const transform = this.element.style.transform || "";
       this.state.flipH = /scaleX\(-1\)/.test(transform);
       this.state.flipV = /scaleY\(-1\)/.test(transform);
+    }
+
+    if (this.type === "shape") {
+      this.state.shapeType = getShapeType(this.element) || this.state.shapeType;
+      const fill = this.element.style.getPropertyValue("--shape-fill").trim();
+      const stroke = this.element.style.getPropertyValue("--shape-stroke").trim();
+      this.state.fill = fill || null;
+      this.state.stroke = stroke || null;
+      for (const cls of this.element.classList) {
+        const m = cls.match(/^shape-stroke-(sm|md|lg|xl)$/);
+        if (m) this.state.strokeWidth = m[1];
+      }
     }
   }
 
@@ -247,6 +346,16 @@ export class EditableElement {
       if (this.state.flipH || this.state.flipV) {
         dims.flipH = this.state.flipH;
         dims.flipV = this.state.flipV;
+      }
+    }
+
+    if (this.type === "shape") {
+      dims.shapeType = this.state.shapeType;
+      if (this.state.fill) dims.fill = this.state.fill;
+      if (this.state.stroke) dims.stroke = this.state.stroke;
+      if (this.state.strokeWidth) dims.strokeWidth = this.state.strokeWidth;
+      if (this.state.direction != null && isCallout(this.state.shapeType)) {
+        dims.direction = this.state.direction;
       }
     }
 

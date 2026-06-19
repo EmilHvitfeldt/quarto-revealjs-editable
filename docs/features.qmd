@@ -11,7 +11,7 @@ A fixed menu bar appears at the top of the presentation with quick access to com
 | Modify | Activate plain elements (images, videos, paragraphs, lists, tables, code blocks, equations, fenced divs, slide titles, arrows, …) for editing — see the supported types table below |
 | Save   | Save edits to file                                  |
 | Copy   | Copy QMD to clipboard                               |
-| Add    | Opens submenu with Text, Slide, and Arrow options   |
+| Add    | Opens submenu with Text, Slide, Arrow, and Shape options |
 
 ## Adding New Elements
 
@@ -20,6 +20,7 @@ Click the **Add** button to open a submenu with options:
 - **Text**: Creates a new editable text block on the current slide. Position and style it like any other editable element.
 - **Slide**: Inserts a new blank slide after the current one. The slide will be saved with a `## New Slide` heading.
 - **Arrow**: Adds an arrow to the current slide (requires [quarto-arrows](https://github.com/EmilHvitfeldt/quarto-arrows) extension). See [Arrow Support](#arrow-support) below.
+- **Shape**: Opens a picker of shape previews and adds the chosen shape to the current slide (requires [quarto-shapes](https://github.com/EmilHvitfeldt/quarto-shapes) extension). See [Shape Support](#shape-support) below.
 
 New elements are marked with a dashed border to distinguish them from original content.
 
@@ -53,6 +54,7 @@ Currently supported element types:
 | Display equation | `$$E = mc^2$$` (single- or multi-line) | Move |
 | Slide title | `## Heading text` | Text editing with formatting toolbar |
 | Positioned arrow | `{{< arrow ... position="absolute" >}}` | Move, resize (full styling preserved) |
+| Shape | `::: {.shape-circle ...}` | Move, resize, rotate, restyle (fill/stroke/type/direction) |
 
 ## Rich Text Editing
 
@@ -282,4 +284,62 @@ Arrows with labels:
 
 ```markdown
 {{</* arrow from="100,200" to="400,300" label="Step 1" label-position="middle" label-offset="10" position="absolute" */>}}
+```
+
+## Shape Support
+
+The extension integrates with [quarto-shapes](https://github.com/EmilHvitfeldt/quarto-shapes) to add and edit CSS/SVG shapes (circles, polygons, stars, arrows, callouts, …) visually.
+
+### Setup
+
+First, install the quarto-shapes extension:
+
+```bash
+quarto add EmilHvitfeldt/quarto-shapes
+```
+
+Then add both filters to your YAML header:
+
+```yaml
+revealjs-plugins:
+  - editable
+filters:
+  - editable
+  - shapes
+```
+
+::: {.callout-note}
+Shapes you add in the browser are saved as `quarto-shapes` syntax. They only render when you next run `quarto render` if the `quarto-shapes` extension is installed and listed in `filters`.
+:::
+
+### Adding a Shape
+
+Click **Add → Shape** to open a picker showing live previews of every shape, grouped by category. Click a preview to drop that shape onto the current slide. The shape is selected immediately, opening the shape panel.
+
+### Shape Styling
+
+When a shape is selected, the menu bar switches to show the shape panel:
+
+- **Shape**: Switch the shape type (circle, hexagon, star, callout, …)
+- **Fill**: Interior color, with a clear (∅) button for no fill
+- **Stroke**: Outline color, with a clear (∅) button for no stroke
+- **Width**: Stroke width (default, S, M, L, XL)
+- **Direction**: For callouts and speech bubbles, the direction the pointer faces (up, right, down, left, or a diagonal). A round handle also appears on the shape's edge — drag it to aim the pointer at any angle.
+
+Shapes move, resize, and rotate with the usual handles. You can also use **Modify mode** to activate shapes you authored directly in source.
+
+### Saved Format
+
+Shapes are saved as `quarto-shapes` fenced divs with absolute positioning:
+
+```markdown
+::: {.shape-hexagon .absolute left=120px top=80px width=200px height=200px fill="#4DADAD"}
+:::
+```
+
+Callouts include a `direction=` attribute and stroked shapes include a `.shape-stroke-*` class:
+
+```markdown
+::: {.shape-callout-round .absolute left=200px top=150px width=180px height=180px fill="none" stroke="#E24A68" .shape-stroke-md direction="45"}
+:::
 ```
