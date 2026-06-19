@@ -167,6 +167,24 @@ test.describe('Shapes Feature', () => {
     expect(qmd).toContain('Hello shape');
   });
 
+  test('the shape panel Edit button enters text edit mode and types', async ({ page }) => {
+    await openShapePicker(page);
+    await pickShape(page, 'Circle');
+
+    // Click the panel's edit-text button (no double-click needed).
+    await page.click('.shape-toolbar-text');
+    const editing = await page.evaluate(() => {
+      const c = document.querySelector('.shape-wrapper.editable-new .shape-content');
+      return c.getAttribute('contenteditable') === 'true' && document.activeElement === c;
+    });
+    expect(editing).toBe(true);
+
+    await page.keyboard.type('Panel text');
+    const qmd = await page.evaluate(() => window.getTransformedQmd());
+    expect(qmd).toMatch(/\.shape-circle/);
+    expect(qmd).toContain('Panel text');
+  });
+
   test('editing text on an authored shape via modify mode round-trips', async ({ page }) => {
     await navigateToSlide(page, 1);
     await page.evaluate(() => {

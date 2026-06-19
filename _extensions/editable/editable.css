@@ -1802,6 +1802,12 @@ button.arrow-toolbar-smooth.active {
   border-color: #999;
 }
 
+/* Standalone edit-text button — full border, unlike the appended color clear */
+.shape-toolbar-text {
+  border-left-width: 1px;
+  border-radius: 4px;
+}
+
 .shape-btn-group {
   display: flex;
   flex-direction: row;

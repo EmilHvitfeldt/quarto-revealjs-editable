@@ -252,6 +252,7 @@ export function createShapeStyleControls() {
   buildColorControl(addCell, "Stroke", "stroke");
   buildWidthControl(addCell);
   buildDirectionControl(addCell);
+  buildTextControl(addCell);
 
   centerWrap.appendChild(controlsWrap);
   container.appendChild(centerWrap);
@@ -339,6 +340,21 @@ function buildWidthControl(addCell) {
   });
   shapeControlRefs.widthSelect = select;
   cell.appendChild(select);
+}
+
+function buildTextControl(addCell) {
+  const cell = addCell("Text");
+  const btn = document.createElement("button");
+  btn.className = "shape-toolbar-btn shape-toolbar-text";
+  btn.textContent = "✎";
+  btn.title = "Edit text inside the shape (or double-click it)";
+  btn.setAttribute("aria-label", "Edit shape text");
+  btn.addEventListener("click", () => {
+    if (!activeShape) return;
+    const content = activeShape.querySelector(".shape-content");
+    if (content) startShapeTextEdit(activeShape, content);
+  });
+  cell.appendChild(btn);
 }
 
 function buildDirectionControl(addCell) {
