@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../editable-element.js', () => ({
   editableRegistry: {
     has: () => true,
-    get: () => ({ toDimensions: () => ({}) }),
+    get: (el) => ({ toDimensions: () => el._dimensions ?? ({}) }),
   },
 }));
 vi.mock('../element-setup.js', () => ({
@@ -31,7 +31,7 @@ vi.mock('../capabilities.js', () => ({ setCapabilityOverride: vi.fn() }));
 vi.mock('../quill.js', () => ({ quillInstances: new Map(), initializeQuillForElement: vi.fn() }));
 vi.mock('../arrows.js', () => ({ createArrowElement: vi.fn(), setActiveArrow: vi.fn() }));
 
-import { makeMediaClassifier } from '../modify-mode.js';
+import { makeMediaClassifier, mediaOccurrences, serializeRawMedia } from '../modify-mode.js';
 import { splitIntoSlideChunks } from '../serialization.js';
 import { getQmdHeadingIndex } from '../utils.js';
 
@@ -139,5 +139,54 @@ describe('makeMediaClassifier serialize()', () => {
     expect(imgOut).toContain('](media.src){width=300px}');
     // Existing `{existing}` attr block is replaced, not preserved alongside.
     expect(imgOut).not.toContain('{existing}');
+  });
+
+  it('edits only the second same-source raw image and preserves fragments and classes', () => {
+    const first = '<img src="plate.png" class="first fragment" data-fragment-index="1" alt="First">';
+    const second = '<img src="plate.png" class="second fragment" data-fragment-index="2" alt="Second">';
+    splitIntoSlideChunks.mockReturnValue(['preamble', `## A\n${first}\n${second}\n`]);
+    const el = mkMedia({ tagName: 'img', src: 'plate.png' });
+    el.dataset.editableModifiedOccurrence = '1';
+    el._dimensions = { left: 24, top: -8, width: 230, height: 150 };
+    const out = withDocument([el], () => buildClassifier('img').serialize('input'));
+    expect(out).toContain(first);
+    expect(out).toContain('class="second fragment" data-fragment-index="2" alt="Second"');
+    expect(out).toContain('position: relative; left: 24px; top: -8px; width: 230px; height: 150px;');
+    expect(out.match(/style=/g)).toHaveLength(1);
+  });
+
+  it('preserves video controls, autoplay and child sources across two saves', () => {
+    const original = '<video class="fragment" data-autoplay controls poster="poster.png"><source src="movie.mp4" type="video/mp4"></video>';
+    const dims = { left: 10, top: 20, width: 450, height: 280 };
+    const first = serializeRawMedia(mediaOccurrences(original, 'video', 'movie.mp4')[0], dims, 'absolute');
+    const second = serializeRawMedia(mediaOccurrences(first, 'video', 'movie.mp4')[0], { ...dims, left: 30, width: 510 }, 'absolute');
+    expect(second).toContain('class="fragment" data-autoplay controls poster="poster.png"');
+    expect(second).toContain('<source src="movie.mp4" type="video/mp4">');
+    expect(second).toContain('position: absolute; left: 30px; top: 20px; width: 510px; height: 280px;');
+    expect(second.match(/style=/g)).toHaveLength(1);
+  });
+
+  it('matches encoded source URLs and preserves authored image styles', () => {
+    const source = '<img src="image.png?a=1&amp;b=2" style="object-fit: contain; border: 1px solid red;" data-fragment-index="3">';
+    const occurrence = mediaOccurrences(source, 'img', 'image.png?a=1&b=2')[0];
+    const out = serializeRawMedia(occurrence, { left: 1, top: 2, width: 300, height: 200 });
+    expect(out).toContain('src="image.png?a=1&amp;b=2"');
+    expect(out).toContain('object-fit: contain; border: 1px solid red;');
+    expect(out).toContain('data-fragment-index="3"');
+  });
+
+  it('keeps rotation and flips stable after reloading edited raw media', () => {
+    const source = '<img src="pic.png" style="transform: translateX(-50%) rotate(15deg) scaleX(-1);">';
+    const first = serializeRawMedia(mediaOccurrences(source, 'img', 'pic.png')[0], { rotation: 15, flipH: true });
+    const second = serializeRawMedia(mediaOccurrences(first, 'img', 'pic.png')[0], { rotation: 15, flipH: true });
+    expect(second).toBe(first);
+    expect(second).toContain('transform: translateX(-50%) rotate(15deg) scaleX(-1);');
+  });
+
+  it('fails explicitly when the activated source occurrence is absent', () => {
+    splitIntoSlideChunks.mockReturnValue(['preamble', '## A\n<img src="other.png">\n']);
+    const el = mkMedia({ tagName: 'img', src: 'pic.png' });
+    expect(() => withDocument([el], () => buildClassifier('img').serialize('input')))
+      .toThrow('Cannot locate editable img: pic.png occurrence 1');
   });
 });

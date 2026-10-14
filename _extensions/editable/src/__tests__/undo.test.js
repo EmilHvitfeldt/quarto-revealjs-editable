@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockRegistry = new Map();
 const mockNewArrows = [];
@@ -24,6 +24,7 @@ import {
   restoreArrowState,
   registerRestoreArrowDOM,
   clearUndoStacks,
+  setupUndoRedoKeyboard,
 } from '../undo.js';
 
 function makeEl() { return {}; }  // plain object as Map key (no DOM needed)
@@ -42,6 +43,52 @@ beforeEach(() => {
   clearUndoStacks();
   mockRegistry.clear();
   mockNewArrows.length = 0;
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('history controls and shortcuts', () => {
+  it('notifies controls and autosave after undo and redo', () => {
+    vi.stubGlobal('CustomEvent', class {
+      constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+    });
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('document', { dispatchEvent });
+    pushUndoState();
+    expect(dispatchEvent).toHaveBeenLastCalledWith(expect.objectContaining({
+      type: 'editable-history-change', detail: { canUndo: true, canRedo: false },
+    }));
+    undo();
+    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'editable-history-change', detail: { canUndo: false, canRedo: true },
+    }));
+    expect(dispatchEvent).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'editable-content-restored' }));
+    redo();
+    expect(dispatchEvent).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'editable-content-restored' }));
+  });
+
+  it('supports uppercase Shift+Z redo and preserves text-field undo', () => {
+    const listeners = {};
+    const doc = {
+      addEventListener: (name, fn) => { listeners[name] = fn; },
+      dispatchEvent: vi.fn(),
+      activeElement: { closest: () => null },
+    };
+    vi.stubGlobal('document', doc);
+    setupUndoRedoKeyboard();
+    pushUndoState();
+    const key = (name, shiftKey = false) => ({ key: name, shiftKey, ctrlKey: true, preventDefault: vi.fn() });
+    listeners.keydown(key('z'));
+    expect(canRedo()).toBe(true);
+    listeners.keydown(key('Z', true));
+    expect(canRedo()).toBe(false);
+    expect(canUndo()).toBe(true);
+    doc.activeElement.closest = () => ({ tagName: 'INPUT' });
+    const inputUndo = key('z');
+    listeners.keydown(inputUndo);
+    expect(inputUndo.preventDefault).not.toHaveBeenCalled();
+    expect(canUndo()).toBe(true);
+  });
 });
 
 describe('canUndo / canRedo', () => {

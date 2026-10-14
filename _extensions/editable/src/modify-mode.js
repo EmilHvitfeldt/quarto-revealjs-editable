@@ -30,7 +30,7 @@
  * @module modify-mode
  */
 
-import { editableRegistry } from './editable-element.js';
+import { editableRegistry, readElementSize } from './editable-element.js';
 import { setupImageWhenReady, setupDivWhenReady, setupVideoWhenReady, setupDraggableElt } from './element-setup.js';
 import { initializeQuillForElement } from './quill.js';
 import { showRightPanel } from './toolbar.js';
@@ -42,11 +42,15 @@ import {
   serializeShapeAttrs,
 } from './serialization.js';
 import { getShapeType } from './editable-element.js';
-import { getQmdHeadingIndex, getSlideScale, escapeRegex } from './utils.js';
+import { getCurrentSlide, getCurrentSlideIndex, getQmdHeadingIndex, getSlideScale, escapeRegex } from './utils.js';
 import { getColorPalette, getBrandColorOutput } from './colors.js';
 import { setCapabilityOverride } from './capabilities.js';
 import { createArrowElement, setActiveArrow } from './arrows.js';
 import { CONFIG } from './config.js';
+import { pushUndoState } from './undo.js';
+import { textClassifier } from './text-editing.js';
+import { svgClassifier } from './svg-editing.js';
+import { makeAbsoluteBlockRegex, makeAbsoluteImageRegex } from './positioned-media-source.js';
 import {
   getAbsolutePosition,
   waitForRegistryThenFixPosition,
@@ -166,6 +170,9 @@ export const ModifyModeClassifier = {
 
 };
 
+ModifyModeClassifier.register(svgClassifier);
+ModifyModeClassifier.register(textClassifier);
+
 // ---------------------------------------------------------------------------
 // Image classifier (built-in)
 // ---------------------------------------------------------------------------
@@ -220,6 +227,106 @@ function videoSrcInQmdSource(video) {
   return !!src && window._input_file.includes(src);
 }
 
+function decodeMediaAttribute(value) {
+  return value.replace(/&(?:amp|quot|apos|lt|gt|#\d+|#x[\da-f]+);/gi, entity => {
+    const named = { '&amp;': '&', '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>' };
+    if (named[entity.toLowerCase()]) return named[entity.toLowerCase()];
+    const hex = /^&#x/i.test(entity);
+    return String.fromCodePoint(parseInt(entity.slice(hex ? 3 : 2, -1), hex ? 16 : 10));
+  });
+}
+
+function mediaAttribute(tag, name) {
+  const match = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+  return match ? decodeMediaAttribute(match[1] ?? match[2] ?? match[3]) : null;
+}
+
+function setMediaAttribute(tag, name, value) {
+  const encoded = String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const attribute = `${name}="${encoded}"`;
+  const regex = new RegExp(`\\s${name}\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)`, 'i');
+  return regex.test(tag) ? tag.replace(regex, ` ${attribute}`) : tag.replace(/\s*\/?\s*>$/, ` ${attribute}>`);
+}
+
+/** Locate Markdown and raw-HTML media in source order, including video sources. */
+export function mediaOccurrences(chunk, tagName, src) {
+  const opening = `<${tagName}\\b(?:[^"'<>]|"[^"]*"|'[^']*')*>`;
+  const rawPattern = tagName === 'video' ? `${opening}[\\s\\S]*?<\\/video\\s*>` : opening;
+  const pattern = new RegExp(`${rawPattern}|\\]\\(${escapeRegex(src)}\\)(?:\\{[^}]*\\})?`, 'gi');
+  const matches = [];
+  for (const match of chunk.matchAll(pattern)) {
+    const literal = match[0];
+    const raw = literal.startsWith('<');
+    const tag = raw ? literal.match(new RegExp(`^${opening}`, 'i'))[0] : null;
+    const sourceTag = tagName === 'video' && raw && !mediaAttribute(tag, 'src')
+      ? literal.match(/<source\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/i)?.[0] : null;
+    const foundSrc = raw ? mediaAttribute(tag, 'src') ?? mediaAttribute(sourceTag ?? '', 'src') : src;
+    if (foundSrc === src) matches.push({ start: match.index, end: match.index + literal.length, literal, raw, tag, sourceTag });
+  }
+  return matches;
+}
+
+/** Preserve authored raw HTML while changing only editable geometry and image style. */
+export function serializeRawMedia(occurrence, dims, position = 'relative') {
+  const styles = new Map((mediaAttribute(occurrence.tag, 'style') ?? '').split(';').map(part => {
+    const colon = part.indexOf(':');
+    return colon < 0 ? [] : [part.slice(0, colon).trim(), part.slice(colon + 1).trim()];
+  }).filter(pair => pair.length === 2 && pair[0]));
+  for (const [key, value] of Object.entries({ position, left: dims.left, top: dims.top, width: dims.width, height: dims.height })) {
+    if (value !== undefined && value !== null) styles.set(key, typeof value === 'number' ? `${Math.round(value * 10) / 10}px` : value);
+  }
+  styles.set('max-width', 'none');
+  styles.set('max-height', 'none');
+  if (dims.opacity !== undefined || styles.has('opacity')) styles.set('opacity', String((dims.opacity ?? 100) / 100));
+  if (dims.borderRadius !== undefined || styles.has('border-radius')) styles.set('border-radius', `${dims.borderRadius ?? 0}px`);
+  if (dims.cropTop || dims.cropRight || dims.cropBottom || dims.cropLeft) {
+    styles.set('clip-path', `inset(${dims.cropTop || 0}px ${dims.cropRight || 0}px ${dims.cropBottom || 0}px ${dims.cropLeft || 0}px)`);
+  } else if (styles.has('clip-path')) {
+    styles.set('clip-path', 'none');
+  }
+  const baseTransform = (styles.get('transform') ?? '').replace(/rotate\([^)]*deg\)|scale[XY]\(-1\)/g, '').trim();
+  const transforms = [baseTransform === 'none' ? '' : baseTransform];
+  if (dims.rotation) transforms.push(`rotate(${dims.rotation}deg)`);
+  if (dims.flipH) transforms.push('scaleX(-1)');
+  if (dims.flipV) transforms.push('scaleY(-1)');
+  if (transforms.filter(Boolean).length) styles.set('transform', transforms.filter(Boolean).join(' '));
+  else styles.delete('transform');
+  let tag = setMediaAttribute(occurrence.tag, 'style', [...styles].map(([key, value]) => `${key}: ${value}`).join('; ') + ';');
+  if (dims.src && !occurrence.sourceTag) tag = setMediaAttribute(tag, 'src', dims.src);
+  let result = tag + occurrence.literal.slice(occurrence.tag.length);
+  if (dims.src && occurrence.sourceTag) result = result.replace(occurrence.sourceTag, setMediaAttribute(occurrence.sourceTag, 'src', dims.src));
+  return result;
+}
+
+function prepareRawMediaLayout(el) {
+  const computed = window.getComputedStyle(el);
+  const { width, height } = readElementSize(el);
+  const extra = keys => computed.boxSizing === 'border-box' ? 0
+    : keys.reduce((sum, key) => sum + (Number.parseFloat(computed[key]) || 0), 0);
+  const outerWidth = width + extra(['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']);
+  const outerHeight = height + extra(['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']);
+  const position = computed.position === 'absolute' ? 'absolute' : 'relative';
+  el.dataset.editableRawPosition = position;
+  const flow = {};
+  for (const key of ['display', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'gridArea', 'alignSelf', 'justifySelf', 'order', 'flexGrow', 'flexShrink', 'flexBasis', 'verticalAlign']) {
+    if (computed[key]) flow[key] = computed[key];
+  }
+  if (flow.display === 'inline') flow.display = 'inline-block';
+  const parent = window.getComputedStyle(el.parentElement);
+  if (parent.display === 'flex' || parent.display === 'inline-flex') {
+    flow.flexGrow = '0';
+    flow.flexShrink = '0';
+    flow.flexBasis = (parent.flexDirection.startsWith('column') ? outerHeight : outerWidth) + 'px';
+  }
+  el._editableRawMediaLayout = {
+    position, flow,
+    rotation: Number.parseFloat(el.style.transform?.match(/rotate\(([^)]+)deg\)/)?.[1]) || 0,
+    left: Number.parseFloat(computed.left) || (position === 'absolute' ? el.offsetLeft : 0),
+    top: Number.parseFloat(computed.top) || (position === 'absolute' ? el.offsetTop : 0),
+    width, height, outerWidth, outerHeight,
+  };
+}
+
 /**
  * Factory for the Images / Videos classifiers, which share the entire
  * activate + serialize pipeline (capture src, lazy data-src swap, dataset
@@ -248,6 +355,14 @@ export function makeMediaClassifier({ tagName, label, getSrc, setupFn, classify,
       // Capture src before assigning to el.src, which would resolve to an
       // absolute URL and break QMD source matching in serialize().
       const originalSrc = getSrc(el);
+      const slideIndex = getCurrentSlideIndex();
+      const leaf = el.closest('section');
+      const siblings = Array.from(leaf?.querySelectorAll(tagName) ?? []).filter(media => getSrc(media) === originalSrc);
+      const occurrenceIndex = Math.max(0, siblings.indexOf(el));
+      el.dataset.editableModifiedOccurrence = String(occurrenceIndex);
+      const chunk = splitIntoSlideChunks(window._input_file ?? '')[getQmdHeadingIndex(slideIndex) + 1];
+      const occurrence = chunk && mediaOccurrences(chunk, tagName, originalSrc)[occurrenceIndex];
+      if (occurrence?.raw) prepareRawMediaLayout(el);
 
       // Ensure lazy-loaded media (data-src only) are fetched before setup
       // polls for natural dimensions — without this, setup can time out
@@ -257,7 +372,7 @@ export function makeMediaClassifier({ tagName, label, getSrc, setupFn, classify,
       }
 
       el.dataset.editableModifiedSrc   = originalSrc;
-      el.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      el.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
       el.dataset.editableModified      = 'true';
 
       if (beforeSetup) beforeSetup(el);
@@ -292,17 +407,22 @@ export function makeMediaClassifier({ tagName, label, getSrc, setupFn, classify,
           a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
         );
 
-        const replacements = groupEls.map(el => {
+        const occurrences = mediaOccurrences(chunks[chunkIndex], tagName, originalSrc);
+        const changesByOccurrence = new Map();
+        groupEls.forEach((el, index) => {
+          const occurrenceIndex = Number.parseInt(el.dataset.editableModifiedOccurrence ?? String(index), 10);
+          const occurrence = occurrences[occurrenceIndex];
+          if (!occurrence) throw new Error(`Cannot locate editable ${tagName}: ${originalSrc} occurrence ${occurrenceIndex + 1}`);
           const dims = editableRegistry.get(el).toDimensions();
-          return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+          const replacement = occurrence.raw
+            ? serializeRawMedia(occurrence, dims, el.dataset.editableRawPosition ?? 'relative')
+            : `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+          changesByOccurrence.set(occurrenceIndex, { ...occurrence, replacement });
         });
-
-        const regex = new RegExp(`\\]\\(${escapeRegex(originalSrc)}\\)(\\{[^}]*\\})?`, 'g');
-
-        let occurrence = 0;
-        chunks[chunkIndex] = chunks[chunkIndex].replace(regex, (match) =>
-          occurrence < replacements.length ? replacements[occurrence++] : match
-        );
+        const changes = [...changesByOccurrence.values()].sort((a, b) => b.start - a.start);
+        for (const change of changes) {
+          chunks[chunkIndex] = chunks[chunkIndex].slice(0, change.start) + change.replacement + chunks[chunkIndex].slice(change.end);
+        }
       }
 
       return chunks.join('');
@@ -463,7 +583,7 @@ ModifyModeClassifier.register({
   label: 'Shapes',
 
   classify(slideEl) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const shapes = Array.from(slideEl.querySelectorAll('.shape-wrapper'));
     const valid = [];
     for (const shape of shapes) {
@@ -476,7 +596,7 @@ ModifyModeClassifier.register({
   },
 
   activate(el) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const shapeType = getShapeType(el);
     el.dataset.editableModifiedShape = shapeType || '';
     el.dataset.editableModifiedSlide = String(slideIndex);
@@ -552,33 +672,6 @@ ModifyModeClassifier.register({
 // regex replace) lives in modify-mode-positioned.js. This section wires the
 // two element types onto that factory.
 // ---------------------------------------------------------------------------
-
-/**
- * Build a regex that matches a {.absolute ...} attribute block containing
- * all four original position values in any order.
- */
-function makeAbsoluteBlockRegex(left, top, width, height) {
-  const vals = [
-    `left=${Math.round(left)}px`,
-    `top=${Math.round(top)}px`,
-    `width=${Math.round(width)}px`,
-    `height=${Math.round(height)}px`,
-  ];
-  const lookaheads = vals.map(v => `(?=[^}]*${escapeRegex(v)})`).join('');
-  return new RegExp(`\\{${lookaheads}\\.absolute[^}]*\\}`, 'g');
-}
-
-function makeAbsoluteImageRegex(src, left, top, width, height) {
-  const escapedSrc = escapeRegex(src);
-  const vals = [
-    `left=${Math.round(left)}px`,
-    `top=${Math.round(top)}px`,
-    `width=${Math.round(width)}px`,
-    `height=${Math.round(height)}px`,
-  ];
-  const lookaheads = vals.map(v => `(?=[^}]*${escapeRegex(v)})`).join('');
-  return new RegExp(`\\]\\(${escapedSrc}\\)\\{${lookaheads}\\.absolute[^}]*\\}`, 'g');
-}
 
 function absoluteDivInQmdSource(div, slideIndex) {
   if (!window._input_file) return false;
@@ -740,10 +833,10 @@ function getPositionFromWrapper(innerEl) {
 function makeTypedFenceRewriteReplacement(_el, dims, ds) {
   return {
     regex: makeAbsoluteBlockRegex(
-      parseInt(ds.editableModifiedAbsLeft,   10),
-      parseInt(ds.editableModifiedAbsTop,    10),
-      parseInt(ds.editableModifiedAbsWidth,  10),
-      parseInt(ds.editableModifiedAbsHeight, 10),
+      parseFloat(ds.editableModifiedAbsLeft),
+      parseFloat(ds.editableModifiedAbsTop),
+      parseFloat(ds.editableModifiedAbsWidth),
+      parseFloat(ds.editableModifiedAbsHeight),
     ),
     replacement: serializeToQmd(dims),
   };
@@ -822,10 +915,10 @@ ModifyModeClassifier.register(makePositionedClassifier({
   setupFn: setupDivWhenReady,
   getReplacement: (_el, dims, ds) => ({
     regex: makeAbsoluteBlockRegex(
-      parseInt(ds.editableModifiedAbsLeft,   10),
-      parseInt(ds.editableModifiedAbsTop,    10),
-      parseInt(ds.editableModifiedAbsWidth,  10),
-      parseInt(ds.editableModifiedAbsHeight, 10),
+      parseFloat(ds.editableModifiedAbsLeft),
+      parseFloat(ds.editableModifiedAbsTop),
+      parseFloat(ds.editableModifiedAbsWidth),
+      parseFloat(ds.editableModifiedAbsHeight),
     ),
     replacement: serializeToQmd(dims),
   }),
@@ -855,10 +948,10 @@ ModifyModeClassifier.register(makePositionedClassifier({
     return {
       regex: makeAbsoluteImageRegex(
         src,
-        parseInt(ds.editableModifiedAbsLeft,   10),
-        parseInt(ds.editableModifiedAbsTop,    10),
-        parseInt(ds.editableModifiedAbsWidth,  10),
-        parseInt(ds.editableModifiedAbsHeight, 10),
+        parseFloat(ds.editableModifiedAbsLeft),
+        parseFloat(ds.editableModifiedAbsTop),
+        parseFloat(ds.editableModifiedAbsWidth),
+        parseFloat(ds.editableModifiedAbsHeight),
       ),
       replacement: `](${src}){.absolute left=${dims.left}px top=${dims.top}px width=${dims.width}px height=${dims.height}px}`,
     };
@@ -1157,7 +1250,7 @@ ModifyModeClassifier.register({
   activate(h2) {
     if (h2.classList.contains('editable-heading-active')) return true;
     h2.dataset.editableModifiedHeading = 'true';
-    h2.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+    h2.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
     h2.dataset.editableModifiedOriginalHtml = h2.innerHTML;
     h2.classList.add('editable-heading-active');
 
@@ -1427,7 +1520,7 @@ ModifyModeClassifier.register({
 
   classify(slideEl) {
     if (!window._input_file) return { valid: [], warn: [] };
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
     const chunks = splitIntoSlideChunks(window._input_file);
     const chunk = chunks[chunkIndex];
@@ -1487,7 +1580,7 @@ ModifyModeClassifier.register({
   },
 
   activate(div) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     div.dataset.editableModifiedFence = 'true';
     div.dataset.editableModifiedSlide = String(slideIndex);
 
@@ -1707,7 +1800,7 @@ ModifyModeClassifier.register({
   },
 
   activate(p) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const { left: origLeft, top: origTop } = captureSlideRelativePosition(p);
 
     p.dataset.editableModifiedParagraph = 'true';
@@ -1870,7 +1963,7 @@ function makeListClassifier({ tagName, dataKey, testLine, label, omitHeight = fa
     },
 
     activate(el) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
       lockNaturalDimensions(el, 'block');
 
@@ -2112,7 +2205,7 @@ function arrowDataFromKwargs(kwargs) {
  * Each entry: { arrowData, sourceEl, slideIndex, sourceLiteral, occurrence }
  *   - arrowData: the editable arrow's data object (live)
  *   - sourceEl:  the original positioned div from the rendered slide (hidden)
- *   - slideIndex: Reveal.getState().indexh at activate time
+ *   - slideIndex: getCurrentSlideIndex() at activate time
  *   - sourceLiteral: exact `{{< arrow … >}}` string from the source chunk
  *   - occurrence: 0-based index among identical sourceLiteral strings in chunk
  */
@@ -2172,7 +2265,7 @@ ModifyModeClassifier.register({
     _arrowsWithPointerEventsCleared.clear();
 
     if (!window._input_file) return { valid: [], warn: [] };
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
     const chunks = splitIntoSlideChunks(window._input_file);
     const chunk = chunks[chunkIndex];
@@ -2245,7 +2338,7 @@ ModifyModeClassifier.register({
     let kwargs;
     try { kwargs = JSON.parse(kwargsJson); } catch (e) { return; }
 
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const arrowData = arrowDataFromKwargs(kwargs);
     arrowData.isActive = true;
 
@@ -2286,6 +2379,7 @@ ModifyModeClassifier.register({
     // Group by chunk index so we can apply replacements per slide.
     const byChunk = new Map();
     for (const entry of _modifiedArrows) {
+      if (!entry.arrowData.element?.isConnected) continue;
       const chunkIndex = getQmdHeadingIndex(entry.slideIndex) + 1;
       if (chunkIndex >= chunks.length) continue;
       if (!byChunk.has(chunkIndex)) byChunk.set(chunkIndex, []);
@@ -2521,7 +2615,7 @@ ModifyModeClassifier.register({
   },
 
   activate(el) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
     // Lock natural dimensions before setup so reparenting into the inline-block
     // editable-container doesn't collapse or stretch the block.
@@ -2671,7 +2765,7 @@ ModifyModeClassifier.register({
 
   classify(slideEl) {
     if (!window._input_file) return { valid: [], warn: [] };
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
     const chunks = splitIntoSlideChunks(window._input_file);
     const chunk = chunks[chunkIndex];
@@ -2721,7 +2815,7 @@ ModifyModeClassifier.register({
   },
 
   activate(el) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
     // Lock natural dimensions before setup; without this, reparenting into the
     // inline-block editable-container collapses the cell width.
@@ -2803,7 +2897,7 @@ ModifyModeClassifier.register({
 
   classify(slideEl) {
     if (!window._input_file) return { valid: [], warn: [] };
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
     const chunks = splitIntoSlideChunks(window._input_file);
     const chunk = chunks[chunkIndex];
@@ -2900,7 +2994,7 @@ ModifyModeClassifier.register({
 
     img.dataset.editableModifiedSrc = originalSrc;
     img.dataset.editableModifiedChunkFig = 'true';
-    img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+    img.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
 
     // Quarto renders the `fig-cap:` as a sibling `<p class="caption">` next
     // to the img. Bundle it into the editable-container after setup so the
@@ -3113,7 +3207,7 @@ ModifyModeClassifier.register({
 
   classify(slideEl) {
     if (!window._input_file) return { valid: [], warn: [] };
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
     const chunks = splitIntoSlideChunks(window._input_file);
     const chunk = chunks[chunkIndex];
@@ -3142,7 +3236,7 @@ ModifyModeClassifier.register({
   },
 
   activate(el) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
     const isTable = el.tagName === 'TABLE';
     lockNaturalDimensions(el);
@@ -3336,7 +3430,7 @@ ModifyModeClassifier.register({
 
   classify(slideEl) {
     if (!window._input_file) return { valid: [], warn: [] };
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
     const chunks = splitIntoSlideChunks(window._input_file);
     const chunk = chunks[chunkIndex];
@@ -3362,7 +3456,7 @@ ModifyModeClassifier.register({
   },
 
   activate(el) {
-    const slideIndex = Reveal.getState().indexh;
+    const slideIndex = getCurrentSlideIndex();
     // Anchor on the rendered math node when available so the container's
     // top edge sits at the visible top of the equation (not the top of the
     // wrapping `<p>`'s margin box, which would shift the equation down).
@@ -3439,14 +3533,19 @@ ModifyModeClassifier.register({
  */
 function classifyElements() {
   const reveal = document.querySelector('.reveal');
-  const currentSlide = reveal?.querySelector('.slides section.present:not(.slide-background)') ?? reveal;
+  const currentSlide = getCurrentSlide() ?? reveal;
 
   const valid = [];
   const warn  = [];
+  const claimed = new Set();
 
   for (const classifier of _classifiers) {
     const result = classifier.classify(currentSlide);
-    result.valid.forEach(el => valid.push({ el, classifier }));
+    result.valid.forEach(el => {
+      if (claimed.has(el)) return;
+      claimed.add(el);
+      valid.push({ el, classifier });
+    });
     result.warn.forEach(({ el, reason }) => {
       warn.push(el);
       _warnReasons.set(el, reason);
@@ -3460,7 +3559,7 @@ function classifyElements() {
  * (Re-)classify elements and attach click handlers.
  * Called on entry and on every slide change.
  */
-function applyClassification() {
+async function applyClassification() {
   restoreAriaLabels();
   document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach(el => {
     el.classList.remove(VALID_CLASS, WARN_CLASS);
@@ -3468,6 +3567,11 @@ function applyClassification() {
   abortController?.abort();
   abortController = new AbortController();
   const { signal } = abortController;
+  const slide = getCurrentSlide();
+  for (const classifier of _classifiers) {
+    if (classifier.prepare) await classifier.prepare(slide);
+    if (signal.aborted || !_active || getCurrentSlide() !== slide) return;
+  }
 
   const { valid, warn } = classifyElements();
 
@@ -3562,8 +3666,13 @@ export function toggleModifyMode() {
  * @param {Classifier}  classifier
  */
 function onValidElementClick(e, classifier) {
-  e.stopPropagation();
+  e.preventDefault();
+  e.stopImmediatePropagation();
   const el = e.currentTarget;
-  const stayActive = classifier.activate(el);
+  // Capture the authored layout before activation can wrap or resize it.
+  // Remove temporary classification outlines before taking the snapshot.
+  exitModifyMode({ resetPanel: false });
+  pushUndoState({ root: el.closest('section') });
+  const stayActive = classifier.activate(el, e);
   if (!stayActive) exitModifyMode();
 }

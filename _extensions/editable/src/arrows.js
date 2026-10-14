@@ -1926,4 +1926,3 @@ export function toggleCurveMode(arrowData) {
   updateArrowHandles(arrowData);
   updateSmoothToggleInToolbar(arrowData);
 }
-

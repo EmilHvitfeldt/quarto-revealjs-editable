@@ -2136,21 +2136,21 @@ var EditableModule = (() => {
           if (typeof b !== "object") {
             b = {};
           }
-          let attributes = cloneDeep2(b);
+          let attributes2 = cloneDeep2(b);
           if (!keepNull) {
-            attributes = Object.keys(attributes).reduce((copy, key) => {
-              if (attributes[key] != null) {
-                copy[key] = attributes[key];
+            attributes2 = Object.keys(attributes2).reduce((copy, key) => {
+              if (attributes2[key] != null) {
+                copy[key] = attributes2[key];
               }
               return copy;
             }, {});
           }
           for (const key in a) {
             if (a[key] !== void 0 && b[key] === void 0) {
-              attributes[key] = a[key];
+              attributes2[key] = a[key];
             }
           }
-          return Object.keys(attributes).length > 0 ? attributes : void 0;
+          return Object.keys(attributes2).length > 0 ? attributes2 : void 0;
         }
         AttributeMap6.compose = compose;
         function diff(a = {}, b = {}) {
@@ -2160,13 +2160,13 @@ var EditableModule = (() => {
           if (typeof b !== "object") {
             b = {};
           }
-          const attributes = Object.keys(a).concat(Object.keys(b)).reduce((attrs, key) => {
+          const attributes2 = Object.keys(a).concat(Object.keys(b)).reduce((attrs, key) => {
             if (!isEqual3(a[key], b[key])) {
               attrs[key] = b[key] === void 0 ? null : b[key];
             }
             return attrs;
           }, {});
-          return Object.keys(attributes).length > 0 ? attributes : void 0;
+          return Object.keys(attributes2).length > 0 ? attributes2 : void 0;
         }
         AttributeMap6.diff = diff;
         function invert(attr = {}, base = {}) {
@@ -2195,13 +2195,13 @@ var EditableModule = (() => {
           if (!priority) {
             return b;
           }
-          const attributes = Object.keys(b).reduce((attrs, key) => {
+          const attributes2 = Object.keys(b).reduce((attrs, key) => {
             if (a[key] === void 0) {
               attrs[key] = b[key];
             }
             return attrs;
           }, {});
-          return Object.keys(attributes).length > 0 ? attributes : void 0;
+          return Object.keys(attributes2).length > 0 ? attributes2 : void 0;
         }
         AttributeMap6.transform = transform;
       })(AttributeMap5 || (AttributeMap5 = {}));
@@ -2380,14 +2380,14 @@ var EditableModule = (() => {
           }
           return handler;
         }
-        insert(arg, attributes) {
+        insert(arg, attributes2) {
           const newOp = {};
           if (typeof arg === "string" && arg.length === 0) {
             return this;
           }
           newOp.insert = arg;
-          if (attributes != null && typeof attributes === "object" && Object.keys(attributes).length > 0) {
-            newOp.attributes = attributes;
+          if (attributes2 != null && typeof attributes2 === "object" && Object.keys(attributes2).length > 0) {
+            newOp.attributes = attributes2;
           }
           return this.push(newOp);
         }
@@ -2397,13 +2397,13 @@ var EditableModule = (() => {
           }
           return this.push({ delete: length });
         }
-        retain(length, attributes) {
+        retain(length, attributes2) {
           if (typeof length === "number" && length <= 0) {
             return this;
           }
           const newOp = { retain: length };
-          if (attributes != null && typeof attributes === "object" && Object.keys(attributes).length > 0) {
-            newOp.attributes = attributes;
+          if (attributes2 != null && typeof attributes2 === "object" && Object.keys(attributes2).length > 0) {
+            newOp.attributes = attributes2;
           }
           return this.push(newOp);
         }
@@ -2551,9 +2551,9 @@ var EditableModule = (() => {
                     };
                   }
                 }
-                const attributes = AttributeMap_1.default.compose(thisOp.attributes, otherOp.attributes, typeof thisOp.retain === "number");
-                if (attributes) {
-                  newOp.attributes = attributes;
+                const attributes2 = AttributeMap_1.default.compose(thisOp.attributes, otherOp.attributes, typeof thisOp.retain === "number");
+                if (attributes2) {
+                  newOp.attributes = attributes2;
                 }
                 delta.push(newOp);
                 if (!otherIter.hasNext() && isEqual3(delta.ops[delta.ops.length - 1], newOp)) {
@@ -3052,10 +3052,19 @@ var EditableModule = (() => {
   function getCurrentSlideIndex() {
     if (typeof Reveal === "undefined")
       return 0;
+    const sourceIndex2 = Reveal.getCurrentSlide?.()?.dataset?.editableSourceIndex;
+    if (sourceIndex2 !== void 0 && /^\d+$/.test(sourceIndex2)) {
+      return Number(sourceIndex2);
+    }
     const indices = Reveal.getIndices();
     return indices.h;
   }
   function getCurrentSlide() {
+    if (typeof Reveal !== "undefined" && Reveal.getCurrentSlide) {
+      const current = Reveal.getCurrentSlide();
+      if (current && !current.querySelector("section"))
+        return current;
+    }
     const nonStack = document.querySelector("section.present:not(.stack)");
     if (nonStack)
       return nonStack;
@@ -3475,6 +3484,14 @@ var EditableModule = (() => {
   // src/editable-element.js
   var editableRegistry = /* @__PURE__ */ new Map();
   var SHAPE_STROKE_WIDTHS = { sm: 1, md: 3, lg: 6, xl: 10 };
+  function readElementSize(element) {
+    const computed = typeof window !== "undefined" && window.getComputedStyle ? window.getComputedStyle(element) : element.style;
+    const read = (key, fallback) => {
+      const value = computed[key] || "";
+      return /^\d+(?:\.\d+)?px$/.test(value) ? Number.parseFloat(value) : fallback;
+    };
+    return { width: read("width", element.offsetWidth), height: read("height", element.offsetHeight) };
+  }
   function getShapeType(el) {
     for (const cls of el.classList) {
       const m = cls.match(/^shape-(.+)$/);
@@ -3492,8 +3509,7 @@ var EditableModule = (() => {
       this.container = null;
       this.type = element.classList?.contains("shape-wrapper") ? "shape" : element.tagName.toLowerCase();
       this.syncHeight = true;
-      let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
-      let height = element.style.height ? parseFloat(element.style.height) : element.offsetHeight;
+      let { width, height } = readElementSize(element);
       if (this.type === "img" && (width === 0 || height === 0)) {
         width = element.naturalWidth || width;
         height = element.naturalHeight || height;
@@ -3636,8 +3652,7 @@ var EditableModule = (() => {
         const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
         this.state.rotation = rotateMatch ? parseFloat(rotateMatch[1]) : 0;
       }
-      this.state.width = this.element.style.width ? parseFloat(this.element.style.width) : this.element.offsetWidth;
-      this.state.height = this.element.style.height ? parseFloat(this.element.style.height) : this.element.offsetHeight;
+      Object.assign(this.state, readElementSize(this.element));
       if (this.type === "div") {
         if (this.element.style.fontSize) {
           this.state.fontSize = parseFloat(this.element.style.fontSize);
@@ -5635,8 +5650,8 @@ var EditableModule = (() => {
       const blot = Registry.find(this.domNode);
       if (blot == null)
         return;
-      const attributes = Attributor.keys(this.domNode), classes = ClassAttributor$1.keys(this.domNode), styles = StyleAttributor$1.keys(this.domNode);
-      attributes.concat(classes).concat(styles).forEach((name) => {
+      const attributes2 = Attributor.keys(this.domNode), classes = ClassAttributor$1.keys(this.domNode), styles = StyleAttributor$1.keys(this.domNode);
+      attributes2.concat(classes).concat(styles).forEach((name) => {
         const attr = blot.scroll.query(name, Scope.ATTRIBUTE);
         attr instanceof Attributor && (this.attributes[attr.attrName] = attr);
       });
@@ -5654,7 +5669,7 @@ var EditableModule = (() => {
     }
     values() {
       return Object.keys(this.attributes).reduce(
-        (attributes, name) => (attributes[name] = this.attributes[name].value(this.domNode), attributes),
+        (attributes2, name) => (attributes2[name] = this.attributes[name].value(this.domNode), attributes2),
         {}
       );
     }
@@ -7060,11 +7075,11 @@ var EditableModule = (() => {
       if ("isConnected" in root2 && !root2.isConnected) {
         return [null, null];
       }
-      const normalized = this.getNativeRange();
-      if (normalized == null)
+      const normalized2 = this.getNativeRange();
+      if (normalized2 == null)
         return [null, null];
-      const range = this.normalizedToRange(normalized);
-      return [range, normalized];
+      const range = this.normalizedToRange(normalized2);
+      return [range, normalized2];
     }
     hasFocus() {
       return document.activeElement === this.root || document.activeElement != null && contains(this.root, document.activeElement);
@@ -7247,7 +7262,7 @@ var EditableModule = (() => {
       const normalizedOps = splitOpLines(normalizedDelta.ops.slice());
       normalizedOps.reduce((index, op) => {
         const length = import_quill_delta2.Op.length(op);
-        let attributes = op.attributes || {};
+        let attributes2 = op.attributes || {};
         let isImplicitNewlinePrepended = false;
         let isImplicitNewlineAppended = false;
         if (op.insert != null) {
@@ -7264,7 +7279,7 @@ var EditableModule = (() => {
                 formats = merge_default(formats, bubbleFormats(leaf));
               }
             }
-            attributes = import_quill_delta2.AttributeMap.diff(formats, attributes) || {};
+            attributes2 = import_quill_delta2.AttributeMap.diff(formats, attributes2) || {};
           } else if (typeof op.insert === "object") {
             const key = Object.keys(op.insert)[0];
             if (key == null)
@@ -7290,7 +7305,7 @@ var EditableModule = (() => {
               const [leaf] = this.scroll.descendant(LeafBlot$1, index);
               if (leaf) {
                 const formats = merge_default({}, bubbleFormats(leaf));
-                attributes = import_quill_delta2.AttributeMap.diff(formats, attributes) || {};
+                attributes2 = import_quill_delta2.AttributeMap.diff(formats, attributes2) || {};
               }
             }
           }
@@ -7304,8 +7319,8 @@ var EditableModule = (() => {
             this.scroll.updateEmbedAt(index, key, op.retain[key]);
           }
         }
-        Object.keys(attributes).forEach((name) => {
-          this.scroll.formatAt(index, length, name, attributes[name]);
+        Object.keys(attributes2).forEach((name) => {
+          this.scroll.formatAt(index, length, name, attributes2[name]);
         });
         const prependedLength = isImplicitNewlinePrepended ? 1 : 0;
         const addedLength = isImplicitNewlineAppended ? 1 : 0;
@@ -8132,22 +8147,22 @@ var EditableModule = (() => {
     }
     getBounds(index) {
       let length = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 0;
-      let bounds = null;
+      let bounds2 = null;
       if (typeof index === "number") {
-        bounds = this.selection.getBounds(index, length);
+        bounds2 = this.selection.getBounds(index, length);
       } else {
-        bounds = this.selection.getBounds(index.index, index.length);
+        bounds2 = this.selection.getBounds(index.index, index.length);
       }
-      if (!bounds)
+      if (!bounds2)
         return null;
       const containerBounds = this.container.getBoundingClientRect();
       return {
-        bottom: bounds.bottom - containerBounds.top,
-        height: bounds.height,
-        left: bounds.left - containerBounds.left,
-        right: bounds.right - containerBounds.left,
-        top: bounds.top - containerBounds.top,
-        width: bounds.width
+        bottom: bounds2.bottom - containerBounds.top,
+        height: bounds2.height,
+        left: bounds2.left - containerBounds.left,
+        right: bounds2.right - containerBounds.left,
+        top: bounds2.top - containerBounds.top,
+        width: bounds2.width
       };
     }
     getContents() {
@@ -8262,9 +8277,9 @@ var EditableModule = (() => {
      */
     scrollSelectionIntoView() {
       const range = this.selection.lastRange;
-      const bounds = range && this.selection.getBounds(range.index, range.length);
-      if (bounds) {
-        this.scrollRectIntoView(bounds);
+      const bounds2 = range && this.selection.getBounds(range.index, range.length);
+      if (bounds2) {
+        this.scrollRectIntoView(bounds2);
       }
     }
     setContents(delta) {
@@ -8591,9 +8606,9 @@ var EditableModule = (() => {
           this.insertAt(lineEndIndex - 1, "\n");
         }
         const formats = bubbleFormats(this.line(index)[0]);
-        const attributes = import_quill_delta4.AttributeMap.diff(formats, first.attributes) || {};
-        Object.keys(attributes).forEach((name) => {
-          this.formatAt(lineEndIndex - 1, 1, name, attributes[name]);
+        const attributes2 = import_quill_delta4.AttributeMap.diff(formats, first.attributes) || {};
+        Object.keys(attributes2).forEach((name) => {
+          this.formatAt(lineEndIndex - 1, 1, name, attributes2[name]);
         });
         index = lineEndIndex;
       }
@@ -8766,10 +8781,10 @@ var EditableModule = (() => {
       }
       return renderBlocks;
     }
-    createBlock(attributes, refBlot) {
+    createBlock(attributes2, refBlot) {
       let blotName;
       const formats = {};
-      Object.entries(attributes).forEach((_ref3) => {
+      Object.entries(attributes2).forEach((_ref3) => {
         let [key, value] = _ref3;
         const isBlockBlot = this.query(key, Scope.BLOCK & Scope.BLOT) != null;
         if (isBlockBlot) {
@@ -8778,7 +8793,7 @@ var EditableModule = (() => {
           formats[key] = value;
         }
       });
-      const block = this.create(blotName || this.statics.defaultChild.blotName, blotName ? attributes[blotName] : void 0);
+      const block = this.create(blotName || this.statics.defaultChild.blotName, blotName ? attributes2[blotName] : void 0);
       this.insertBefore(block, refBlot || void 0);
       const length = block.length();
       Object.entries(formats).forEach((_ref4) => {
@@ -8791,14 +8806,14 @@ var EditableModule = (() => {
   function insertInlineContents(parent, index, inlineContents) {
     inlineContents.reduce((index2, op) => {
       const length = import_quill_delta4.Op.length(op);
-      let attributes = op.attributes || {};
+      let attributes2 = op.attributes || {};
       if (op.insert != null) {
         if (typeof op.insert === "string") {
           const text = op.insert;
           parent.insertAt(index2, text);
           const [leaf] = parent.descendant(LeafBlot$1, index2);
           const formats = bubbleFormats(leaf);
-          attributes = import_quill_delta4.AttributeMap.diff(formats, attributes) || {};
+          attributes2 = import_quill_delta4.AttributeMap.diff(formats, attributes2) || {};
         } else if (typeof op.insert === "object") {
           const key = Object.keys(op.insert)[0];
           if (key == null)
@@ -8808,12 +8823,12 @@ var EditableModule = (() => {
           if (isInlineEmbed) {
             const [leaf] = parent.descendant(LeafBlot$1, index2);
             const formats = bubbleFormats(leaf);
-            attributes = import_quill_delta4.AttributeMap.diff(formats, attributes) || {};
+            attributes2 = import_quill_delta4.AttributeMap.diff(formats, attributes2) || {};
           }
         }
       }
-      Object.keys(attributes).forEach((key) => {
-        parent.formatAt(index2, length, key, attributes[key]);
+      Object.keys(attributes2).forEach((key) => {
+        parent.formatAt(index2, length, key, attributes2[key]);
       });
       return index2 + length;
     }, index);
@@ -9996,11 +10011,11 @@ ${escapeText(this.code(index, length))}
     };
   }
   function matchAttributor(node, delta, scroll) {
-    const attributes = Attributor.keys(node);
+    const attributes2 = Attributor.keys(node);
     const classes = ClassAttributor$1.keys(node);
     const styles = StyleAttributor$1.keys(node);
     const formats = {};
-    attributes.concat(classes).concat(styles).forEach((name) => {
+    attributes2.concat(classes).concat(styles).forEach((name) => {
       let attr = scroll.query(name, Scope.ATTRIBUTE);
       if (attr != null) {
         formats[attr.attrName] = attr.value(node);
@@ -10371,9 +10386,9 @@ ${escapeText(this.code(index, length))}
           native.setStart(position.offsetNode, position.offset);
           native.setEnd(position.offsetNode, position.offset);
         }
-        const normalized = native && quill.selection.normalizeNative(native);
-        if (normalized) {
-          const range = quill.selection.normalizedToRange(normalized);
+        const normalized2 = native && quill.selection.normalizeNative(native);
+        if (normalized2) {
+          const range = quill.selection.normalizedToRange(normalized2);
           if (e.dataTransfer?.files) {
             this.upload(range, e.dataTransfer.files);
           }
@@ -10470,8 +10485,8 @@ ${escapeText(this.code(index, length))}
       if (text == null) {
         return;
       }
-      const normalized = this.quill.selection.normalizeNative(staticRange);
-      const range = normalized ? this.quill.selection.normalizedToRange(normalized) : null;
+      const normalized2 = this.quill.selection.normalizeNative(staticRange);
+      const range = normalized2 ? this.quill.selection.normalizedToRange(normalized2) : null;
       if (range && this.replaceText(range, text)) {
         event.preventDefault();
       }
@@ -11019,14 +11034,14 @@ ${escapeText(this.code(index, length))}
           oldDelta.diff(delta).reduce((index, _ref) => {
             let {
               retain,
-              attributes
+              attributes: attributes2
             } = _ref;
             if (!retain)
               return index;
-            if (attributes) {
-              Object.keys(attributes).forEach((format) => {
+            if (attributes2) {
+              Object.keys(attributes2).forEach((format) => {
                 if ([SyntaxCodeBlock.blotName, CodeToken.blotName].includes(format)) {
-                  this.formatAt(index, retain, format, attributes[format]);
+                  this.formatAt(index, retain, format, attributes2[format]);
                 }
               });
             }
@@ -11094,26 +11109,26 @@ ${escapeText(this.code(index, length))}
       this.quill.on(Quill.events.SCROLL_BLOT_MOUNT, (blot) => {
         if (!(blot instanceof SyntaxCodeBlockContainer))
           return;
-        const select = this.quill.root.ownerDocument.createElement("select");
+        const select2 = this.quill.root.ownerDocument.createElement("select");
         this.options.languages.forEach((_ref3) => {
           let {
             key,
             label
           } = _ref3;
-          const option = select.ownerDocument.createElement("option");
+          const option = select2.ownerDocument.createElement("option");
           option.textContent = label;
           option.setAttribute("value", key);
-          select.appendChild(option);
+          select2.appendChild(option);
         });
-        select.addEventListener("change", () => {
-          blot.format(SyntaxCodeBlock.blotName, select.value);
+        select2.addEventListener("change", () => {
+          blot.format(SyntaxCodeBlock.blotName, select2.value);
           this.quill.root.focus();
           this.highlight(blot, true);
         });
         if (blot.uiNode == null) {
-          blot.attachUI(select);
+          blot.attachUI(select2);
           if (blot.children.head) {
-            select.value = SyntaxCodeBlock.formats(blot.children.head.domNode);
+            select2.value = SyntaxCodeBlock.formats(blot.children.head.domNode);
           }
         }
       });
@@ -11591,11 +11606,11 @@ ${escapeText(this.code(index, length))}
         if (input.tagName === "SELECT") {
           if (input.selectedIndex < 0)
             return;
-          const selected = input.options[input.selectedIndex];
-          if (selected.hasAttribute("selected")) {
+          const selected3 = input.options[input.selectedIndex];
+          if (selected3.hasAttribute("selected")) {
             value = false;
           } else {
-            value = selected.value || false;
+            value = selected3.value || false;
           }
         } else {
           if (input.classList.contains("ql-active")) {
@@ -11683,10 +11698,10 @@ ${escapeText(this.code(index, length))}
     if (!Array.isArray(groups[0])) {
       groups = [groups];
     }
-    groups.forEach((controls) => {
+    groups.forEach((controls2) => {
       const group = document.createElement("span");
       group.classList.add("ql-formats");
-      controls.forEach((control) => {
+      controls2.forEach((control) => {
         if (typeof control === "string") {
           addButton(group, control);
         } else {
@@ -11868,8 +11883,8 @@ ${escapeText(this.code(index, length))}
     element.setAttribute(attribute, `${!(element.getAttribute(attribute) === "true")}`);
   }
   var Picker = class {
-    constructor(select) {
-      this.select = select;
+    constructor(select2) {
+      this.select = select2;
       this.container = document.createElement("span");
       this.buildPicker();
       this.select.style.display = "none";
@@ -11973,11 +11988,11 @@ ${escapeText(this.code(index, length))}
     }
     selectItem(item) {
       let trigger = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : false;
-      const selected = this.container.querySelector(".ql-selected");
-      if (item === selected)
+      const selected3 = this.container.querySelector(".ql-selected");
+      if (item === selected3)
         return;
-      if (selected != null) {
-        selected.classList.remove("ql-selected");
+      if (selected3 != null) {
+        selected3.classList.remove("ql-selected");
       }
       if (item == null)
         return;
@@ -12018,8 +12033,8 @@ ${escapeText(this.code(index, length))}
 
   // node_modules/quill/ui/color-picker.js
   var ColorPicker = class extends picker_default {
-    constructor(select, label) {
-      super(select);
+    constructor(select2, label) {
+      super(select2);
       this.label.innerHTML = label;
       this.container.classList.add("ql-color-picker");
       Array.from(this.container.querySelectorAll(".ql-picker-item")).slice(0, 7).forEach((item) => {
@@ -12048,8 +12063,8 @@ ${escapeText(this.code(index, length))}
 
   // node_modules/quill/ui/icon-picker.js
   var IconPicker = class extends picker_default {
-    constructor(select, icons) {
-      super(select);
+    constructor(select2, icons) {
+      super(select2);
       this.container.classList.add("ql-icon-picker");
       Array.from(this.container.querySelectorAll(".ql-picker-item")).forEach((item) => {
         item.innerHTML = icons[item.getAttribute("data-value") || ""];
@@ -12183,32 +12198,32 @@ ${escapeText(this.code(index, length))}
       });
     }
     buildPickers(selects, icons) {
-      this.pickers = Array.from(selects).map((select) => {
-        if (select.classList.contains("ql-align")) {
-          if (select.querySelector("option") == null) {
-            fillSelect(select, ALIGNS);
+      this.pickers = Array.from(selects).map((select2) => {
+        if (select2.classList.contains("ql-align")) {
+          if (select2.querySelector("option") == null) {
+            fillSelect(select2, ALIGNS);
           }
           if (typeof icons.align === "object") {
-            return new icon_picker_default(select, icons.align);
+            return new icon_picker_default(select2, icons.align);
           }
         }
-        if (select.classList.contains("ql-background") || select.classList.contains("ql-color")) {
-          const format = select.classList.contains("ql-background") ? "background" : "color";
-          if (select.querySelector("option") == null) {
-            fillSelect(select, COLORS, format === "background" ? "#ffffff" : "#000000");
+        if (select2.classList.contains("ql-background") || select2.classList.contains("ql-color")) {
+          const format = select2.classList.contains("ql-background") ? "background" : "color";
+          if (select2.querySelector("option") == null) {
+            fillSelect(select2, COLORS, format === "background" ? "#ffffff" : "#000000");
           }
-          return new color_picker_default(select, icons[format]);
+          return new color_picker_default(select2, icons[format]);
         }
-        if (select.querySelector("option") == null) {
-          if (select.classList.contains("ql-font")) {
-            fillSelect(select, FONTS);
-          } else if (select.classList.contains("ql-header")) {
-            fillSelect(select, HEADERS);
-          } else if (select.classList.contains("ql-size")) {
-            fillSelect(select, SIZES);
+        if (select2.querySelector("option") == null) {
+          if (select2.classList.contains("ql-font")) {
+            fillSelect(select2, FONTS);
+          } else if (select2.classList.contains("ql-header")) {
+            fillSelect(select2, HEADERS);
+          } else if (select2.classList.contains("ql-size")) {
+            fillSelect(select2, SIZES);
           }
         }
-        return new picker_default(select);
+        return new picker_default(select2);
       });
       const update = () => {
         this.pickers.forEach((picker) => {
@@ -12270,7 +12285,7 @@ ${escapeText(this.code(index, length))}
       this.restoreFocus();
     }
     edit() {
-      let mode = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : "link";
+      let mode2 = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : "link";
       let preview = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : null;
       this.root.classList.remove("ql-hidden");
       this.root.classList.add("ql-editing");
@@ -12278,16 +12293,16 @@ ${escapeText(this.code(index, length))}
         return;
       if (preview != null) {
         this.textbox.value = preview;
-      } else if (mode !== this.root.getAttribute("data-mode")) {
+      } else if (mode2 !== this.root.getAttribute("data-mode")) {
         this.textbox.value = "";
       }
-      const bounds = this.quill.getBounds(this.quill.selection.savedRange);
-      if (bounds != null) {
-        this.position(bounds);
+      const bounds2 = this.quill.getBounds(this.quill.selection.savedRange);
+      if (bounds2 != null) {
+        this.position(bounds2);
       }
       this.textbox.select();
-      this.textbox.setAttribute("placeholder", this.textbox.getAttribute(`data-${mode}`) || "");
-      this.root.setAttribute("data-mode", mode);
+      this.textbox.setAttribute("placeholder", this.textbox.getAttribute(`data-${mode2}`) || "");
+      this.root.setAttribute("data-mode", mode2);
     }
     restoreFocus() {
       this.quill.focus({
@@ -12352,7 +12367,7 @@ ${escapeText(this.code(index, length))}
     }
     return url;
   }
-  function fillSelect(select, values) {
+  function fillSelect(select2, values) {
     let defaultValue = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : false;
     values.forEach((value) => {
       const option = document.createElement("option");
@@ -12361,7 +12376,7 @@ ${escapeText(this.code(index, length))}
       } else {
         option.setAttribute("value", String(value));
       }
-      select.appendChild(option);
+      select2.appendChild(option);
     });
   }
 
@@ -12373,8 +12388,8 @@ ${escapeText(this.code(index, length))}
   }, "blockquote"]];
   var BubbleTooltip = class extends BaseTooltip {
     static TEMPLATE = ['<span class="ql-tooltip-arrow"></span>', '<div class="ql-tooltip-editor">', '<input type="text" data-formula="e=mc^2" data-link="https://quilljs.com" data-video="Embed URL">', '<a class="ql-close"></a>', "</div>"].join("");
-    constructor(quill, bounds) {
-      super(quill, bounds);
+    constructor(quill, bounds2) {
+      super(quill, bounds2);
       this.quill.on(emitter_default.events.EDITOR_CHANGE, (type, range, oldRange, source) => {
         if (type !== emitter_default.events.SELECTION_CHANGE)
           return;
@@ -12385,9 +12400,9 @@ ${escapeText(this.code(index, length))}
           this.root.style.width = `${this.root.offsetWidth}px`;
           const lines = this.quill.getLines(range.index, range.length);
           if (lines.length === 1) {
-            const bounds2 = this.quill.getBounds(range);
-            if (bounds2 != null) {
-              this.position(bounds2);
+            const bounds3 = this.quill.getBounds(range);
+            if (bounds3 != null) {
+              this.position(bounds3);
             }
           } else {
             const lastLine = lines[lines.length - 1];
@@ -12414,9 +12429,9 @@ ${escapeText(this.code(index, length))}
             return;
           const range = this.quill.getSelection();
           if (range != null) {
-            const bounds = this.quill.getBounds(range);
-            if (bounds != null) {
-              this.position(bounds);
+            const bounds2 = this.quill.getBounds(range);
+            if (bounds2 != null) {
+              this.position(bounds2);
             }
           }
         }, 1);
@@ -12510,9 +12525,9 @@ ${escapeText(this.code(index, length))}
             this.preview.textContent = preview;
             this.preview.setAttribute("href", preview);
             this.show();
-            const bounds = this.quill.getBounds(this.linkRange);
-            if (bounds != null) {
-              this.position(bounds);
+            const bounds2 = this.quill.getBounds(this.linkRange);
+            if (bounds2 != null) {
+              this.position(bounds2);
             }
             return;
           }
@@ -12669,9 +12684,9 @@ ${escapeText(this.code(index, length))}
   function normalizeColor(color) {
     if (!color)
       return color;
-    let normalized = color.trim().toLowerCase();
-    if (normalized.startsWith("rgb")) {
-      const hex = rgbToHex(normalized);
+    let normalized2 = color.trim().toLowerCase();
+    if (normalized2.startsWith("rgb")) {
+      const hex = rgbToHex(normalized2);
       if (hex)
         return hex.toLowerCase();
     }
@@ -12696,12 +12711,12 @@ ${escapeText(this.code(index, length))}
       orange: "#ffa500",
       transparent: "#00000000"
     };
-    if (namedColors[normalized])
-      return namedColors[normalized];
-    if (normalized.match(/^#[0-9a-f]{3}$/i)) {
-      return "#" + normalized[1] + normalized[1] + normalized[2] + normalized[2] + normalized[3] + normalized[3];
+    if (namedColors[normalized2])
+      return namedColors[normalized2];
+    if (normalized2.match(/^#[0-9a-f]{3}$/i)) {
+      return "#" + normalized2[1] + normalized2[1] + normalized2[2] + normalized2[2] + normalized2[3] + normalized2[3];
     }
-    return normalized;
+    return normalized2;
   }
   function getBrandColorOutput(colorVal) {
     if (!window._quarto_brand_color_names) {
@@ -14949,9 +14964,9 @@ ${escapeText(this.code(index, length))}
   }
   function buildTypeControl(addCell) {
     const cell = addCell("Shape");
-    const select = document.createElement("select");
-    select.className = "shape-toolbar-select shape-toolbar-type";
-    select.title = "Shape type";
+    const select2 = document.createElement("select");
+    select2.className = "shape-toolbar-select shape-toolbar-type";
+    select2.title = "Shape type";
     for (const group of SHAPE_GROUPS) {
       const og = document.createElement("optgroup");
       og.label = group.group;
@@ -14961,18 +14976,18 @@ ${escapeText(this.code(index, length))}
         opt.textContent = item.label;
         og.appendChild(opt);
       }
-      select.appendChild(og);
+      select2.appendChild(og);
     }
-    select.addEventListener("change", () => {
+    select2.addEventListener("change", () => {
       pushUndoState();
       withActiveShape((el) => {
-        el.setState({ shapeType: select.value });
+        el.setState({ shapeType: select2.value });
         updateShapeStylePanel(activeShape);
         syncDirectionHandle();
       });
     });
-    shapeControlRefs.typeSelect = select;
-    cell.appendChild(select);
+    shapeControlRefs.typeSelect = select2;
+    cell.appendChild(select2);
   }
   function buildColorControl(addCell, labelText, prop) {
     const cell = addCell(labelText);
@@ -15007,21 +15022,21 @@ ${escapeText(this.code(index, length))}
   }
   function buildWidthControl(addCell) {
     const cell = addCell("Width");
-    const select = document.createElement("select");
-    select.className = "shape-toolbar-select shape-toolbar-width";
-    select.title = "Stroke width";
+    const select2 = document.createElement("select");
+    select2.className = "shape-toolbar-select shape-toolbar-width";
+    select2.title = "Stroke width";
     for (const [value, label] of [["", "Default"], ["sm", "S"], ["md", "M"], ["lg", "L"], ["xl", "XL"]]) {
       const opt = document.createElement("option");
       opt.value = value;
       opt.textContent = label;
-      select.appendChild(opt);
+      select2.appendChild(opt);
     }
-    select.addEventListener("change", () => {
+    select2.addEventListener("change", () => {
       pushUndoState();
-      withActiveShape((el) => el.setState({ strokeWidth: select.value || null }));
+      withActiveShape((el) => el.setState({ strokeWidth: select2.value || null }));
     });
-    shapeControlRefs.widthSelect = select;
-    cell.appendChild(select);
+    shapeControlRefs.widthSelect = select2;
+    cell.appendChild(select2);
   }
   function buildTextControl(addCell) {
     const cell = addCell("Text");
@@ -15041,25 +15056,25 @@ ${escapeText(this.code(index, length))}
   }
   function buildDirectionControl(addCell) {
     const cell = addCell("Direction");
-    const select = document.createElement("select");
-    select.className = "shape-toolbar-select shape-toolbar-direction";
-    select.title = "Callout pointer direction";
+    const select2 = document.createElement("select");
+    select2.className = "shape-toolbar-select shape-toolbar-direction";
+    select2.title = "Callout pointer direction";
     for (const [value, label] of [["up", "Up"], ["right", "Right"], ["down", "Down"], ["left", "Left"], ["45", "\u2197 45\xB0"], ["135", "\u2198 135\xB0"], ["225", "\u2199 225\xB0"], ["315", "\u2196 315\xB0"]]) {
       const opt = document.createElement("option");
       opt.value = value;
       opt.textContent = label;
-      select.appendChild(opt);
+      select2.appendChild(opt);
     }
-    select.addEventListener("change", () => {
+    select2.addEventListener("change", () => {
       pushUndoState();
       withActiveShape((el) => {
-        el.setState({ direction: select.value });
+        el.setState({ direction: select2.value });
         positionDirectionHandle();
       });
     });
     shapeControlRefs.directionCell = cell;
-    shapeControlRefs.directionSelect = select;
-    cell.appendChild(select);
+    shapeControlRefs.directionSelect = select2;
+    cell.appendChild(select2);
   }
 
   // src/toolbar.js
@@ -15496,6 +15511,75 @@ ${escapeText(this.code(index, length))}
   function registerRestoreArrowDOM(fn) {
     restoreArrowDOMFn = fn;
   }
+  function notifyHistoryChange(restored = false) {
+    if (typeof document === "undefined" || typeof CustomEvent === "undefined")
+      return;
+    document.dispatchEvent(new CustomEvent("editable-history-change", {
+      detail: { canUndo: canUndo(), canRedo: canRedo() }
+    }));
+    if (restored)
+      document.dispatchEvent(new CustomEvent("editable-content-restored"));
+  }
+  function captureDOM(root2) {
+    const nodes = [];
+    const visit = (node) => {
+      const children = [...node.childNodes];
+      nodes.push({
+        node,
+        children,
+        attributes: node !== root2 && node.attributes ? [...node.attributes].map((attribute) => [attribute.name, attribute.value]) : null,
+        text: node.nodeType === 3 ? node.nodeValue : null
+      });
+      children.forEach(visit);
+    };
+    visit(root2);
+    return { root: root2, nodes, registry: new Map(editableRegistry) };
+  }
+  function restoreDOM(snapshot) {
+    for (const { node, children, attributes: attributes2, text } of snapshot.nodes) {
+      if (attributes2) {
+        const fragment = node.classList.contains("fragment");
+        const visible2 = node.classList.contains("visible");
+        const current = node.classList.contains("current-fragment");
+        const target = new Map(attributes2);
+        for (const attribute of [...node.attributes]) {
+          if (!target.has(attribute.name))
+            node.removeAttribute(attribute.name);
+        }
+        for (const [name, value] of attributes2) {
+          if (node.getAttribute(name) !== value)
+            node.setAttribute(name, value);
+        }
+        if (fragment) {
+          node.classList.toggle("visible", visible2);
+          node.classList.toggle("current-fragment", current);
+        }
+      }
+      if (text !== null)
+        node.nodeValue = text;
+      const currentChildren = [...node.childNodes];
+      if (children.length !== currentChildren.length || children.some((child, index) => child !== currentChildren[index])) {
+        node.replaceChildren(...children);
+      }
+    }
+    editableRegistry.clear();
+    for (const [element, editableElt] of snapshot.registry)
+      editableRegistry.set(element, editableElt);
+  }
+  function captureSnapshot(root2 = null) {
+    return {
+      elements: captureAllState(),
+      arrows: captureArrowState(),
+      dom: root2 ? captureDOM(root2) : null
+    };
+  }
+  function restoreSnapshot(snapshot) {
+    if (snapshot.dom)
+      restoreDOM(snapshot.dom);
+    restoreState(snapshot.elements);
+    restoreArrowState(snapshot.arrows);
+    notifyHistoryChange(true);
+  }
   function captureAllState() {
     const snapshots = [];
     for (const [element, editableElt] of editableRegistry) {
@@ -15556,41 +15640,29 @@ ${escapeText(this.code(index, length))}
       }
     }
   }
-  function pushUndoState() {
-    const state = {
-      elements: captureAllState(),
-      arrows: captureArrowState()
-    };
+  function pushUndoState({ root: root2 = null } = {}) {
+    const state = captureSnapshot(root2);
     undoStack.push(state);
     if (undoStack.length > CONFIG.MAX_UNDO_STACK_SIZE) {
       undoStack.shift();
     }
     redoStack.length = 0;
+    notifyHistoryChange();
   }
   function undo() {
     if (undoStack.length === 0)
       return false;
-    const currentState = {
-      elements: captureAllState(),
-      arrows: captureArrowState()
-    };
-    redoStack.push(currentState);
     const previousState = undoStack.pop();
-    restoreState(previousState.elements);
-    restoreArrowState(previousState.arrows);
+    redoStack.push(captureSnapshot(previousState.dom?.root));
+    restoreSnapshot(previousState);
     return true;
   }
   function redo() {
     if (redoStack.length === 0)
       return false;
-    const currentState = {
-      elements: captureAllState(),
-      arrows: captureArrowState()
-    };
-    undoStack.push(currentState);
     const redoState = redoStack.pop();
-    restoreState(redoState.elements);
-    restoreArrowState(redoState.arrows);
+    undoStack.push(captureSnapshot(redoState.dom?.root));
+    restoreSnapshot(redoState);
     return true;
   }
   function canUndo() {
@@ -15601,18 +15673,18 @@ ${escapeText(this.code(index, length))}
   }
   function setupUndoRedoKeyboard() {
     document.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-        if (document.activeElement.contentEditable === "true")
-          return;
+      const target = document.activeElement;
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"]'))
+        return;
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && key === "z" && !e.shiftKey) {
         e.preventDefault();
         if (undo()) {
           debug("Undo performed");
         }
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "z" && e.shiftKey)) {
-        if (document.activeElement.contentEditable === "true")
-          return;
+      if ((e.ctrlKey || e.metaKey) && (key === "y" || key === "z" && e.shiftKey)) {
         e.preventDefault();
         if (redo()) {
           debug("Redo performed");
@@ -15652,14 +15724,16 @@ ${escapeText(this.code(index, length))}
             return;
           if (e.target.closest(".ql-picker") || e.target.classList.contains("ql-picker-item"))
             return;
-          pushUndoState();
+          context.dragRecorded = false;
           context.cachedScale = getSlideScale();
           context.isDragging = true;
           const coords = getClientCoordinates(e, context.cachedScale);
           context.dragStartX = coords.clientX;
           context.dragStartY = coords.clientY;
-          context.dragInitialX = container.offsetLeft;
-          context.dragInitialY = container.offsetTop;
+          context.editableElt.syncFromDOM();
+          const position = context.editableElt.getState();
+          context.dragInitialX = position.x;
+          context.dragInitialY = position.y;
           e.preventDefault();
         };
         element.addEventListener("mousedown", startDrag);
@@ -15672,6 +15746,12 @@ ${escapeText(this.code(index, length))}
         const coords = getClientCoordinates(e, context.cachedScale);
         const deltaX = coords.clientX - context.dragStartX;
         const deltaY = coords.clientY - context.dragStartY;
+        if (!context.dragRecorded) {
+          if (Math.hypot(deltaX, deltaY) * context.cachedScale < 3)
+            return;
+          pushUndoState();
+          context.dragRecorded = true;
+        }
         context.container.style.left = context.dragInitialX + deltaX + "px";
         context.container.style.top = context.dragInitialY + deltaY + "px";
         e.preventDefault();
@@ -15745,7 +15825,7 @@ ${escapeText(this.code(index, length))}
       attachEvents(context) {
         const { container, element } = context;
         const startResize = (e) => {
-          pushUndoState();
+          context.resizeRecorded = false;
           context.cachedScale = getSlideScale();
           context.isResizing = true;
           context.resizeHandle = e.target.dataset.position;
@@ -15754,8 +15834,10 @@ ${escapeText(this.code(index, length))}
           context.resizeStartY = coords.clientY;
           context.resizeInitialWidth = element.offsetWidth;
           context.resizeInitialHeight = element.offsetHeight;
-          context.resizeInitialX = container.offsetLeft;
-          context.resizeInitialY = container.offsetTop;
+          context.editableElt.syncFromDOM();
+          const position = context.editableElt.getState();
+          context.resizeInitialX = position.x;
+          context.resizeInitialY = position.y;
           e.preventDefault();
           e.stopPropagation();
         };
@@ -15772,6 +15854,12 @@ ${escapeText(this.code(index, length))}
         const coords = getClientCoordinates(e, context.cachedScale);
         const deltaX = coords.clientX - context.resizeStartX;
         const deltaY = coords.clientY - context.resizeStartY;
+        if (!context.resizeRecorded) {
+          if (Math.hypot(deltaX, deltaY) * context.cachedScale < 3)
+            return;
+          pushUndoState();
+          context.resizeRecorded = true;
+        }
         let newWidth = context.resizeInitialWidth;
         let newHeight = context.resizeInitialHeight;
         let newX = context.resizeInitialX;
@@ -16160,9 +16248,34 @@ ${escapeText(this.code(index, length))}
   function setupDraggableElt(elt) {
     const editableElt = new EditableElement(elt);
     editableRegistry.set(elt, editableElt);
+    if (["img", "video"].includes(editableElt.type)) {
+      elt.style.width = editableElt.state.width + "px";
+      elt.style.height = editableElt.state.height + "px";
+    }
     const container = createEltContainer(elt);
     editableElt.container = container;
     setupEltStyles(elt);
+    if (elt._editableRawMediaLayout) {
+      const layout = elt._editableRawMediaLayout;
+      Object.assign(container.style, layout.flow);
+      container.style.position = layout.position;
+      container.style.left = layout.left + "px";
+      container.style.top = layout.top + "px";
+      container.style.width = (layout.outerWidth ?? layout.width) + "px";
+      container.style.height = (layout.outerHeight ?? layout.height) + "px";
+      if (layout.rotation)
+        container.style.transform = `rotate(${layout.rotation}deg)`;
+      elt.style.position = "relative";
+      elt.style.left = "0px";
+      elt.style.top = "0px";
+      elt.style.margin = "0";
+      elt.style.transform = elt.style.transform.replace(/rotate\([^)]*deg\)/g, "").trim();
+      elt.style.width = layout.width + "px";
+      elt.style.height = layout.height + "px";
+      elt.style.maxWidth = "none";
+      elt.style.maxHeight = "none";
+      editableElt.setState({ x: layout.left, y: layout.top, width: layout.width, height: layout.height, rotation: layout.rotation }, false);
+    }
     const context = {
       element: elt,
       container,
@@ -16355,6 +16468,36 @@ ${escapeText(this.code(index, length))}
   }
   function setupVideoWhenReady(video) {
     setupDraggableElt(video);
+  }
+
+  // src/source-slides.js
+  function sourceSlideHeadings(source) {
+    const headings = [];
+    let offset = 0;
+    let fence = null;
+    let frontmatter = false;
+    for (const line of source.match(/[^\n]*\n|[^\n]+$/g) || []) {
+      const text = line.replace(/\r?\n$/, "");
+      if (offset === 0 && text === "---")
+        frontmatter = true;
+      else if (frontmatter && /^(?:---|\.\.\.)\s*$/.test(text))
+        frontmatter = false;
+      else if (!frontmatter) {
+        const marker = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+        if (fence) {
+          if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim())
+            fence = null;
+        } else if (marker) {
+          fence = marker[1];
+        } else {
+          const heading = text.match(/^##[ \t]+(.+)$/);
+          if (heading)
+            headings.push({ start: offset, title: heading[1], line: text });
+        }
+      }
+      offset += line.length;
+    }
+    return headings;
   }
 
   // src/serialization.js
@@ -16932,24 +17075,1564 @@ ${fence}`;
     return dimensions.map((dim) => serializeToQmd(dim));
   }
   function splitIntoSlideChunks(text) {
-    let preamble = "";
-    let body = text;
-    if (text.startsWith("---\n")) {
-      const closingIdx = text.indexOf("\n---\n", 4);
-      if (closingIdx !== -1) {
-        const end = closingIdx + 5;
-        preamble = text.slice(0, end);
-        body = text.slice(end);
-      }
-    }
-    const parts = body.split(/(?=^## )/m);
-    const firstIsSlide = parts[0].startsWith("## ");
-    const preslide = firstIsSlide ? "" : parts[0];
-    const slideChunks = firstIsSlide ? parts : parts.slice(1);
-    return [preamble + preslide, ...slideChunks];
+    const starts = sourceSlideHeadings(text).map((heading) => heading.start);
+    return [text.slice(0, starts[0] ?? text.length), ...starts.map((start, index) => text.slice(start, starts[index + 1] ?? text.length))];
   }
   function applyModifiedSerializers(text, classifierRegistry) {
     return classifierRegistry.applySerializers(text);
+  }
+
+  // src/text-source.js
+  var VOID_TAGS = /* @__PURE__ */ new Set([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr"
+  ]);
+  var EXCLUDED_TAGS = /* @__PURE__ */ new Set(["script", "style", "svg", "math", "template"]);
+  var RAW_TEXT_TAGS = /* @__PURE__ */ new Set(["script", "style"]);
+  var ENTITIES = {
+    amp: "&",
+    quot: '"',
+    apos: "'",
+    lt: "<",
+    gt: ">",
+    nbsp: "\xA0",
+    ensp: "\u2002",
+    emsp: "\u2003",
+    thinsp: "\u2009",
+    hairsp: "\u200A",
+    Tab: "	",
+    NewLine: "\n",
+    ZeroWidthSpace: "\u200B"
+  };
+  function decodeEntity(entity) {
+    const body = entity.slice(1, -1);
+    if (Object.hasOwn(ENTITIES, body))
+      return ENTITIES[body];
+    if (!/^#(?:\d+|x[\da-f]+)$/i.test(body))
+      return entity;
+    const hex = /^#x/i.test(body);
+    const value = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10);
+    return value > 0 && value <= 1114111 && !(value >= 55296 && value <= 57343) ? String.fromCodePoint(value) : entity;
+  }
+  function decodeAttribute(value) {
+    return value.replace(/&(?:[a-z][\da-z]*|#\d+|#x[\da-f]+);/gi, decodeEntity);
+  }
+  function decodedAttributeOffsets(value) {
+    let decoded2 = "";
+    const offsets = [0];
+    for (let i = 0; i < value.length; ) {
+      const entity = value[i] === "&" ? value.slice(i).match(/^&(?:[a-z][\da-z]*|#\d+|#x[\da-f]+);/i)?.[0] : null;
+      const piece = entity ? decodeEntity(entity) : value[i];
+      const end = i + (entity ? entity.length : 1);
+      decoded2 += piece;
+      for (let j = 0; j < piece.length; j++)
+        offsets.push(j === piece.length - 1 ? end : i);
+      i = end;
+    }
+    return { decoded: decoded2, offsets };
+  }
+  function escapeAttribute(value, quote = '"') {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(quote === "'" ? /'/g : /"/g, quote === "'" ? "&#39;" : "&quot;");
+  }
+  function readTag(source, start) {
+    const match2 = source.slice(start).match(/^<(\/?)([a-z][\da-z:-]*)(?=[\s/>])/i);
+    if (!match2)
+      return null;
+    let quote = null;
+    for (let i = start + match2[0].length; i < source.length; i++) {
+      const char = source[i];
+      if (quote) {
+        if (char === quote)
+          quote = null;
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if (char === ">") {
+        const literal = source.slice(start, i + 1);
+        if (match2[1] && !/^<\/[a-z][\da-z:-]*\s*>$/i.test(literal))
+          return null;
+        return {
+          tagName: match2[2].toLowerCase(),
+          start,
+          end: i + 1,
+          closing: !!match2[1],
+          selfClosing: /\/\s*>$/.test(literal)
+        };
+      }
+    }
+    return null;
+  }
+  function attributes(opening) {
+    const result = [];
+    let i = opening.match(/^<[a-z][\da-z:-]*/i)?.[0].length ?? opening.length;
+    while (i < opening.length) {
+      while (/\s/.test(opening[i] ?? "") && i < opening.length)
+        i++;
+      if (opening[i] === ">" || /^\/\s*>/.test(opening.slice(i)))
+        break;
+      const start = i;
+      while (i < opening.length && !/[\s=<>/]/.test(opening[i]))
+        i++;
+      if (i === start) {
+        i++;
+        continue;
+      }
+      const name = opening.slice(start, i).toLowerCase();
+      const nameEnd = i;
+      while (/\s/.test(opening[i] ?? "") && i < opening.length)
+        i++;
+      let value = null;
+      let quote = null;
+      let valueStart = i;
+      let valueEnd = i;
+      if (opening[i] === "=") {
+        i++;
+        while (/\s/.test(opening[i] ?? "") && i < opening.length)
+          i++;
+        quote = opening[i] === '"' || opening[i] === "'" ? opening[i++] : null;
+        valueStart = i;
+        if (quote) {
+          while (i < opening.length && opening[i] !== quote)
+            i++;
+        } else {
+          while (i < opening.length && !/[\s>]/.test(opening[i]))
+            i++;
+        }
+        valueEnd = i;
+        value = opening.slice(valueStart, valueEnd);
+        if (quote && opening[i] === quote)
+          i++;
+      } else {
+        i = nameEnd;
+      }
+      result.push({ name, start, end: i, value, quote, valueStart, valueEnd });
+    }
+    return result;
+  }
+  function meaningful(text) {
+    return /[^\s\u200b-\u200d\u2060\ufeff]/u.test(decodeAttribute(text));
+  }
+  function lineEnd(source, start) {
+    const end = source.indexOf("\n", start);
+    return end < 0 ? source.length : end + 1;
+  }
+  function fenceAt(source, start) {
+    const end = lineEnd(source, start);
+    const match2 = source.slice(start, end).match(/^[ \t]{0,3}(`{3,}|~{3,})([^\r\n]*)\r?\n?$/);
+    if (!match2)
+      return null;
+    return { marker: match2[1][0], length: match2[1].length, info: match2[2].trim(), end };
+  }
+  function closingFence(fence, current) {
+    return current && current.marker === fence.marker && current.length >= fence.length && !current.info;
+  }
+  function htmlTextElements(chunk) {
+    const stack = [];
+    const records = [];
+    const ordinals = /* @__PURE__ */ new Map();
+    let fence = null;
+    let i = 0;
+    while (i < chunk.length) {
+      const inCode = stack.some((frame) => frame.tagName === "pre" || frame.tagName === "code");
+      const excluded = stack.some((frame) => frame.excluded);
+      if (!inCode && !excluded && (i === 0 || chunk[i - 1] === "\n")) {
+        const current = fenceAt(chunk, i);
+        if (fence && closingFence(fence, current)) {
+          fence = null;
+          i = current.end;
+          continue;
+        }
+        if (!fence && current && !(current.marker === "`" && current.info.includes("`"))) {
+          fence = current;
+          i = current.end;
+          if (!/^\{\s*=\s*html\s*\}$/i.test(current.info)) {
+            while (i < chunk.length) {
+              const closing = fenceAt(chunk, i);
+              if (closingFence(fence, closing)) {
+                i = closing.end;
+                fence = null;
+                break;
+              }
+              i = lineEnd(chunk, i);
+            }
+          }
+          continue;
+        }
+      }
+      if (chunk.startsWith("<!--", i)) {
+        const end2 = chunk.indexOf("-->", i + 4);
+        i = end2 < 0 ? chunk.length : end2 + 3;
+        continue;
+      }
+      if (chunk[i] === "<") {
+        const token = readTag(chunk, i);
+        if (token) {
+          if (token.closing) {
+            let matching = stack.length - 1;
+            while (matching >= 0 && stack[matching].tagName !== token.tagName)
+              matching--;
+            if (matching >= 0) {
+              const frame = stack[matching];
+              const balanced = matching === stack.length - 1;
+              stack.length = matching;
+              if (balanced && frame.recordable && frame.hasText && !frame.hasCodeChild) {
+                if (frame.tagName === "code") {
+                  for (const ancestor of stack)
+                    if (ancestor.tagName === "pre")
+                      ancestor.hasCodeChild = true;
+                }
+                const opening = chunk.slice(frame.start, frame.openEnd);
+                const attrs = attributes(opening);
+                const attr = (name) => {
+                  const value = attrs.find((item) => item.name === name)?.value;
+                  return value == null ? null : decodeAttribute(value);
+                };
+                records.push({
+                  tagName: frame.tagName,
+                  opening,
+                  inner: chunk.slice(frame.openEnd, i),
+                  literal: chunk.slice(frame.start, token.end),
+                  start: frame.start,
+                  openEnd: frame.openEnd,
+                  closeStart: i,
+                  end: token.end,
+                  id: attr("data-editable-text-id"),
+                  elementId: attr("id"),
+                  classes: (attr("class") ?? "").split(/\s+/).filter(Boolean),
+                  ordinal: frame.ordinal,
+                  textRuns: frame.textRuns
+                });
+              }
+            }
+          } else if (RAW_TEXT_TAGS.has(token.tagName)) {
+            const close = new RegExp(`</${token.tagName}\\s*>`, "gi");
+            close.lastIndex = token.end;
+            const match2 = close.exec(chunk);
+            i = match2 ? close.lastIndex : chunk.length;
+            continue;
+          } else if (!VOID_TAGS.has(token.tagName)) {
+            const isExcluded = excluded || EXCLUDED_TAGS.has(token.tagName);
+            const codeParent = stack.some((frame) => frame.tagName === "code");
+            const recordable = !isExcluded && (!inCode || token.tagName === "code" && !codeParent);
+            const ordinal = recordable ? ordinals.get(token.tagName) ?? 0 : -1;
+            if (recordable)
+              ordinals.set(token.tagName, ordinal + 1);
+            if (token.selfClosing) {
+              i = token.end;
+              continue;
+            }
+            stack.push({
+              tagName: token.tagName,
+              start: i,
+              openEnd: token.end,
+              excluded: isExcluded,
+              recordable,
+              ordinal,
+              hasText: false,
+              hasCodeChild: false,
+              textRuns: []
+            });
+          }
+          i = token.end;
+          continue;
+        }
+        if (/^<!|^<\?/.test(chunk.slice(i, i + 2))) {
+          const end2 = chunk.indexOf(">", i + 2);
+          i = end2 < 0 ? chunk.length : end2 + 1;
+          continue;
+        }
+      }
+      let end = i + 1;
+      while (end < chunk.length && chunk[end] !== "<" && chunk[end - 1] !== "\n")
+        end++;
+      if (!excluded) {
+        const direct = stack[stack.length - 1];
+        if (direct?.recordable) {
+          const previous = direct.textRuns[direct.textRuns.length - 1];
+          if (previous?.end === i) {
+            previous.end = end;
+            previous.literal += chunk.slice(i, end);
+          } else {
+            direct.textRuns.push({ start: i, end, literal: chunk.slice(i, end) });
+          }
+        }
+        if (meaningful(chunk.slice(i, end))) {
+          for (const frame of stack)
+            if (!frame.excluded)
+              frame.hasText = true;
+        }
+      }
+      i = end;
+    }
+    return records.sort((a, b) => a.start - b.start);
+  }
+  function cssSeparators(text, separator) {
+    const result = [];
+    let quote = null;
+    let depth = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (quote) {
+        if (char === "\\")
+          i++;
+        else if (char === quote)
+          quote = null;
+      } else if (char === "\\") {
+        i++;
+      } else if (text.startsWith("/*", i)) {
+        const end = text.indexOf("*/", i + 2);
+        i = end < 0 ? text.length : end + 1;
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if ("([{".includes(char)) {
+        depth++;
+      } else if (")]}".includes(char)) {
+        depth = Math.max(0, depth - 1);
+      } else if (char === separator && depth === 0) {
+        result.push(i);
+      }
+    }
+    return result;
+  }
+  function cssDeclarations(text) {
+    const result = [];
+    let start = 0;
+    for (const end of [...cssSeparators(text, ";"), text.length]) {
+      const content = text.slice(start, end);
+      const colon = cssSeparators(content, ":")[0];
+      if (colon !== void 0) {
+        const property = content.slice(0, colon).replace(/\/\*[\s\S]*?\*\//g, "").trim();
+        if (/^(?:--[\w-]+|[-a-z][\w-]*)$/i.test(property)) {
+          const valueOffset = colon + 1;
+          const rawValue = content.slice(valueOffset);
+          const leading = rawValue.length - rawValue.trimStart().length;
+          const trailing = rawValue.length - rawValue.trimEnd().length;
+          result.push({
+            property,
+            key: property.startsWith("--") ? property : property.toLowerCase(),
+            value: rawValue.trim(),
+            valueStart: start + valueOffset + leading,
+            valueEnd: start + Math.max(valueOffset + leading, content.length - trailing)
+          });
+        }
+      }
+      start = end + 1;
+    }
+    return result;
+  }
+  function mergeStyle(rawStyle, quote, styleText, translate) {
+    const { decoded: decoded2, offsets } = decodedAttributeOffsets(rawStyle);
+    const existing = cssDeclarations(decoded2);
+    const updates = /* @__PURE__ */ new Map();
+    if (styleText !== void 0) {
+      if (typeof styleText !== "string")
+        throw new TypeError("styleText must be a CSS declaration string");
+      for (const declaration of cssDeclarations(styleText))
+        updates.set(declaration.key, declaration);
+    }
+    if (translate !== void 0) {
+      if (!translate || !Number.isFinite(translate.x) || !Number.isFinite(translate.y)) {
+        throw new TypeError("translate must contain finite numeric x and y coordinates");
+      }
+      updates.set("translate", { property: "translate", value: `${translate.x}px ${translate.y}px` });
+    }
+    const patches = [];
+    const found = /* @__PURE__ */ new Set();
+    for (const declaration of existing) {
+      const update = updates.get(declaration.key);
+      if (!update)
+        continue;
+      found.add(declaration.key);
+      patches.push({
+        start: offsets[declaration.valueStart],
+        end: offsets[declaration.valueEnd],
+        value: escapeAttribute(update.value, quote)
+      });
+    }
+    let result = rawStyle;
+    for (const patch of patches.sort((a, b) => b.start - a.start)) {
+      result = result.slice(0, patch.start) + patch.value + result.slice(patch.end);
+    }
+    const additions = [...updates].filter(([key]) => !found.has(key)).map(([, update]) => escapeAttribute(`${update.property}: ${update.value};`, quote));
+    if (additions.length) {
+      const end = result.trimEnd().length;
+      const prefix = result.slice(0, end);
+      result = prefix + (prefix ? /;$/.test(prefix) ? " " : "; " : "") + additions.join(" ") + result.slice(end);
+    }
+    return result;
+  }
+  function setAttribute(opening, name, encodedValue) {
+    const attr = attributes(opening).find((item) => item.name === name);
+    if (attr) {
+      if (attr.value !== null && attr.quote) {
+        return opening.slice(0, attr.valueStart) + encodedValue(attr.quote) + opening.slice(attr.valueEnd);
+      }
+      return opening.slice(0, attr.start) + `${name}="${encodedValue('"')}"` + opening.slice(attr.end);
+    }
+    const ending = opening.match(/\s*\/?\s*>$/);
+    const at = ending ? ending.index : opening.length - 1;
+    return opening.slice(0, at) + ` ${name}="${encodedValue('"')}"` + opening.slice(at);
+  }
+  function patchHtmlOpening(opening, { id, translate, styleText } = {}) {
+    const token = readTag(opening, 0);
+    if (!token || token.closing || token.end !== opening.length) {
+      throw new TypeError("Expected one complete HTML opening tag");
+    }
+    let result = opening;
+    if (id !== void 0) {
+      if (typeof id !== "string")
+        throw new TypeError("id must be a string");
+      result = setAttribute(result, "data-editable-text-id", (quote) => escapeAttribute(id, quote));
+    }
+    if (translate !== void 0 || styleText !== void 0) {
+      const attr = attributes(result).find((item) => item.name === "style");
+      const style = attr?.value ?? "";
+      result = setAttribute(result, "style", (quote) => mergeStyle(style, quote, styleText, translate));
+    }
+    return result;
+  }
+
+  // src/text-editing.js
+  var anchors = /* @__PURE__ */ new WeakMap();
+  var slideAnchors = /* @__PURE__ */ new WeakMap();
+  var sourceIds = /* @__PURE__ */ new Map();
+  var textRuns = /* @__PURE__ */ new WeakMap();
+  var selected = null;
+  var order = 0;
+  var eventsStarted = false;
+  var blocked = "script, style, svg, math, template, iframe, .ql-editor, .editable-toolbar, .editable-container, .slide-number, .notes";
+  var blockChildren = "div, p, pre, table, ul, ol, img, video, iframe, svg, button, input";
+  function withIdentity(anchor, suffix = "") {
+    const location2 = anchor.record ? `html:${anchor.record.tagName}:${anchor.record.ordinal}` : `${anchor.kind}:${anchor.original}`;
+    const key = `${anchor.chunkIndex}:${location2}${suffix}`;
+    if (!sourceIds.has(key))
+      sourceIds.set(key, anchor.record?.id || `text-${crypto.randomUUID()}`);
+    return { ...anchor, key, id: sourceIds.get(key) };
+  }
+  function normalized(text) {
+    return text.replace(/\s+/g, " ").trim();
+  }
+  function decoded(html) {
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    return normalized(template.content.textContent);
+  }
+  function escapeHTML(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function sameRecord(a, b) {
+    return a.tagName === b.tagName && a.elementId === b.elementId && a.classes.join(" ") === b.classes.join(" ") && decoded(a.inner) === decoded(b.inner);
+  }
+  function notifySelection() {
+    document.dispatchEvent(new CustomEvent("editable-text-selection-change"));
+  }
+  function select(element) {
+    selected?.classList.remove("editable-text-selected");
+    selected = element;
+    selected?.classList.add("editable-text-selected");
+    notifySelection();
+  }
+  function canEditSelectedText() {
+    return Boolean(selected?.isConnected && editableRegistry.get(selected)?.type === "plain-text");
+  }
+  function editSelectedText() {
+    if (canEditSelectedText())
+      editableRegistry.get(selected).edit();
+  }
+  function startEvents() {
+    if (eventsStarted)
+      return;
+    eventsStarted = true;
+    document.addEventListener("click", (event) => {
+      if (event.target.closest(".editable-toolbar, [data-editable-text-id], [contenteditable]"))
+        return;
+      select(null);
+    });
+    document.addEventListener("editable-content-restored", () => {
+      if (selected && !canEditSelectedText())
+        select(null);
+      notifySelection();
+    });
+  }
+  var InPlaceText = class {
+    constructor(element, anchor) {
+      this.element = element;
+      this.container = anchor.wrapperId ? element.closest(`[id="${anchor.wrapperId}"]`) : element;
+      this.anchor = anchor;
+      this.type = "plain-text";
+      this.editing = false;
+      const computed = getComputedStyle(this.container);
+      this.inline = computed.display === "inline";
+      this.inlineBase = { x: Number.parseFloat(computed.left) || 0, y: Number.parseFloat(computed.top) || 0 };
+      const terms = computed.translate.split(/\s+/);
+      const coordinate = (value, size) => value?.endsWith("%") ? (Number.parseFloat(value) || 0) * size / 100 : Number.parseFloat(value) || 0;
+      this.state = {
+        x: coordinate(terms[0], element.offsetWidth),
+        y: coordinate(terms[1], element.offsetHeight),
+        edited: false,
+        order: 0
+      };
+      const previous = [...editableRegistry.values()].filter((editable) => editable.type === "plain-text" && editable.element.isConnected && editable.anchor.key === anchor.key).sort((a, b) => b.state.order - a.state.order)[0];
+      if (previous) {
+        this.state = { ...previous.state };
+        this.applyPosition();
+        if (this.state.edited)
+          this.element.innerHTML = cleanInnerHTML(previous.element);
+      }
+      element.dataset.editableTextId = anchor.id;
+      element.classList.add("editable-text-target");
+      this.attach();
+      select(element);
+    }
+    getState() {
+      return { ...this.state };
+    }
+    syncFromDOM() {
+    }
+    adoptLatest() {
+      const latest = [...editableRegistry.values()].filter((editable) => editable.type === "plain-text" && editable.element.isConnected && editable.anchor.key === this.anchor.key).sort((a, b) => b.state.order - a.state.order)[0];
+      if (!latest || latest.state.order <= this.state.order)
+        return;
+      this.state = { ...latest.state };
+      this.applyPosition();
+      if (this.state.edited)
+        this.element.innerHTML = cleanInnerHTML(latest.element);
+    }
+    setState(updates) {
+      Object.assign(this.state, updates);
+      this.applyPosition();
+    }
+    applyPosition() {
+      if (this.inline) {
+        this.container.style.position = "relative";
+        this.container.style.left = `${this.inlineBase.x + this.state.x}px`;
+        this.container.style.top = `${this.inlineBase.y + this.state.y}px`;
+      } else {
+        this.container.style.translate = `${this.state.x}px ${this.state.y}px`;
+      }
+    }
+    getResizeHandles() {
+      return [];
+    }
+    current() {
+      return editableRegistry.get(this.element) === this;
+    }
+    attach() {
+      let drag = null;
+      const begin = (event) => {
+        if (!this.current() || this.editing || event.button > 0 || !editorVisible())
+          return;
+        if (event.target.closest("[data-editable-text-id]") !== this.element)
+          return;
+        this.adoptLatest();
+        select(this.element);
+        const pointer = event.touches?.[0] ?? event;
+        drag = { x: pointer.clientX, y: pointer.clientY, initialX: this.state.x, initialY: this.state.y, scale: getSlideScale(), recorded: false };
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      const move = (event) => {
+        if (!drag || !this.current())
+          return;
+        const pointer = event.touches?.[0] ?? event;
+        const dx = pointer.clientX - drag.x, dy = pointer.clientY - drag.y;
+        if (!drag.recorded) {
+          if (Math.hypot(dx, dy) < 3)
+            return;
+          pushUndoState();
+          drag.recorded = true;
+        }
+        this.setState({ x: drag.initialX + dx / drag.scale, y: drag.initialY + dy / drag.scale, order: ++order });
+        event.preventDefault();
+      };
+      const end = () => {
+        drag = null;
+      };
+      this.element.addEventListener("mousedown", begin);
+      this.element.addEventListener("touchstart", begin, { passive: false });
+      document.addEventListener("mousemove", move);
+      document.addEventListener("touchmove", move, { passive: false });
+      document.addEventListener("mouseup", end);
+      document.addEventListener("touchend", end);
+      this.element.addEventListener("dblclick", (event) => {
+        if (!this.current() || !editorVisible())
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.edit();
+      });
+      this.element.addEventListener("keydown", (event) => {
+        if (!this.current() || !editorVisible())
+          return;
+        if (this.editing) {
+          event.stopPropagation();
+          if (event.key === "Escape") {
+            this.element.innerHTML = this.beforeEdit;
+            this.state.edited = this.beforeEdited;
+            this.element.blur();
+          } else if (event.key === "Enter" && this.element.tagName !== "CODE" && !event.shiftKey) {
+            event.preventDefault();
+            this.element.blur();
+          }
+          return;
+        }
+        const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+        if (!delta || event.ctrlKey || event.metaKey)
+          return;
+        this.adoptLatest();
+        event.preventDefault();
+        event.stopPropagation();
+        pushUndoState();
+        const step = event.shiftKey ? 10 : 1;
+        this.setState({ x: this.state.x + delta[0] * step, y: this.state.y + delta[1] * step, order: ++order });
+      });
+      this.element.addEventListener("blur", () => this.finishEdit());
+      this.element.addEventListener("input", () => {
+        if (!this.editing)
+          return;
+        this.state.edited = true;
+        this.state.order = ++order;
+      });
+    }
+    edit() {
+      if (this.editing)
+        return;
+      this.adoptLatest();
+      select(this.element);
+      pushUndoState({ root: this.element.closest("section") });
+      this.beforeEdit = this.element.innerHTML;
+      this.beforeEdited = this.state.edited;
+      this.editing = true;
+      this.element.contentEditable = "true";
+      this.element.classList.add("editable-text-active");
+      this.element.focus();
+      const range = document.createRange();
+      range.selectNodeContents(this.element);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    finishEdit() {
+      if (!this.editing)
+        return;
+      this.editing = false;
+      this.element.removeAttribute("contenteditable");
+      this.element.classList.remove("editable-text-active");
+      if (this.element.innerHTML !== this.beforeEdit) {
+        if (this.element.tagName === "CODE")
+          this.element.textContent = this.element.innerText;
+        this.state.edited = true;
+        this.state.order = ++order;
+      }
+      this.syncFromDOM();
+      document.dispatchEvent(new CustomEvent("editable-content-restored"));
+    }
+  };
+  function editorVisible() {
+    return document.documentElement.classList.contains("presentation-editor-visible");
+  }
+  function registerAnchor(element, anchor) {
+    if (anchors.has(element))
+      return;
+    anchors.set(element, anchor);
+    if (anchor.kind === "html") {
+      [...element.childNodes].filter((node) => node.nodeType === 3).forEach((node, index) => textRuns.set(node, index));
+    }
+  }
+  function sourceAnchors(slide) {
+    if (slideAnchors.has(slide))
+      return slideAnchors.get(slide);
+    const chunkIndex = getQmdHeadingIndex(getCurrentSlideIndex()) + 1;
+    const chunk = splitIntoSlideChunks(window._input_file || "")[chunkIndex];
+    if (!chunk)
+      return [];
+    const records = htmlTextElements(chunk);
+    const candidates = [...slide.querySelectorAll("*")].filter((element) => !element.closest(blocked) && (element.tagName === "CODE" || !element.closest("pre, code")));
+    const used = /* @__PURE__ */ new Set();
+    for (const record of records) {
+      const choices = candidates.filter((element2) => !used.has(element2) && element2.tagName.toLowerCase() === record.tagName && (!record.elementId || element2.id === record.elementId) && record.classes.every((name) => element2.classList.contains(name)) && (record.id ? element2.dataset.editableTextId === record.id : normalized(element2.textContent) === decoded(record.inner)));
+      const element = choices[0];
+      if (!element)
+        continue;
+      used.add(element);
+      registerAnchor(element, withIdentity({
+        kind: "html",
+        chunkIndex,
+        record,
+        sameIndex: records.filter((other) => sameRecord(other, record)).indexOf(record)
+      }));
+    }
+    const headings = [...chunk.matchAll(/^(#{1,6})[ \t]+(.+)$/gm)];
+    for (const match2 of headings) {
+      const title = match2[2].replace(/\s*\{[^}]*\}\s*$/, "").replace(/[*`]/g, "").trim();
+      const element = candidates.find((el) => el.tagName === `H${match2[1].length}` && normalized(el.textContent) === title);
+      if (element)
+        registerAnchor(element, withIdentity({ kind: "heading", chunkIndex, original: match2[0] }));
+    }
+    for (const match2 of chunk.matchAll(/^(`{3,}|~{3,})([^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm)) {
+      if (match2[2].includes("=html"))
+        continue;
+      const element = candidates.find((el) => el.tagName === "CODE" && !anchors.has(el) && normalized(el.textContent) === normalized(match2[3]));
+      if (element) {
+        const before = chunk.slice(0, match2.index).match(/^::: \{#(text-[\w-]+) style="translate: [^"\n]+"\}\n$/m);
+        const wrapped = before && before.index + before[0].length === match2.index && chunk.slice(match2.index + match2[0].length).startsWith("\n:::");
+        const original = wrapped ? before[0] + match2[0] + "\n:::" : match2[0];
+        registerAnchor(element, withIdentity({ kind: "code-fence", chunkIndex, original, fenceContent: match2[0], wrapperId: wrapped ? before[1] : null, fence: match2[1], language: match2[2] }));
+      }
+    }
+    const result = candidates.filter((element) => anchors.has(element));
+    slideAnchors.set(slide, result);
+    return result;
+  }
+  function candidate(element) {
+    if (!normalized(element.textContent))
+      return false;
+    if (element.tagName === "CODE")
+      return true;
+    if (element.closest("pre, code"))
+      return false;
+    const ownText = [...element.childNodes].some((node) => node.nodeType === 3 && normalized(node.nodeValue));
+    const richLabel = !element.querySelector(blockChildren);
+    return ownText || richLabel;
+  }
+  function findRecord(records, anchor) {
+    return records.find((record) => record.id === anchor.id) ?? records.filter((record) => sameRecord(record, anchor.record))[anchor.sameIndex];
+  }
+  function isolateDirectText(element, event) {
+    const anchor = anchors.get(element);
+    if (anchor.kind !== "html" || !element.querySelector(blockChildren))
+      return element;
+    const nodes = [...element.childNodes].filter((node2) => node2.nodeType === 3);
+    const range = event && document.caretRangeFromPoint?.(event.clientX, event.clientY);
+    const node = nodes.includes(range?.startContainer) ? range.startContainer : nodes.find((node2) => normalized(node2.nodeValue));
+    if (!node || !normalized(node.nodeValue))
+      return null;
+    const index = textRuns.get(node);
+    const run = anchor.record.textRuns[index];
+    if (!run || decoded(run.literal) !== normalized(node.nodeValue))
+      return null;
+    const span = document.createElement("span");
+    span.style.display = "inline-block";
+    node.replaceWith(span);
+    span.append(node);
+    registerAnchor(span, withIdentity({ ...anchor, kind: "text-run", runIndex: index }, `:run:${index}`));
+    return span;
+  }
+  function cleanInnerHTML(element) {
+    const copy = element.cloneNode(true);
+    for (const node of [copy, ...copy.querySelectorAll("*")]) {
+      node.classList.remove("editable-text-target", "editable-text-selected", "editable-text-active");
+      node.removeAttribute("contenteditable");
+      if (node.getAttribute("class") === "")
+        node.removeAttribute("class");
+    }
+    return copy.innerHTML;
+  }
+  var textClassifier = {
+    label: "Text and labels",
+    classify(slide) {
+      startEvents();
+      const valid = sourceAnchors(slide).filter((element) => candidate(element) && !editableRegistry.has(element));
+      return { valid, warn: [] };
+    },
+    activate(element, event) {
+      element = isolateDirectText(element, event);
+      if (!element)
+        return;
+      element.setAttribute("tabindex", "0");
+      const editable = new InPlaceText(element, anchors.get(element));
+      editableRegistry.set(element, editable);
+      notifySelection();
+    },
+    serialize(text) {
+      const chunks = splitIntoSlideChunks(text);
+      const selectedEdits = /* @__PURE__ */ new Map();
+      for (const [element, editable] of editableRegistry) {
+        if (editable.type !== "plain-text" || !element.isConnected)
+          continue;
+        const key = editable.anchor.key;
+        if (!selectedEdits.has(key) || selectedEdits.get(key).state.order < editable.state.order)
+          selectedEdits.set(key, editable);
+      }
+      const patches = /* @__PURE__ */ new Map();
+      const add = (chunkIndex, start, end, replacement) => {
+        if (!patches.has(chunkIndex))
+          patches.set(chunkIndex, []);
+        patches.get(chunkIndex).push({ start, end, replacement });
+      };
+      for (const editable of selectedEdits.values()) {
+        const { element, anchor, state } = editable;
+        const chunk = chunks[anchor.chunkIndex];
+        if (!chunk)
+          throw new Error("Cannot locate text source slide");
+        if (anchor.kind === "html" || anchor.kind === "text-run") {
+          const target = findRecord(htmlTextElements(chunk), anchor);
+          if (!target)
+            throw new Error(`Cannot locate text source: ${anchor.record.tagName}`);
+          if (anchor.kind === "text-run") {
+            const run = target.textRuns[anchor.runIndex];
+            if (!run)
+              throw new Error("Cannot locate text source run");
+            const opening = patchHtmlOpening('<span style="display: inline-block;">', { id: anchor.id, translate: { x: state.x, y: state.y } });
+            add(anchor.chunkIndex, run.start, run.end, `${opening}${state.edited ? cleanInnerHTML(element) : run.literal}</span>`);
+            continue;
+          }
+          add(
+            anchor.chunkIndex,
+            target.start,
+            target.openEnd,
+            patchHtmlOpening(target.opening, editable.inline ? { id: anchor.id, styleText: `position: relative; left: ${editable.inlineBase.x + state.x}px; top: ${editable.inlineBase.y + state.y}px;` } : { id: anchor.id, translate: { x: state.x, y: state.y } })
+          );
+          if (state.edited)
+            add(
+              anchor.chunkIndex,
+              target.openEnd,
+              target.closeStart,
+              element.tagName === "CODE" ? escapeHTML(element.innerText) : cleanInnerHTML(element)
+            );
+        } else {
+          const start = chunk.indexOf(anchor.original);
+          if (start < 0)
+            throw new Error("Cannot locate original text block");
+          if (anchor.kind === "code-fence") {
+            let content = state.edited ? `${anchor.fence}${anchor.language}
+${element.innerText.replace(/\n?$/, "\n")}${anchor.fence}` : anchor.fenceContent;
+            if (state.x || state.y || anchor.wrapperId) {
+              content = `::: {#${anchor.wrapperId || anchor.id} style="translate: ${state.x}px ${state.y}px;"}
+${content}
+:::`;
+            }
+            if (content !== anchor.original)
+              add(anchor.chunkIndex, start, start + anchor.original.length, content);
+          } else {
+            const line = anchor.original;
+            const attributes2 = line.match(/\s*\{([^}]*)\}\s*$/)?.[1] || "";
+            const oldStyle = attributes2.match(/\bstyle=(?:"([^"]*)"|'([^']*)')/);
+            const styleTag = patchHtmlOpening(`<span style="${(oldStyle?.[1] ?? oldStyle?.[2] ?? "").replace(/"/g, "&quot;")}">`, { translate: { x: state.x, y: state.y } });
+            const style = styleTag.match(/\sstyle="([^"]*)"/)[1];
+            const attrs = attributes2.replace(/\bstyle=(?:"[^"]*"|'[^']*')/, "").trim();
+            const title = state.edited ? normalized(element.textContent) : line.replace(/^#+\s+/, "").replace(/\s*\{[^}]*\}\s*$/, "");
+            const prefix = line.match(/^#+/)[0];
+            add(anchor.chunkIndex, start, start + line.length, `${prefix} ${title} {${attrs}${attrs ? " " : ""}style="${style}"}`);
+          }
+        }
+      }
+      for (const [index, edits] of patches) {
+        const outer = edits.filter((edit) => !edits.some((parent) => parent !== edit && parent.start <= edit.start && parent.end >= edit.end && (parent.start < edit.start || parent.end > edit.end)));
+        outer.sort((a, b) => b.start - a.start);
+        for (const patch of outer) {
+          chunks[index] = chunks[index].slice(0, patch.start) + patch.replacement + chunks[index].slice(patch.end);
+        }
+      }
+      return chunks.join("");
+    }
+  };
+
+  // src/svg-source.js
+  function svgOccurrences(source) {
+    let fence = null;
+    const visible2 = source.split(/(?<=\n)/).map((line) => {
+      const match2 = line.match(/^\s{0,3}(`{3,}|~{3,})([^\n]*)/);
+      if (match2) {
+        if (fence && match2[1][0] === fence.mark && match2[1].length >= fence.length && !match2[2].trim()) {
+          fence = null;
+          return line.replace(/[^\n]/g, " ");
+        }
+        if (!fence)
+          fence = { mark: match2[1][0], length: match2[1].length, html: /^\{\s*=html\s*\}$/.test(match2[2].trim()) };
+        return line.replace(/[^\n]/g, " ");
+      }
+      return fence && !fence.html ? line.replace(/[^\n]/g, " ") : line;
+    }).join("").replace(/<!--[\s\S]*?-->|<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, (text) => text.replace(/[^\n]/g, " "));
+    const tag = `<(?:svg|img)\\b(?:[^"'<>]|"[^"]*"|'[^']*')*>|<\\/svg\\s*>`;
+    const image = "!\\[[^\\]\\n]*\\]\\(([^)\\n]+)\\)(?:\\{[^}]*\\})?";
+    const tokens = new RegExp(`${tag}|${image}`, "gi");
+    const records = [];
+    let depth = 0, root2 = null;
+    for (const match2 of visible2.matchAll(tokens)) {
+      const literal = source.slice(match2.index, match2.index + match2[0].length);
+      if (/^<svg\b/i.test(literal)) {
+        if (!depth)
+          root2 = { start: match2.index, opening: literal, kind: "svg" };
+        if (!/\/\s*>$/.test(literal))
+          depth++;
+        else if (!depth)
+          records.push({ ...root2, end: match2.index + literal.length });
+      } else if (/^<\/svg/i.test(literal)) {
+        if (depth && !--depth)
+          records.push({ ...root2, end: match2.index + literal.length });
+      } else if (!depth) {
+        const src = literal.startsWith("<") ? literal.match(/\s(?:src|data-src)\s*=\s*(?:"([^"]*)"|'([^']*)')/i)?.slice(1).find((value) => value !== void 0) : match2[1];
+        if (src && /\.svg(?:[?#]|$)/i.test(src))
+          records.push({ start: match2.index, end: match2.index + literal.length, opening: literal, kind: "image", src: src.replace(/&amp;/g, "&"), markdown: literal.startsWith("!") });
+      }
+    }
+    return records.map((record, ordinal) => ({ ...record, ordinal, literal: source.slice(record.start, record.end), id: record.opening.match(/\sdata-editable-svg-id="([^"]+)"/)?.[1] }));
+  }
+  function replaceSVGSource(chunk, anchor, svg) {
+    const records = svgOccurrences(chunk);
+    const target = records.find((record) => record.id === anchor.id) ?? records[anchor.ordinal];
+    if (!target || target.id !== anchor.id && (target.kind !== anchor.kind || (anchor.kind === "image" ? target.src !== anchor.src : target.opening !== anchor.opening)))
+      throw new Error("Cannot locate diagram source; reload before editing");
+    const replacement = target.markdown ? `
+
+\`\`\`{=html}
+${svg}
+\`\`\`
+
+` : svg;
+    return chunk.slice(0, target.start) + replacement + chunk.slice(target.end);
+  }
+
+  // src/svg-geometry.js
+  var identityMatrix = () => [1, 0, 0, 1, 0, 0];
+  function multiplyMatrices(a, b) {
+    return [
+      a[0] * b[0] + a[2] * b[1],
+      a[1] * b[0] + a[3] * b[1],
+      a[0] * b[2] + a[2] * b[3],
+      a[1] * b[2] + a[3] * b[3],
+      a[0] * b[4] + a[2] * b[5] + a[4],
+      a[1] * b[4] + a[3] * b[5] + a[5]
+    ];
+  }
+  function inverseMatrix(m) {
+    const d = m[0] * m[3] - m[1] * m[2];
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-12)
+      throw new Error("Cannot edit a singular diagram transform");
+    return [m[3] / d, -m[1] / d, -m[2] / d, m[0] / d, (m[2] * m[5] - m[3] * m[4]) / d, (m[1] * m[4] - m[0] * m[5]) / d];
+  }
+  function svgStateMatrix(state) {
+    return multiplyMatrices([1, 0, 0, 1, state.x || 0, state.y || 0], state.matrix || identityMatrix());
+  }
+  function combinedSVGMatrix(parts, member, stateFor = (part) => part.state) {
+    return parts.filter((part) => part.members.includes(member)).reduce(
+      (matrix, part) => multiplyMatrices(matrix, svgStateMatrix(stateFor(part))),
+      identityMatrix()
+    );
+  }
+  function resizeSVGState(state, box, handle, dx, dy, { keepAspect = false, minSize = 1, prefixMatrix = identityMatrix() } = {}) {
+    const west = handle.includes("w"), east = handle.includes("e");
+    const north = handle.includes("n"), south = handle.includes("s");
+    let sx = box.width > 0 && (west || east) ? Math.max(minSize, box.width + (west ? -dx : dx)) / box.width : 1;
+    let sy = box.height > 0 && (north || south) ? Math.max(minSize, box.height + (north ? -dy : dy)) / box.height : 1;
+    if (keepAspect && (west || east) && (north || south) && box.width > 0 && box.height > 0) {
+      sx = sy = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
+    }
+    const ax = west ? box.x + box.width : box.x;
+    const ay = north ? box.y + box.height : box.y;
+    const resize = [sx, 0, 0, sy, ax * (1 - sx), ay * (1 - sy)];
+    const localResize = multiplyMatrices(inverseMatrix(prefixMatrix), multiplyMatrices(resize, prefixMatrix));
+    return { ...state, x: 0, y: 0, matrix: multiplyMatrices(localResize, svgStateMatrix(state)) };
+  }
+
+  // src/svg-editing.js
+  var diagrams = /* @__PURE__ */ new WeakMap();
+  var identities = /* @__PURE__ */ new Map();
+  var repaired = /* @__PURE__ */ new WeakSet();
+  var mode = false;
+  var order2 = 0;
+  var selected2 = null;
+  var controls = null;
+  var blocked2 = "defs, marker, clipPath, mask, pattern, symbol, script, style, .editable-toolbar";
+  var visible = () => document.documentElement.classList.contains("presentation-editor-visible");
+  function svgPartsEnabled() {
+    return mode;
+  }
+  function setSVGPartsEnabled(value) {
+    mode = value;
+    document.querySelector(".reveal")?.classList.toggle("editable-svg-mode", mode);
+    document.querySelector(".toolbar-diagram-parts")?.classList.toggle("active", mode);
+    updateControls();
+  }
+  function partBounds(part) {
+    if (part.frame) {
+      const b = part.data.root.viewBox.baseVal;
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    }
+    const boxes = part.members.map(bounds).filter(Boolean);
+    if (!boxes.length)
+      return null;
+    const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
+    return { x, y, width: Math.max(...boxes.map((b) => b.x + b.width)) - x, height: Math.max(...boxes.map((b) => b.y + b.height)) - y };
+  }
+  function updateControls() {
+    if (!controls)
+      return;
+    const active = selected2?.current() && visible() && (selected2.part.frame ? !mode : mode) && selected2.element.isConnected && selected2.element.closest("section")?.classList.contains("present");
+    controls.hidden = !active;
+    if (!active)
+      return;
+    const b = partBounds(selected2.part), matrix = selected2.part.data.root.getScreenCTM();
+    if (!b || !matrix) {
+      controls.hidden = true;
+      return;
+    }
+    const points = [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].map(([x, y]) => new DOMPoint(x, y).matrixTransform(matrix));
+    const left = Math.min(...points.map((p) => p.x)), top = Math.min(...points.map((p) => p.y));
+    const width = Math.max(...points.map((p) => p.x)) - left, height = Math.max(...points.map((p) => p.y)) - top;
+    Object.assign(controls.style, { left: `${left - Math.max(0, 12 - width) / 2}px`, top: `${top - Math.max(0, 12 - height) / 2}px`, width: `${Math.max(12, width)}px`, height: `${Math.max(12, height)}px` });
+  }
+  function resizeControls() {
+    if (controls)
+      return controls;
+    controls = document.createElement("div");
+    controls.className = "editable-toolbar editable-svg-controls";
+    controls.setAttribute("aria-label", "Resize selected diagram part");
+    for (const handle of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `editable-svg-resize-handle handle-${handle}`;
+      button.dataset.handle = handle;
+      button.setAttribute("aria-label", `Resize diagram ${handle}`);
+      for (const event of ["mousedown", "touchstart"])
+        button.addEventListener(event, (e) => selected2?.beginResize(e, handle), { passive: false });
+      controls.append(button);
+    }
+    document.body.append(controls);
+    window.addEventListener("resize", updateControls);
+    document.addEventListener("scroll", updateControls, true);
+    document.addEventListener("editable-content-restored", updateControls);
+    const deselect = (event) => {
+      if (event.target.closest?.("svg[data-editable-svg-id], .editable-toolbar"))
+        return;
+      selected2?.element.classList.remove("editable-svg-selected");
+      selected2 = null;
+      updateControls();
+    };
+    document.addEventListener("mousedown", deselect);
+    document.addEventListener("touchstart", deselect, { passive: true });
+    window.Reveal?.on("slidechanged", updateControls);
+    window.Reveal?.on("fragmentshown", updateControls);
+    window.Reveal?.on("fragmenthidden", updateControls);
+    return controls;
+  }
+  function transformedMember(data, member, stateFor) {
+    const parent = member.parentElement.getScreenCTM(), root2 = data.root.getScreenCTM();
+    if (!parent || !root2)
+      return null;
+    const svgMatrix = parent.inverse().multiply(root2);
+    const fromRoot = new DOMMatrix([svgMatrix.a, svgMatrix.b, svgMatrix.c, svgMatrix.d, svgMatrix.e, svgMatrix.f]);
+    const delta = new DOMMatrix(combinedSVGMatrix(data.parts, member, stateFor));
+    const m = fromRoot.multiply(delta).multiply(fromRoot.inverse());
+    return `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f}) ${data.baselines.get(member)}`.trim();
+  }
+  function partPrefixMatrix(part) {
+    return combinedSVGMatrix(part.data.parts.slice(0, part.data.parts.indexOf(part)), part.node);
+  }
+  function scopeImportedSVG(root2, identity2, baseURL) {
+    const ids = new Map([...root2.querySelectorAll("[id]")].map((node) => [node.id, `${identity2}-${node.id}`]));
+    if (root2.id)
+      ids.set(root2.id, `${identity2}-${root2.id}`);
+    for (const node of [root2, ...root2.querySelectorAll("*")]) {
+      if (node.id)
+        node.dataset.editableSvgRef = node.id;
+      for (const attr of [...node.attributes]) {
+        let value = attr.value.replace(/url\(\s*['"]?#([^)'"\s]+)['"]?\s*\)/g, (all, id) => ids.has(id) ? `url(#${ids.get(id)})` : all);
+        if (attr.name === "id")
+          value = ids.get(value) || value;
+        if (attr.name === "aria-labelledby" || attr.name === "aria-describedby")
+          value = value.split(/\s+/).map((id) => ids.get(id) || id).join(" ");
+        if (attr.localName === "href") {
+          if (value.startsWith("#"))
+            value = `#${ids.get(value.slice(1)) || value.slice(1)}`;
+          else if (!/^(?:data:|https?:|\/)/i.test(value)) {
+            const resolved = new URL(value, baseURL);
+            const directory = new URL(".", document.baseURI);
+            value = resolved.href.startsWith(directory.href) ? resolved.href.slice(directory.href.length) : resolved.href;
+          }
+        }
+        node.setAttributeNS(attr.namespaceURI, attr.name, value);
+      }
+    }
+    root2.dataset.editableSvgId = identity2;
+    for (const node of root2.querySelectorAll("[data-editable-svg-ref]"))
+      node.dataset.editableSvgName = node.id;
+    for (const style of root2.querySelectorAll("style")) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(style.textContent.replace(/url\(\s*#([^\s)]+)\s*\)/g, (all, id) => ids.has(id) ? `url(#${ids.get(id)})` : all));
+      const scope = (rules) => [...rules].map((rule) => {
+        if (rule.selectorText)
+          return `[data-editable-svg-id="${identity2}"] :is(${rule.selectorText}) {${rule.style.cssText}}`;
+        if (rule.cssRules && rule.conditionText)
+          return `${rule.cssText.slice(0, rule.cssText.indexOf("{"))}{${scope(rule.cssRules)}}`;
+        return rule.cssText;
+      }).join("\n");
+      style.textContent = scope(sheet.cssRules);
+    }
+  }
+  function initializeSVGReferences(scope = document) {
+    for (const root2 of scope.querySelectorAll("svg[data-editable-svg-id]")) {
+      if (repaired.has(root2))
+        continue;
+      const nodes = [...root2.querySelectorAll("[data-editable-svg-ref]")], prefix = `${root2.dataset.editableSvgId}-${crypto.randomUUID()}`;
+      const names = new Map(nodes.map((node) => [node.dataset.editableSvgName, `${prefix}-${node.dataset.editableSvgRef}`]));
+      for (const node of nodes) {
+        node.id = names.get(node.dataset.editableSvgName);
+        node.dataset.editableSvgName = node.id;
+      }
+      const update = (value) => value.replace(/url\(\s*['"]?#([^)'"\s]+)['"]?\s*\)/g, (all, id) => names.has(id) ? `url(#${names.get(id)})` : all);
+      for (const node of [root2, ...root2.querySelectorAll("*")]) {
+        for (const attr of [...node.attributes]) {
+          let value = update(attr.value);
+          if (attr.localName === "href" && value.startsWith("#") && names.has(value.slice(1)))
+            value = `#${names.get(value.slice(1))}`;
+          if (attr.name === "aria-labelledby" || attr.name === "aria-describedby")
+            value = value.split(/\s+/).map((id) => names.get(id) || id).join(" ");
+          if (value !== attr.value)
+            node.setAttributeNS(attr.namespaceURI, attr.name, value);
+        }
+        if (node.localName === "style")
+          node.textContent = update(node.textContent);
+      }
+      repaired.add(root2);
+    }
+  }
+  async function inlineImage(image, identity2) {
+    const src = image.getAttribute("src") || image.getAttribute("data-src");
+    const response = await fetch(src);
+    if (!response.ok)
+      throw new Error(`Cannot load diagram: ${response.status}`);
+    const xml = new DOMParser().parseFromString(await response.text(), "image/svg+xml");
+    if (xml.querySelector("parsererror") || xml.documentElement.localName !== "svg")
+      throw new Error("Invalid SVG diagram");
+    const root2 = document.importNode(xml.documentElement, true);
+    scopeImportedSVG(root2, identity2, new URL(src, document.baseURI));
+    const computed = getComputedStyle(image);
+    const originalStyle = root2.getAttribute("style") || "";
+    root2.setAttribute("class", image.className);
+    root2.classList.remove("r-stretch", "stretch");
+    root2.setAttribute("style", `${originalStyle};${image.getAttribute("style") || ""}`);
+    for (const key of ["width", "height", "display", "position", "left", "top", "marginTop", "marginRight", "marginBottom", "marginLeft", "verticalAlign", "objectFit", "transform", "transformOrigin", "gridArea", "alignSelf", "justifySelf", "flexGrow", "flexShrink", "flexBasis"])
+      root2.style[key] = computed[key];
+    root2.style.maxWidth = "none";
+    root2.style.maxHeight = "none";
+    root2.style.boxShadow = computed.boxShadow;
+    if (image.id)
+      root2.id = image.id;
+    if (image.getAttribute("alt"))
+      root2.setAttribute("aria-label", image.getAttribute("alt"));
+    for (const attribute of [...image.attributes])
+      if (attribute.name.startsWith("data-fragment"))
+        root2.setAttribute(attribute.name, attribute.value);
+    if (!root2.hasAttribute("viewBox"))
+      root2.setAttribute("viewBox", `0 0 ${parseFloat(root2.getAttribute("width")) || image.naturalWidth} ${parseFloat(root2.getAttribute("height")) || image.naturalHeight}`);
+    image.replaceWith(root2);
+    return root2;
+  }
+  function bounds(element) {
+    try {
+      if (element.localName === "svg") {
+        const m2 = element.parentElement.getScreenCTM(), inverse2 = element.ownerSVGElement.getScreenCTM().inverse();
+        const x = element.x.baseVal.value, y = element.y.baseVal.value;
+        const a = new DOMPoint(x, y).matrixTransform(m2).matrixTransform(inverse2), z = new DOMPoint(x + element.width.baseVal.value, y + element.height.baseVal.value).matrixTransform(m2).matrixTransform(inverse2);
+        return { x: a.x, y: a.y, width: z.x - a.x, height: z.y - a.y };
+      }
+      const b = element.getBBox(), m = element.getScreenCTM(), root2 = element.ownerSVGElement;
+      if (!m || !root2)
+        return null;
+      const inverse = root2.getScreenCTM()?.inverse();
+      if (!inverse)
+        return null;
+      const points = [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].map(([x, y]) => new DOMPoint(x, y).matrixTransform(m).matrixTransform(inverse));
+      return { x: Math.min(...points.map((p) => p.x)), y: Math.min(...points.map((p) => p.y)), width: Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x)), height: Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y)) };
+    } catch {
+      return null;
+    }
+  }
+  var contains2 = (a, b, pad = 2) => b.x >= a.x - pad && b.y >= a.y - pad && b.x + b.width <= a.x + a.width + pad && b.y + b.height <= a.y + a.height + pad;
+  function buildParts(root2) {
+    const primitives = [...root2.querySelectorAll("g.node, g.edge, g.cluster, [data-diagram-part], rect, path, line, polyline, polygon, circle, ellipse, text, image, svg")].filter((node) => !node.closest(blocked2) && node.ownerSVGElement === root2 && !node.parentElement.closest("g.node, g.edge, g.cluster, [data-diagram-part]"));
+    const cached = new Map(primitives.map((node) => [node, bounds(node)])), boxOf = (node) => cached.get(node);
+    const view = root2.viewBox.baseVal;
+    const page = (node) => {
+      const b = boxOf(node);
+      return node.localName === "rect" && b && b.width >= view.width * 0.95 && b.height >= view.height * 0.95;
+    };
+    const boxes = primitives.filter((node) => ["rect", "g"].includes(node.localName) && boxOf(node) && !page(node));
+    const decoration = (node) => node.localName === "rect" && getComputedStyle(node).fill === "none" && boxes.some((box) => box !== node && getComputedStyle(box).fill !== "none" && contains2(boxOf(box), boxOf(node), 0.1) && contains2(boxOf(node), boxOf(box), 0.1));
+    const labels = new Map(primitives.filter((node) => node.localName === "text").map((node) => {
+      const b = boxOf(node);
+      const choices = boxes.filter((box) => {
+        const bb = boxOf(box);
+        return b && Math.abs(b.x + b.width / 2 - (bb.x + bb.width / 2)) < 12 && b.y + b.height <= bb.y && bb.y - b.y - b.height < 35;
+      }).sort((a, b2) => boxOf(a).width * boxOf(a).height - boxOf(b2).width * boxOf(b2).height);
+      return [node, choices[0]];
+    }));
+    const heads = /* @__PURE__ */ new Set(), parts = [];
+    for (const node of primitives) {
+      if (heads.has(node) || decoration(node))
+        continue;
+      const b = boxOf(node);
+      if (!b || !b.width && !b.height)
+        continue;
+      if (node.localName === "rect" && b.width >= view.width * 0.95 && b.height >= view.height * 0.95)
+        continue;
+      if (boxes.some((box) => box !== node && contains2(boxOf(box), b) && !contains2(b, boxOf(box)) && ["text", "image", "svg"].includes(node.localName)))
+        continue;
+      const members = [node];
+      if (["rect", "g"].includes(node.localName)) {
+        for (const child of primitives) {
+          if (child === node || child.contains(node) || node.contains(child))
+            continue;
+          const cb = boxOf(child);
+          if (!cb)
+            continue;
+          const isLabel = labels.get(child) === node;
+          if (contains2(b, cb) || isLabel)
+            members.push(child);
+        }
+      }
+      const next = node.nextElementSibling;
+      if (["polyline", "line", "path"].includes(node.localName) && next && ["polygon", "path"].includes(next.localName) && !heads.has(next) && !node.hasAttribute("marker-end")) {
+        const nb = boxOf(next), fill = getComputedStyle(next).fill;
+        if (nb && fill !== "none" && nb.width < 40 && nb.height < 40 && contains2({ x: b.x - 25, y: b.y - 25, width: b.width + 50, height: b.height + 50 }, nb)) {
+          members.push(next);
+          heads.add(next);
+        }
+      }
+      parts.push({ node, members, state: { x: 0, y: 0, matrix: identityMatrix(), order: 0 } });
+    }
+    return parts;
+  }
+  function sourceIndex(slide) {
+    return Number(slide.dataset.editableSourceIndex ?? getQmdHeadingIndex(getCurrentSlideIndex()) + 1);
+  }
+  async function prepare(slide) {
+    const chunkIndex = sourceIndex(slide), chunk = splitIntoSlideChunks(window._input_file || "")[chunkIndex];
+    if (!chunk)
+      return;
+    const records = svgOccurrences(chunk);
+    const candidates = [...slide.querySelectorAll("svg, img")].filter((node) => !node.parentElement.closest("svg") && !node.closest(".editable-toolbar, .editable-arrow-container, .shape-wrapper, button, pre, code") && (node.localName === "svg" || /\.svg(?:[?#]|$)/i.test(node.getAttribute("src") || node.getAttribute("data-src") || "")));
+    const used = /* @__PURE__ */ new Set();
+    for (const record of records) {
+      const attr = (name) => record.opening.match(new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`, "i"))?.slice(1).find((value) => value !== void 0);
+      let root2 = candidates.find((node) => !used.has(node) && (record.kind === "image" ? node.localName === "img" && (node.getAttribute("src") || node.getAttribute("data-src")) === record.src || diagrams.get(node)?.anchor.ordinal === record.ordinal : node.localName === "svg" && (record.id ? node.dataset.editableSvgId === record.id : (!attr("viewBox") || node.getAttribute("viewBox") === attr("viewBox")) && (!attr("aria-label") || node.getAttribute("aria-label") === attr("aria-label")))));
+      if (!root2)
+        continue;
+      used.add(root2);
+      if (diagrams.has(root2))
+        continue;
+      const key = `${chunkIndex}:${record.ordinal}`;
+      if (!identities.has(key))
+        identities.set(key, record.id || `diagram-${crypto.randomUUID()}`);
+      const id = identities.get(key);
+      const anchor = { ...record, id, key, chunkIndex };
+      if (root2.localName === "img") {
+        if (!mode)
+          continue;
+        if (root2.closest(".editable-container"))
+          continue;
+        try {
+          root2 = await inlineImage(root2, id);
+        } catch (error) {
+          console.warn(error);
+          continue;
+        }
+      }
+      root2.dataset.editableSvgId = id;
+      initializeSVGReferences(slide);
+      const data = { root: root2, anchor, parts: buildParts(root2), baselines: /* @__PURE__ */ new Map() };
+      const translate = getComputedStyle(root2).translate.split(/\s+/);
+      const frameMatrix = root2.getScreenCTM(), slideScale = getSlideScale(), frameStyle = getComputedStyle(root2);
+      data.frame = { node: root2, members: [root2], data, key: `${key}:frame`, frame: true, state: { x: 0, y: 0, scaleX: 1, scaleY: 1, order: 0 }, base: {
+        x: parseFloat(translate[0]) || 0,
+        y: parseFloat(translate[1]) || 0,
+        width: parseFloat(frameStyle.width),
+        height: parseFloat(frameStyle.height),
+        a: frameMatrix.a / slideScale,
+        b: frameMatrix.b / slideScale,
+        c: frameMatrix.c / slideScale,
+        d: frameMatrix.d / slideScale
+      } };
+      diagrams.set(root2, data);
+      for (const [index, part] of data.parts.entries()) {
+        part.key = `${key}:${index}`;
+        part.data = data;
+        for (const member of part.members) {
+          if (!data.baselines.has(member))
+            data.baselines.set(member, member.getAttribute("transform") || "");
+        }
+      }
+      for (const [index, member] of [...data.baselines.keys()].entries()) {
+        member.dataset.editableSvgMember = String(index);
+        const choices = data.parts.filter((part) => part.members.includes(member));
+        const primary = choices.find((part) => part.node === member) ?? choices.sort((a, b) => {
+          const aa = bounds(a.node), bb = bounds(b.node);
+          return aa.width * aa.height - bb.width * bb.height;
+        })[0];
+        member.dataset.editableSvgPart = String(data.parts.indexOf(primary));
+      }
+    }
+  }
+  function cleanSVG(root2) {
+    const copy = root2.cloneNode(true);
+    for (const node of [copy, ...copy.querySelectorAll("*")]) {
+      for (const name of ["modify-mode-valid", "modify-mode-warn", "editable-svg-selected", "editable-svg-target"])
+        node.classList.remove(name);
+      for (const name of ["tabindex", "data-editable-svg-part", "data-editable-svg-member"])
+        node.removeAttribute(name);
+      if (node.classList.contains("fragment"))
+        node.classList.remove("visible", "current-fragment");
+      if (!node.getAttribute("class"))
+        node.removeAttribute("class");
+    }
+    return copy;
+  }
+  var SVGPart = class {
+    constructor(part) {
+      this.part = part;
+      this.element = part.node;
+      this.container = part.node;
+      this.type = "svg-part";
+      this.state = part.state;
+      this.adoptLatest();
+      this.element.classList.add("editable-svg-target");
+      this.element.setAttribute("tabindex", "0");
+      this.attach();
+    }
+    getState() {
+      return { ...this.state, ...this.state.matrix ? { matrix: [...this.state.matrix] } : {} };
+    }
+    syncFromDOM() {
+    }
+    getResizeHandles() {
+      return [...resizeControls().querySelectorAll("button")];
+    }
+    current() {
+      return editableRegistry.get(this.element) === this;
+    }
+    adoptLatest() {
+      const latest = [...editableRegistry.values()].filter((item) => item.type === "svg-part" && item.current() && item.part.key === this.part.key).sort((a, b) => b.state.order - a.state.order)[0];
+      if (latest && latest.state.order > this.state.order)
+        this.setState(latest.state);
+    }
+    setState(state) {
+      Object.assign(this.state, state);
+      const data = this.part.data, root2 = data.root;
+      if (this.part.frame) {
+        const base = this.part.base;
+        root2.style.translate = `${base.x + base.a * this.state.x + base.c * this.state.y}px ${base.y + base.b * this.state.x + base.d * this.state.y}px`;
+        root2.style.width = `${base.width * (this.state.scaleX || 1)}px`;
+        root2.style.height = `${base.height * (this.state.scaleY || 1)}px`;
+        const matrix = root2.getScreenCTM(), scale = getSlideScale();
+        for (const overlay of this.part.overlays || []) {
+          const p = new DOMPoint(overlay.rootX, overlay.rootY).matrixTransform(matrix);
+          overlay.node.style.translate = `${overlay.x + (p.x - overlay.screenX) / scale}px ${overlay.y + (p.y - overlay.screenY) / scale}px`;
+          overlay.node.style.width = `${overlay.width * Math.hypot(matrix.a, matrix.b) / overlay.rootScaleX}px`;
+          overlay.node.style.height = `${overlay.height * Math.hypot(matrix.c, matrix.d) / overlay.rootScaleY}px`;
+        }
+        updateControls();
+        return;
+      }
+      for (const overlay of this.part.overlays || []) {
+        const m = svgStateMatrix(this.state), p = new DOMPoint(overlay.rootX, overlay.rootY).matrixTransform(new DOMMatrix(m));
+        overlay.node.style.translate = `${overlay.x + (p.x - overlay.rootX) * overlay.scale}px ${overlay.y + (p.y - overlay.rootY) * overlay.scale}px`;
+        overlay.node.style.width = `${overlay.width * Math.hypot(m[0], m[1])}px`;
+        overlay.node.style.height = `${overlay.height * Math.hypot(m[2], m[3])}px`;
+      }
+      for (const member of this.part.members) {
+        const transform = transformedMember(data, member);
+        if (transform)
+          member.setAttribute("transform", transform);
+      }
+      updateControls();
+    }
+    select() {
+      document.querySelectorAll(".editable-svg-selected").forEach((n) => n.classList.remove("editable-svg-selected"));
+      this.element.classList.add("editable-svg-selected");
+      selected2 = this;
+      resizeControls();
+      updateControls();
+    }
+    beginResize(event, handle) {
+      if (!this.current() || !visible() || (this.part.frame ? mode : !mode) || event.button > 0)
+        return;
+      this.adoptLatest();
+      this.select();
+      const matrix = this.part.data.root.getScreenCTM()?.inverse(), box = partBounds(this.part), p = event.touches?.[0] ?? event;
+      if (!matrix || !box)
+        return;
+      this.resize = { point: new DOMPoint(p.clientX, p.clientY).matrixTransform(matrix), matrix, box, handle, state: this.getState(), prefixMatrix: partPrefixMatrix(this.part), recorded: false };
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    attach() {
+      let drag = null;
+      const begin = (event) => {
+        if (!this.current() || !visible() || (this.part.frame ? mode : !mode) || event.button > 0)
+          return;
+        this.adoptLatest();
+        this.select();
+        const p = event.touches?.[0] ?? event, base = this.part.base, scale = getSlideScale();
+        const matrix = this.part.frame ? new DOMMatrix([base.a * scale, base.b * scale, base.c * scale, base.d * scale, 0, 0]).inverse() : this.part.data.root.getScreenCTM()?.inverse();
+        if (!matrix)
+          return;
+        const point = new DOMPoint(p.clientX, p.clientY).matrixTransform(matrix);
+        drag = { point, matrix, x: this.state.x, y: this.state.y, inversePrefix: inverseMatrix(partPrefixMatrix(this.part)), recorded: false };
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      for (const member of this.part.members.filter((node) => this.part.frame || Number(node.dataset.editableSvgPart) === this.part.data.parts.indexOf(this.part))) {
+        member.addEventListener("mousedown", begin);
+        member.addEventListener("touchstart", begin, { passive: false });
+      }
+      const move = (event) => {
+        if (this.resize && this.current()) {
+          const resize = this.resize, p2 = event.touches?.[0] ?? event, point2 = new DOMPoint(p2.clientX, p2.clientY).matrixTransform(resize.matrix), dx2 = point2.x - resize.point.x, dy2 = point2.y - resize.point.y;
+          if (!resize.recorded) {
+            if (Math.hypot(dx2, dy2) < 2)
+              return;
+            pushUndoState();
+            resize.recorded = true;
+          }
+          if (this.part.frame) {
+            const next = resizeSVGState({ x: 0, y: 0 }, resize.box, resize.handle, dx2, dy2, { keepAspect: event.shiftKey, minSize: 4 }), m2 = next.matrix;
+            this.setState({ x: resize.state.x + m2[4] * resize.state.scaleX, y: resize.state.y + m2[5] * resize.state.scaleY, scaleX: resize.state.scaleX * m2[0], scaleY: resize.state.scaleY * m2[3], order: ++order2 });
+          } else
+            this.setState({ ...resizeSVGState(resize.state, resize.box, resize.handle, dx2, dy2, { keepAspect: event.shiftKey, minSize: 4, prefixMatrix: resize.prefixMatrix }), order: ++order2 });
+          event.preventDefault();
+          return;
+        }
+        if (!drag || !this.current())
+          return;
+        const p = event.touches?.[0] ?? event, point = new DOMPoint(p.clientX, p.clientY).matrixTransform(drag.matrix), dx = point.x - drag.point.x, dy = point.y - drag.point.y;
+        if (!drag.recorded) {
+          if (Math.hypot(dx, dy) < 2)
+            return;
+          pushUndoState();
+          drag.recorded = true;
+        }
+        const m = drag.inversePrefix;
+        this.setState({ x: drag.x + m[0] * dx + m[2] * dy, y: drag.y + m[1] * dx + m[3] * dy, order: ++order2 });
+        event.preventDefault();
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("touchmove", move, { passive: false });
+      const end = () => {
+        drag = null;
+        this.resize = null;
+      };
+      document.addEventListener("mouseup", end);
+      document.addEventListener("touchend", end);
+      document.addEventListener("touchcancel", end);
+      this.element.addEventListener("keydown", (event) => {
+        if (!this.current() || !visible() || (this.part.frame ? mode : !mode))
+          return;
+        const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+        if (!delta || event.ctrlKey || event.metaKey)
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.adoptLatest();
+        pushUndoState();
+        const step = event.shiftKey ? 10 : 1, m = inverseMatrix(partPrefixMatrix(this.part));
+        this.setState({ x: this.state.x + (m[0] * delta[0] + m[2] * delta[1]) * step, y: this.state.y + (m[1] * delta[0] + m[3] * delta[1]) * step, order: ++order2 });
+      });
+      this.select();
+    }
+  };
+  var svgClassifier = {
+    label: "Diagram parts",
+    prepare,
+    classify(slide) {
+      if (!mode)
+        return { valid: [...slide.querySelectorAll("svg[data-editable-svg-id]")].filter((root2) => diagrams.has(root2) && !editableRegistry.has(root2)), warn: [] };
+      return { valid: [...slide.querySelectorAll("svg[data-editable-svg-id]")].flatMap((root2) => {
+        const data = diagrams.get(root2);
+        return data ? [...data.baselines.keys()].filter((node) => !editableRegistry.has(data.parts[Number(node.dataset.editableSvgPart)]?.node)) : [];
+      }), warn: [] };
+    },
+    activate(element) {
+      const root2 = element.closest("svg[data-editable-svg-id]"), data = diagrams.get(root2), part = element === root2 ? data?.frame : data?.parts[Number(element.dataset.editableSvgPart)];
+      if (!part)
+        return;
+      if (part.frame || part.node.localName === "rect") {
+        const r = part.node.getBoundingClientRect(), scale = root2.getBoundingClientRect().width / root2.viewBox.baseVal.width / getSlideScale();
+        part.overlays = [...root2.parentElement.querySelectorAll(":scope > .emulator-story-attempt-protocol")].filter((node) => {
+          const b = node.getBoundingClientRect();
+          return b.left >= r.left && b.right <= r.right && b.top >= r.top && b.bottom <= r.bottom;
+        }).map((node) => {
+          const rect = node.getBoundingClientRect(), matrix = root2.getScreenCTM(), point = new DOMPoint(rect.left, rect.top).matrixTransform(matrix.inverse()), style = getComputedStyle(node);
+          return { node, scale, x: parseFloat(style.translate) || 0, y: parseFloat(style.translate.split(" ")[1]) || 0, rootX: point.x, rootY: point.y, width: parseFloat(style.width), height: parseFloat(style.height), screenX: rect.left, screenY: rect.top, rootScaleX: Math.hypot(matrix.a, matrix.b), rootScaleY: Math.hypot(matrix.c, matrix.d) };
+        });
+      }
+      const editable = new SVGPart(part);
+      editableRegistry.set(part.node, editable);
+      editable.select();
+    },
+    serialize(text) {
+      const chunks = splitIntoSlideChunks(text), latest = /* @__PURE__ */ new Map();
+      for (const editable of editableRegistry.values())
+        if (editable.type === "svg-part" && editable.current()) {
+          const old = latest.get(editable.part.key);
+          if (!old || old.state.order < editable.state.order)
+            latest.set(editable.part.key, editable);
+        }
+      const roots = /* @__PURE__ */ new Map();
+      for (const editable of latest.values())
+        if (editable.state.order) {
+          const key = editable.part.data.anchor.key;
+          if (!roots.has(key))
+            roots.set(key, editable.part.data);
+        }
+      for (const data of roots.values()) {
+        const copy = data.root.cloneNode(true);
+        for (const [index, member] of [...data.baselines.keys()].entries()) {
+          const target = copy.querySelector(`[data-editable-svg-member="${index}"]`);
+          const transform = transformedMember(data, member, (part) => latest.get(part.key)?.state ?? part.state);
+          if (target && transform)
+            target.setAttribute("transform", transform);
+        }
+        const anchor = data.anchor;
+        const frame = latest.get(data.frame.key);
+        if (frame) {
+          const base = frame.part.base;
+          copy.style.translate = `${base.x + base.a * frame.state.x + base.c * frame.state.y}px ${base.y + base.b * frame.state.x + base.d * frame.state.y}px`;
+          copy.style.width = `${base.width * (frame.state.scaleX || 1)}px`;
+          copy.style.height = `${base.height * (frame.state.scaleY || 1)}px`;
+        }
+        chunks[anchor.chunkIndex] = replaceSVGSource(chunks[anchor.chunkIndex], anchor, cleanSVG(copy).outerHTML);
+        for (const editable of latest.values())
+          if (editable.part.data.anchor.key === anchor.key && editable.state.order)
+            for (const overlay of editable.part.overlays || []) {
+              const record = htmlTextElements(chunks[anchor.chunkIndex]).find((record2) => record2.classes.includes("emulator-story-attempt-protocol"));
+              if (record)
+                chunks[anchor.chunkIndex] = chunks[anchor.chunkIndex].slice(0, record.start) + patchHtmlOpening(record.opening, { styleText: overlay.node.style.cssText }) + chunks[anchor.chunkIndex].slice(record.openEnd);
+            }
+      }
+      return chunks.join("");
+    }
+  };
+
+  // src/positioned-media-source.js
+  function pixelValue(value) {
+    if (!Number.isFinite(value))
+      throw new TypeError("Positioned geometry must be finite");
+    const canonical = String(value);
+    return canonical.includes(".") ? `${escapeRegex(canonical)}0*px` : `${escapeRegex(canonical)}(?:\\.0+)?px`;
+  }
+  function absoluteAttributes(left, top, width, height) {
+    const geometry = { left, top, width, height };
+    const matches = Object.entries(geometry).map(([name, value]) => `(?=(?:[^}]*\\s)?${name}=${pixelValue(value)}(?=\\s|}))`).join("");
+    return `\\{(?=(?:[^}]*\\s)?\\.absolute(?=\\s|}))${matches}[^}]*\\}`;
+  }
+  function makeAbsoluteBlockRegex(left, top, width, height) {
+    return new RegExp(absoluteAttributes(left, top, width, height), "g");
+  }
+  function makeAbsoluteImageRegex(src, left, top, width, height) {
+    return new RegExp(`\\]\\(${escapeRegex(src)}\\)${absoluteAttributes(left, top, width, height)}`, "g");
   }
 
   // src/modify-mode-positioned.js
@@ -16996,7 +18679,7 @@ ${fence}`;
     return {
       label,
       classify(slideEl) {
-        const slideIndex = Reveal.getState().indexh;
+        const slideIndex = getCurrentSlideIndex();
         const candidates = Array.from(slideEl.querySelectorAll(selector));
         const valid = [];
         const warn = [];
@@ -17024,20 +18707,26 @@ ${fence}`;
         const pos = getPosition(el);
         if (!pos)
           return;
+        const rendered = el.tagName === "IMG" ? readElementSize(el) : null;
         el.dataset.editableModified = "true";
-        el.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
-        el.dataset.editableModifiedAbsLeft = String(Math.round(pos.left));
-        el.dataset.editableModifiedAbsTop = String(Math.round(pos.top));
-        el.dataset.editableModifiedAbsWidth = String(Math.round(pos.width));
-        el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
+        el.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
+        el.dataset.editableModifiedAbsLeft = String(pos.left);
+        el.dataset.editableModifiedAbsTop = String(pos.top);
+        el.dataset.editableModifiedAbsWidth = String(pos.width);
+        el.dataset.editableModifiedAbsHeight = String(pos.height);
         if (extraDataset)
           extraDataset(el);
         el.style.left = "";
         el.style.top = "";
-        if (!el.style.width)
-          el.style.width = pos.width + "px";
-        if (!el.style.height)
-          el.style.height = pos.height + "px";
+        if (rendered?.width > 0 && rendered?.height > 0) {
+          el.style.width = rendered.width + "px";
+          el.style.height = rendered.height + "px";
+        } else {
+          if (!el.style.width)
+            el.style.width = pos.width + "px";
+          if (!el.style.height)
+            el.style.height = pos.height + "px";
+        }
         if (extraActivate)
           extraActivate(el);
         setupFn(el);
@@ -17131,6 +18820,8 @@ ${fence}`;
       return text;
     }
   };
+  ModifyModeClassifier.register(svgClassifier);
+  ModifyModeClassifier.register(textClassifier);
   function getImgSrc(img) {
     return img.getAttribute("src") || img.getAttribute("data-src") || null;
   }
@@ -17165,6 +18856,114 @@ ${fence}`;
     const src = getVideoSrc(video);
     return !!src && window._input_file.includes(src);
   }
+  function decodeMediaAttribute(value) {
+    return value.replace(/&(?:amp|quot|apos|lt|gt|#\d+|#x[\da-f]+);/gi, (entity) => {
+      const named = { "&amp;": "&", "&quot;": '"', "&apos;": "'", "&lt;": "<", "&gt;": ">" };
+      if (named[entity.toLowerCase()])
+        return named[entity.toLowerCase()];
+      const hex = /^&#x/i.test(entity);
+      return String.fromCodePoint(parseInt(entity.slice(hex ? 3 : 2, -1), hex ? 16 : 10));
+    });
+  }
+  function mediaAttribute(tag, name) {
+    const match2 = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+    return match2 ? decodeMediaAttribute(match2[1] ?? match2[2] ?? match2[3]) : null;
+  }
+  function setMediaAttribute(tag, name, value) {
+    const encoded = String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    const attribute = `${name}="${encoded}"`;
+    const regex = new RegExp(`\\s${name}\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)`, "i");
+    return regex.test(tag) ? tag.replace(regex, ` ${attribute}`) : tag.replace(/\s*\/?\s*>$/, ` ${attribute}>`);
+  }
+  function mediaOccurrences(chunk, tagName, src) {
+    const opening = `<${tagName}\\b(?:[^"'<>]|"[^"]*"|'[^']*')*>`;
+    const rawPattern = tagName === "video" ? `${opening}[\\s\\S]*?<\\/video\\s*>` : opening;
+    const pattern = new RegExp(`${rawPattern}|\\]\\(${escapeRegex(src)}\\)(?:\\{[^}]*\\})?`, "gi");
+    const matches = [];
+    for (const match2 of chunk.matchAll(pattern)) {
+      const literal = match2[0];
+      const raw = literal.startsWith("<");
+      const tag = raw ? literal.match(new RegExp(`^${opening}`, "i"))[0] : null;
+      const sourceTag = tagName === "video" && raw && !mediaAttribute(tag, "src") ? literal.match(/<source\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/i)?.[0] : null;
+      const foundSrc = raw ? mediaAttribute(tag, "src") ?? mediaAttribute(sourceTag ?? "", "src") : src;
+      if (foundSrc === src)
+        matches.push({ start: match2.index, end: match2.index + literal.length, literal, raw, tag, sourceTag });
+    }
+    return matches;
+  }
+  function serializeRawMedia(occurrence, dims, position = "relative") {
+    const styles = new Map((mediaAttribute(occurrence.tag, "style") ?? "").split(";").map((part) => {
+      const colon = part.indexOf(":");
+      return colon < 0 ? [] : [part.slice(0, colon).trim(), part.slice(colon + 1).trim()];
+    }).filter((pair) => pair.length === 2 && pair[0]));
+    for (const [key, value] of Object.entries({ position, left: dims.left, top: dims.top, width: dims.width, height: dims.height })) {
+      if (value !== void 0 && value !== null)
+        styles.set(key, typeof value === "number" ? `${Math.round(value * 10) / 10}px` : value);
+    }
+    styles.set("max-width", "none");
+    styles.set("max-height", "none");
+    if (dims.opacity !== void 0 || styles.has("opacity"))
+      styles.set("opacity", String((dims.opacity ?? 100) / 100));
+    if (dims.borderRadius !== void 0 || styles.has("border-radius"))
+      styles.set("border-radius", `${dims.borderRadius ?? 0}px`);
+    if (dims.cropTop || dims.cropRight || dims.cropBottom || dims.cropLeft) {
+      styles.set("clip-path", `inset(${dims.cropTop || 0}px ${dims.cropRight || 0}px ${dims.cropBottom || 0}px ${dims.cropLeft || 0}px)`);
+    } else if (styles.has("clip-path")) {
+      styles.set("clip-path", "none");
+    }
+    const baseTransform = (styles.get("transform") ?? "").replace(/rotate\([^)]*deg\)|scale[XY]\(-1\)/g, "").trim();
+    const transforms = [baseTransform === "none" ? "" : baseTransform];
+    if (dims.rotation)
+      transforms.push(`rotate(${dims.rotation}deg)`);
+    if (dims.flipH)
+      transforms.push("scaleX(-1)");
+    if (dims.flipV)
+      transforms.push("scaleY(-1)");
+    if (transforms.filter(Boolean).length)
+      styles.set("transform", transforms.filter(Boolean).join(" "));
+    else
+      styles.delete("transform");
+    let tag = setMediaAttribute(occurrence.tag, "style", [...styles].map(([key, value]) => `${key}: ${value}`).join("; ") + ";");
+    if (dims.src && !occurrence.sourceTag)
+      tag = setMediaAttribute(tag, "src", dims.src);
+    let result = tag + occurrence.literal.slice(occurrence.tag.length);
+    if (dims.src && occurrence.sourceTag)
+      result = result.replace(occurrence.sourceTag, setMediaAttribute(occurrence.sourceTag, "src", dims.src));
+    return result;
+  }
+  function prepareRawMediaLayout(el) {
+    const computed = window.getComputedStyle(el);
+    const { width, height } = readElementSize(el);
+    const extra = (keys2) => computed.boxSizing === "border-box" ? 0 : keys2.reduce((sum, key) => sum + (Number.parseFloat(computed[key]) || 0), 0);
+    const outerWidth = width + extra(["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"]);
+    const outerHeight = height + extra(["paddingTop", "paddingBottom", "borderTopWidth", "borderBottomWidth"]);
+    const position = computed.position === "absolute" ? "absolute" : "relative";
+    el.dataset.editableRawPosition = position;
+    const flow = {};
+    for (const key of ["display", "marginTop", "marginRight", "marginBottom", "marginLeft", "gridArea", "alignSelf", "justifySelf", "order", "flexGrow", "flexShrink", "flexBasis", "verticalAlign"]) {
+      if (computed[key])
+        flow[key] = computed[key];
+    }
+    if (flow.display === "inline")
+      flow.display = "inline-block";
+    const parent = window.getComputedStyle(el.parentElement);
+    if (parent.display === "flex" || parent.display === "inline-flex") {
+      flow.flexGrow = "0";
+      flow.flexShrink = "0";
+      flow.flexBasis = (parent.flexDirection.startsWith("column") ? outerHeight : outerWidth) + "px";
+    }
+    el._editableRawMediaLayout = {
+      position,
+      flow,
+      rotation: Number.parseFloat(el.style.transform?.match(/rotate\(([^)]+)deg\)/)?.[1]) || 0,
+      left: Number.parseFloat(computed.left) || (position === "absolute" ? el.offsetLeft : 0),
+      top: Number.parseFloat(computed.top) || (position === "absolute" ? el.offsetTop : 0),
+      width,
+      height,
+      outerWidth,
+      outerHeight
+    };
+  }
   function makeMediaClassifier({ tagName, label, getSrc, setupFn, classify, beforeSetup, cleanup }) {
     return {
       label,
@@ -17172,11 +18971,20 @@ ${fence}`;
       cleanup,
       activate(el) {
         const originalSrc = getSrc(el);
+        const slideIndex = getCurrentSlideIndex();
+        const leaf = el.closest("section");
+        const siblings = Array.from(leaf?.querySelectorAll(tagName) ?? []).filter((media) => getSrc(media) === originalSrc);
+        const occurrenceIndex = Math.max(0, siblings.indexOf(el));
+        el.dataset.editableModifiedOccurrence = String(occurrenceIndex);
+        const chunk = splitIntoSlideChunks(window._input_file ?? "")[getQmdHeadingIndex(slideIndex) + 1];
+        const occurrence = chunk && mediaOccurrences(chunk, tagName, originalSrc)[occurrenceIndex];
+        if (occurrence?.raw)
+          prepareRawMediaLayout(el);
         if (!el.getAttribute("src") && el.getAttribute("data-src")) {
           el.src = el.getAttribute("data-src");
         }
         el.dataset.editableModifiedSrc = originalSrc;
-        el.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+        el.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
         el.dataset.editableModified = "true";
         if (beforeSetup)
           beforeSetup(el);
@@ -17209,16 +19017,21 @@ ${fence}`;
           groupEls.sort(
             (a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
           );
-          const replacements = groupEls.map((el) => {
+          const occurrences = mediaOccurrences(chunks[chunkIndex], tagName, originalSrc);
+          const changesByOccurrence = /* @__PURE__ */ new Map();
+          groupEls.forEach((el, index) => {
+            const occurrenceIndex = Number.parseInt(el.dataset.editableModifiedOccurrence ?? String(index), 10);
+            const occurrence = occurrences[occurrenceIndex];
+            if (!occurrence)
+              throw new Error(`Cannot locate editable ${tagName}: ${originalSrc} occurrence ${occurrenceIndex + 1}`);
             const dims = editableRegistry.get(el).toDimensions();
-            return `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+            const replacement = occurrence.raw ? serializeRawMedia(occurrence, dims, el.dataset.editableRawPosition ?? "relative") : `](${dims.src || originalSrc})${serializeToQmd(dims)}`;
+            changesByOccurrence.set(occurrenceIndex, { ...occurrence, replacement });
           });
-          const regex = new RegExp(`\\]\\(${escapeRegex(originalSrc)}\\)(\\{[^}]*\\})?`, "g");
-          let occurrence = 0;
-          chunks[chunkIndex] = chunks[chunkIndex].replace(
-            regex,
-            (match2) => occurrence < replacements.length ? replacements[occurrence++] : match2
-          );
+          const changes = [...changesByOccurrence.values()].sort((a, b) => b.start - a.start);
+          for (const change of changes) {
+            chunks[chunkIndex] = chunks[chunkIndex].slice(0, change.start) + change.replacement + chunks[chunkIndex].slice(change.end);
+          }
         }
         return chunks.join("");
       }
@@ -17332,7 +19145,7 @@ ${fence}`;
   ModifyModeClassifier.register({
     label: "Shapes",
     classify(slideEl) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const shapes = Array.from(slideEl.querySelectorAll(".shape-wrapper"));
       const valid = [];
       for (const shape of shapes) {
@@ -17347,7 +19160,7 @@ ${fence}`;
       return { valid, warn: [] };
     },
     activate(el) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const shapeType = getShapeType(el);
       el.dataset.editableModifiedShape = shapeType || "";
       el.dataset.editableModifiedSlide = String(slideIndex);
@@ -17410,27 +19223,6 @@ ${body}`;
       return chunks.join("");
     }
   });
-  function makeAbsoluteBlockRegex(left, top, width, height) {
-    const vals = [
-      `left=${Math.round(left)}px`,
-      `top=${Math.round(top)}px`,
-      `width=${Math.round(width)}px`,
-      `height=${Math.round(height)}px`
-    ];
-    const lookaheads = vals.map((v) => `(?=[^}]*${escapeRegex(v)})`).join("");
-    return new RegExp(`\\{${lookaheads}\\.absolute[^}]*\\}`, "g");
-  }
-  function makeAbsoluteImageRegex(src, left, top, width, height) {
-    const escapedSrc = escapeRegex(src);
-    const vals = [
-      `left=${Math.round(left)}px`,
-      `top=${Math.round(top)}px`,
-      `width=${Math.round(width)}px`,
-      `height=${Math.round(height)}px`
-    ];
-    const lookaheads = vals.map((v) => `(?=[^}]*${escapeRegex(v)})`).join("");
-    return new RegExp(`\\]\\(${escapedSrc}\\)\\{${lookaheads}\\.absolute[^}]*\\}`, "g");
-  }
   function absoluteDivInQmdSource(div, slideIndex) {
     if (!window._input_file)
       return false;
@@ -17537,10 +19329,10 @@ ${body}`;
   function makeTypedFenceRewriteReplacement(_el, dims, ds) {
     return {
       regex: makeAbsoluteBlockRegex(
-        parseInt(ds.editableModifiedAbsLeft, 10),
-        parseInt(ds.editableModifiedAbsTop, 10),
-        parseInt(ds.editableModifiedAbsWidth, 10),
-        parseInt(ds.editableModifiedAbsHeight, 10)
+        parseFloat(ds.editableModifiedAbsLeft),
+        parseFloat(ds.editableModifiedAbsTop),
+        parseFloat(ds.editableModifiedAbsWidth),
+        parseFloat(ds.editableModifiedAbsHeight)
       ),
       replacement: serializeToQmd(dims)
     };
@@ -17600,10 +19392,10 @@ ${body}`;
     setupFn: setupDivWhenReady,
     getReplacement: (_el, dims, ds) => ({
       regex: makeAbsoluteBlockRegex(
-        parseInt(ds.editableModifiedAbsLeft, 10),
-        parseInt(ds.editableModifiedAbsTop, 10),
-        parseInt(ds.editableModifiedAbsWidth, 10),
-        parseInt(ds.editableModifiedAbsHeight, 10)
+        parseFloat(ds.editableModifiedAbsLeft),
+        parseFloat(ds.editableModifiedAbsTop),
+        parseFloat(ds.editableModifiedAbsWidth),
+        parseFloat(ds.editableModifiedAbsHeight)
       ),
       replacement: serializeToQmd(dims)
     })
@@ -17629,10 +19421,10 @@ ${body}`;
       return {
         regex: makeAbsoluteImageRegex(
           src,
-          parseInt(ds.editableModifiedAbsLeft, 10),
-          parseInt(ds.editableModifiedAbsTop, 10),
-          parseInt(ds.editableModifiedAbsWidth, 10),
-          parseInt(ds.editableModifiedAbsHeight, 10)
+          parseFloat(ds.editableModifiedAbsLeft),
+          parseFloat(ds.editableModifiedAbsTop),
+          parseFloat(ds.editableModifiedAbsWidth),
+          parseFloat(ds.editableModifiedAbsHeight)
         ),
         replacement: `](${src}){.absolute left=${dims.left}px top=${dims.top}px width=${dims.width}px height=${dims.height}px}`
       };
@@ -17860,7 +19652,7 @@ ${body}`;
       if (h2.classList.contains("editable-heading-active"))
         return true;
       h2.dataset.editableModifiedHeading = "true";
-      h2.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      h2.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
       h2.dataset.editableModifiedOriginalHtml = h2.innerHTML;
       h2.classList.add("editable-heading-active");
       exitModifyMode({ resetPanel: false });
@@ -18057,7 +19849,7 @@ ${body}`;
     classify(slideEl) {
       if (!window._input_file)
         return { valid: [], warn: [] };
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       const chunks = splitIntoSlideChunks(window._input_file);
       const chunk = chunks[chunkIndex];
@@ -18099,7 +19891,7 @@ ${body}`;
       return { valid, warn };
     },
     activate(div) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       div.dataset.editableModifiedFence = "true";
       div.dataset.editableModifiedSlide = String(slideIndex);
       const { left: origLeft, top: origTop } = captureSlideRelativePosition(div);
@@ -18255,7 +20047,7 @@ ${body}`;
       return { valid, warn: [] };
     },
     activate(p) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const { left: origLeft, top: origTop } = captureSlideRelativePosition(p);
       p.dataset.editableModifiedParagraph = "true";
       p.dataset.editableModifiedSlide = String(slideIndex);
@@ -18373,7 +20165,7 @@ ${body}`;
         return { valid, warn: [] };
       },
       activate(el) {
-        const slideIndex = Reveal.getState().indexh;
+        const slideIndex = getCurrentSlideIndex();
         const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
         lockNaturalDimensions(el, "block");
         el.dataset[activeAttr] = "true";
@@ -18573,7 +20365,7 @@ ${body}`;
       _arrowsWithPointerEventsCleared.clear();
       if (!window._input_file)
         return { valid: [], warn: [] };
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       const chunks = splitIntoSlideChunks(window._input_file);
       const chunk = chunks[chunkIndex];
@@ -18627,7 +20419,7 @@ ${body}`;
       } catch (e) {
         return;
       }
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const arrowData = arrowDataFromKwargs(kwargs);
       arrowData.isActive = true;
       div.dataset.editableModifiedArrowHidden = "true";
@@ -18653,6 +20445,8 @@ ${body}`;
       const chunks = splitIntoSlideChunks(text);
       const byChunk = /* @__PURE__ */ new Map();
       for (const entry of _modifiedArrows) {
+        if (!entry.arrowData.element?.isConnected)
+          continue;
         const chunkIndex = getQmdHeadingIndex(entry.slideIndex) + 1;
         if (chunkIndex >= chunks.length)
           continue;
@@ -18762,11 +20556,11 @@ ${body}`;
     }
     const idx = parseInt(el.dataset[idxAttr] ?? "-1", 10);
     if (idx >= 0 && idx < sources.length) {
-      const candidate = sources[idx];
+      const candidate2 = sources[idx];
       const expectedFirst = (el.dataset[firstLineAttr] ?? "").trim();
-      const actualFirst = (getFirstLine(candidate) ?? "").trim();
+      const actualFirst = (getFirstLine(candidate2) ?? "").trim();
       if (!expectedFirst || !actualFirst || expectedFirst === actualFirst) {
-        return candidate;
+        return candidate2;
       }
     }
     return null;
@@ -18817,7 +20611,7 @@ ${body}`;
       return { valid, warn: [] };
     },
     activate(el) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
       lockNaturalDimensions(el, "block");
       el.dataset.editableModifiedCode = "true";
@@ -18929,7 +20723,7 @@ ${body}`;
     classify(slideEl) {
       if (!window._input_file)
         return { valid: [], warn: [] };
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       const chunks = splitIntoSlideChunks(window._input_file);
       const chunk = chunks[chunkIndex];
@@ -18972,7 +20766,7 @@ ${body}`;
       return { valid, warn: [] };
     },
     activate(el) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
       lockNaturalDimensions(el, "block");
       el.dataset.editableModifiedCell = "true";
@@ -19023,7 +20817,7 @@ ${body}`;
     classify(slideEl) {
       if (!window._input_file)
         return { valid: [], warn: [] };
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       const chunks = splitIntoSlideChunks(window._input_file);
       const chunk = chunks[chunkIndex];
@@ -19103,7 +20897,7 @@ ${body}`;
       img.removeAttribute("height");
       img.dataset.editableModifiedSrc = originalSrc;
       img.dataset.editableModifiedChunkFig = "true";
-      img.dataset.editableModifiedSlide = String(Reveal.getState().indexh);
+      img.dataset.editableModifiedSlide = String(getCurrentSlideIndex());
       const caption = findChunkFigureCaption(img);
       setupImageWhenReady(img);
       if (caption) {
@@ -19281,7 +21075,7 @@ ${body}`;
     classify(slideEl) {
       if (!window._input_file)
         return { valid: [], warn: [] };
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       const chunks = splitIntoSlideChunks(window._input_file);
       const chunk = chunks[chunkIndex];
@@ -19305,7 +21099,7 @@ ${body}`;
       return { valid, warn: [] };
     },
     activate(el) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const { left: origLeft, top: origTop } = captureSlideRelativePosition(el);
       const isTable = el.tagName === "TABLE";
       lockNaturalDimensions(el);
@@ -19449,7 +21243,7 @@ ${body}`;
     classify(slideEl) {
       if (!window._input_file)
         return { valid: [], warn: [] };
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const chunkIndex = getQmdHeadingIndex(slideIndex) + 1;
       const chunks = splitIntoSlideChunks(window._input_file);
       const chunk = chunks[chunkIndex];
@@ -19473,7 +21267,7 @@ ${body}`;
       return { valid, warn: [] };
     },
     activate(el) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const inner = pickEquationRenderNode(el) ?? el;
       const { left: origLeft, top: origTop, width: naturalW, height: naturalH } = captureSlideRelativePosition(el, { rectSource: inner });
       el.style.padding = "0";
@@ -19520,12 +21314,18 @@ ${body}`;
   });
   function classifyElements() {
     const reveal = document.querySelector(".reveal");
-    const currentSlide = reveal?.querySelector(".slides section.present:not(.slide-background)") ?? reveal;
+    const currentSlide = getCurrentSlide() ?? reveal;
     const valid = [];
     const warn = [];
+    const claimed = /* @__PURE__ */ new Set();
     for (const classifier of _classifiers) {
       const result = classifier.classify(currentSlide);
-      result.valid.forEach((el) => valid.push({ el, classifier }));
+      result.valid.forEach((el) => {
+        if (claimed.has(el))
+          return;
+        claimed.add(el);
+        valid.push({ el, classifier });
+      });
       result.warn.forEach(({ el, reason }) => {
         warn.push(el);
         _warnReasons.set(el, reason);
@@ -19533,7 +21333,7 @@ ${body}`;
     }
     return { valid, warn };
   }
-  function applyClassification() {
+  async function applyClassification() {
     restoreAriaLabels();
     document.querySelectorAll(`.${VALID_CLASS}, .${WARN_CLASS}`).forEach((el) => {
       el.classList.remove(VALID_CLASS, WARN_CLASS);
@@ -19541,6 +21341,13 @@ ${body}`;
     abortController?.abort();
     abortController = new AbortController();
     const { signal } = abortController;
+    const slide = getCurrentSlide();
+    for (const classifier of _classifiers) {
+      if (classifier.prepare)
+        await classifier.prepare(slide);
+      if (signal.aborted || !_active || getCurrentSlide() !== slide)
+        return;
+    }
     const { valid, warn } = classifyElements();
     valid.forEach(({ el, classifier }) => {
       el.classList.add(VALID_CLASS);
@@ -19605,11 +21412,231 @@ ${body}`;
     }
   }
   function onValidElementClick(e, classifier) {
-    e.stopPropagation();
+    e.preventDefault();
+    e.stopImmediatePropagation();
     const el = e.currentTarget;
-    const stayActive = classifier.activate(el);
+    exitModifyMode({ resetPanel: false });
+    pushUndoState({ root: el.closest("section") });
+    const stayActive = classifier.activate(el, e);
     if (!stayActive)
       exitModifyMode();
+  }
+
+  // src/server-sync.js
+  var ServerSaveClient = class {
+    constructor({ serialize, fetcher = (...args) => fetch(...args), onStatus = () => {
+    }, delay = 650 }) {
+      this.serialize = serialize;
+      this.fetcher = fetcher;
+      this.onStatus = onStatus;
+      this.delay = delay;
+      this.enabled = false;
+      this.conflict = false;
+      this.pending = false;
+      this.dirty = false;
+      this.saving = null;
+      this.timer = null;
+      this.renderTimer = null;
+      this.lastSaved = "";
+    }
+    status(label, error = false, detail = "") {
+      this.onStatus({ label, error, detail });
+    }
+    async connect() {
+      try {
+        const response = await this.fetcher("/__presentation_editor/state", { cache: "no-store" });
+        if (response.status === 404 || response.status === 501) {
+          this.status("Save downloads QMD");
+          return null;
+        }
+        if (!response.ok)
+          throw new Error(`Server returned ${response.status}`);
+        const state = await response.json();
+        if (typeof state.content !== "string" || !state.revision || !state.token) {
+          throw new Error("Invalid editor server response");
+        }
+        this.revision = state.revision;
+        this.token = state.token;
+        this.lastSaved = state.content;
+        this.enabled = true;
+        this.status("Autosave on");
+        return state;
+      } catch (error) {
+        this.status("Server unavailable", true, error.message);
+        return null;
+      }
+    }
+    schedule() {
+      if (!this.enabled || this.conflict)
+        return;
+      this.pending = true;
+      this.dirty = true;
+      this.status("Unsaved changes");
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => this.flush(), this.delay);
+    }
+    async flush() {
+      if (!this.enabled || this.conflict)
+        return false;
+      clearTimeout(this.timer);
+      this.timer = null;
+      this.pending = true;
+      if (this.saving)
+        return this.saving;
+      this.saving = this.savePending();
+      try {
+        return await this.saving;
+      } finally {
+        this.saving = null;
+      }
+    }
+    async savePending() {
+      while (this.pending && !this.conflict) {
+        this.pending = false;
+        let content;
+        try {
+          content = this.serialize();
+          if (!content)
+            throw new Error("No slide source available");
+          if (content === this.lastSaved) {
+            this.dirty = false;
+            this.status("Saved to server");
+            continue;
+          }
+          this.status("Saving\u2026");
+          this.dirty = true;
+          const response = await this.fetcher("/__presentation_editor/save", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Presentation-Editor-Token": this.token
+            },
+            body: JSON.stringify({ revision: this.revision, content })
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            this.conflict = response.status === 409;
+            throw new Error(result.error || `Save failed (${response.status})`);
+          }
+          this.revision = result.revision;
+          this.lastSaved = content;
+          this.dirty = this.pending;
+          this.status("Saved to server");
+          this.pollRender();
+        } catch (error) {
+          this.status(this.conflict ? "Changed elsewhere: reload before editing" : "Not saved: click Save to retry", true, error.message);
+          return false;
+        }
+      }
+      return true;
+    }
+    pollRender() {
+      clearTimeout(this.renderTimer);
+      this.renderTimer = setTimeout(async () => {
+        try {
+          const response = await this.fetcher("/__presentation_editor/status", { cache: "no-store" });
+          if (!response.ok)
+            return;
+          const result = await response.json();
+          const render = result.render || result;
+          if (render.busy || render.queued) {
+            if (!this.unsaved)
+              this.status("Saved; rebuilding slides\u2026");
+            this.pollRender();
+          } else if (render.error) {
+            this.status("Saved; rebuild failed", true, render.error);
+          } else if (!this.unsaved) {
+            this.status("Saved to server");
+          }
+        } catch {
+        }
+      }, 800);
+    }
+    get unsaved() {
+      return this.dirty || this.pending || Boolean(this.saving);
+    }
+  };
+  function assignSourceIndices(source, slides) {
+    const headings = sourceSlideHeadings(source).map((heading, index) => {
+      const attributes2 = heading.title.match(/\{([^}]*)\}\s*$/)?.[1] || "";
+      return {
+        index: index + 1,
+        id: attributes2.match(/(?:^|\s)#([^\s}]+)/)?.[1],
+        title: heading.title.replace(/\s*\{[^}]*\}\s*$/, "").replace(/[*`]/g, "").replace(/\s+/g, " ").trim()
+      };
+    });
+    for (const slide of slides) {
+      const renderedIndex = slide.querySelector("h2")?.dataset?.editableSourceIndex || slide.dataset.editableSourceIndex;
+      if (/^[1-9]\d*$/.test(renderedIndex || "") && Number(renderedIndex) <= headings.length) {
+        slide.dataset.editableSourceIndex = renderedIndex;
+        continue;
+      }
+      const id = slide.dataset.editableSourceId || slide.id;
+      const title = slide.querySelector("h2")?.textContent.replace(/\s+/g, " ").trim();
+      const matches = headings.filter((heading) => heading.id === id);
+      const candidates = matches.length ? matches : headings.filter((heading) => heading.title === title);
+      if (candidates.length === 1)
+        slide.dataset.editableSourceIndex = String(candidates[0].index);
+    }
+  }
+  var client = null;
+  var currentStatus = { label: "Connecting\u2026", error: false, detail: "" };
+  function renderStatus(status = currentStatus) {
+    currentStatus = status;
+    const toolbar = document.querySelector(".editable-toolbar-left");
+    if (!toolbar)
+      return;
+    let label = toolbar.querySelector(".presentation-save-status");
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "presentation-save-status";
+      label.setAttribute("role", "status");
+      label.setAttribute("aria-live", "polite");
+      toolbar.append(label);
+    }
+    label.textContent = status.label;
+    label.title = status.detail;
+    label.classList.toggle("save-error", status.error);
+  }
+  async function initializeServerSaving(serialize) {
+    assignSourceIndices(window._input_file || "", document.querySelectorAll(".slides section:not(.stack)"));
+    if (location.protocol !== "http:" && location.protocol !== "https:") {
+      currentStatus = { label: "Save downloads QMD", error: false, detail: "" };
+      return;
+    }
+    client = new ServerSaveClient({ serialize, onStatus: renderStatus });
+    const state = await client.connect();
+    if (state) {
+      if (window._presentation_rendered_revision && window._presentation_rendered_revision !== state.revision) {
+        client.conflict = true;
+        client.status("Source changed: reload after rebuilding", true);
+        return;
+      }
+      window._input_file = state.content;
+    }
+    assignSourceIndices(window._input_file || "", document.querySelectorAll(".slides section:not(.stack)"));
+  }
+  function startServerSavingEvents() {
+    renderStatus();
+    if (!client?.enabled)
+      return;
+    const queue = () => {
+      if (!document.documentElement.classList.contains("presentation-editor-visible"))
+        return;
+      requestAnimationFrame(() => client.schedule());
+    };
+    for (const name of ["mouseup", "touchend", "input", "change", "keyup", "focusout", "click", "editable-content-restored"]) {
+      document.addEventListener(name, queue, true);
+    }
+    window.addEventListener("beforeunload", (event) => {
+      if (!client.unsaved)
+        return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+  }
+  function saveToServer() {
+    return client?.enabled ? client.flush() : null;
   }
 
   // src/io.js
@@ -19636,9 +21663,9 @@ ${body}`;
     content = insertNewShapes(content);
     const dimensions = extractEditableEltDimensions();
     content = updateTextDivs(content);
-    const attributes = formatEditableEltStrings(dimensions);
+    const attributes2 = formatEditableEltStrings(dimensions);
     const srcReplacements = dimensions.map((d) => d.src || null);
-    content = replaceEditableOccurrences(content, attributes, srcReplacements);
+    content = replaceEditableOccurrences(content, attributes2, srcReplacements);
     content = applyModifiedSerializers(content, ModifyModeClassifier);
     return content;
   }
@@ -19669,8 +21696,13 @@ ${body}`;
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
-  function saveMovedElts() {
+  async function saveMovedElts() {
     try {
+      const serverSave = saveToServer();
+      if (serverSave !== null) {
+        await serverSave;
+        return;
+      }
       const content = getTransformedQmd();
       if (content)
         downloadString(content);
@@ -19736,10 +21768,37 @@ ${body}`;
   }
 
   // src/main.js
+  ToolbarRegistry.register("undo", {
+    icon: "\u21B6",
+    label: "Undo",
+    title: "Undo last change (Ctrl/Cmd+Z)",
+    className: "toolbar-undo",
+    zone: "left",
+    stacked: false,
+    onClick: () => undo()
+  });
+  ToolbarRegistry.register("redo", {
+    icon: "\u21B7",
+    label: "Redo",
+    title: "Redo last change (Ctrl/Cmd+Shift+Z or Ctrl+Y)",
+    className: "toolbar-redo",
+    zone: "left",
+    stacked: false,
+    onClick: () => redo()
+  });
+  ToolbarRegistry.register("edit-text", {
+    icon: "T",
+    label: "Edit text",
+    title: "Edit selected text (or double-click it)",
+    className: "toolbar-edit-text",
+    zone: "left",
+    stacked: false,
+    onClick: () => editSelectedText()
+  });
   ToolbarRegistry.register("save", {
     icon: "\u{1F4BE}",
     label: "Save",
-    title: "Save edits to file",
+    title: "Save edits to the server",
     className: "toolbar-save",
     zone: "left",
     onClick: () => saveMovedElts()
@@ -19770,17 +21829,32 @@ ${body}`;
   ToolbarRegistry.register("modify", {
     icon: "\u270F\uFE0F",
     label: "Modify",
-    title: "Click an image to make it editable",
+    title: "Click text, labels or media to make them editable",
     className: "toolbar-modify",
     zone: "left",
     stacked: false,
     onClick: () => toggleModifyMode()
+  });
+  ToolbarRegistry.register("diagram-parts", {
+    icon: "\u25C7",
+    label: "Diagram parts",
+    title: "Move boxes, their contents, and arrows inside vector figures",
+    className: "toolbar-diagram-parts",
+    zone: "left",
+    stacked: false,
+    onClick: () => {
+      setSVGPartsEnabled(!svgPartsEnabled());
+      exitModifyMode();
+      enterModifyMode();
+    }
   });
   window.Revealeditable = function() {
     return {
       id: "Revealeditable",
       init: function(deck) {
         deck.on("ready", async function() {
+          await initializeServerSaving(getTransformedQmd);
+          initializeSVGReferences();
           initArrows();
           const editableElements = getEditableElements();
           const editableDivs = Array.from(editableElements).filter(
@@ -19796,7 +21870,30 @@ ${body}`;
           });
           addSaveMenuButton();
           createFloatingToolbar();
+          const updateHistoryButtons = () => {
+            for (const [name, available] of [["undo", canUndo()], ["redo", canRedo()]]) {
+              const button = document.querySelector(`.toolbar-${name}`);
+              button.disabled = !available;
+              button.classList.toggle("toolbar-button-disabled", !available);
+            }
+          };
+          document.addEventListener("editable-history-change", updateHistoryButtons);
+          document.addEventListener("editable-content-restored", () => {
+            setActiveImage(null);
+            setActiveShape(null);
+            setActiveArrow(null);
+          });
+          updateHistoryButtons();
+          const updateTextButton = () => {
+            const button = document.querySelector(".toolbar-edit-text");
+            button.disabled = !canEditSelectedText();
+            button.classList.toggle("toolbar-button-disabled", button.disabled);
+          };
+          document.addEventListener("editable-text-selection-change", updateTextButton);
+          updateTextButton();
           setupUndoRedoKeyboard();
+          startServerSavingEvents();
+          document.dispatchEvent(new CustomEvent("presentation-editor-ready"));
           document.addEventListener("click", (e) => {
             if (!isInsideActiveEditContext(e.target)) {
               setActiveImage(null);

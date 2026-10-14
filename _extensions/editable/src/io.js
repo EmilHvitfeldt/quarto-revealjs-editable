@@ -16,6 +16,7 @@ import {
   insertNewShapes,
 } from './serialization.js';
 import { ModifyModeClassifier } from './modify-mode.js';
+import { saveToServer } from './server-sync.js';
 
 /**
  * Read the original QMD content from the injected global variable.
@@ -100,8 +101,13 @@ async function downloadString(content, mimeType = "text/plain") {
 /**
  * Save edits to a file (triggers download dialog).
  */
-export function saveMovedElts() {
+export async function saveMovedElts() {
   try {
+    const serverSave = saveToServer();
+    if (serverSave !== null) {
+      await serverSave;
+      return;
+    }
     const content = getTransformedQmd();
     if (content) downloadString(content);
   } catch (error) {

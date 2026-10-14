@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock CONFIG
 vi.mock('../config.js', () => ({
@@ -7,7 +7,28 @@ vi.mock('../config.js', () => ({
   }
 }));
 
-import { round } from '../utils.js';
+import { round, getCurrentSlideIndex, getCurrentSlide } from '../utils.js';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('source slide identity', () => {
+  it('uses the expanded-source index of a vertical or cloned leaf slide', () => {
+    const leaf = { dataset: { editableSourceIndex: '47' }, querySelector: () => null };
+    vi.stubGlobal('Reveal', { getCurrentSlide: () => leaf, getIndices: () => ({ h: 8, v: 3 }) });
+    expect(getCurrentSlideIndex()).toBe(47);
+    expect(getCurrentSlide()).toBe(leaf);
+  });
+
+  it('preserves standard Reveal indexing without source metadata', () => {
+    vi.stubGlobal('Reveal', { getCurrentSlide: () => ({ dataset: {} }), getIndices: () => ({ h: 8, v: 3 }) });
+    expect(getCurrentSlideIndex()).toBe(8);
+  });
+
+  it('does not accept malformed source metadata as a slide index', () => {
+    vi.stubGlobal('Reveal', { getCurrentSlide: () => ({ dataset: { editableSourceIndex: 'broken' } }), getIndices: () => ({ h: 8 }) });
+    expect(getCurrentSlideIndex()).toBe(8);
+  });
+});
 
 describe('round', () => {
   it('rounds to 1 decimal place', () => {

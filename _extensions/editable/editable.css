@@ -49,13 +49,14 @@
 .editable-container {
   position: absolute;
   display: inline-block;
-  border: var(--editable-border-width) solid transparent;
+  border: 0;
+  outline: var(--editable-border-width) solid transparent;
   transform-origin: center center;
 }
 
 .editable-container:hover,
 .editable-container.active {
-  border-color: var(--editable-accent-color);
+  outline-color: var(--editable-accent-color);
 }
 
 /* Resize handles */
@@ -320,7 +321,9 @@
 
 /* Disabled toolbar button (e.g. Modify placeholder) */
 .editable-toolbar-button.toolbar-button-disabled {
-  opacity: 0.4;
+  opacity: 1;
+  color: #475569;
+  background-color: #e2e8f0;
   cursor: not-allowed;
 }
 
@@ -363,6 +366,32 @@
 }
 
 /* Toolbar button colors */
+.editable-toolbar-button.toolbar-undo,
+.editable-toolbar-button.toolbar-redo,
+.editable-toolbar-button.toolbar-edit-text,
+.editable-toolbar-button.presentation-editor-hide {
+  color: #fff;
+  background-color: #334155;
+}
+
+.editable-toolbar-button.toolbar-button-disabled {
+  color: #475569;
+  background-color: #e2e8f0;
+}
+
+html.presentation-editor-visible .editable-text-target {
+  cursor: move;
+}
+html.presentation-editor-visible .editable-text-selected {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+html.presentation-editor-visible .editable-text-active {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .editable-toolbar-button.toolbar-save {
   background-color: var(--editable-toolbar-save-color);
 }
@@ -1908,3 +1937,60 @@ button.arrow-toolbar-smooth.active {
     transition: none !important;
   }
 }
+.editable-svg-mode svg [data-editable-svg-part] {
+  pointer-events: all;
+  cursor: move;
+}
+.editable-svg-mode svg .modify-mode-valid {
+  outline: 2px dashed #15803d;
+  outline-offset: 3px;
+}
+svg .editable-svg-selected {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 3px;
+}
+/* Screen-space controls remain usable at any diagram or Reveal zoom level. */
+.editable-toolbar.editable-svg-controls {
+  position: fixed;
+  display: none;
+  z-index: 10010;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  bottom: auto;
+  right: auto;
+  transform: none;
+  border: 2px solid #1d4ed8;
+  border-radius: 0;
+  box-sizing: border-box;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+html.presentation-editor-visible .editable-svg-controls:not([hidden]) { display: block; }
+.editable-svg-resize-handle {
+  position: absolute;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: -6px 0 0 -6px;
+  border: 2px solid white;
+  border-radius: 1px;
+  background: #1d4ed8;
+  box-shadow: 0 0 0 1px #1d4ed8;
+  pointer-events: auto;
+  touch-action: none;
+}
+.editable-svg-resize-handle.handle-nw { left: 0; top: 0; cursor: nwse-resize; }
+.editable-svg-resize-handle.handle-n { left: 50%; top: 0; cursor: ns-resize; }
+.editable-svg-resize-handle.handle-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.editable-svg-resize-handle.handle-e { left: 100%; top: 50%; cursor: ew-resize; }
+.editable-svg-resize-handle.handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.editable-svg-resize-handle.handle-s { left: 50%; top: 100%; cursor: ns-resize; }
+.editable-svg-resize-handle.handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.editable-svg-resize-handle.handle-w { left: 0; top: 50%; cursor: ew-resize; }

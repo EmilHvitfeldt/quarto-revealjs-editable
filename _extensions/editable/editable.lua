@@ -3,6 +3,41 @@ local function b64encode(data)
   return quarto.base64.encode(data)
 end
 
+-- The marker travels with the rendered heading even if project scripts reorder
+-- or clone slides. It identifies the corresponding heading in expanded QMD.
+local slide_source_index = 0
+
+function Header(el)
+  if el.level == 2 then
+    slide_source_index = slide_source_index + 1
+    el.attributes["data-editable-source-index"] = tostring(slide_source_index)
+  end
+  return el
+end
+
+-- The editor indexes the rendered slide sequence, which includes QMD partials.
+-- Embed that same expanded source for offline editing. The write-enabled server
+-- replaces it with a boundary-marked bundle to save back to the original files.
+local function read_expanded_source(filename, active)
+  active = active or {}
+  if active[filename] then error("Recursive editable source include: " .. filename) end
+  active[filename] = true
+  local file = assert(io.open(filename, "r"))
+  local source = file:read("a")
+  file:close()
+  local directory = filename:match("(.*/)") or "./"
+  local expanded = source:gsub("([^\n]*\n?)", function(line)
+    local include = line:match("^%s*{{<%s+include%s+(.+)%s+>}}%s*$")
+    if not include then return line end
+    include = include:gsub("%s+$", ""):gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
+    local content = read_expanded_source(directory .. include, active)
+    if line:sub(-1) == "\n" and content:sub(-1) ~= "\n" then content = content .. "\n" end
+    return content
+  end)
+  active[filename] = nil
+  return expanded
+end
+
 -- Check if a Pandoc element has the class "editable"
 local function has_editable_class(el)
   if el.attr and el.attr.classes then
@@ -114,9 +149,7 @@ function Pandoc(doc)
 
   -- Encode qmd source as base64 and inject into <head>
   local filename = quarto.doc.input_file
-  local f = assert(io.open(filename, "r"))
-  local text = f:read("a")
-  f:close()
+  local text = read_expanded_source(filename)
   local encoded = b64encode(text)
 
   -- Escape backslashes and single quotes in filename for safe JS string

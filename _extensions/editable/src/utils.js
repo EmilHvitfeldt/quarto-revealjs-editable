@@ -141,6 +141,10 @@ export function getRawClient(e) {
  */
 export function getCurrentSlideIndex() {
   if (typeof Reveal === 'undefined') return 0;
+  const sourceIndex = Reveal.getCurrentSlide?.()?.dataset?.editableSourceIndex;
+  if (sourceIndex !== undefined && /^\d+$/.test(sourceIndex)) {
+    return Number(sourceIndex);
+  }
   const indices = Reveal.getIndices();
   return indices.h;
 }
@@ -150,6 +154,10 @@ export function getCurrentSlideIndex() {
  * @returns {HTMLElement|null} The current slide section element
  */
 export function getCurrentSlide() {
+  if (typeof Reveal !== 'undefined' && Reveal.getCurrentSlide) {
+    const current = Reveal.getCurrentSlide();
+    if (current && !current.querySelector('section')) return current;
+  }
   // Prefer a leaf .present section (not a stack wrapper which contains child sections)
   const nonStack = document.querySelector("section.present:not(.stack)");
   if (nonStack) return nonStack;

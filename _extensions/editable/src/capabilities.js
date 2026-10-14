@@ -54,17 +54,17 @@ export const Capabilities = {
         if (e.target.closest(".ql-toolbar") || e.target.closest(".quill-toolbar-container")) return;
         if (e.target.closest(".ql-picker") || e.target.classList.contains("ql-picker-item")) return;
 
-        // Capture state for undo before starting drag
-        pushUndoState();
-
+        context.dragRecorded = false;
         context.cachedScale = getSlideScale();
         context.isDragging = true;
         const coords = getClientCoordinates(e, context.cachedScale);
 
         context.dragStartX = coords.clientX;
         context.dragStartY = coords.clientY;
-        context.dragInitialX = container.offsetLeft;
-        context.dragInitialY = container.offsetTop;
+        context.editableElt.syncFromDOM();
+        const position = context.editableElt.getState();
+        context.dragInitialX = position.x;
+        context.dragInitialY = position.y;
 
         e.preventDefault();
       };
@@ -81,6 +81,13 @@ export const Capabilities = {
       const coords = getClientCoordinates(e, context.cachedScale);
       const deltaX = coords.clientX - context.dragStartX;
       const deltaY = coords.clientY - context.dragStartY;
+
+      // A click to select an element is not a move or an undoable edit.
+      if (!context.dragRecorded) {
+        if (Math.hypot(deltaX, deltaY) * context.cachedScale < 3) return;
+        pushUndoState();
+        context.dragRecorded = true;
+      }
 
       context.container.style.left = context.dragInitialX + deltaX + "px";
       context.container.style.top = context.dragInitialY + deltaY + "px";
@@ -168,9 +175,7 @@ export const Capabilities = {
       const { container, element } = context;
 
       const startResize = (e) => {
-        // Capture state for undo before starting resize
-        pushUndoState();
-
+        context.resizeRecorded = false;
         context.cachedScale = getSlideScale();
         context.isResizing = true;
         context.resizeHandle = e.target.dataset.position;
@@ -181,8 +186,10 @@ export const Capabilities = {
         context.resizeStartY = coords.clientY;
         context.resizeInitialWidth = element.offsetWidth;
         context.resizeInitialHeight = element.offsetHeight;
-        context.resizeInitialX = container.offsetLeft;
-        context.resizeInitialY = container.offsetTop;
+        context.editableElt.syncFromDOM();
+        const position = context.editableElt.getState();
+        context.resizeInitialX = position.x;
+        context.resizeInitialY = position.y;
 
         e.preventDefault();
         e.stopPropagation();
@@ -203,6 +210,12 @@ export const Capabilities = {
       const coords = getClientCoordinates(e, context.cachedScale);
       const deltaX = coords.clientX - context.resizeStartX;
       const deltaY = coords.clientY - context.resizeStartY;
+
+      if (!context.resizeRecorded) {
+        if (Math.hypot(deltaX, deltaY) * context.cachedScale < 3) return;
+        pushUndoState();
+        context.resizeRecorded = true;
+      }
 
       let newWidth = context.resizeInitialWidth;
       let newHeight = context.resizeInitialHeight;

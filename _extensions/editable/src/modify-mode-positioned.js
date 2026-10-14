@@ -19,9 +19,9 @@
  * @module modify-mode-positioned
  */
 
-import { editableRegistry } from './editable-element.js';
+import { editableRegistry, readElementSize } from './editable-element.js';
 import { splitIntoSlideChunks } from './serialization.js';
-import { getQmdHeadingIndex, escapeRegex } from './utils.js';
+import { getCurrentSlideIndex, getQmdHeadingIndex, escapeRegex } from './utils.js';
 
 /* eslint-env browser */
 /* global Reveal */
@@ -236,7 +236,7 @@ export function makePositionedClassifier(opts) {
     label,
 
     classify(slideEl) {
-      const slideIndex = Reveal.getState().indexh;
+      const slideIndex = getCurrentSlideIndex();
       const candidates = Array.from(slideEl.querySelectorAll(selector));
       const valid = [];
       const warn  = [];
@@ -258,12 +258,16 @@ export function makePositionedClassifier(opts) {
     activate(el) {
       const pos = getPosition(el);
       if (!pos) return;
+      // Preserve the visible used size before image activation removes theme
+      // max-width/max-height constraints. The authored geometry below remains
+      // the source anchor; it may be larger than the visible image.
+      const rendered = el.tagName === 'IMG' ? readElementSize(el) : null;
       el.dataset.editableModified          = 'true';
-      el.dataset.editableModifiedSlide     = String(Reveal.getState().indexh);
-      el.dataset.editableModifiedAbsLeft   = String(Math.round(pos.left));
-      el.dataset.editableModifiedAbsTop    = String(Math.round(pos.top));
-      el.dataset.editableModifiedAbsWidth  = String(Math.round(pos.width));
-      el.dataset.editableModifiedAbsHeight = String(Math.round(pos.height));
+      el.dataset.editableModifiedSlide     = String(getCurrentSlideIndex());
+      el.dataset.editableModifiedAbsLeft   = String(pos.left);
+      el.dataset.editableModifiedAbsTop    = String(pos.top);
+      el.dataset.editableModifiedAbsWidth  = String(pos.width);
+      el.dataset.editableModifiedAbsHeight = String(pos.height);
       if (extraDataset) extraDataset(el);
       // Clear left/top before setup: setupEltStyles sets position:relative,
       // and any remaining inline left/top would act as relative offsets and
@@ -276,8 +280,13 @@ export function makePositionedClassifier(opts) {
       // which is the unconstrained flow width — much wider than the source
       // `width=Xpx`. This applies to typed-inner re-activation where the
       // inner element has no width style of its own.
-      if (!el.style.width)  el.style.width  = pos.width  + 'px';
-      if (!el.style.height) el.style.height = pos.height + 'px';
+      if (rendered?.width > 0 && rendered?.height > 0) {
+        el.style.width = rendered.width + 'px';
+        el.style.height = rendered.height + 'px';
+      } else {
+        if (!el.style.width)  el.style.width  = pos.width  + 'px';
+        if (!el.style.height) el.style.height = pos.height + 'px';
+      }
       if (extraActivate) extraActivate(el);
       setupFn(el);
       waitForRegistryThenFixPosition(el, pos.left, pos.top);

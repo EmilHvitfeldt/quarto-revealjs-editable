@@ -29,6 +29,80 @@ export function registerRestoreArrowDOM(fn) {
 export function clearUndoStacks() {
   undoStack.length = 0;
   redoStack.length = 0;
+  notifyHistoryChange();
+}
+
+function notifyHistoryChange(restored = false) {
+  if (typeof document === 'undefined' || typeof CustomEvent === 'undefined') return;
+  document.dispatchEvent(new CustomEvent('editable-history-change', {
+    detail: { canUndo: canUndo(), canRedo: canRedo() },
+  }));
+  if (restored) document.dispatchEvent(new CustomEvent('editable-content-restored'));
+}
+
+/**
+ * Activation changes the DOM structure, not just editable coordinates. Keep
+ * node references so undo can unwrap an element and redo can reuse its event
+ * listeners. Only the affected slide is captured, never the entire deck.
+ */
+function captureDOM(root) {
+  const nodes = [];
+  const visit = node => {
+    const children = [...node.childNodes];
+    nodes.push({
+      node, children,
+      attributes: node !== root && node.attributes
+        ? [...node.attributes].map(attribute => [attribute.name, attribute.value]) : null,
+      text: node.nodeType === 3 ? node.nodeValue : null,
+    });
+    children.forEach(visit);
+  };
+  visit(root);
+  return { root, nodes, registry: new Map(editableRegistry) };
+}
+
+function restoreDOM(snapshot) {
+  for (const { node, children, attributes, text } of snapshot.nodes) {
+    if (attributes) {
+      // Navigation can change fragment visibility between an edit and undo.
+      const fragment = node.classList.contains('fragment');
+      const visible = node.classList.contains('visible');
+      const current = node.classList.contains('current-fragment');
+      const target = new Map(attributes);
+      for (const attribute of [...node.attributes]) {
+        if (!target.has(attribute.name)) node.removeAttribute(attribute.name);
+      }
+      for (const [name, value] of attributes) {
+        if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+      }
+      if (fragment) {
+        node.classList.toggle('visible', visible);
+        node.classList.toggle('current-fragment', current);
+      }
+    }
+    if (text !== null) node.nodeValue = text;
+    const currentChildren = [...node.childNodes];
+    if (children.length !== currentChildren.length || children.some((child, index) => child !== currentChildren[index])) {
+      node.replaceChildren(...children);
+    }
+  }
+  editableRegistry.clear();
+  for (const [element, editableElt] of snapshot.registry) editableRegistry.set(element, editableElt);
+}
+
+function captureSnapshot(root = null) {
+  return {
+    elements: captureAllState(),
+    arrows: captureArrowState(),
+    dom: root ? captureDOM(root) : null,
+  };
+}
+
+function restoreSnapshot(snapshot) {
+  if (snapshot.dom) restoreDOM(snapshot.dom);
+  restoreState(snapshot.elements);
+  restoreArrowState(snapshot.arrows);
+  notifyHistoryChange(true);
 }
 
 /**
@@ -120,11 +194,8 @@ export function restoreState(snapshots) {
  * Push current state to undo stack. Call before making changes.
  * Clears redo stack since new action invalidates redo history.
  */
-export function pushUndoState() {
-  const state = {
-    elements: captureAllState(),
-    arrows: captureArrowState(),
-  };
+export function pushUndoState({ root = null } = {}) {
+  const state = captureSnapshot(root);
   undoStack.push(state);
 
   // Limit stack size
@@ -134,6 +205,7 @@ export function pushUndoState() {
 
   // Clear redo stack on new action
   redoStack.length = 0;
+  notifyHistoryChange();
 }
 
 /**
@@ -144,16 +216,9 @@ export function undo() {
   if (undoStack.length === 0) return false;
 
   // Save current state to redo stack
-  const currentState = {
-    elements: captureAllState(),
-    arrows: captureArrowState(),
-  };
-  redoStack.push(currentState);
-
-  // Restore previous state
   const previousState = undoStack.pop();
-  restoreState(previousState.elements);
-  restoreArrowState(previousState.arrows);
+  redoStack.push(captureSnapshot(previousState.dom?.root));
+  restoreSnapshot(previousState);
 
   return true;
 }
@@ -166,16 +231,9 @@ export function redo() {
   if (redoStack.length === 0) return false;
 
   // Save current state to undo stack
-  const currentState = {
-    elements: captureAllState(),
-    arrows: captureArrowState(),
-  };
-  undoStack.push(currentState);
-
-  // Restore redo state
   const redoState = redoStack.pop();
-  restoreState(redoState.elements);
-  restoreArrowState(redoState.arrows);
+  undoStack.push(captureSnapshot(redoState.dom?.root));
+  restoreSnapshot(redoState);
 
   return true;
 }
@@ -202,11 +260,11 @@ export function canRedo() {
  */
 export function setupUndoRedoKeyboard() {
   document.addEventListener("keydown", (e) => {
+    const target = document.activeElement;
+    if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    const key = e.key.toLowerCase();
     // Check for Ctrl+Z (undo) or Cmd+Z on Mac
-    if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-      // Don't intercept if user is editing text content
-      if (document.activeElement.contentEditable === "true") return;
-
+    if ((e.ctrlKey || e.metaKey) && key === "z" && !e.shiftKey) {
       e.preventDefault();
       if (undo()) {
         debug("Undo performed");
@@ -215,10 +273,7 @@ export function setupUndoRedoKeyboard() {
     }
 
     // Check for Ctrl+Y or Ctrl+Shift+Z (redo)
-    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
-      // Don't intercept if user is editing text content
-      if (document.activeElement.contentEditable === "true") return;
-
+    if ((e.ctrlKey || e.metaKey) && (key === "y" || (key === "z" && e.shiftKey))) {
       e.preventDefault();
       if (redo()) {
         debug("Redo performed");

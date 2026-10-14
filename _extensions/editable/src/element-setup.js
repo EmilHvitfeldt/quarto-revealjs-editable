@@ -235,9 +235,36 @@ export function setupDraggableElt(elt) {
   const editableElt = new EditableElement(elt);
   editableRegistry.set(elt, editableElt);
 
+  // Resolve percentage/constrained media sizes before reparenting can change
+  // their containing block and therefore their visible dimensions.
+  if (['img', 'video'].includes(editableElt.type)) {
+    elt.style.width = editableElt.state.width + 'px';
+    elt.style.height = editableElt.state.height + 'px';
+  }
+
   const container = createEltContainer(elt);
   editableElt.container = container;
   setupEltStyles(elt);
+  if (elt._editableRawMediaLayout) {
+    const layout = elt._editableRawMediaLayout;
+    Object.assign(container.style, layout.flow);
+    container.style.position = layout.position;
+    container.style.left = layout.left + 'px';
+    container.style.top = layout.top + 'px';
+    container.style.width = (layout.outerWidth ?? layout.width) + 'px';
+    container.style.height = (layout.outerHeight ?? layout.height) + 'px';
+    if (layout.rotation) container.style.transform = `rotate(${layout.rotation}deg)`;
+    elt.style.position = 'relative';
+    elt.style.left = '0px';
+    elt.style.top = '0px';
+    elt.style.margin = '0';
+    elt.style.transform = elt.style.transform.replace(/rotate\([^)]*deg\)/g, '').trim();
+    elt.style.width = layout.width + 'px';
+    elt.style.height = layout.height + 'px';
+    elt.style.maxWidth = 'none';
+    elt.style.maxHeight = 'none';
+    editableElt.setState({ x: layout.left, y: layout.top, width: layout.width, height: layout.height, rotation: layout.rotation }, false);
+  }
 
   const context = {
     element: elt,

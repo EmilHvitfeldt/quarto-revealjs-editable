@@ -15,6 +15,17 @@ import { renderShapeSvg, isCallout, isKnownShape } from './shape-svg.js';
 /** Map quarto-shapes stroke-width class suffix → CSS stroke-width value. */
 const SHAPE_STROKE_WIDTHS = { sm: 1, md: 3, lg: 6, xl: 10 };
 
+/** CSS used sizes are untransformed pixels; percentages are not pixel sizes. */
+export function readElementSize(element) {
+  const computed = typeof window !== 'undefined' && window.getComputedStyle
+    ? window.getComputedStyle(element) : element.style;
+  const read = (key, fallback) => {
+    const value = computed[key] || '';
+    return /^\d+(?:\.\d+)?px$/.test(value) ? Number.parseFloat(value) : fallback;
+  };
+  return { width: read('width', element.offsetWidth), height: read('height', element.offsetHeight) };
+}
+
 /**
  * Read the `shape-<name>` type from a `.shape-wrapper` element's class list.
  * Ignores modifier classes (shape-sm, shape-stroke-md, shape-rotate-45, …).
@@ -56,8 +67,7 @@ export class EditableElement {
     this.syncHeight = true;
 
     // Prefer pre-set inline style (sub-pixel accurate) over offsetWidth (integer-truncated).
-    let width = element.style.width ? parseFloat(element.style.width) : element.offsetWidth;
-    let height = element.style.height ? parseFloat(element.style.height) : element.offsetHeight;
+    let { width, height } = readElementSize(element);
     if (this.type === "img" && (width === 0 || height === 0)) {
       width = element.naturalWidth || width;
       height = element.naturalHeight || height;
@@ -238,12 +248,7 @@ export class EditableElement {
       this.state.rotation = rotateMatch ? parseFloat(rotateMatch[1]) : 0;
     }
 
-    this.state.width = this.element.style.width
-      ? parseFloat(this.element.style.width)
-      : this.element.offsetWidth;
-    this.state.height = this.element.style.height
-      ? parseFloat(this.element.style.height)
-      : this.element.offsetHeight;
+    Object.assign(this.state, readElementSize(this.element));
 
     if (this.type === "div") {
       if (this.element.style.fontSize) {

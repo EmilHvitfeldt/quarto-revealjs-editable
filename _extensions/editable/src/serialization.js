@@ -8,6 +8,7 @@ import { CONFIG } from './config.js';
 import { round, getOriginalEditableElements, getOriginalEditableDivs } from './utils.js';
 import { getBrandColorOutput, normalizeColor } from './colors.js';
 import { editableRegistry } from './editable-element.js';
+import { sourceSlideHeadings } from './source-slides.js';
 import { NewElementRegistry } from './registries.js';
 import { quillInstances } from './quill.js';
 
@@ -840,27 +841,8 @@ export function formatEditableEltStrings(dimensions) {
  * @returns {string[]}
  */
 export function splitIntoSlideChunks(text) {
-  // Strip YAML front matter so its --- delimiters are not treated as boundaries
-  let preamble = '';
-  let body = text;
-  if (text.startsWith('---\n')) {
-    const closingIdx = text.indexOf('\n---\n', 4);
-    if (closingIdx !== -1) {
-      const end = closingIdx + 5; // include the closing ---\n
-      preamble = text.slice(0, end);
-      body = text.slice(end);
-    }
-  }
-
-  // Split body on ## slide headers
-  const parts = body.split(/(?=^## )/m);
-
-  // parts[0] may be pre-slide content (blank lines, etc.) or a ## slide itself
-  const firstIsSlide = parts[0].startsWith('## ');
-  const preslide = firstIsSlide ? '' : parts[0];
-  const slideChunks = firstIsSlide ? parts : parts.slice(1);
-
-  return [preamble + preslide, ...slideChunks];
+  const starts = sourceSlideHeadings(text).map(heading => heading.start);
+  return [text.slice(0, starts[0] ?? text.length), ...starts.map((start, index) => text.slice(start, starts[index + 1] ?? text.length))];
 }
 
 /**
